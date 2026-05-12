@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Workspace {
+  id         String   @id @default(cuid())
+  clerkOrgId String   @unique
+  name       String
+  slug       String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  members         Member[]
+  applications    Application[]
+  events          Event[]
+  rsvps           RSVP[]
+  tickets         Ticket[]
+  payments        Payment[]
+  waitlistEntries WaitlistEntry[]
+  auditEvents     AuditEvent[]
+}
+
+enum MemberStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WAITLISTED
+}
+
+model Member {
+  id                String       @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace    @relation(fields: [workspaceId], references: [id])
+  clerkUserId       String
+  email             String
+  firstName         String
+  lastName          String
+  phone             String?
+  status            MemberStatus @default(PENDING)
+  tags              String[]
+  energyScore       Int?
+  networkValueScore Int?
+  aiSummary         String?
+  redListed         Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  rsvps           RSVP[]
+  tickets         Ticket[]
+  waitlistEntries WaitlistEntry[]
+
+  @@unique([workspaceId, clerkUserId])
+  @@index([workspaceId])
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HOLD
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  workspaceId String
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id])
+  memberId    String?
+  email       String
+  firstName   String
+  lastName    String
+  phone        String?
+  city         String?
+  referredBy   String?
+  consentEmail Boolean           @default(false)
+  consentSms   Boolean           @default(false)
+  status       ApplicationStatus @default(PENDING)
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  aiTags      String[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  answers ApplicationAnswer[]
+
+  @@index([workspaceId])
+}
+
+model ApplicationAnswer {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  questionKey   String
+  answer        String
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+enum EventAccessMode {
+  OPEN
+  TICKETED
+  APPLY_OR_PAY
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+}
+
+model Event {
+  id               String          @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id])
+  slug             String
+  title            String
+  description      String?
+  startAt          DateTime
+  endAt            DateTime?
+  location         String?
+  capacity         Int?
+  accessMode       EventAccessMode @default(OPEN)
+  approvalRequired Boolean         @default(false)
+  plusOnesAllowed  Boolean         @default(false)
+  status           EventStatus     @default(DRAFT)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  customQuestions EventCustomQuestion[]
+  rsvps           RSVP[]
+  tickets         Ticket[]
+  waitlistEntries WaitlistEntry[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+}
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  SELECT
+  MULTISELECT
+  CHECKBOX
+  DATE
+}
+
+model EventCustomQuestion {
+  id          String    @id @default(cuid())
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id])
+  workspaceId String
+  label       String
+  fieldType   FieldType
+  options     String[]
+  required    Boolean   @default(false)
+  order       Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
+  @@index([eventId])
+}
+
+enum RSVPStatus {
+  CONFIRMED
+  DECLINED
+  WAITLISTED
+}
+
+model RSVP {
+  id          String     @id @default(cuid())
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id])
+  eventId     String
+  event       Event      @relation(fields: [eventId], references: [id])
+  memberId    String
+  member      Member     @relation(fields: [memberId], references: [id])
+  status      RSVPStatus @default(CONFIRMED)
+  checkedInAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  tickets Ticket[]
+
+  @@unique([workspaceId, eventId, memberId])
+  @@index([workspaceId])
+  @@index([eventId])
+}
+
+enum TicketStatus {
+  AUTHORIZED
+  CAPTURED
+  REFUNDED
+  CANCELLED
+}
+
+model Ticket {
+  id                    String       @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace    @relation(fields: [workspaceId], references: [id])
+  eventId               String
+  event                 Event        @relation(fields: [eventId], references: [id])
+  memberId              String
+  member                Member       @relation(fields: [memberId], references: [id])
+  rsvpId                String
+  rsvp                  RSVP         @relation(fields: [rsvpId], references: [id])
+  stripePaymentIntentId String?
+  amount                Int
+  currency              String
+  status                TicketStatus
+  walletPassId          String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  payments Payment[]
+
+  @@index([workspaceId])
+  @@index([eventId])
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  REFUNDED
+  FAILED
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace     @relation(fields: [workspaceId], references: [id])
+  ticketId              String
+  ticket                Ticket        @relation(fields: [ticketId], references: [id])
+  stripePaymentIntentId String
+  amount                Int
+  currency              String
+  status                PaymentStatus
+  capturedAt            DateTime?
+  refundedAt            DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([workspaceId])
+  @@index([ticketId])
+}
+
+model WaitlistEntry {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id])
+  memberId    String
+  member      Member    @relation(fields: [memberId], references: [id])
+  position    Int
+  promotedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, eventId, memberId])
+  @@index([workspaceId])
+  @@index([eventId])
+}
+
+model AuditEvent {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  actorId     String?
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
+  @@index([entityType, entityId])
+}
