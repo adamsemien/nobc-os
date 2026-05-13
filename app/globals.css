@@ -3,15 +3,21 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --apply-bg: #faf9f7;
-  --apply-border: #e8e3db;
+  --apply-cream: #F5EDE0;
+  --apply-crimson: #C1121F;
+  --apply-ink: #1C1008;
+  --apply-muted: #8B7B6E;
+  --apply-rule: #D4C4B4;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-apply-bg: var(--apply-bg);
-  --color-apply-border: var(--apply-border);
+  --color-apply-cream: var(--apply-cream);
+  --color-apply-crimson: var(--apply-crimson);
+  --color-apply-ink: var(--apply-ink);
+  --color-apply-muted: var(--apply-muted);
+  --color-apply-rule: var(--apply-rule);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-playfair: var(--font-playfair-display);

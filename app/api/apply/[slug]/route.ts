@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { generateObject } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { db } from '@/lib/db';
-import { ApplySchema, answerQuestions } from '@/lib/apply-questions';
+import { ApplySchema, answerQuestions } from '@/lib/apply-config';
 
 const TagSchema = z.object({ tags: z.array(z.string()) });
+
+const SUBSTANTIVE_KEYS = new Set(['workingOn', 'greatEnergy', 'learnedThisYear', 'meetPeople']);
 
 export async function POST(
   req: NextRequest,
@@ -53,6 +55,12 @@ export async function POST(
     return NextResponse.json({ status: 'already_applied' });
   }
 
+  // Split "full name" → firstName + lastName
+  const fullName = ((data.fullName as string) ?? '').trim();
+  const spaceIdx = fullName.indexOf(' ');
+  const firstName = spaceIdx >= 0 ? fullName.slice(0, spaceIdx) : fullName;
+  const lastName = spaceIdx >= 0 ? fullName.slice(spaceIdx + 1) : '';
+
   const redListed = await db.member.findFirst({
     where: { workspaceId: workspace.id, email, redListed: true },
   });
@@ -61,8 +69,8 @@ export async function POST(
       data: {
         workspaceId: workspace.id,
         email,
-        firstName: data.firstName as string,
-        lastName: data.lastName as string,
+        firstName,
+        lastName,
         phone: data.phone as string | undefined,
         city: data.city as string | undefined,
         referredBy: data.referredBy as string | undefined,
@@ -80,8 +88,8 @@ export async function POST(
       data: {
         workspaceId: workspace.id,
         email,
-        firstName: data.firstName as string,
-        lastName: data.lastName as string,
+        firstName,
+        lastName,
         phone: data.phone as string | undefined,
         city: data.city as string | undefined,
         referredBy: data.referredBy as string | undefined,
@@ -98,7 +106,7 @@ export async function POST(
           data: {
             applicationId: app.id,
             questionKey: q.key,
-            answer: (data[q.key] as string) ?? '',
+            answer: String(data[q.key] ?? ''),
           },
         }),
       ),
@@ -109,7 +117,8 @@ export async function POST(
 
   try {
     const answerContext = answerQuestions
-      .map(q => `${q.label}:\n${(data[q.key] as string) ?? ''}`)
+      .filter(q => SUBSTANTIVE_KEYS.has(q.key))
+      .map(q => `${q.label}:\n${String(data[q.key] ?? '')}`)
       .join('\n\n');
 
     const { object } = await generateObject({
@@ -117,7 +126,7 @@ export async function POST(
       schema: TagSchema,
       prompt: `Extract 3–8 short descriptive tags from this No Bad Company membership application. Cover: industry/profession, personality/vibe signals, referral source, seniority signals, and location context. Tags should be lowercase, 1–3 words each, useful for filtering applicants.
 
-Applicant: ${data.firstName} ${data.lastName}
+Applicant: ${firstName} ${lastName}
 City: ${(data.city as string) || 'not provided'}
 How they heard about us: ${(data.referredBy as string) || 'not provided'}
 
