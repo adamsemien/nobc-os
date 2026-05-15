@@ -1,6 +1,10 @@
 'use client';
 
-import type { EventAccess, FlowStep } from '@/lib/event-access-schema';
+import type {
+  EventAccess,
+  FlowStep,
+  RegistrationStyle,
+} from '@/lib/event-access-schema';
 import type { AccessQuestion } from '@/lib/registration-fields';
 import { FlowBuilder } from './FlowBuilder';
 import { FlowPreview } from './FlowPreview';
@@ -84,6 +88,11 @@ export function AccessGroupsCard({
             }
           />
         </AccessGroup>
+
+        <RegistrationStyleCard
+          value={value.registrationStyle ?? 'all_at_once'}
+          onChange={(s) => onChange({ ...value, registrationStyle: s })}
+        />
       </div>
 
       {/* Live preview */}
@@ -149,6 +158,74 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (b: boolean
         }`}
       />
     </button>
+  );
+}
+
+function RegistrationStyleCard({
+  value,
+  onChange,
+}: {
+  value: RegistrationStyle;
+  onChange: (s: RegistrationStyle) => void;
+}) {
+  const options: { key: RegistrationStyle; label: string; hint: string }[] = [
+    {
+      key: 'all_at_once',
+      label: 'Show all questions at once',
+      hint: 'One screen, single submit. Best for 1–3 questions.',
+    },
+    {
+      key: 'one_at_a_time',
+      label: 'One question at a time',
+      hint: 'Typeform-style, one per screen. Best for longer flows.',
+    },
+  ];
+  return (
+    <div className="rounded-sm border border-[var(--apply-rule)] bg-white p-5">
+      <h3 className="text-[22px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+        Registration style
+      </h3>
+      <p className="mt-0.5 text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        How questions appear in the checkout
+      </p>
+      <div className="mt-4 flex flex-col gap-2">
+        {options.map((o) => {
+          const active = value === o.key;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => onChange(o.key)}
+              className={`rounded-sm border px-3 py-2.5 text-left transition-colors ${
+                active
+                  ? 'border-[var(--nobc-red)] bg-[#FBEBE9]'
+                  : 'border-[var(--apply-rule)] bg-white hover:border-[var(--nobc-red)]'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span
+                  className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                    active
+                      ? 'border-[var(--nobc-red)]'
+                      : 'border-[var(--apply-rule)]'
+                  }`}
+                >
+                  {active && (
+                    <span className="h-2 w-2 rounded-full bg-[var(--nobc-red)]" />
+                  )}
+                </span>
+                <span className="text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+                  {o.label}
+                </span>
+              </span>
+              <span className="mt-0.5 block pl-6 text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                {o.hint}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

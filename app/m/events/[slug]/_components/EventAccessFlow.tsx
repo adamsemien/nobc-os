@@ -5,9 +5,12 @@ import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import {
   Elements,
   PaymentElement,
+  ExpressCheckoutElement,
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
+import QRCode from 'qrcode';
+import { Loader2, CalendarPlus } from 'lucide-react';
 import type { EventDetailDTO, CustomQuestionDTO } from './EventDetail';
 import { formatGateCTA } from '@/lib/event-access';
 
@@ -23,7 +26,20 @@ type Props = {
   }) => void;
 };
 
-type StepKey = 'auth' | 'guestInfo' | 'fieldsBefore' | 'pay' | 'fieldsAfter' | 'submit';
+type Screen =
+  | { kind: 'auth'; key: string }
+  | { kind: 'guestInfo'; key: string }
+  | { kind: 'fields'; key: string; questions: CustomQuestionDTO[] }
+  | { kind: 'pay'; key: string }
+  | { kind: 'submit'; key: string };
+
+type FlowResult = {
+  ticketStatus: string;
+  paid: boolean;
+  memberQrCode: string | null;
+  waitlisted: boolean;
+  position: number | null;
+};
 
 type FlowState = {
   guestName: string;
@@ -53,48 +69,65 @@ function formatPrice(cents: number): string {
   });
 }
 
-function filterQuestions(
-  questions: CustomQuestionDTO[],
-  resolved: EventDetailDTO['resolved'],
-  when: CustomQuestionDTO['whenInFlow'] | CustomQuestionDTO['whenInFlow'][],
-): CustomQuestionDTO[] {
-  const whenSet = new Set(Array.isArray(when) ? when : [when]);
-  return questions.filter((q) => {
-    if (!whenSet.has(q.whenInFlow)) return false;
-    if (resolved.kind === 'member') return q.showToMember;
-    if (resolved.kind === 'guest') return q.showToGuest;
-    return false;
-  });
+function buildScreens(event: EventDetailDTO): Screen[] {
+  const isMember = event.resolved.kind === 'member';
+  const visibleQuestions = event.customQuestions.filter((q) =>
+    isMember ? q.showToMember : q.showToGuest,
+  );
+  const style = event.eventAccess.registrationStyle ?? 'all_at_once';
+
+  const out: Screen[] = [];
+  for (const step of event.steps) {
+    if (step === 'auth') out.push({ kind: 'auth', key: 'auth' });
+    else if (step === 'guestInfo') out.push({ kind: 'guestInfo', key: 'guestInfo' });
+    else if (step === 'fieldsBefore' || step === 'fieldsAfter') {
+      if (visibleQuestions.length === 0) continue;
+      if (style === 'one_at_a_time') {
+        visibleQuestions.forEach((q) =>
+          out.push({ kind: 'fields', key: `f-${q.id}`, questions: [q] }),
+        );
+      } else {
+        out.push({ kind: 'fields', key: 'fields', questions: visibleQuestions });
+      }
+    } else if (step === 'pay') out.push({ kind: 'pay', key: 'pay' });
+    else if (step === 'submit') out.push({ kind: 'submit', key: 'submit' });
+  }
+  // Pay is terminal — drop a trailing confirm screen when payment is in the flow.
+  if (out.some((s) => s.kind === 'pay')) {
+    return out.filter((s) => s.kind !== 'submit');
+  }
+  return out;
 }
 
 export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
-  const steps = event.steps;
+  const screens = useMemo(() => buildScreens(event), [event]);
   const [stepIdx, setStepIdx] = useState(0);
-  const [state, setState] = useState<FlowState>({
-    guestName: '',
-    guestEmail: '',
-    answers: {},
-    clientSecret: null,
-    rsvpId: null,
-    amountCents: 0,
-    errorMsg: null,
-    submitting: false,
-  });
+  const [entered, setEntered] = useState(false);
+  const [result, setResult] = useState<FlowResult | null>(null);
+  const [state, setState] = useState<FlowState>(() => emptyState());
+
+  function emptyState(): FlowState {
+    return {
+      guestName: '',
+      guestEmail: '',
+      answers: {},
+      clientSecret: null,
+      rsvpId: null,
+      amountCents: 0,
+      errorMsg: null,
+      submitting: false,
+    };
+  }
 
   useEffect(() => {
-    if (!open) {
-      setStepIdx(0);
-      setState({
-        guestName: '',
-        guestEmail: '',
-        answers: {},
-        clientSecret: null,
-        rsvpId: null,
-        amountCents: 0,
-        errorMsg: null,
-        submitting: false,
-      });
+    if (open) {
+      const r = requestAnimationFrame(() => setEntered(true));
+      return () => cancelAnimationFrame(r);
     }
+    setEntered(false);
+    setStepIdx(0);
+    setResult(null);
+    setState(emptyState());
   }, [open]);
 
   useEffect(() => {
@@ -106,10 +139,12 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  const stepKey = (steps[stepIdx] ?? 'submit') as StepKey;
+  const screen = screens[stepIdx];
+  const isPayScreen = screen?.kind === 'pay';
 
+  // Prepare the PaymentIntent when the pay screen is reached.
   useEffect(() => {
-    if (!open || stepKey !== 'pay') return;
+    if (!open || !isPayScreen) return;
     if (state.clientSecret || state.submitting) return;
     void (async () => {
       setState((s) => ({ ...s, submitting: true, errorMsg: null }));
@@ -148,18 +183,23 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, stepKey]);
+  }, [open, isPayScreen]);
 
-  if (!open || steps.length === 0) return null;
+  if (!open || screens.length === 0) return null;
 
   const cta = formatGateCTA(event.resolved);
+  const lastIdx = screens.length - 1;
 
   function goNext() {
-    setStepIdx((i) => Math.min(i + 1, steps.length - 1));
+    setState((s) => ({ ...s, errorMsg: null }));
+    setStepIdx((i) => Math.min(i + 1, lastIdx));
   }
   function goBack() {
     if (stepIdx === 0) onClose();
-    else setStepIdx((i) => Math.max(0, i - 1));
+    else {
+      setState((s) => ({ ...s, errorMsg: null }));
+      setStepIdx((i) => Math.max(0, i - 1));
+    }
   }
 
   async function submitFree() {
@@ -183,10 +223,12 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
         error?: string;
       };
       if (!res.ok) throw new Error(data.error ?? 'Submission failed');
-      onComplete({
-        ticketStatus: data.ticketStatus,
-        memberQrCode: data.memberQrCode,
-        waitlisted: data.waitlisted,
+      setState((s) => ({ ...s, submitting: false }));
+      setResult({
+        ticketStatus: data.ticketStatus ?? 'confirmed',
+        paid: false,
+        memberQrCode: data.memberQrCode ?? null,
+        waitlisted: Boolean(data.waitlisted),
         position: data.position ?? null,
       });
     } catch (e) {
@@ -198,86 +240,151 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
     }
   }
 
+  function finishAndClose() {
+    if (result) {
+      onComplete({
+        ticketStatus: result.ticketStatus,
+        memberQrCode: result.memberQrCode,
+        waitlisted: result.waitlisted,
+        position: result.position,
+      });
+    } else {
+      onClose();
+    }
+  }
+
+  const showDone = result !== null;
+  const dotCount = showDone ? screens.length : screens.length;
+  const dotActive = showDone ? dotCount : stepIdx;
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Event access flow"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 sm:items-center"
+      aria-label="Event registration"
       onClick={onClose}
+      className={`fixed inset-0 z-50 flex items-end justify-center transition-colors duration-300 sm:items-center ${
+        entered ? 'bg-black/55' : 'bg-black/0'
+      }`}
     >
       <div
-        className="w-full max-w-[480px] rounded-t-[10px] bg-[#F9F7F2] shadow-[0_-2px_20px_rgba(0,0,0,0.18)] sm:rounded-[10px]"
         onClick={(e) => e.stopPropagation()}
+        className={`w-full max-w-[460px] rounded-t-[14px] bg-[#F9F7F2] shadow-[0_-2px_28px_rgba(0,0,0,0.22)] transition-all duration-300 ease-out sm:rounded-[14px] ${
+          entered
+            ? 'translate-y-0 opacity-100 sm:scale-100'
+            : 'translate-y-full opacity-0 sm:translate-y-0 sm:scale-95'
+        }`}
       >
-        <FlowHeader
-          title={event.title}
-          cta={cta}
-          steps={steps}
-          stepIdx={stepIdx}
-          onBack={goBack}
-          onClose={onClose}
-        />
-
-        <div className="px-6 pb-6 sm:px-8 sm:pb-8">
-          {stepKey === 'auth' && <AuthStep />}
-
-          {stepKey === 'guestInfo' && (
-            <GuestInfoStep
-              name={state.guestName}
-              email={state.guestEmail}
-              onChange={(name, email) =>
-                setState((s) => ({ ...s, guestName: name, guestEmail: email }))
-              }
-              onNext={() => {
-                if (!state.guestName.trim() || !state.guestEmail.trim()) {
-                  setState((s) => ({ ...s, errorMsg: 'Name and email required' }));
-                  return;
-                }
-                setState((s) => ({ ...s, errorMsg: null }));
-                goNext();
-              }}
-              error={state.errorMsg}
+        {showDone ? (
+          <DoneScreen event={event} result={result!} onClose={finishAndClose} />
+        ) : (
+          <>
+            <FlowHeader
+              title={event.title}
+              cta={cta}
+              dotCount={dotCount}
+              dotActive={dotActive}
+              atStart={stepIdx === 0}
+              onBack={goBack}
+              onClose={onClose}
             />
-          )}
+            <div className="px-6 pb-7 sm:px-8 sm:pb-8">
+              <ScreenFade screenKey={screen?.key ?? 'x'}>
+                {screen?.kind === 'auth' && <AuthStep />}
 
-          {(stepKey === 'fieldsBefore' || stepKey === 'fieldsAfter') && (
-            <FieldsStep
-              questions={filterQuestions(
-                event.customQuestions,
-                event.resolved,
-                stepKey === 'fieldsBefore'
-                  ? ['BEFORE_SUBMIT', 'BEFORE_APPROVAL']
-                  : 'AFTER_PAYMENT',
-              )}
-              answers={state.answers}
-              onChange={(answers) => setState((s) => ({ ...s, answers }))}
-              onNext={goNext}
-              error={state.errorMsg}
-            />
-          )}
+                {screen?.kind === 'guestInfo' && (
+                  <GuestInfoStep
+                    name={state.guestName}
+                    email={state.guestEmail}
+                    error={state.errorMsg}
+                    onChange={(name, email) =>
+                      setState((s) => ({ ...s, guestName: name, guestEmail: email }))
+                    }
+                    onNext={() => {
+                      if (!state.guestName.trim() || !state.guestEmail.trim()) {
+                        setState((s) => ({
+                          ...s,
+                          errorMsg: 'Please add your name and email.',
+                        }));
+                        return;
+                      }
+                      goNext();
+                    }}
+                  />
+                )}
 
-          {stepKey === 'pay' && (
-            <PayStep
-              clientSecret={state.clientSecret}
-              amountCents={state.amountCents}
-              error={state.errorMsg}
-              onSuccess={() => {
-                onComplete({ ticketStatus: 'confirmed', memberQrCode: null });
-              }}
-            />
-          )}
+                {screen?.kind === 'fields' && (
+                  <FieldsStep
+                    questions={screen.questions}
+                    answers={state.answers}
+                    error={state.errorMsg}
+                    single={screen.questions.length === 1}
+                    isLast={stepIdx === lastIdx}
+                    submitting={state.submitting}
+                    onChange={(answers) => setState((s) => ({ ...s, answers }))}
+                    onNext={() => {
+                      if (stepIdx === lastIdx) void submitFree();
+                      else goNext();
+                    }}
+                  />
+                )}
 
-          {stepKey === 'submit' && (
-            <SubmitStep
-              ctaLabel={cta}
-              submitting={state.submitting}
-              error={state.errorMsg}
-              onSubmit={submitFree}
-            />
-          )}
-        </div>
+                {screen?.kind === 'pay' && (
+                  <PayStep
+                    clientSecret={state.clientSecret}
+                    amountCents={state.amountCents}
+                    error={state.errorMsg}
+                    onSuccess={() =>
+                      setResult({
+                        ticketStatus: 'confirmed',
+                        paid: true,
+                        memberQrCode: null,
+                        waitlisted: false,
+                        position: null,
+                      })
+                    }
+                  />
+                )}
+
+                {screen?.kind === 'submit' && (
+                  <SubmitStep
+                    ctaLabel={cta}
+                    needsApproval={event.resolved.kind !== 'closed' &&
+                      event.resolved.flow.includes('approval')}
+                    submitting={state.submitting}
+                    error={state.errorMsg}
+                    onSubmit={() => void submitFree()}
+                  />
+                )}
+              </ScreenFade>
+            </div>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function ScreenFade({
+  screenKey,
+  children,
+}: {
+  screenKey: string;
+  children: React.ReactNode;
+}) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    setShown(false);
+    const r = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(r);
+  }, [screenKey]);
+  return (
+    <div
+      className={`transition-all duration-300 ease-out ${
+        shown ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0'
+      }`}
+    >
+      {children}
     </div>
   );
 }
@@ -285,15 +392,17 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
 function FlowHeader({
   title,
   cta,
-  steps,
-  stepIdx,
+  dotCount,
+  dotActive,
+  atStart,
   onBack,
   onClose,
 }: {
   title: string;
   cta: string;
-  steps: StepKey[];
-  stepIdx: number;
+  dotCount: number;
+  dotActive: number;
+  atStart: boolean;
   onBack: () => void;
   onClose: () => void;
 }) {
@@ -305,31 +414,31 @@ function FlowHeader({
           onClick={onBack}
           className="text-[11px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
         >
-          {stepIdx === 0 ? 'Cancel' : '← Back'}
+          {atStart ? 'Cancel' : '← Back'}
         </button>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="text-[var(--apply-muted)] hover:text-[var(--nobc-red)]"
+          className="text-lg leading-none text-[var(--apply-muted)] hover:text-[var(--nobc-red)]"
         >
           ✕
         </button>
       </div>
 
-      <p className="mt-4 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      <p className="mt-4 text-[22px] leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
         {title}
       </p>
-      <h2 className="mt-1 text-[26px] leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+      <p className="mt-0.5 text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
         {cta}
-      </h2>
+      </p>
 
-      <div className="mt-4 mb-4 flex items-center gap-1.5">
-        {steps.map((_, i) => (
+      <div className="mt-4 mb-5 flex items-center gap-1.5">
+        {Array.from({ length: dotCount }).map((_, i) => (
           <span
             key={i}
             className={`h-1 flex-1 rounded-full transition-colors ${
-              i <= stepIdx ? 'bg-[var(--nobc-red)]' : 'bg-[var(--apply-rule)]'
+              i < dotActive ? 'bg-[var(--nobc-red)]' : 'bg-[var(--apply-rule)]'
             }`}
           />
         ))}
@@ -338,16 +447,39 @@ function FlowHeader({
   );
 }
 
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      {children}
+    </span>
+  );
+}
+
+const inputCls =
+  'w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3.5 py-3 text-[15px] text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none focus:ring-1 focus:ring-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]';
+
+const primaryBtnCls =
+  'w-full rounded-sm bg-[var(--nobc-red)] px-5 py-3.5 text-center text-[12px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-colors hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]';
+
+function ErrorText({ msg }: { msg: string | null }) {
+  if (!msg) return null;
+  return (
+    <p
+      role="alert"
+      className="text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+    >
+      {msg}
+    </p>
+  );
+}
+
 function AuthStep() {
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+    <div className="space-y-5">
+      <p className="text-[15px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
         This event is open to NoBC members. Sign in to continue.
       </p>
-      <a
-        href="/sign-in"
-        className="inline-block w-full rounded-sm bg-[var(--nobc-red)] px-5 py-3 text-center text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] font-[family-name:var(--font-dm-sans)]"
-      >
+      <a href="/sign-in" className={primaryBtnCls + ' block'}>
         Sign in
       </a>
     </div>
@@ -357,15 +489,15 @@ function AuthStep() {
 function GuestInfoStep({
   name,
   email,
+  error,
   onChange,
   onNext,
-  error,
 }: {
   name: string;
   email: string;
+  error: string | null;
   onChange: (n: string, e: string) => void;
   onNext: () => void;
-  error: string | null;
 }) {
   return (
     <form
@@ -373,50 +505,34 @@ function GuestInfoStep({
         e.preventDefault();
         onNext();
       }}
-      className="space-y-4"
+      className="space-y-5"
     >
       <div>
-        <label
-          htmlFor="flow-name"
-          className="mb-1 block text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]"
-        >
-          Your name
-        </label>
+        <FieldLabel>Your name</FieldLabel>
         <input
-          id="flow-name"
           type="text"
+          autoFocus
           required
           value={name}
           onChange={(e) => onChange(e.target.value, email)}
-          className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+          placeholder="First and last name"
+          className={inputCls}
         />
       </div>
       <div>
-        <label
-          htmlFor="flow-email"
-          className="mb-1 block text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]"
-        >
-          Email
-        </label>
+        <FieldLabel>Email</FieldLabel>
         <input
-          id="flow-email"
           type="email"
           required
           value={email}
           onChange={(e) => onChange(name, e.target.value)}
-          className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+          placeholder="you@email.com"
+          className={inputCls}
         />
       </div>
-      {error ? (
-        <p role="alert" className="text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-          {error}
-        </p>
-      ) : null}
-      <button
-        type="submit"
-        className="w-full rounded-sm bg-[var(--nobc-red)] px-5 py-3 text-center text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] font-[family-name:var(--font-dm-sans)]"
-      >
-        Continue
+      <ErrorText msg={error} />
+      <button type="submit" className={primaryBtnCls}>
+        Continue →
       </button>
     </form>
   );
@@ -425,27 +541,26 @@ function GuestInfoStep({
 function FieldsStep({
   questions,
   answers,
+  error,
+  single,
+  isLast,
+  submitting,
   onChange,
   onNext,
-  error,
 }: {
   questions: CustomQuestionDTO[];
   answers: Record<string, string | boolean>;
+  error: string | null;
+  single: boolean;
+  isLast: boolean;
+  submitting: boolean;
   onChange: (a: Record<string, string | boolean>) => void;
   onNext: () => void;
-  error: string | null;
 }) {
-  // If filtered set is empty, auto-advance.
-  useEffect(() => {
-    if (questions.length === 0) onNext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questions.length]);
-
-  if (questions.length === 0) return null;
-
   function update(id: string, value: string | boolean) {
     onChange({ ...answers, [id]: value });
   }
+  const label = isLast ? 'Complete registration' : 'Continue →';
 
   return (
     <form
@@ -453,13 +568,16 @@ function FieldsStep({
         e.preventDefault();
         onNext();
       }}
-      className="space-y-4"
+      className={single ? 'space-y-6' : 'space-y-5'}
     >
       {questions.map((q) => (
         <div key={q.id}>
-          <label
-            htmlFor={`cq-${q.id}`}
-            className="mb-1 block text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]"
+          <span
+            className={
+              single
+                ? 'mb-3 block text-[20px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]'
+                : 'mb-1.5 block text-[13px] font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]'
+            }
           >
             {q.label}
             {q.required ? (
@@ -467,23 +585,22 @@ function FieldsStep({
                 *
               </span>
             ) : null}
-          </label>
+          </span>
           {q.type === 'textarea' ? (
             <textarea
-              id={`cq-${q.id}`}
-              rows={3}
+              rows={single ? 4 : 3}
               required={q.required}
+              autoFocus={single}
               value={String(answers[q.id] ?? '')}
               onChange={(e) => update(q.id, e.target.value)}
-              className="w-full resize-none border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className={inputCls + ' resize-none'}
             />
           ) : q.type === 'select' && q.options ? (
             <select
-              id={`cq-${q.id}`}
               required={q.required}
               value={String(answers[q.id] ?? '')}
               onChange={(e) => update(q.id, e.target.value)}
-              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className={inputCls}
             >
               <option value="">Select…</option>
               {q.options.map((opt) => (
@@ -495,37 +612,33 @@ function FieldsStep({
           ) : q.type === 'checkbox' ? (
             <label className="flex cursor-pointer items-center gap-3 font-[family-name:var(--font-dm-sans)]">
               <input
-                id={`cq-${q.id}`}
                 type="checkbox"
                 required={q.required}
                 checked={Boolean(answers[q.id])}
                 onChange={(e) => update(q.id, e.target.checked)}
-                className="h-4 w-4 accent-[var(--nobc-red)]"
+                className="h-5 w-5 accent-[var(--nobc-red)]"
               />
-              <span className="text-sm text-[var(--apply-ink)]">{q.label}</span>
+              <span className="text-[15px] text-[var(--apply-ink)]">Yes</span>
             </label>
           ) : (
             <input
-              id={`cq-${q.id}`}
-              type={q.type === 'email' ? 'email' : q.type === 'phone' ? 'tel' : q.type}
+              type={q.type === 'email' ? 'email' : q.type === 'phone' ? 'tel' : 'text'}
               required={q.required}
+              autoFocus={single}
               value={String(answers[q.id] ?? '')}
               onChange={(e) => update(q.id, e.target.value)}
-              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className={inputCls}
             />
           )}
         </div>
       ))}
-      {error ? (
-        <p role="alert" className="text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-          {error}
-        </p>
-      ) : null}
-      <button
-        type="submit"
-        className="w-full rounded-sm bg-[var(--nobc-red)] px-5 py-3 text-center text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] font-[family-name:var(--font-dm-sans)]"
-      >
-        Continue
+      <ErrorText msg={error} />
+      <button type="submit" disabled={submitting} className={primaryBtnCls}>
+        {submitting ? (
+          <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+        ) : (
+          label
+        )}
       </button>
     </form>
   );
@@ -545,16 +658,13 @@ function PayStep({
   const stripeP = useMemo(() => getStripe(), []);
 
   if (error) {
-    return (
-      <p role="alert" className="text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-        {error}
-      </p>
-    );
+    return <ErrorText msg={error} />;
   }
   if (!clientSecret) {
     return (
-      <p className="text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-        Preparing payment…
+      <p className="flex items-center gap-2 text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Preparing secure checkout…
       </p>
     );
   }
@@ -568,7 +678,7 @@ function PayStep({
           theme: 'flat',
           variables: {
             colorPrimary: '#B22E21',
-            colorBackground: '#FFFCF6',
+            colorBackground: '#FFFFFF',
             colorText: '#1C1008',
             fontFamily: 'DM Sans, system-ui, sans-serif',
             borderRadius: '6px',
@@ -592,12 +702,10 @@ function PayForm({
   const elements = useElements();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [hasExpress, setHasExpress] = useState(false);
 
-  async function handlePay(e: React.FormEvent) {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-    setBusy(true);
-    setErr(null);
+  async function confirm() {
+    if (!stripe || !elements) return false;
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
@@ -607,30 +715,67 @@ function PayForm({
     });
     if (error) {
       setErr(error.message ?? 'Payment failed');
-      setBusy(false);
-      return;
+      return false;
     }
-    if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
-      onSuccess();
-      return;
+    if (
+      paymentIntent &&
+      (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')
+    ) {
+      return true;
     }
-    setBusy(false);
+    return false;
+  }
+
+  async function handleCardSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    const ok = await confirm();
+    if (ok) onSuccess();
+    else setBusy(false);
   }
 
   return (
-    <form onSubmit={handlePay} className="space-y-5">
+    <form onSubmit={handleCardSubmit} className="space-y-4">
+      <div className={hasExpress ? '' : 'hidden'}>
+        <ExpressCheckoutElement
+          onReady={({ availablePaymentMethods }) =>
+            setHasExpress(Boolean(availablePaymentMethods))
+          }
+          onConfirm={async () => {
+            setBusy(true);
+            setErr(null);
+            const ok = await confirm();
+            if (ok) onSuccess();
+            else setBusy(false);
+          }}
+        />
+        <div className="my-3 flex items-center gap-2">
+          <span className="h-px flex-1 bg-[var(--apply-rule)]" />
+          <span className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            or pay by card
+          </span>
+          <span className="h-px flex-1 bg-[var(--apply-rule)]" />
+        </div>
+      </div>
+
       <PaymentElement />
-      {err ? (
-        <p role="alert" className="text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-          {err}
-        </p>
-      ) : null}
-      <button
-        type="submit"
-        disabled={!stripe || busy}
-        className="w-full rounded-sm bg-[var(--nobc-red)] px-5 py-3 text-center text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-colors hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
-      >
-        {busy ? 'Processing…' : `Pay ${formatPrice(amountCents)}`}
+
+      <div className="flex items-center justify-between border-t border-[var(--apply-rule)] pt-3 text-sm font-[family-name:var(--font-dm-sans)]">
+        <span className="text-[var(--apply-muted)]">Total</span>
+        <span className="font-medium text-[var(--apply-ink)]">
+          {formatPrice(amountCents)}
+        </span>
+      </div>
+
+      {err ? <ErrorText msg={err} /> : null}
+
+      <button type="submit" disabled={!stripe || busy} className={primaryBtnCls}>
+        {busy ? (
+          <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+        ) : (
+          'Complete registration'
+        )}
       </button>
     </form>
   );
@@ -638,33 +783,172 @@ function PayForm({
 
 function SubmitStep({
   ctaLabel,
+  needsApproval,
   submitting,
   error,
   onSubmit,
 }: {
   ctaLabel: string;
+  needsApproval: boolean;
   submitting: boolean;
   error: string | null;
   onSubmit: () => void;
 }) {
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-        Ready to confirm.
+    <div className="space-y-5">
+      <p className="text-[15px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+        {needsApproval
+          ? 'Submit your request — the operator will review it and you’ll hear back shortly.'
+          : 'You’re all set. Confirm to lock in your spot.'}
       </p>
-      {error ? (
-        <p role="alert" className="text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-          {error}
-        </p>
-      ) : null}
+      <ErrorText msg={error} />
       <button
         type="button"
         onClick={onSubmit}
         disabled={submitting}
-        className="w-full rounded-sm bg-[var(--nobc-red)] px-5 py-3 text-center text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-colors hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
+        className={primaryBtnCls}
       >
-        {submitting ? 'Submitting…' : ctaLabel}
+        {submitting ? (
+          <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+        ) : (
+          ctaLabel
+        )}
       </button>
     </div>
+  );
+}
+
+function calendarUrl(event: EventDetailDTO): string {
+  const fmt = (v: string | Date) =>
+    new Date(v).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const start = fmt(event.startAt);
+  const end = event.endAt ? fmt(event.endAt) : start;
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.title,
+    dates: `${start}/${end}`,
+  });
+  if (event.location) params.set('location', event.location);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function DoneScreen({
+  event,
+  result,
+  onClose,
+}: {
+  event: EventDetailDTO;
+  result: FlowResult;
+  onClose: () => void;
+}) {
+  const pending = result.ticketStatus === 'pending_approval';
+  const heading = result.waitlisted
+    ? 'On the waitlist'
+    : pending
+      ? 'Request received'
+      : result.paid
+        ? 'Ticket confirmed'
+        : 'You’re in';
+  const confirmed = !result.waitlisted && !pending;
+
+  const start = new Date(event.startAt);
+  const dateLine = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  }).format(start);
+  const timeLine = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(start);
+
+  return (
+    <div className="px-6 pb-8 pt-9 text-center sm:px-8">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--nobc-red)] text-xl text-[var(--nobc-on-red)]">
+        {confirmed ? '✓' : '◷'}
+      </div>
+      <p className="mt-4 text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+        {heading}
+      </p>
+      <h2 className="mt-2 text-[34px] leading-[1.1] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+        {event.title}
+      </h2>
+
+      <div className="mt-4 space-y-0.5 text-[13px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        <p>{dateLine}</p>
+        <p>{timeLine}</p>
+        {event.location ? <p>{event.location}</p> : null}
+      </div>
+
+      {confirmed && result.memberQrCode ? (
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <QrBlock code={result.memberQrCode} />
+          <p className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            Show this at the door
+          </p>
+        </div>
+      ) : null}
+
+      {result.waitlisted ? (
+        <p className="mt-4 text-[13px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+          {result.position ? `You're #${result.position}. ` : ''}
+          We&rsquo;ll notify you if a spot opens.
+        </p>
+      ) : pending ? (
+        <p className="mt-4 text-[13px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+          You&rsquo;ll get an email as soon as the operator reviews your request.
+        </p>
+      ) : null}
+
+      {confirmed ? (
+        <a
+          href={calendarUrl(event)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
+        >
+          <CalendarPlus className="h-3.5 w-3.5" />
+          Add to calendar
+        </a>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={onClose}
+        className={primaryBtnCls + ' mt-7'}
+      >
+        Done
+      </button>
+    </div>
+  );
+}
+
+function QrBlock({ code }: { code: string }) {
+  const [svg, setSvg] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toString(code, {
+      type: 'svg',
+      width: 180,
+      margin: 1,
+      color: { dark: '#1C1008', light: '#FFFFFF' },
+    })
+      .then((s) => {
+        if (!cancelled) setSvg(s);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  if (!svg) {
+    return <div className="h-[180px] w-[180px] animate-pulse rounded-sm bg-[#F1ECE2]" />;
+  }
+  return (
+    <div
+      className="[&_svg]:h-auto [&_svg]:max-w-[180px]"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 }

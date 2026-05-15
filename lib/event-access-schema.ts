@@ -31,10 +31,15 @@ export const CompAccessSchema = z.object({
   budgetCap: z.number().int().min(0).nullable(),
 })
 
+/** How registration fields are presented to the attendee in the checkout modal. */
+export const RegistrationStyleSchema = z.enum(["all_at_once", "one_at_a_time"])
+export type RegistrationStyle = z.infer<typeof RegistrationStyleSchema>
+
 export const EventAccessSchema = z.object({
   member: GroupAccessSchema,
   guest: GroupAccessSchema,
   comp: CompAccessSchema,
+  registrationStyle: RegistrationStyleSchema.optional(),
 })
 export type EventAccess = z.infer<typeof EventAccessSchema>
 
@@ -51,5 +56,6 @@ export function defaultEventAccess(): EventAccess {
     member: { enabled: true, flow: defaultMemberFlow(), priceCents: 0 },
     guest: { enabled: false, flow: defaultGuestFlow(), priceCents: 0 },
     comp: { enabled: false, budgetCap: null },
+    registrationStyle: "all_at_once",
   }
 }
