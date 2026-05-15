@@ -4,11 +4,14 @@ import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { getEventBySlug, getCapacityUsedRsvpCount } from '@/lib/events';
 import { getEventHeroDisplayUrl } from '@/lib/event-hero-url';
+import {
+  parseEventAccess,
+  resolveViewer,
+  resolveAccessForViewer,
+  buildSteps,
+} from '@/lib/event-access';
 import { MemberWorkspaceGate } from '../_components/MemberWorkspaceGate';
 import { EventDetail, type EventDetailDTO } from './_components/EventDetail';
-
-const applySlug = process.env.NEXT_PUBLIC_APPLY_SLUG?.trim();
-const applyHref = `/apply/${applySlug && applySlug.length > 0 ? applySlug : 'nobc'}`;
 
 export default async function EventDetailPage({
   params,
@@ -31,7 +34,7 @@ export default async function EventDetailPage({
   const [member, capacityUsedCount, heroImageUrl] = await Promise.all([
     db.member.findFirst({
       where: { workspaceId, clerkUserId: userId },
-      select: { id: true, approved: true, memberQrCode: true },
+      select: { id: true, approved: true, status: true, memberQrCode: true },
     }),
     getCapacityUsedRsvpCount(event.id, workspaceId),
     getEventHeroDisplayUrl(event.heroImageAssetId),
@@ -44,12 +47,49 @@ export default async function EventDetailPage({
       })
     : null;
 
-  const plusOneRsvp = member && existingRsvp?.ticketStatus === 'confirmed'
-    ? await db.rSVP.findFirst({
-        where: { workspaceId, eventId: event.id, plusOneOfMemberId: member.id },
-        select: { id: true, member: { select: { firstName: true, lastName: true, email: true } } },
-      })
-    : null;
+  const plusOneRsvp =
+    member && existingRsvp?.ticketStatus === 'confirmed'
+      ? await db.rSVP.findFirst({
+          where: { workspaceId, eventId: event.id, plusOneOfMemberId: member.id },
+          select: {
+            id: true,
+            member: { select: { firstName: true, lastName: true, email: true } },
+          },
+        })
+      : null;
+
+  const eventAccess = parseEventAccess(event.eventAccess);
+  const viewer = resolveViewer(member, userId);
+  const resolved = resolveAccessForViewer(eventAccess, viewer);
+
+  const customQuestions = event.customQuestions.map((q) => ({
+    id: q.id,
+    type: q.fieldType.toLowerCase() as
+      | 'text'
+      | 'textarea'
+      | 'select'
+      | 'checkbox'
+      | 'number'
+      | 'date'
+      | 'email'
+      | 'phone',
+    label: q.label,
+    required: q.required,
+    options: q.options.length > 0 ? q.options : undefined,
+    showToMember: q.showToMember,
+    showToGuest: q.showToGuest,
+    whenInFlow: q.whenInFlow,
+  }));
+
+  const steps = buildSteps(
+    resolved,
+    viewer,
+    customQuestions.map((q) => ({
+      whenInFlow: q.whenInFlow,
+      showToMember: q.showToMember,
+      showToGuest: q.showToGuest,
+    })),
+  );
 
   const dto: EventDetailDTO = {
     eventId: event.id,
@@ -61,29 +101,22 @@ export default async function EventDetailPage({
     location: event.location,
     mapsUrl: event.mapsUrl,
     runOfShow: event.runOfShow,
-    accessMode: event.accessMode,
-    applyMode: event.applyMode,
-    approvalRequired: event.approvalRequired,
+    eventAccess,
+    viewer,
+    resolved,
+    steps,
     capacity: event.capacity,
     capacityUsedCount,
     showCapacity: event.showCapacity,
     plusOnesAllowed: event.plusOnesAllowed,
     heroImageUrl,
-    priceInCents: event.priceInCents,
-    nonMemberPriceCents: event.nonMemberPriceInCents,
     memberApproved: member?.approved ?? false,
     memberId: member?.id ?? null,
     memberQrCode: member?.memberQrCode ?? null,
     existingRsvp: existingRsvp
       ? { id: existingRsvp.id, ticketStatus: existingRsvp.ticketStatus }
       : null,
-    customQuestions: event.customQuestions.map(q => ({
-      id: q.id,
-      type: q.fieldType.toLowerCase() as 'text' | 'textarea' | 'select' | 'checkbox' | 'number' | 'date',
-      label: q.label,
-      required: q.required,
-      options: q.options.length > 0 ? q.options : undefined,
-    })),
+    customQuestions,
     plusOneRsvp: plusOneRsvp
       ? {
           id: plusOneRsvp.id,
@@ -93,7 +126,7 @@ export default async function EventDetailPage({
           guestEmail: plusOneRsvp.member?.email ?? '',
         }
       : null,
-    applyHref,
+    template: (event.template ?? 'editorial') as 'editorial' | 'split' | 'minimal',
   };
 
   return <EventDetail event={dto} />;
