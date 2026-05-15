@@ -1,6 +1,11 @@
 import { db } from "./db"
-import { parseEventAccess, resolveAccessForViewer, type ResolvedAccess, type ViewerKind } from "./event-access"
-import { isGateSupported } from "./event-access-schema"
+import {
+  parseEventAccess,
+  resolveAccessForViewer,
+  inSessionFlow,
+  type ResolvedAccess,
+  type ViewerKind,
+} from "./event-access"
 
 export type OpenResolvedAccess = Exclude<ResolvedAccess, { kind: "closed" }>
 
@@ -61,9 +66,6 @@ export async function loadAccessContext(
   if (resolved.kind === "closed") {
     return { ok: false, status: 403, error: resolved.reason }
   }
-  if (!isGateSupported(resolved.gate)) {
-    return { ok: false, status: 400, error: "This event flow is not available yet." }
-  }
   return {
     ok: true,
     resolved,
@@ -79,14 +81,10 @@ export async function loadAccessContext(
   }
 }
 
-/** Computes price in cents for the resolved access (0 means free). */
+/** Price in cents collected in this session (0 means free). Only a Pay step
+ * before the first Gate is charged up front. */
 export function priceForResolved(resolved: OpenResolvedAccess): number {
-  if (/pay/.test(resolved.gate as string)) return resolved.priceCents
-  return 0
-}
-
-export function gateNeedsApproval(gate: string): boolean {
-  return /approval$/.test(gate) || gate === "apply"
+  return inSessionFlow(resolved.flow).includes("pay") ? resolved.priceCents : 0
 }
 
 /**

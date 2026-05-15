@@ -8,7 +8,7 @@ import { UserPlus, X } from 'lucide-react';
 
 import type { EventDetailDTO } from './EventDetail';
 import { EventAccessFlow } from './EventAccessFlow';
-import { formatGateCTA } from '@/lib/event-access';
+import { formatGateCTA, accessTypeLabel } from '@/lib/event-access';
 
 function QrDisplay({ code }: { code: string }) {
   const [svg, setSvg] = useState<string | null>(null);
@@ -218,15 +218,6 @@ function PlusOneSection({
   );
 }
 
-function getAccessBadgeLabel(event: EventDetailDTO): string {
-  const r = event.resolved;
-  if (r.kind === 'closed') return 'Closed';
-  if (/pay/.test(r.gate as string)) return 'Ticketed';
-  if (r.gate === 'apply' || /approval$/.test(r.gate as string)) return 'Apply to Attend';
-  if (r.kind === 'member') return 'Members';
-  return 'Open';
-}
-
 export function RsvpCard({ event, variant = 'card' }: Props) {
   const searchParams = useSearchParams();
   const successFromUrl = searchParams.get('rsvp') === 'success';
@@ -279,14 +270,13 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
 
   const resolved = event.resolved;
   const isClosed = resolved.kind === 'closed';
-  const gateUnsupported = !isClosed && !resolved.supported;
   const ctaLabel = isClosed ? 'Closed' : formatGateCTA(resolved);
 
   return (
     <div className={cardWrapper}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-block rounded-sm border border-[var(--apply-rule)] px-2 py-1 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-          {getAccessBadgeLabel(event)}
+          {accessTypeLabel(event.resolved)}
         </span>
         {remaining != null && remaining > 0 ? (
           <span className="text-[11px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
@@ -346,15 +336,6 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
         <div className="space-y-3">
           <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
             Sold Out
-          </p>
-        </div>
-      ) : gateUnsupported ? (
-        <div className="space-y-3">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            Available in next update
-          </p>
-          <p className="text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-            This event flow isn&rsquo;t live yet. Check back soon.
           </p>
         </div>
       ) : (

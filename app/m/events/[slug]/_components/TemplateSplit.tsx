@@ -3,6 +3,7 @@
 import { MemberShellFooter, MemberShellNav, useMemberApplyHref } from '../../_components/MemberShell';
 import { RsvpCard } from './RsvpCard';
 import type { EventDetailDTO } from './EventDetail';
+import { accessTypeLabel } from '@/lib/event-access';
 
 function parseDate(value: string | Date): Date {
   return typeof value === 'string' ? new Date(value) : value;
@@ -24,15 +25,6 @@ function formatTimeLine(d: Date): string {
     hour: 'numeric',
     minute: '2-digit',
   }).format(d);
-}
-
-function getAccessLabel(event: EventDetailDTO): string {
-  const r = event.resolved;
-  if (r.kind === 'closed') return 'Closed';
-  if (/pay/.test(r.gate as string)) return 'Ticketed';
-  if (r.gate === 'apply' || /approval$/.test(r.gate as string)) return 'Apply to Attend';
-  if (r.kind === 'member') return 'Members';
-  return 'Open';
 }
 
 export function TemplateSplit({ event }: { event: EventDetailDTO }) {
@@ -69,7 +61,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
 
         <div className="flex flex-1 flex-col px-6 pb-16 pt-6 sm:px-10 sm:pt-10">
           <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-            {getAccessLabel(event)}
+            {accessTypeLabel(event.resolved)}
           </p>
 
           <h1 className="mt-4 max-w-2xl text-[clamp(2.25rem,4.2vw,3.5rem)] leading-[1.05] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">

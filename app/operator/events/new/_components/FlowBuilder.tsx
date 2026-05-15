@@ -1,65 +1,55 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Plus, GripVertical } from 'lucide-react';
-import type { MemberGate, GuestGate } from '@/lib/event-access-schema';
-import {
-  type FlowStep,
-  FLOW_STEP_META,
-  memberGateFromFlow,
-  guestGateFromFlow,
-  flowFromMemberGate,
-  flowFromGuestGate,
-  invalidFlowHint,
-} from '@/lib/event-access-flow';
-import {
-  type AccessQuestion,
-  appliesToMember,
-  appliesToGuest,
-} from '@/lib/registration-fields';
+import { X, Plus, GripVertical, RotateCcw } from 'lucide-react';
+import type { FlowStep } from '@/lib/event-access-schema';
+import { defaultMemberFlow, defaultGuestFlow } from '@/lib/event-access-schema';
+import { FLOW_STEP_META } from '@/lib/event-access-flow';
+import type { AccessQuestion } from '@/lib/registration-fields';
 import { RegistrationFieldsEditor } from './RegistrationFieldsEditor';
 
 type Group = 'member' | 'guest';
 
 type Props = {
   group: Group;
-  gate: MemberGate | GuestGate;
-  onGateChange: (gate: MemberGate | GuestGate) => void;
+  flow: FlowStep[];
+  onFlowChange: (flow: FlowStep[]) => void;
   priceCents: number;
   onPriceChange: (cents: number) => void;
   questions: AccessQuestion[];
   onQuestionsChange: (q: AccessQuestion[]) => void;
 };
 
-function flowForGroup(group: Group, gate: MemberGate | GuestGate): FlowStep[] {
-  return group === 'member'
-    ? flowFromMemberGate(gate as MemberGate)
-    : flowFromGuestGate(gate as GuestGate);
+const ALL_STEPS: FlowStep[] = ['fields', 'pay', 'approval'];
+
+function defaultFlow(group: Group): FlowStep[] {
+  return group === 'member' ? defaultMemberFlow() : defaultGuestFlow();
+}
+
+type Template = { key: string; label: string; flow: FlowStep[] };
+
+function templatesFor(group: Group): Template[] {
+  const who = group === 'member' ? 'Members' : 'Guests';
+  return [
+    { key: 'apply', label: `${who} apply, you approve`, flow: ['fields', 'approval'] },
+    { key: 'pay', label: `${who} pay`, flow: ['pay'] },
+    { key: 'open', label: `${who} just show up`, flow: [] },
+  ];
 }
 
 export function FlowBuilder({
   group,
-  gate,
-  onGateChange,
+  flow,
+  onFlowChange,
   priceCents,
   onPriceChange,
   questions,
   onQuestionsChange,
 }: Props) {
-  const [steps, setSteps] = useState<FlowStep[]>(() => flowForGroup(group, gate));
-  const lastEmitted = useRef(gate);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const menuWrapRef = useRef<HTMLDivElement>(null);
 
-  // Resync only when the gate changes from outside (e.g. a template is applied).
-  useEffect(() => {
-    if (gate === lastEmitted.current) return;
-    lastEmitted.current = gate;
-    setSteps(flowForGroup(group, gate));
-  }, [gate, group]);
-
-  // Close the add-step menu on outside click.
   useEffect(() => {
     if (!menuOpen) return;
     function onDoc(e: MouseEvent) {
@@ -69,81 +59,80 @@ export function FlowBuilder({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen]);
 
-  function commit(next: FlowStep[]) {
-    // Await Approval is always the final block.
-    const hasApproval = next.includes('approval');
-    const ordered: FlowStep[] = [
-      ...next.filter((s) => s !== 'approval'),
-      ...(hasApproval ? (['approval'] as FlowStep[]) : []),
-    ];
-    setSteps(ordered);
-    const res =
-      group === 'member'
-        ? memberGateFromFlow(ordered)
-        : guestGateFromFlow(ordered);
-    if (res) {
-      lastEmitted.current = res.gate;
-      onGateChange(res.gate);
-    }
-  }
-
   function addStep(s: FlowStep) {
-    commit([...steps, s]);
+    onFlowChange([...flow, s]);
     setMenuOpen(false);
   }
 
-  function removeStep(s: FlowStep) {
-    let next = steps.filter((x) => x !== s);
-    // Await Approval depends on the Answer Fields step.
-    if (s === 'fields') next = next.filter((x) => x !== 'approval');
-    commit(next);
+  function removeStep(idx: number) {
+    onFlowChange(flow.filter((_, i) => i !== idx));
   }
 
   function reorder(from: number, to: number) {
-    const opt = steps.filter((s) => s !== 'approval');
-    if (from === to || from < 0 || to < 0 || from >= opt.length) return;
-    const [moved] = opt.splice(from, 1);
-    opt.splice(to, 0, moved);
-    commit([...opt, ...(steps.includes('approval') ? (['approval'] as FlowStep[]) : [])]);
+    if (from === to || from < 0 || to < 0 || from >= flow.length) return;
+    const next = [...flow];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onFlowChange(next);
   }
 
-  const hasFields = steps.includes('fields');
-  const hasPay = steps.includes('pay');
-  const hasApproval = steps.includes('approval');
-  const groupFields = questions.filter(
-    group === 'member' ? appliesToMember : appliesToGuest,
-  );
-  const resolution =
-    group === 'member' ? memberGateFromFlow(steps) : guestGateFromFlow(steps);
-  const invalid = resolution === null;
-  const unsupported = resolution !== null && !resolution.supported;
-
-  const reorderable = steps.filter((s) => s !== 'approval');
+  const inactive = ALL_STEPS.filter((s) => !flow.includes(s));
+  const templates = templatesFor(group);
+  const isDefault =
+    JSON.stringify(flow) === JSON.stringify(defaultFlow(group));
 
   return (
     <div className="flex flex-col gap-5">
+      {/* Templates */}
+      <div>
+        <p className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          Start from a template
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {templates.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => onFlowChange(t.flow)}
+              className="rounded-full border border-[var(--apply-rule)] px-2.5 py-1 text-[11px] text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Flow canvas */}
       <div>
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-          The flow
-        </p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            The flow
+          </p>
+          {!isDefault && (
+            <button
+              type="button"
+              onClick={() => onFlowChange(defaultFlow(group))}
+              className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset to default
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2] p-3">
-          {/* Register — fixed anchor */}
           <span className="inline-flex items-center rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm font-medium text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
             Register
           </span>
 
-          {reorderable.map((s, i) => (
-            <div key={s} className="flex items-center gap-1.5">
+          {flow.map((s, i) => (
+            <div key={`${s}-${i}`} className="flex items-center gap-1.5">
               <Arrow />
               <StepBlock
                 step={s}
-                index={i}
-                draggable
                 isDragging={dragIdx === i}
                 priceCents={priceCents}
                 onPriceChange={onPriceChange}
-                onRemove={() => removeStep(s)}
+                onRemove={() => removeStep(i)}
                 onDragStart={() => setDragIdx(i)}
                 onDragEnd={() => setDragIdx(null)}
                 onDropOnto={() => {
@@ -154,20 +143,7 @@ export function FlowBuilder({
             </div>
           ))}
 
-          {hasApproval && (
-            <div className="flex items-center gap-1.5">
-              <Arrow />
-              <StepBlock
-                step="approval"
-                index={-1}
-                priceCents={priceCents}
-                onPriceChange={onPriceChange}
-                onRemove={() => removeStep('approval')}
-              />
-            </div>
-          )}
-
-          {steps.length < 3 && (
+          {inactive.length > 0 && (
             <div className="flex items-center gap-1.5" ref={menuWrapRef}>
               <Arrow />
               <div className="relative">
@@ -180,33 +156,29 @@ export function FlowBuilder({
                   Add Step
                 </button>
                 {menuOpen && (
-                  <AddStepMenu
-                    canAddFields={!hasFields}
-                    fieldsEnabled={groupFields.length > 0}
-                    canAddPay={!hasPay}
-                    canAddApproval={!hasApproval}
-                    approvalEnabled={hasFields}
-                    onAdd={addStep}
-                  />
+                  <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-60 rounded-sm border border-[var(--apply-rule)] bg-white p-1 shadow-lg">
+                    {inactive.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => addStep(s)}
+                        className="flex w-full flex-col items-start rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-[#F9F7F2]"
+                      >
+                        <span className="text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+                          {FLOW_STEP_META[s].label}
+                        </span>
+                        <span className="text-[11px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                          {FLOW_STEP_META[s].hint}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* Warnings */}
-      {invalid && (
-        <p className="rounded-sm border border-[var(--nobc-red)] bg-[#FBEBE9] px-3 py-2 text-xs text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-          {invalidFlowHint(group, steps)}
-        </p>
-      )}
-      {unsupported && (
-        <p className="rounded-sm bg-[#F1E8D6] px-3 py-2 text-xs text-[#8A6A2E] font-[family-name:var(--font-dm-sans)]">
-          Coming soon — this flow isn&rsquo;t live yet. Members will see a notice and
-          can&rsquo;t register until it ships.
-        </p>
-      )}
 
       {/* Per-group registration fields */}
       <RegistrationFieldsEditor
@@ -226,94 +198,8 @@ function Arrow() {
   );
 }
 
-function AddStepMenu({
-  canAddFields,
-  fieldsEnabled,
-  canAddPay,
-  canAddApproval,
-  approvalEnabled,
-  onAdd,
-}: {
-  canAddFields: boolean;
-  fieldsEnabled: boolean;
-  canAddPay: boolean;
-  canAddApproval: boolean;
-  approvalEnabled: boolean;
-  onAdd: (s: FlowStep) => void;
-}) {
-  return (
-    <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-60 rounded-sm border border-[var(--apply-rule)] bg-white p-1 shadow-lg">
-      {canAddFields && (
-        <MenuItem
-          label={FLOW_STEP_META.fields.label}
-          hint={
-            fieldsEnabled
-              ? FLOW_STEP_META.fields.hint
-              : 'Add a registration field below first'
-          }
-          disabled={!fieldsEnabled}
-          onClick={() => onAdd('fields')}
-        />
-      )}
-      {canAddPay && (
-        <MenuItem
-          label={FLOW_STEP_META.pay.label}
-          hint={FLOW_STEP_META.pay.hint}
-          onClick={() => onAdd('pay')}
-        />
-      )}
-      {canAddApproval && (
-        <MenuItem
-          label={FLOW_STEP_META.approval.label}
-          hint={
-            approvalEnabled
-              ? FLOW_STEP_META.approval.hint
-              : 'Add an Answer Fields step first'
-          }
-          disabled={!approvalEnabled}
-          onClick={() => onAdd('approval')}
-        />
-      )}
-    </div>
-  );
-}
-
-function MenuItem({
-  label,
-  hint,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  hint: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex w-full flex-col items-start rounded-sm px-2.5 py-2 text-left transition-colors ${
-        disabled
-          ? 'cursor-not-allowed opacity-50'
-          : 'hover:bg-[#F9F7F2]'
-      }`}
-    >
-      <span className="text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-        {label}
-      </span>
-      <span className="text-[11px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-        {hint}
-      </span>
-    </button>
-  );
-}
-
 function StepBlock({
   step,
-  index,
-  draggable,
   isDragging,
   priceCents,
   onPriceChange,
@@ -323,43 +209,34 @@ function StepBlock({
   onDropOnto,
 }: {
   step: FlowStep;
-  index: number;
-  draggable?: boolean;
-  isDragging?: boolean;
+  isDragging: boolean;
   priceCents: number;
   onPriceChange: (cents: number) => void;
   onRemove: () => void;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
-  onDropOnto?: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDropOnto: () => void;
 }) {
   return (
     <span
-      onDragOver={draggable ? (e) => e.preventDefault() : undefined}
-      onDrop={
-        draggable
-          ? (e) => {
-              e.preventDefault();
-              onDropOnto?.();
-            }
-          : undefined
-      }
-      data-index={index}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDropOnto();
+      }}
       className={`inline-flex items-center gap-1.5 rounded-sm border border-[var(--nobc-red)] bg-[#FBEBE9] px-2.5 py-2 text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)] ${
         isDragging ? 'opacity-40' : ''
       }`}
     >
-      {draggable && (
-        <span
-          draggable
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          className="cursor-grab text-[var(--apply-muted)] active:cursor-grabbing"
-          aria-label="Drag to reorder"
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </span>
-      )}
+      <span
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        className="cursor-grab text-[var(--apply-muted)] active:cursor-grabbing"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </span>
       {FLOW_STEP_META[step].label}
       {step === 'pay' && (
         <PriceInput valueCents={priceCents} onChange={onPriceChange} />

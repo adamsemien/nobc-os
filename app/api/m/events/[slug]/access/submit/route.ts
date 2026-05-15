@@ -3,11 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
-import { resolveViewer } from '@/lib/event-access';
+import { resolveViewer, flowNeedsApproval } from '@/lib/event-access';
 import {
   loadAccessContext,
   priceForResolved,
-  gateNeedsApproval,
   findOrCreateGuestMember,
   hasCapacity,
 } from '@/lib/event-access-submit';
@@ -85,7 +84,7 @@ export async function POST(
   }
 
   // Capacity check (skipped for approval gates — they create pending requests, not held seats).
-  const needsApproval = gateNeedsApproval(resolved.gate as string);
+  const needsApproval = flowNeedsApproval(resolved.flow);
   if (!needsApproval && !(await hasCapacity(workspaceId, evt.id, event.capacity))) {
     return NextResponse.json({ error: 'Event is full' }, { status: 409 });
   }
@@ -142,7 +141,7 @@ export async function POST(
       action: 'rsvp.created',
       entityType: 'RSVP',
       entityId: rsvpId,
-      metadata: { ticketStatus, viewer, gate: resolved.gate },
+      metadata: { ticketStatus, viewer, flow: resolved.flow },
     },
   });
 

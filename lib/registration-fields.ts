@@ -93,3 +93,41 @@ export function appliesToMember(q: AccessQuestion): boolean {
 export function appliesToGuest(q: AccessQuestion): boolean {
   return q.showTo === "guests" || q.showTo === "both"
 }
+
+/** Common one-click questions shown as chips in the operator field editor. */
+export const QUESTION_BANK: {
+  label: string
+  type: FieldType
+  options?: string[]
+}[] = [
+  { label: "What's your vibe?", type: "text" },
+  {
+    label: "How did you hear about us?",
+    type: "select",
+    options: ["Friend referral", "Instagram", "Newsletter", "Existing member", "Other"],
+  },
+  { label: "What do you do?", type: "text" },
+  { label: "What are you hoping to get out of tonight?", type: "textarea" },
+  { label: "Are you bringing a plus one?", type: "checkbox" },
+  { label: "Any dietary restrictions or allergies?", type: "text" },
+  { label: "What's your Instagram handle?", type: "text" },
+  { label: "What city are you based in?", type: "text" },
+]
+
+let bankSeq = 0
+
+/** Builds an AccessQuestion from a Question Bank entry with sensible defaults. */
+export function questionFromBank(
+  entry: { label: string; type: FieldType; options?: string[] },
+  showTo: ShowTo,
+): AccessQuestion {
+  bankSeq += 1
+  return {
+    tempId: `bank-${Date.now()}-${bankSeq}`,
+    label: entry.label,
+    type: entry.type,
+    required: false,
+    options: entry.options ?? [],
+    showTo,
+  }
+}

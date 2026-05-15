@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { RsvpCard } from './RsvpCard';
 import type { EventDetailDTO } from './EventDetail';
+import { accessTypeLabel } from '@/lib/event-access';
 
 function parseDate(value: string | Date): Date {
   return typeof value === 'string' ? new Date(value) : value;
@@ -27,15 +28,6 @@ function formatTimeLine(d: Date): string {
   }).format(d);
 }
 
-function getAccessLabel(event: EventDetailDTO): string {
-  const r = event.resolved;
-  if (r.kind === 'closed') return 'Closed';
-  if (/pay/.test(r.gate as string)) return 'Ticketed';
-  if (r.gate === 'apply' || /approval$/.test(r.gate as string)) return 'Apply to Attend';
-  if (r.kind === 'member') return 'Members';
-  return 'Open';
-}
-
 export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
   const start = parseDate(event.startAt);
 
@@ -57,7 +49,7 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
         <div className="my-10 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
 
         <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-          {getAccessLabel(event)}
+          {accessTypeLabel(event.resolved)}
         </p>
 
         <h1 className="mt-6 text-[clamp(2.5rem,6vw,4rem)] italic leading-[1.05] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { TemplatePicker, type TemplateKey } from '../../new/_components/TemplatePicker';
 import { AccessGroupsCard } from '../../new/_components/AccessGroupsCard';
@@ -92,6 +92,13 @@ export function EventSettingsTab({ event }: Props) {
 
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(t);
+  }, [toast]);
   const [statusPending, setStatusPending] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(event.status);
   const [templateName, setTemplateName] = useState('');
@@ -147,7 +154,7 @@ export function EventSettingsTab({ event }: Props) {
         eventAccess,
       };
       await patch(body);
-      setFlash({ type: 'success', message: 'Event saved.' });
+      setToast('Flow saved ✓');
     } catch (e) {
       setFlash({ type: 'error', message: e instanceof Error ? e.message : 'Save failed.' });
     } finally {
@@ -360,6 +367,7 @@ export function EventSettingsTab({ event }: Props) {
           onChange={setEventAccess}
           questions={questions}
           onQuestionsChange={setQuestions}
+          eventTitle={title}
         />
       </div>
 
@@ -485,6 +493,18 @@ export function EventSettingsTab({ event }: Props) {
           </button>
         )}
       </div>
+      {toast && <FlowToast message={toast} />}
     </form>
+  );
+}
+
+function FlowToast({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-sm bg-[var(--apply-ink)] px-4 py-2.5 text-[12px] font-medium text-[#F9F7F2] shadow-[0_4px_16px_rgba(28,16,8,0.25)]"
+    >
+      {message}
+    </div>
   );
 }

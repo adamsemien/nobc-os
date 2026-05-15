@@ -151,7 +151,7 @@ export async function POST(
       action: 'rsvp.payment_initiated',
       entityType: 'RSVP',
       entityId: rsvpId,
-      metadata: { gate: resolved.gate, viewer },
+      metadata: { flow: resolved.flow, viewer },
     },
   });
 

@@ -1,14 +1,16 @@
 'use client';
 
-import type { EventAccess, MemberGate, GuestGate } from '@/lib/event-access-schema';
+import type { EventAccess, FlowStep } from '@/lib/event-access-schema';
 import type { AccessQuestion } from '@/lib/registration-fields';
 import { FlowBuilder } from './FlowBuilder';
+import { FlowPreview } from './FlowPreview';
 
 type Props = {
   value: EventAccess;
   onChange: (v: EventAccess) => void;
   questions: AccessQuestion[];
   onQuestionsChange: (q: AccessQuestion[]) => void;
+  eventTitle: string;
 };
 
 export function AccessGroupsCard({
@@ -16,62 +18,85 @@ export function AccessGroupsCard({
   onChange,
   questions,
   onQuestionsChange,
+  eventTitle,
 }: Props) {
   return (
-    <div className="flex flex-col gap-4">
-      <AccessGroup
-        title="Member Access"
-        subtitle="For approved NoBC members"
-        enabled={value.member.enabled}
-        onToggle={(b) => onChange({ ...value, member: { ...value.member, enabled: b } })}
-      >
-        <FlowBuilder
-          group="member"
-          gate={value.member.gate}
-          onGateChange={(g) =>
-            onChange({ ...value, member: { ...value.member, gate: g as MemberGate } })
+    <div className="grid gap-5 lg:grid-cols-[1fr_268px]">
+      <div className="flex flex-col gap-4">
+        <AccessGroup
+          title="Member Access"
+          subtitle="For approved NoBC members"
+          enabled={value.member.enabled}
+          onToggle={(b) =>
+            onChange({ ...value, member: { ...value.member, enabled: b } })
           }
-          priceCents={value.member.priceCents}
-          onPriceChange={(cents) =>
-            onChange({ ...value, member: { ...value.member, priceCents: cents } })
-          }
-          questions={questions}
-          onQuestionsChange={onQuestionsChange}
-        />
-      </AccessGroup>
+        >
+          <FlowBuilder
+            group="member"
+            flow={value.member.flow}
+            onFlowChange={(flow: FlowStep[]) =>
+              onChange({ ...value, member: { ...value.member, flow } })
+            }
+            priceCents={value.member.priceCents}
+            onPriceChange={(cents) =>
+              onChange({ ...value, member: { ...value.member, priceCents: cents } })
+            }
+            questions={questions}
+            onQuestionsChange={onQuestionsChange}
+          />
+        </AccessGroup>
 
-      <AccessGroup
-        title="Guest Access"
-        subtitle="For everyone else"
-        enabled={value.guest.enabled}
-        onToggle={(b) => onChange({ ...value, guest: { ...value.guest, enabled: b } })}
-      >
-        <FlowBuilder
-          group="guest"
-          gate={value.guest.gate}
-          onGateChange={(g) =>
-            onChange({ ...value, guest: { ...value.guest, gate: g as GuestGate } })
+        <AccessGroup
+          title="Guest Access"
+          subtitle="For everyone else"
+          enabled={value.guest.enabled}
+          onToggle={(b) =>
+            onChange({ ...value, guest: { ...value.guest, enabled: b } })
           }
-          priceCents={value.guest.priceCents}
-          onPriceChange={(cents) =>
-            onChange({ ...value, guest: { ...value.guest, priceCents: cents } })
-          }
-          questions={questions}
-          onQuestionsChange={onQuestionsChange}
-        />
-      </AccessGroup>
+        >
+          <FlowBuilder
+            group="guest"
+            flow={value.guest.flow}
+            onFlowChange={(flow: FlowStep[]) =>
+              onChange({ ...value, guest: { ...value.guest, flow } })
+            }
+            priceCents={value.guest.priceCents}
+            onPriceChange={(cents) =>
+              onChange({ ...value, guest: { ...value.guest, priceCents: cents } })
+            }
+            questions={questions}
+            onQuestionsChange={onQuestionsChange}
+          />
+        </AccessGroup>
 
-      <AccessGroup
-        title="Comp Access"
-        subtitle="Complimentary tickets you issue manually"
-        enabled={value.comp.enabled}
-        onToggle={(b) => onChange({ ...value, comp: { ...value.comp, enabled: b } })}
-      >
-        <BudgetCapField
-          value={value.comp.budgetCap}
-          onChange={(n) => onChange({ ...value, comp: { ...value.comp, budgetCap: n } })}
+        <AccessGroup
+          title="Comp Access"
+          subtitle="Complimentary tickets you issue manually"
+          enabled={value.comp.enabled}
+          onToggle={(b) =>
+            onChange({ ...value, comp: { ...value.comp, enabled: b } })
+          }
+        >
+          <BudgetCapField
+            value={value.comp.budgetCap}
+            onChange={(n) =>
+              onChange({ ...value, comp: { ...value.comp, budgetCap: n } })
+            }
+          />
+        </AccessGroup>
+      </div>
+
+      {/* Live preview */}
+      <div className="h-fit lg:sticky lg:top-4">
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          Live preview
+        </p>
+        <FlowPreview
+          access={value}
+          questions={questions}
+          eventTitle={eventTitle}
         />
-      </AccessGroup>
+      </div>
     </div>
   );
 }

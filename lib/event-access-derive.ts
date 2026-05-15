@@ -8,33 +8,26 @@ export type DerivedLegacy = {
   nonMemberPriceInCents: number | null
 }
 
+/** Derives the legacy Event columns from the flow-based access config. */
 export function deriveLegacyFromAccess(access: EventAccess): DerivedLegacy {
-  const memberPay = access.member.enabled && /pay/.test(access.member.gate)
-  const guestPay = access.guest.enabled && /pay/.test(access.guest.gate)
-  const anyPay = memberPay || guestPay
+  const memberFlow = access.member.enabled ? access.member.flow : []
+  const guestFlow = access.guest.enabled ? access.guest.flow : []
 
-  const memberApproval = access.member.enabled && /approval$/.test(access.member.gate)
-  const guestApproval =
-    access.guest.enabled &&
-    (access.guest.gate === "apply" || /approval$/.test(access.guest.gate))
-  const anyApproval = memberApproval || guestApproval
+  const anyPay = memberFlow.includes("pay") || guestFlow.includes("pay")
+  const anyApproval =
+    memberFlow.includes("approval") || guestFlow.includes("approval")
 
   let accessMode: DerivedLegacy["accessMode"] = "OPEN"
-  if (anyPay && (anyApproval || access.guest.enabled)) {
-    accessMode = anyPay && (anyApproval || (access.member.enabled && access.guest.enabled))
-      ? (anyApproval ? "APPLY_OR_PAY" : "TICKETED")
-      : "TICKETED"
-  } else if (anyPay) {
-    accessMode = "TICKETED"
-  } else if (anyApproval) {
-    accessMode = "APPLY_OR_PAY"
-  }
+  if (anyApproval) accessMode = "APPLY_OR_PAY"
+  else if (anyPay) accessMode = "TICKETED"
 
   return {
     accessMode,
     applyMode: anyApproval ? "APPROVAL_HOLDS_TICKET" : null,
     approvalRequired: anyApproval,
     priceInCents: access.member.enabled ? access.member.priceCents : null,
-    nonMemberPriceInCents: access.guest.enabled ? access.guest.priceCents : null,
+    nonMemberPriceInCents: access.guest.enabled
+      ? access.guest.priceCents
+      : null,
   }
 }

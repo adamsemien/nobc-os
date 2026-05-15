@@ -8,7 +8,7 @@ import { Check, Loader2, Sparkles } from 'lucide-react';
 import { HeroImageUpload } from './_components/HeroImageUpload';
 import { AccessGroupsCard } from './_components/AccessGroupsCard';
 import { TemplatePicker, type TemplateKey } from './_components/TemplatePicker';
-import { defaultEventAccess, type EventAccess } from '@/lib/event-access-schema';
+import { defaultEventAccess, type EventAccess, type FlowStep } from '@/lib/event-access-schema';
 import {
   type AccessQuestion,
   toApiQuestion,
@@ -193,6 +193,13 @@ export default function NewEventPage() {
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(t);
+  }, [toast]);
 
   // Auto-generate slug from title until user edits it
   useEffect(() => {
@@ -279,17 +286,17 @@ export default function NewEventPage() {
       });
       if (data.slug) setSlugEdited(true);
 
-      // Map accessMode → EventAccess roughly
+      // Map accessMode → EventAccess flows roughly
       if (data.accessMode === 'TICKETED') {
         setAccess({
-          member: { enabled: true, gate: 'pay', priceCents: 0 },
-          guest: { enabled: true, gate: 'pay', priceCents: 0 },
+          member: { enabled: true, flow: ['pay'], priceCents: 0 },
+          guest: { enabled: true, flow: ['pay'], priceCents: 0 },
           comp: { enabled: false, budgetCap: null },
         });
       } else if (data.accessMode === 'APPLY_OR_PAY') {
         setAccess({
-          member: { enabled: true, gate: 'questions_approval', priceCents: 0 },
-          guest: { enabled: true, gate: 'pay', priceCents: 0 },
+          member: { enabled: true, flow: ['fields', 'approval'], priceCents: 0 },
+          guest: { enabled: true, flow: ['pay'], priceCents: 0 },
           comp: { enabled: false, budgetCap: null },
         });
       } else if (data.accessMode === 'OPEN') {
@@ -319,22 +326,26 @@ export default function NewEventPage() {
     const guestPrice = t.nonMemberPriceInCents ?? 0;
     const approved = t.approvalRequired;
 
+    const applyFlow: FlowStep[] = ['fields', 'approval'];
+    const payFlow: FlowStep[] = ['pay'];
+    const openFlow: FlowStep[] = [];
+
     if (t.accessMode === 'OPEN') {
       setAccess({
-        member: { enabled: true, gate: approved ? 'questions_approval' : 'auto_confirm', priceCents: 0 },
-        guest: { enabled: false, gate: 'pay', priceCents: 0 },
+        member: { enabled: true, flow: approved ? applyFlow : openFlow, priceCents: 0 },
+        guest: { enabled: false, flow: payFlow, priceCents: 0 },
         comp: { enabled: false, budgetCap: null },
       });
     } else if (t.accessMode === 'TICKETED') {
       setAccess({
-        member: { enabled: true, gate: memberPrice > 0 ? 'pay' : 'auto_confirm', priceCents: memberPrice },
-        guest: { enabled: guestPrice > 0, gate: 'pay', priceCents: guestPrice },
+        member: { enabled: true, flow: memberPrice > 0 ? payFlow : openFlow, priceCents: memberPrice },
+        guest: { enabled: guestPrice > 0, flow: payFlow, priceCents: guestPrice },
         comp: { enabled: false, budgetCap: null },
       });
     } else if (t.accessMode === 'APPLY_OR_PAY') {
       setAccess({
-        member: { enabled: true, gate: approved ? 'questions_approval' : 'auto_confirm', priceCents: 0 },
-        guest: { enabled: true, gate: approved ? 'apply' : 'pay', priceCents: guestPrice },
+        member: { enabled: true, flow: approved ? applyFlow : openFlow, priceCents: 0 },
+        guest: { enabled: true, flow: approved ? applyFlow : payFlow, priceCents: guestPrice },
         comp: { enabled: false, budgetCap: null },
       });
     } else {
@@ -662,6 +673,7 @@ export default function NewEventPage() {
               onChange={setAccess}
               questions={questions}
               onQuestionsChange={setQuestions}
+              eventTitle={form.title}
             />
           </section>
         )}
@@ -733,7 +745,13 @@ export default function NewEventPage() {
               </PrimaryButton>
             )}
             {step === 3 && (
-              <PrimaryButton type="button" onClick={() => setStep(4)}>
+              <PrimaryButton
+                type="button"
+                onClick={() => {
+                  setToast('Flow saved ✓');
+                  setStep(4);
+                }}
+              >
                 Next →
               </PrimaryButton>
             )}
@@ -750,6 +768,18 @@ export default function NewEventPage() {
           </div>
         </div>
       </div>
+      {toast && <FlowToast message={toast} />}
+    </div>
+  );
+}
+
+function FlowToast({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-sm bg-[var(--apply-ink)] px-4 py-2.5 text-[12px] font-medium text-[#F9F7F2] shadow-[0_4px_16px_rgba(28,16,8,0.25)] font-[family-name:var(--font-dm-sans)]"
+    >
+      {message}
     </div>
   );
 }

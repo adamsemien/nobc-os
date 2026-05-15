@@ -8,6 +8,8 @@ import {
   type ShowTo,
   FIELD_TYPE_OPTIONS,
   SHOW_TO_OPTIONS,
+  QUESTION_BANK,
+  questionFromBank,
   appliesToMember,
   appliesToGuest,
 } from '@/lib/registration-fields';
@@ -44,11 +46,12 @@ const SHOW_TO_LABEL: Record<ShowTo, string> = {
 };
 
 export function RegistrationFieldsEditor({ group, questions, onChange }: Props) {
+  const groupShowTo: ShowTo = group === 'member' ? 'members' : 'guests';
   const emptyDraft: Draft = {
     label: '',
     type: 'text',
     required: false,
-    showTo: group === 'member' ? 'members' : 'guests',
+    showTo: groupShowTo,
     options: '',
   };
 
@@ -58,10 +61,15 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
   const groupFields = questions.filter(
     group === 'member' ? appliesToMember : appliesToGuest,
   );
+  const usedLabels = new Set(questions.map((q) => q.label.toLowerCase()));
+
+  function add(q: AccessQuestion) {
+    onChange([...questions, q]);
+  }
 
   function commitDraft() {
     if (!draft.label.trim()) return;
-    const q: AccessQuestion = {
+    add({
       tempId: `new-${Date.now()}`,
       label: draft.label.trim(),
       type: draft.type,
@@ -71,8 +79,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
         draft.type === 'select'
           ? draft.options.split(',').map((s) => s.trim()).filter(Boolean)
           : [],
-    };
-    onChange([...questions, q]);
+    });
     setDraft(emptyDraft);
     setAdding(false);
   }
@@ -88,7 +95,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
       </p>
 
       {groupFields.length > 0 && (
-        <ul className="mb-2 flex flex-col gap-1.5">
+        <ul className="mb-3 flex flex-col gap-1.5">
           {groupFields.map((q) => (
             <li
               key={q.tempId}
@@ -110,11 +117,6 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
                   <span className="rounded-sm bg-[#F9F7F2] px-1.5 py-0.5">
                     {SHOW_TO_LABEL[q.showTo]}
                   </span>
-                  {q.type === 'select' && q.options.length > 0 ? (
-                    <span className="rounded-sm bg-[#F9F7F2] px-1.5 py-0.5">
-                      {q.options.length} options
-                    </span>
-                  ) : null}
                 </p>
               </div>
               <button
@@ -129,6 +131,32 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
           ))}
         </ul>
       )}
+
+      {/* Question Bank */}
+      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        Question bank
+      </p>
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {QUESTION_BANK.map((entry) => {
+          const used = usedLabels.has(entry.label.toLowerCase());
+          return (
+            <button
+              key={entry.label}
+              type="button"
+              disabled={used}
+              onClick={() => add(questionFromBank(entry, groupShowTo))}
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors font-[family-name:var(--font-dm-sans)] ${
+                used
+                  ? 'cursor-not-allowed border-[var(--apply-rule)] text-[var(--apply-muted)] opacity-50'
+                  : 'border-[var(--apply-rule)] text-[var(--apply-ink)] hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]'
+              }`}
+            >
+              {!used && <Plus className="h-3 w-3" />}
+              {entry.label}
+            </button>
+          );
+        })}
+      </div>
 
       {adding ? (
         <div className="flex flex-col gap-3 rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2] p-3">
@@ -232,7 +260,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
           className="inline-flex items-center gap-1.5 rounded-sm border border-dashed border-[var(--apply-rule)] px-3 py-2 text-sm text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
         >
           <Plus className="h-4 w-4" />
-          Add Registration Field
+          Add custom field
         </button>
       )}
     </div>

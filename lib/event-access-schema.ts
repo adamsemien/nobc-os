@@ -1,25 +1,13 @@
 import { z } from "zod"
 
-export const MemberGateSchema = z.enum([
-  "auto_confirm",
-  "questions",
-  "questions_approval",
-  "pay",
-  "pay_questions",
-  "questions_pay",
-  "questions_pay_approval",
-])
-export type MemberGate = z.infer<typeof MemberGateSchema>
-
-export const GuestGateSchema = z.enum([
-  "pay",
-  "apply",
-  "pay_questions",
-  "questions_pay",
-  "apply_pay",
-  "questions_approval",
-])
-export type GuestGate = z.infer<typeof GuestGateSchema>
+/**
+ * A flow is the ordered list of step blocks an operator stacks after the
+ * implicit "Register" anchor. Every group stores its flow directly — the
+ * ordered sequence IS the configuration. A "Gate: Approval" step can sit at
+ * any position.
+ */
+export const FlowStepSchema = z.enum(["fields", "pay", "approval"])
+export type FlowStep = z.infer<typeof FlowStepSchema>
 
 export const CompTypeSchema = z.enum([
   "sponsor",
@@ -31,17 +19,12 @@ export const CompTypeSchema = z.enum([
 ])
 export type CompType = z.infer<typeof CompTypeSchema>
 
-export const MemberAccessSchema = z.object({
+export const GroupAccessSchema = z.object({
   enabled: z.boolean(),
-  gate: MemberGateSchema,
+  flow: z.array(FlowStepSchema),
   priceCents: z.number().int().min(0),
 })
-
-export const GuestAccessSchema = z.object({
-  enabled: z.boolean(),
-  gate: GuestGateSchema,
-  priceCents: z.number().int().min(0),
-})
+export type GroupAccess = z.infer<typeof GroupAccessSchema>
 
 export const CompAccessSchema = z.object({
   enabled: z.boolean(),
@@ -49,25 +32,24 @@ export const CompAccessSchema = z.object({
 })
 
 export const EventAccessSchema = z.object({
-  member: MemberAccessSchema,
-  guest: GuestAccessSchema,
+  member: GroupAccessSchema,
+  guest: GroupAccessSchema,
   comp: CompAccessSchema,
 })
 export type EventAccess = z.infer<typeof EventAccessSchema>
 
-export function defaultEventAccess(): EventAccess {
-  return {
-    member: { enabled: true, gate: "auto_confirm", priceCents: 0 },
-    guest: { enabled: false, gate: "pay", priceCents: 0 },
-    comp: { enabled: false, budgetCap: null },
-  }
+/** Default flow for a group the first time it is enabled. */
+export function defaultMemberFlow(): FlowStep[] {
+  return ["fields", "approval"]
+}
+export function defaultGuestFlow(): FlowStep[] {
+  return ["pay"]
 }
 
-export const UNSUPPORTED_GATES = new Set<string>([
-  "questions_pay_approval",
-  "apply_pay",
-])
-
-export function isGateSupported(gate: string): boolean {
-  return !UNSUPPORTED_GATES.has(gate)
+export function defaultEventAccess(): EventAccess {
+  return {
+    member: { enabled: true, flow: defaultMemberFlow(), priceCents: 0 },
+    guest: { enabled: false, flow: defaultGuestFlow(), priceCents: 0 },
+    comp: { enabled: false, budgetCap: null },
+  }
 }
