@@ -11,6 +11,7 @@ const listSelect = {
   location: true,
   mapsUrl: true,
   runOfShow: true,
+  template: true,
   accessMode: true,
   applyMode: true,
   approvalRequired: true,
@@ -18,6 +19,7 @@ const listSelect = {
   showCapacity: true,
   priceInCents: true,
   nonMemberPriceInCents: true,
+  eventAccess: true,
 } as const;
 
 export async function getPublishedEvents(workspaceId: string) {
@@ -66,6 +68,9 @@ export async function getEventBySlug(workspaceId: string, slug: string) {
           options: true,
           required: true,
           order: true,
+          showToMember: true,
+          showToGuest: true,
+          whenInFlow: true,
         },
         orderBy: { order: 'asc' },
       },

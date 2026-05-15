@@ -3,13 +3,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { z } from 'zod';
+import { EventAccessSchema } from '@/lib/event-access-schema';
+import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
 
 const CustomQuestionSchema = z.object({
   id: z.string(),
-  type: z.enum(['text', 'textarea', 'select', 'checkbox', 'number', 'date']),
+  type: z.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'number', 'date', 'email', 'phone']),
   label: z.string().min(1),
   required: z.boolean().default(false),
   options: z.array(z.string()).optional(),
+  showToMember: z.boolean().optional(),
+  showToGuest: z.boolean().optional(),
+  whenInFlow: z.enum(['BEFORE_SUBMIT', 'AFTER_PAYMENT', 'BEFORE_APPROVAL']).optional(),
 });
 
 const UpdateSchema = z.object({
@@ -29,7 +34,9 @@ const UpdateSchema = z.object({
   plusOnesAllowed: z.boolean().optional(),
   showCapacity: z.boolean().optional(),
   runOfShow: z.string().optional().nullable(),
+  template: z.enum(['editorial', 'split', 'minimal']).optional(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'CANCELLED']).optional(),
+  eventAccess: EventAccessSchema.optional(),
 });
 
 export async function GET(
@@ -42,17 +49,36 @@ export async function GET(
   const workspaceId = await requireWorkspaceId(userId);
   const { id } = await params;
 
-  const event = await db.event.findFirst({
-    where: { id, workspaceId },
-    include: {
-      customQuestions: { orderBy: { order: 'asc' } },
-      _count: { select: { rsvps: true } },
-    },
-  });
+  const [event, rsvpStats] = await Promise.all([
+    db.event.findFirst({
+      where: { id, workspaceId },
+      include: {
+        customQuestions: { orderBy: { order: 'asc' } },
+        _count: { select: { rsvps: true } },
+      },
+    }),
+    db.rSVP.groupBy({
+      by: ['ticketStatus'],
+      where: { workspaceId, eventId: id },
+      _count: { _all: true },
+    }),
+  ]);
 
   if (!event) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  return NextResponse.json({ event });
+  const confirmedCount = rsvpStats.find(r => r.ticketStatus === 'confirmed')?._count._all ?? 0;
+  const heldCount = rsvpStats.find(r => r.ticketStatus === 'held')?._count._all ?? 0;
+  const revenueCents =
+    event.priceInCents != null && event.priceInCents > 0
+      ? confirmedCount * event.priceInCents
+      : 0;
+
+  return NextResponse.json({
+    event: {
+      ...event,
+      _stats: { confirmedCount, heldCount, capacityUsed: confirmedCount + heldCount, revenueCents },
+    },
+  });
 }
 
 export async function PATCH(
@@ -74,12 +100,22 @@ export async function PATCH(
   const parsed = UpdateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
 
-  const { customQuestions, startAt, endAt, ...rest } = parsed.data;
+  const { customQuestions, startAt, endAt, eventAccess: eventAccessInput, ...rest } = parsed.data;
 
   // Coerce datetime strings to Date objects
   const eventData: Record<string, unknown> = { ...rest };
   if (startAt) eventData.startAt = new Date(startAt);
   if (endAt !== undefined) eventData.endAt = endAt ? new Date(endAt) : null;
+
+  if (eventAccessInput) {
+    const derived = deriveLegacyFromAccess(eventAccessInput);
+    eventData.eventAccess = eventAccessInput as object;
+    eventData.accessMode = derived.accessMode;
+    eventData.applyMode = derived.applyMode;
+    eventData.approvalRequired = derived.approvalRequired;
+    eventData.priceInCents = derived.priceInCents;
+    eventData.nonMemberPriceInCents = derived.nonMemberPriceInCents;
+  }
 
   const statusChanged = rest.status !== undefined && rest.status !== event.status;
 
@@ -92,10 +128,13 @@ export async function PATCH(
             eventId: id,
             workspaceId,
             label: q.label,
-            fieldType: q.type.toUpperCase() as 'TEXT' | 'TEXTAREA' | 'SELECT' | 'CHECKBOX' | 'DATE',
+            fieldType: q.type.toUpperCase() as 'TEXT' | 'TEXTAREA' | 'SELECT' | 'MULTISELECT' | 'CHECKBOX' | 'DATE' | 'EMAIL' | 'PHONE',
             options: q.options ?? [],
             required: q.required,
             order: idx,
+            showToMember: q.showToMember ?? true,
+            showToGuest: q.showToGuest ?? true,
+            whenInFlow: q.whenInFlow ?? 'BEFORE_SUBMIT',
           })),
         });
       }

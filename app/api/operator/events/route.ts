@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { z } from 'zod';
+import { EventAccessSchema, defaultEventAccess } from '@/lib/event-access-schema';
+import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
 
 export async function GET() {
   const { userId } = await auth();
@@ -41,6 +43,16 @@ export async function GET() {
   return NextResponse.json({ events: result });
 }
 
+const CustomQuestionInput = z.object({
+  label: z.string().min(1),
+  type: z.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'email', 'phone']),
+  required: z.boolean().default(false),
+  options: z.array(z.string()).optional(),
+  showToMember: z.boolean().default(true),
+  showToGuest: z.boolean().default(true),
+  whenInFlow: z.enum(['BEFORE_SUBMIT', 'AFTER_PAYMENT', 'BEFORE_APPROVAL']).default('BEFORE_SUBMIT'),
+});
+
 const CreateSchema = z.object({
   title: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
@@ -58,7 +70,10 @@ const CreateSchema = z.object({
   plusOnesAllowed: z.boolean().default(false),
   showCapacity: z.boolean().default(false),
   runOfShow: z.string().optional().nullable(),
+  template: z.enum(['editorial', 'split', 'minimal']).default('editorial'),
   status: z.enum(['DRAFT', 'PUBLISHED']).default('DRAFT'),
+  customQuestions: z.array(CustomQuestionInput).optional(),
+  eventAccess: EventAccessSchema.optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -73,15 +88,18 @@ export async function POST(req: NextRequest) {
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
 
-  const data = parsed.data;
+  const { customQuestions, eventAccess: eventAccessInput, ...data } = parsed.data;
 
   const slugTaken = await db.event.findUnique({
     where: { workspaceId_slug: { workspaceId, slug: data.slug } },
   });
   if (slugTaken) return NextResponse.json({ error: 'Slug already in use' }, { status: 409 });
 
-  const [event] = await db.$transaction([
-    db.event.create({
+  const eventAccess = eventAccessInput ?? defaultEventAccess();
+  const derived = deriveLegacyFromAccess(eventAccess);
+
+  const event = await db.$transaction(async tx => {
+    const ev = await tx.event.create({
       data: {
         workspaceId,
         title: data.title,
@@ -92,18 +110,38 @@ export async function POST(req: NextRequest) {
         location: data.location ?? null,
         heroImageAssetId: data.heroImageAssetId ?? null,
         capacity: data.capacity ?? null,
-        accessMode: data.accessMode,
-        applyMode: data.applyMode ?? null,
-        priceInCents: data.priceInCents ?? null,
-        nonMemberPriceInCents: data.nonMemberPriceInCents ?? null,
-        approvalRequired: data.approvalRequired,
+        accessMode: eventAccessInput ? derived.accessMode : data.accessMode,
+        applyMode: eventAccessInput ? derived.applyMode : (data.applyMode ?? null),
+        priceInCents: eventAccessInput ? derived.priceInCents : (data.priceInCents ?? null),
+        nonMemberPriceInCents: eventAccessInput ? derived.nonMemberPriceInCents : (data.nonMemberPriceInCents ?? null),
+        approvalRequired: eventAccessInput ? derived.approvalRequired : data.approvalRequired,
         plusOnesAllowed: data.plusOnesAllowed,
         showCapacity: data.showCapacity,
         runOfShow: data.runOfShow ?? null,
+        template: data.template,
         status: data.status,
+        eventAccess: eventAccess as object,
       },
-    }),
-    db.auditEvent.create({
+    });
+
+    if (customQuestions && customQuestions.length > 0) {
+      await tx.eventCustomQuestion.createMany({
+        data: customQuestions.map((q, idx) => ({
+          eventId: ev.id,
+          workspaceId,
+          label: q.label,
+          fieldType: q.type.toUpperCase() as 'TEXT' | 'TEXTAREA' | 'SELECT' | 'MULTISELECT' | 'CHECKBOX' | 'DATE' | 'EMAIL' | 'PHONE',
+          options: q.options ?? [],
+          required: q.required,
+          order: idx,
+          showToMember: q.showToMember,
+          showToGuest: q.showToGuest,
+          whenInFlow: q.whenInFlow,
+        })),
+      });
+    }
+
+    await tx.auditEvent.create({
       data: {
         workspaceId,
         actorId: userId,
@@ -111,8 +149,10 @@ export async function POST(req: NextRequest) {
         entityType: 'EVENT',
         entityId: data.slug,
       },
-    }),
-  ]);
+    });
+
+    return ev;
+  });
 
   return NextResponse.json({ event }, { status: 201 });
 }
