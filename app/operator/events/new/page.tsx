@@ -96,8 +96,8 @@ function StepIndicator({ current }: { current: Step }) {
                 active
                   ? 'border-[var(--nobc-red)] bg-[var(--nobc-red)] text-[var(--nobc-on-red)]'
                   : done
-                    ? 'border-[var(--apply-rule)] bg-[#F9F7F2] text-[var(--apply-ink)]'
-                    : 'border-[var(--apply-rule)] bg-white text-[var(--apply-muted)]'
+                    ? 'border-[var(--apply-rule)] bg-raised text-[var(--apply-ink)]'
+                    : 'border-[var(--apply-rule)] bg-card text-[var(--apply-muted)]'
               }`}
               aria-current={active ? 'step' : undefined}
             >
@@ -125,7 +125,7 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...rest}
-      className={`w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)] ${className}`}
+      className={`w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)] ${className}`}
     />
   );
 }
@@ -151,7 +151,7 @@ function GhostButton({
   return (
     <button
       {...rest}
-      className={`inline-flex items-center justify-center gap-2 rounded-sm border border-[var(--apply-rule)] bg-white px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] disabled:opacity-50 font-[family-name:var(--font-dm-sans)] ${rest.className ?? ''}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-sm border border-[var(--apply-rule)] bg-card px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] disabled:opacity-50 font-[family-name:var(--font-dm-sans)] ${rest.className ?? ''}`}
     >
       {children}
     </button>
@@ -444,7 +444,7 @@ export default function NewEventPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F9F7F2] px-4 pb-24 pt-10 sm:px-6">
+    <div className="min-h-screen bg-raised px-4 pb-24 pt-10 sm:px-6">
       <div className="mx-auto max-w-3xl">
         <Link
           href="/operator/events"
@@ -475,7 +475,7 @@ export default function NewEventPage() {
               value={aiPrompt}
               onChange={e => setAiPrompt(e.target.value)}
               placeholder="A late summer rooftop dinner for 24 — long shared table, natural wine pairings, a chef from Saigon for one night only..."
-              className="w-full rounded-sm border border-[var(--apply-rule)] bg-white p-4 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full rounded-sm border border-[var(--apply-rule)] bg-card p-4 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             />
 
             {aiError ? (
@@ -551,7 +551,7 @@ export default function NewEventPage() {
                 rows={6}
                 value={form.description}
                 onChange={e => set('description', e.target.value)}
-                className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+                className="w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
               />
             </div>
 
@@ -643,8 +643,8 @@ export default function NewEventPage() {
                       onClick={() => applyFlowTemplate(t)}
                       className={`flex flex-col items-start rounded-sm border px-4 py-3 text-left transition-colors ${
                         appliedTemplate?.id === t.id
-                          ? 'border-[var(--nobc-red)] bg-[#F9F7F2]'
-                          : 'border-[var(--apply-rule)] bg-white hover:border-[var(--nobc-red)]'
+                          ? 'border-[var(--nobc-red)] bg-raised'
+                          : 'border-[var(--apply-rule)] bg-card hover:border-[var(--nobc-red)]'
                       }`}
                     >
                       <span className="text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
@@ -693,7 +693,7 @@ export default function NewEventPage() {
         {submitError ? (
           <p
             role="alert"
-            className="mt-6 rounded-sm border border-[var(--apply-rule)] bg-white px-4 py-3 text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+            className="mt-6 rounded-sm border border-[var(--apply-rule)] bg-card px-4 py-3 text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
           >
             {submitError}
           </p>

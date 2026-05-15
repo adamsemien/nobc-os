@@ -119,8 +119,8 @@ export function FlowBuilder({
             </button>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2] p-3">
-          <span className="inline-flex items-center rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm font-medium text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-raised p-3">
+          <span className="inline-flex items-center rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm font-medium text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
             Register
           </span>
 
@@ -150,19 +150,19 @@ export function FlowBuilder({
                 <button
                   type="button"
                   onClick={() => setMenuOpen((o) => !o)}
-                  className="inline-flex items-center gap-1.5 rounded-sm border border-dashed border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+                  className="inline-flex items-center gap-1.5 rounded-sm border border-dashed border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add Step
                 </button>
                 {menuOpen && (
-                  <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-60 rounded-sm border border-[var(--apply-rule)] bg-white p-1 shadow-lg">
+                  <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-60 rounded-sm border border-[var(--apply-rule)] bg-card p-1 shadow-lg">
                     {inactive.map((s) => (
                       <button
                         key={s}
                         type="button"
                         onClick={() => addStep(s)}
-                        className="flex w-full flex-col items-start rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-[#F9F7F2]"
+                        className="flex w-full flex-col items-start rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-raised"
                       >
                         <span className="text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
                           {FLOW_STEP_META[s].label}
@@ -224,7 +224,7 @@ function StepBlock({
         e.preventDefault();
         onDropOnto();
       }}
-      className={`inline-flex items-center gap-1.5 rounded-sm border border-[var(--nobc-red)] bg-[#FBEBE9] px-2.5 py-2 text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)] ${
+      className={`inline-flex items-center gap-1.5 rounded-sm border border-[var(--nobc-red)] bg-primary-soft px-2.5 py-2 text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)] ${
         isDragging ? 'opacity-40' : ''
       }`}
     >
@@ -267,7 +267,7 @@ function PriceInput({
   }, [valueCents]);
 
   return (
-    <span className="inline-flex items-center rounded-sm border border-[var(--apply-rule)] bg-white pl-1.5">
+    <span className="inline-flex items-center rounded-sm border border-[var(--apply-rule)] bg-card pl-1.5">
       <span className="text-xs text-[var(--apply-muted)]">$</span>
       <input
         type="text"

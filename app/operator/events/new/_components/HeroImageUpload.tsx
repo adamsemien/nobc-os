@@ -83,7 +83,7 @@ export function HeroImageUpload({ value, onChange }: Props) {
       />
 
       {value ? (
-        <div className="group relative aspect-video w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-white">
+        <div className="group relative aspect-video w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="Hero preview" className="h-full w-full object-cover" />
           <div className="absolute inset-0 hidden items-center justify-center gap-3 bg-[#1C1008]/40 group-hover:flex">
@@ -121,9 +121,9 @@ export function HeroImageUpload({ value, onChange }: Props) {
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
-          className={`flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-sm border-2 border-dashed bg-white px-4 text-center transition-colors ${
+          className={`flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-sm border-2 border-dashed bg-card px-4 text-center transition-colors ${
             dragOver
-              ? 'border-[var(--nobc-red)] bg-[#F9F7F2]'
+              ? 'border-[var(--nobc-red)] bg-raised'
               : 'border-[var(--apply-rule)] hover:border-[var(--nobc-red)]'
           }`}
         >
@@ -161,7 +161,7 @@ export function HeroImageUpload({ value, onChange }: Props) {
       {toast ? (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-[var(--apply-rule)] bg-white px-4 py-2.5 text-xs text-[var(--apply-ink)] shadow-md font-[family-name:var(--font-dm-sans)]"
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-sm border border-[var(--apply-rule)] bg-card px-4 py-2.5 text-xs text-[var(--apply-ink)] shadow-md font-[family-name:var(--font-dm-sans)]"
         >
           <span className="inline-flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 text-[var(--nobc-red)]" />

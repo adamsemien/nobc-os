@@ -124,7 +124,7 @@ function AccessGroup({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-sm border border-[var(--apply-rule)] bg-white p-5">
+    <div className="rounded-sm border border-[var(--apply-rule)] bg-card p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <h3 className="text-[22px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
@@ -153,7 +153,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (b: boolean
       }`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-all ${
           checked ? 'left-[22px]' : 'left-0.5'
         }`}
       />
@@ -181,7 +181,7 @@ function RegistrationStyleCard({
     },
   ];
   return (
-    <div className="rounded-sm border border-[var(--apply-rule)] bg-white p-5">
+    <div className="rounded-sm border border-[var(--apply-rule)] bg-card p-5">
       <h3 className="text-[22px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
         Registration style
       </h3>
@@ -198,8 +198,8 @@ function RegistrationStyleCard({
               onClick={() => onChange(o.key)}
               className={`rounded-sm border px-3 py-2.5 text-left transition-colors ${
                 active
-                  ? 'border-[var(--nobc-red)] bg-[#FBEBE9]'
-                  : 'border-[var(--apply-rule)] bg-white hover:border-[var(--nobc-red)]'
+                  ? 'border-[var(--nobc-red)] bg-primary-soft'
+                  : 'border-[var(--apply-rule)] bg-card hover:border-[var(--nobc-red)]'
               }`}
             >
               <span className="flex items-center gap-2">
@@ -249,7 +249,7 @@ function BudgetCapField({
           const v = e.target.value;
           onChange(v === '' ? null : Math.max(0, parseInt(v, 10) || 0));
         }}
-        className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+        className="w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
         placeholder="No cap"
       />
     </div>

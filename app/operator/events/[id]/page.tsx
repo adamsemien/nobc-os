@@ -184,7 +184,7 @@ export default async function OperatorEventDetailPage({
             href={`/m/events/${event.slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
           >
             Preview Member Page ↗
           </a>
@@ -193,7 +193,7 @@ export default async function OperatorEventDetailPage({
               href={`${PRODUCER_URL}/events/${event.slug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
+              className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
             >
               Open in Producer ↗
             </a>

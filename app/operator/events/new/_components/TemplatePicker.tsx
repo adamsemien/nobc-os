@@ -10,7 +10,7 @@ type Props = {
 
 function EditorialThumb() {
   return (
-    <div className="flex h-[120px] w-full flex-col overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-white">
+    <div className="flex h-[120px] w-full flex-col overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card">
       <div className="h-1/2 w-full bg-[var(--events-canvas)]" aria-hidden />
       <div className="flex flex-1 gap-2 p-2">
         <div className="flex flex-1 flex-col gap-1">
@@ -18,7 +18,7 @@ function EditorialThumb() {
           <div className="h-1.5 w-full rounded-sm bg-[var(--apply-rule)]" />
           <div className="h-1.5 w-5/6 rounded-sm bg-[var(--apply-rule)]" />
         </div>
-        <div className="w-1/3 rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2]" />
+        <div className="w-1/3 rounded-sm border border-[var(--apply-rule)] bg-raised" />
       </div>
     </div>
   );
@@ -26,7 +26,7 @@ function EditorialThumb() {
 
 function SplitThumb() {
   return (
-    <div className="flex h-[120px] w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-white">
+    <div className="flex h-[120px] w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card">
       <div className="h-full w-1/2 bg-[var(--events-canvas)]" aria-hidden />
       <div className="flex h-full flex-1 flex-col justify-center gap-1 px-3">
         <div className="h-2 w-3/4 rounded-sm bg-[var(--apply-ink)]" />
@@ -40,7 +40,7 @@ function SplitThumb() {
 
 function MinimalThumb() {
   return (
-    <div className="flex h-[120px] w-full items-center justify-center rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2]">
+    <div className="flex h-[120px] w-full items-center justify-center rounded-sm border border-[var(--apply-rule)] bg-raised">
       <div className="flex w-2/3 flex-col items-center gap-1.5">
         <div className="h-2 w-2/3 rounded-sm bg-[var(--apply-ink)]" />
         <div className="h-px w-full bg-[var(--apply-rule)]" />
@@ -99,7 +99,7 @@ export function TemplatePicker({ value, onChange, compact = false }: Props) {
             key={key}
             onClick={() => onChange(key)}
             aria-pressed={selected}
-            className={`relative shrink-0 rounded-sm border bg-white p-4 text-left transition-colors ${
+            className={`relative shrink-0 rounded-sm border bg-card p-4 text-left transition-colors ${
               selected
                 ? 'border-[var(--nobc-red)]'
                 : 'border-[var(--apply-rule)] hover:border-[var(--nobc-red)]'

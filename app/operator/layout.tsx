@@ -7,9 +7,12 @@ export default function OperatorLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: 'var(--nobc-ivory)' }}>
+    <div
+      className="operator-scope flex min-h-screen"
+      style={{ background: 'var(--page-bg)' }}
+    >
       <OperatorNav />
-      <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+      <main className="flex min-h-screen min-w-0 flex-1 flex-col">{children}</main>
       <AiChatPanel />
     </div>
   );

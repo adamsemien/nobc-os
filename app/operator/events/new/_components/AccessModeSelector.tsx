@@ -52,7 +52,7 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+      className="w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
     />
   );
 }
@@ -101,8 +101,8 @@ export function AccessModeSelector({ value, onChange }: Props) {
               aria-pressed={selected}
               className={`relative rounded-sm border px-5 py-4 text-left transition-colors ${
                 selected
-                  ? 'border-[var(--nobc-red)] bg-[#F9F7F2]'
-                  : 'border-[var(--apply-rule)] bg-white hover:border-[var(--nobc-red)]'
+                  ? 'border-[var(--nobc-red)] bg-raised'
+                  : 'border-[var(--apply-rule)] bg-card hover:border-[var(--nobc-red)]'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -121,7 +121,7 @@ export function AccessModeSelector({ value, onChange }: Props) {
         })}
       </div>
 
-      <div className="overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-white transition-[max-height] duration-300">
+      <div className="overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card transition-[max-height] duration-300">
         <div className="space-y-4 px-5 py-5">
           {value.mode === 'RSVP' && (
             <>

@@ -56,7 +56,7 @@ export function FlowPreview({ access, questions, eventTitle }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {/* View toggle */}
-      <div className="flex items-center rounded-sm bg-[#F1ECE2] p-0.5">
+      <div className="flex items-center rounded-sm bg-raised p-0.5">
         {(['guest', 'member'] as const).map((v) => (
           <button
             key={v}
@@ -76,8 +76,8 @@ export function FlowPreview({ access, questions, eventTitle }: Props) {
         ))}
       </div>
 
-      {/* Phone frame */}
-      <div className="mx-auto w-full max-w-[248px] rounded-[26px] border-[6px] border-[#1C1008] bg-[#1C1008] shadow-[0_8px_24px_rgba(28,16,8,0.22)]">
+      {/* Phone frame — pinned light: previews the always-light member UI */}
+      <div className="member-preview-scope mx-auto w-full max-w-[248px] rounded-[26px] border-[6px] border-[#1C1008] bg-[#1C1008] shadow-[0_8px_24px_rgba(28,16,8,0.22)]">
         <div className="relative overflow-hidden rounded-[20px] bg-[#F9F7F2]">
           <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-[#1C1008]/20" aria-hidden />
           <div className="flex min-h-[368px] flex-col px-4 pb-4 pt-3">

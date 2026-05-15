@@ -1,35 +1,115 @@
 @import "tailwindcss";
 
+/* ============================================================
+   THEME: NoBC (light) — default. Operator-tool token system.
+   ============================================================ */
+:root,
+[data-theme="nobc"] {
+  --bg: #F9F6F1;
+  --surface: #FFFFFF;
+  --raised: #F0EBE3;
+  --card: #FFFFFF;
+  --sidebar: #F4F0EA;
+  --sidebar-active-bg: color-mix(in srgb, #B22E21 8%, transparent);
+  --border: #E8E0D5;
+  --border-strong: #D4C9BB;
+  --text-primary: #1A1512;
+  --text-secondary: #6B5E52;
+  --text-tertiary: #A8978A;
+  --primary: #B22E21;
+  --primary-hover: #9A2419;
+  --primary-soft: color-mix(in srgb, #B22E21 10%, transparent);
+  --accent: #B22E21;
+  --accent-hover: #9A2419;
+  --accent-soft: color-mix(in srgb, #B22E21 10%, transparent);
+  --on-primary: #FFFFFF;
+  --success: #2D7A4F;
+  --success-soft: color-mix(in srgb, #2D7A4F 12%, transparent);
+  --warning: #B86A00;
+  --warning-soft: color-mix(in srgb, #B86A00 12%, transparent);
+  --danger: #B22E21;
+  --danger-soft: color-mix(in srgb, #B22E21 12%, transparent);
+  --neutral-soft: color-mix(in srgb, #A8978A 14%, transparent);
+  --radius-base: 10px;
+  --card-shadow: 0 1px 3px rgba(26, 21, 18, 0.06), 0 1px 2px rgba(26, 21, 18, 0.04);
+  --card-shadow-hover: 0 4px 16px rgba(26, 21, 18, 0.1), 0 2px 4px rgba(26, 21, 18, 0.06);
+  --sidebar-shadow: inset -1px 0 0 var(--border);
+  --page-bg: var(--bg);
+
+  /* Legacy operator aliases — keep existing components themed */
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--card);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+}
+
+/* ============================================================
+   THEME: Midnight (dark)
+   ============================================================ */
+[data-theme="midnight"] {
+  --bg: #0D0A14;
+  --surface: #150F20;
+  --raised: #1E1530;
+  --card: #1A1128;
+  --sidebar: #110D1C;
+  --sidebar-active-bg: color-mix(in srgb, #A26DB8 12%, transparent);
+  --border: #2C1F3E;
+  --border-strong: #3D2B55;
+  --text-primary: #F0EAF8;
+  --text-secondary: #9E83BE;
+  --text-tertiary: #5C4A7A;
+  --primary: #A26DB8;
+  --primary-hover: #B97FCC;
+  --primary-soft: color-mix(in srgb, #A26DB8 12%, transparent);
+  --accent: #7B3FA0;
+  --accent-hover: #8F4FBA;
+  --accent-soft: color-mix(in srgb, #7B3FA0 12%, transparent);
+  --on-primary: #0D0A14;
+  --success: #4A9E6A;
+  --success-soft: color-mix(in srgb, #4A9E6A 14%, transparent);
+  --warning: #C4820A;
+  --warning-soft: color-mix(in srgb, #C4820A 14%, transparent);
+  --danger: #C04A6B;
+  --danger-soft: color-mix(in srgb, #C04A6B 12%, transparent);
+  --neutral-soft: color-mix(in srgb, #5C4A7A 14%, transparent);
+  --radius-base: 10px;
+  --card-shadow: 0 0 0 1px #2C1F3E, 0 4px 24px rgba(162, 109, 184, 0.08);
+  --card-shadow-hover: 0 0 0 1px #3D2B55, 0 8px 32px rgba(162, 109, 184, 0.14);
+  --sidebar-shadow: inset -1px 0 0 #2C1F3E, 4px 0 24px rgba(162, 109, 184, 0.04);
+  --page-bg: radial-gradient(ellipse at 50% 0%, #1A1128 0%, #0D0A14 70%);
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--card);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+}
+
+/* ============================================================
+   Brand constants — member-facing identity, theme-independent.
+   ============================================================ */
 :root {
-  --background: #F5EFE8;
-  --foreground: #171717;
   --apply-cream: #F5EDE0;
   --apply-crimson: #C1121F;
   --apply-ink: #1C1008;
   --apply-muted: #8B7B6E;
   --apply-rule: #D4C4B4;
 
-  /* Operator / NoBC brand */
+  /* NoBC brand red — fixed */
   --nobc-red: #b22e21;
   --nobc-red-hover: color-mix(in oklab, var(--nobc-red) 86%, black);
   --nobc-on-red: oklch(0.99 0.004 85);
-  --nobc-ivory: #f5efe8;
-  --nobc-ink: #1c1c1c;
   --nobc-dark: #2a1f1a;
-  --nobc-hairline: rgba(0, 0, 0, 0.06);
 
-  /* Member UI — semantic (no hex in components) */
-  --primary: oklch(0.48 0.14 275);
-  --primary-hover: oklch(0.42 0.14 275);
-  --primary-foreground: oklch(0.99 0 0);
-  --text-primary: oklch(0.22 0.02 55);
-  --text-secondary: oklch(0.45 0.02 55);
-  --text-muted: oklch(0.55 0.02 55);
-  --border: oklch(0.9 0.01 55);
-  --surface: oklch(0.99 0.005 55);
-  --surface-elevated: oklch(1 0 0);
-  --muted: oklch(0.96 0.01 55);
-  --accent: oklch(0.94 0.03 275);
   --badge-open: oklch(0.55 0.12 155);
   --badge-open-bg: oklch(0.94 0.04 155);
   --badge-ticketed: oklch(0.48 0.14 275);
@@ -108,14 +188,31 @@
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-on-primary: var(--on-primary);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
   --color-text-muted: var(--text-muted);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-surface: var(--surface);
   --color-surface-elevated: var(--surface-elevated);
+  --color-bg: var(--bg);
+  --color-raised: var(--raised);
+  --color-card: var(--card);
+  --color-sidebar: var(--sidebar);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-neutral-soft: var(--neutral-soft);
   --color-badge-open: var(--badge-open);
   --color-badge-open-bg: var(--badge-open-bg);
   --color-badge-ticketed: var(--badge-ticketed);
@@ -174,19 +271,58 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-playfair: var(--font-playfair-display);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-cormorant: var(--font-cormorant);
+  --font-dm-sans: var(--font-dm-sans);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+/* Operator card surface */
+.op-card {
+  background: var(--card);
+  border-radius: var(--radius-base);
+  box-shadow: var(--card-shadow);
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease,
+    background-color 200ms ease,
+    border-color 200ms ease;
+}
+.op-card-hover:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* Operator subtree — alias the legacy member-brand vars to the active theme
+   so operator components built on the apply-* palette retheme with the tool. */
+.operator-scope {
+  --apply-ink: var(--text-primary);
+  --apply-muted: var(--text-secondary);
+  --apply-rule: var(--border);
+  --apply-cream: var(--card);
+  --nobc-red: var(--primary);
+  --nobc-red-hover: var(--primary-hover);
+  --nobc-on-red: var(--on-primary);
+  --nobc-ink: var(--text-primary);
+  --nobc-ivory: var(--bg);
+}
+
+/* A pinned-light island inside the operator subtree — used for member-UI
+   previews that should always show the member (light) experience. */
+.member-preview-scope {
+  --apply-ink: #1A1512;
+  --apply-muted: #6B5E52;
+  --apply-rule: #E8E0D5;
+  --nobc-red: #B22E21;
+  --nobc-on-red: #FFFFFF;
 }
 
 /* Member events hero: scrim + no hex in JSX */

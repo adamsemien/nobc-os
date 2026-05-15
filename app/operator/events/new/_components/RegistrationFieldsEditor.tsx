@@ -99,7 +99,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
           {groupFields.map((q) => (
             <li
               key={q.tempId}
-              className="flex items-start justify-between gap-3 rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2"
+              className="flex items-start justify-between gap-3 rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2"
             >
               <div className="min-w-0">
                 <p className="text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
@@ -111,10 +111,10 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
                   ) : null}
                 </p>
                 <p className="mt-0.5 flex flex-wrap gap-1.5 text-[10px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-                  <span className="rounded-sm bg-[#F9F7F2] px-1.5 py-0.5">
+                  <span className="rounded-sm bg-raised px-1.5 py-0.5">
                     {TYPE_LABEL[q.type]}
                   </span>
-                  <span className="rounded-sm bg-[#F9F7F2] px-1.5 py-0.5">
+                  <span className="rounded-sm bg-raised px-1.5 py-0.5">
                     {SHOW_TO_LABEL[q.showTo]}
                   </span>
                 </p>
@@ -159,7 +159,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
       </div>
 
       {adding ? (
-        <div className="flex flex-col gap-3 rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2] p-3">
+        <div className="flex flex-col gap-3 rounded-sm border border-[var(--apply-rule)] bg-raised p-3">
           <div>
             <FieldLabel>Label</FieldLabel>
             <input
@@ -168,7 +168,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
               value={draft.label}
               onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
               placeholder="e.g. Dietary restrictions"
-              className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             />
           </div>
 
@@ -180,7 +180,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, type: e.target.value as FieldType }))
                 }
-                className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+                className="w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
               >
                 {FIELD_TYPE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -196,7 +196,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, showTo: e.target.value as ShowTo }))
                 }
-                className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+                className="w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
               >
                 {SHOW_TO_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -215,7 +215,7 @@ export function RegistrationFieldsEditor({ group, questions, onChange }: Props) 
                 value={draft.options}
                 onChange={(e) => setDraft((d) => ({ ...d, options: e.target.value }))}
                 placeholder="Option A, Option B"
-                className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+                className="w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
               />
             </div>
           )}
