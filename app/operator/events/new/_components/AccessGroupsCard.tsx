@@ -1,13 +1,8 @@
 'use client';
 
 import type { EventAccess, MemberGate, GuestGate } from '@/lib/event-access-schema';
-import {
-  type AccessQuestion,
-  appliesToMember,
-  appliesToGuest,
-} from '@/lib/registration-fields';
+import type { AccessQuestion } from '@/lib/registration-fields';
 import { FlowBuilder } from './FlowBuilder';
-import { RegistrationFieldsEditor } from './RegistrationFieldsEditor';
 
 type Props = {
   value: EventAccess;
@@ -22,9 +17,6 @@ export function AccessGroupsCard({
   questions,
   onQuestionsChange,
 }: Props) {
-  const memberFields = questions.filter(appliesToMember).map((q) => q.label);
-  const guestFields = questions.filter(appliesToGuest).map((q) => q.label);
-
   return (
     <div className="flex flex-col gap-4">
       <AccessGroup
@@ -43,7 +35,8 @@ export function AccessGroupsCard({
           onPriceChange={(cents) =>
             onChange({ ...value, member: { ...value.member, priceCents: cents } })
           }
-          previewFields={memberFields}
+          questions={questions}
+          onQuestionsChange={onQuestionsChange}
         />
       </AccessGroup>
 
@@ -63,7 +56,8 @@ export function AccessGroupsCard({
           onPriceChange={(cents) =>
             onChange({ ...value, guest: { ...value.guest, priceCents: cents } })
           }
-          previewFields={guestFields}
+          questions={questions}
+          onQuestionsChange={onQuestionsChange}
         />
       </AccessGroup>
 
@@ -78,8 +72,6 @@ export function AccessGroupsCard({
           onChange={(n) => onChange({ ...value, comp: { ...value.comp, budgetCap: n } })}
         />
       </AccessGroup>
-
-      <RegistrationFieldsEditor questions={questions} onChange={onQuestionsChange} />
     </div>
   );
 }

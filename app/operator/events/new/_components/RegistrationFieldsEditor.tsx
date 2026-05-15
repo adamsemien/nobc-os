@@ -8,9 +8,14 @@ import {
   type ShowTo,
   FIELD_TYPE_OPTIONS,
   SHOW_TO_OPTIONS,
+  appliesToMember,
+  appliesToGuest,
 } from '@/lib/registration-fields';
 
+type Group = 'member' | 'guest';
+
 type Props = {
+  group: Group;
   questions: AccessQuestion[];
   onChange: (q: AccessQuestion[]) => void;
 };
@@ -21,14 +26,6 @@ type Draft = {
   required: boolean;
   showTo: ShowTo;
   options: string;
-};
-
-const EMPTY_DRAFT: Draft = {
-  label: '',
-  type: 'text',
-  required: false,
-  showTo: 'both',
-  options: '',
 };
 
 const TYPE_LABEL: Record<FieldType, string> = {
@@ -46,9 +43,21 @@ const SHOW_TO_LABEL: Record<ShowTo, string> = {
   guests: 'Guests only',
 };
 
-export function RegistrationFieldsEditor({ questions, onChange }: Props) {
+export function RegistrationFieldsEditor({ group, questions, onChange }: Props) {
+  const emptyDraft: Draft = {
+    label: '',
+    type: 'text',
+    required: false,
+    showTo: group === 'member' ? 'members' : 'guests',
+    options: '',
+  };
+
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+
+  const groupFields = questions.filter(
+    group === 'member' ? appliesToMember : appliesToGuest,
+  );
 
   function commitDraft() {
     if (!draft.label.trim()) return;
@@ -64,7 +73,7 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
           : [],
     };
     onChange([...questions, q]);
-    setDraft(EMPTY_DRAFT);
+    setDraft(emptyDraft);
     setAdding(false);
   }
 
@@ -73,24 +82,17 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
   }
 
   return (
-    <div className="rounded-sm border border-[var(--apply-rule)] bg-white p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-[22px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
-            Registration Fields
-          </h3>
-          <p className="mt-0.5 text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            Questions asked during the Answer Fields step
-          </p>
-        </div>
-      </div>
+    <div>
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        Registration fields
+      </p>
 
-      {questions.length > 0 && (
-        <ul className="mt-4 flex flex-col gap-2">
-          {questions.map((q) => (
+      {groupFields.length > 0 && (
+        <ul className="mb-2 flex flex-col gap-1.5">
+          {groupFields.map((q) => (
             <li
               key={q.tempId}
-              className="flex items-start justify-between gap-3 rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2] px-3 py-2.5"
+              className="flex items-start justify-between gap-3 rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2"
             >
               <div className="min-w-0">
                 <p className="text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
@@ -102,14 +104,14 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
                   ) : null}
                 </p>
                 <p className="mt-0.5 flex flex-wrap gap-1.5 text-[10px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-                  <span className="rounded-sm bg-white px-1.5 py-0.5">
+                  <span className="rounded-sm bg-[#F9F7F2] px-1.5 py-0.5">
                     {TYPE_LABEL[q.type]}
                   </span>
-                  <span className="rounded-sm bg-white px-1.5 py-0.5">
+                  <span className="rounded-sm bg-[#F9F7F2] px-1.5 py-0.5">
                     {SHOW_TO_LABEL[q.showTo]}
                   </span>
                   {q.type === 'select' && q.options.length > 0 ? (
-                    <span className="rounded-sm bg-white px-1.5 py-0.5">
+                    <span className="rounded-sm bg-[#F9F7F2] px-1.5 py-0.5">
                       {q.options.length} options
                     </span>
                   ) : null}
@@ -129,7 +131,7 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
       )}
 
       {adding ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2] p-4">
+        <div className="flex flex-col gap-3 rounded-sm border border-[var(--apply-rule)] bg-[#F9F7F2] p-3">
           <div>
             <FieldLabel>Label</FieldLabel>
             <input
@@ -143,7 +145,7 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <div className="flex-1 min-w-[140px]">
+            <div className="min-w-[140px] flex-1">
               <FieldLabel>Type</FieldLabel>
               <select
                 value={draft.type}
@@ -159,7 +161,7 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
                 ))}
               </select>
             </div>
-            <div className="flex-1 min-w-[140px]">
+            <div className="min-w-[140px] flex-1">
               <FieldLabel>Show to</FieldLabel>
               <select
                 value={draft.showTo}
@@ -183,9 +185,7 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
               <input
                 type="text"
                 value={draft.options}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, options: e.target.value }))
-                }
+                onChange={(e) => setDraft((d) => ({ ...d, options: e.target.value }))}
                 placeholder="Option A, Option B"
                 className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
               />
@@ -204,7 +204,7 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
             Required
           </label>
 
-          <div className="flex items-center gap-3 pt-1">
+          <div className="flex items-center gap-3 pt-0.5">
             <button
               type="button"
               onClick={commitDraft}
@@ -217,7 +217,7 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
               type="button"
               onClick={() => {
                 setAdding(false);
-                setDraft(EMPTY_DRAFT);
+                setDraft(emptyDraft);
               }}
               className="text-[11px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:underline font-[family-name:var(--font-dm-sans)]"
             >
@@ -229,7 +229,7 @@ export function RegistrationFieldsEditor({ questions, onChange }: Props) {
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-sm border border-dashed border-[var(--apply-rule)] px-3 py-2 text-sm text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+          className="inline-flex items-center gap-1.5 rounded-sm border border-dashed border-[var(--apply-rule)] px-3 py-2 text-sm text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
         >
           <Plus className="h-4 w-4" />
           Add Registration Field

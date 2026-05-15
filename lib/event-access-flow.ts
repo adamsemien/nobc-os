@@ -2,8 +2,9 @@ import type { MemberGate, GuestGate } from "./event-access-schema"
 import { isGateSupported } from "./event-access-schema"
 
 /**
- * A flow is built from optional step blocks the operator adds after the
- * implicit "Register" anchor. The ordered set of blocks maps to a gate enum.
+ * A flow is the ordered list of step blocks an operator stacks after the
+ * implicit "Register" anchor. The ordered sequence maps to a gate enum —
+ * order matters (pay-then-fields ≠ fields-then-pay).
  */
 export type FlowStep = "fields" | "pay" | "approval"
 
@@ -13,41 +14,36 @@ export const FLOW_STEP_META: Record<FlowStep, { label: string; hint: string }> =
   approval: { label: "Await Approval", hint: "You review and approve manually" },
 }
 
-const CANON_ORDER: FlowStep[] = ["fields", "pay", "approval"]
+export type GateResolution<G> = { gate: G; supported: boolean } | null
 
-/** Sort steps into canonical order and dedupe. */
-export function canonicalizeFlow(steps: FlowStep[]): FlowStep[] {
-  return CANON_ORDER.filter((s) => steps.includes(s))
+const MEMBER_MAP: Record<string, MemberGate> = {
+  "": "auto_confirm",
+  "fields": "questions",
+  "pay": "pay",
+  "fields,pay": "questions_pay",
+  "pay,fields": "pay_questions",
+  "fields,approval": "questions_approval",
+  "fields,pay,approval": "questions_pay_approval",
+  "pay,fields,approval": "questions_pay_approval",
 }
 
-export type GateResolution<G> =
-  | { gate: G; supported: boolean }
-  | null
+const GUEST_MAP: Record<string, GuestGate> = {
+  "pay": "pay",
+  "fields,pay": "questions_pay",
+  "pay,fields": "pay_questions",
+  "fields,approval": "apply",
+  "fields,pay,approval": "apply_pay",
+  "pay,fields,approval": "apply_pay",
+}
 
 export function memberGateFromFlow(steps: FlowStep[]): GateResolution<MemberGate> {
-  const key = canonicalizeFlow(steps).join(",")
-  const map: Record<string, MemberGate> = {
-    "": "auto_confirm",
-    "fields": "questions",
-    "fields,approval": "questions_approval",
-    "pay": "pay",
-    "fields,pay": "questions_pay",
-    "fields,pay,approval": "questions_pay_approval",
-  }
-  const gate = map[key]
+  const gate = MEMBER_MAP[steps.join(",")]
   if (!gate) return null
   return { gate, supported: isGateSupported(gate) }
 }
 
 export function guestGateFromFlow(steps: FlowStep[]): GateResolution<GuestGate> {
-  const key = canonicalizeFlow(steps).join(",")
-  const map: Record<string, GuestGate> = {
-    "pay": "pay",
-    "fields,approval": "apply",
-    "fields,pay": "questions_pay",
-    "fields,pay,approval": "apply_pay",
-  }
-  const gate = map[key]
+  const gate = GUEST_MAP[steps.join(",")]
   if (!gate) return null
   return { gate, supported: isGateSupported(gate) }
 }
@@ -58,7 +54,7 @@ export function flowFromMemberGate(gate: MemberGate): FlowStep[] {
     questions: ["fields"],
     questions_approval: ["fields", "approval"],
     pay: ["pay"],
-    pay_questions: ["fields", "pay"],
+    pay_questions: ["pay", "fields"],
     questions_pay: ["fields", "pay"],
     questions_pay_approval: ["fields", "pay", "approval"],
   }
@@ -70,7 +66,7 @@ export function flowFromGuestGate(gate: GuestGate): FlowStep[] {
     pay: ["pay"],
     apply: ["fields", "approval"],
     questions_approval: ["fields", "approval"],
-    pay_questions: ["fields", "pay"],
+    pay_questions: ["pay", "fields"],
     questions_pay: ["fields", "pay"],
     apply_pay: ["fields", "pay", "approval"],
   }
@@ -79,18 +75,18 @@ export function flowFromGuestGate(gate: GuestGate): FlowStep[] {
 
 /** "Register → Answer Fields → Pay" */
 export function describeFlow(steps: FlowStep[]): string {
-  const parts = ["Register", ...canonicalizeFlow(steps).map((s) => FLOW_STEP_META[s].label)]
-  return parts.join("  →  ")
+  return ["Register", ...steps.map((s) => FLOW_STEP_META[s].label)].join("  →  ")
 }
 
 /** Why a guest/member flow has no valid gate — short operator-facing hint. */
 export function invalidFlowHint(group: "member" | "guest", steps: FlowStep[]): string {
   if (group === "guest") {
-    const has = canonicalizeFlow(steps)
-    if (has.length === 0) return "Guests need at least a Pay or Await Approval step."
-    if (has.length === 1 && has[0] === "fields") {
+    if (steps.length === 0) {
+      return "Guests need a Pay or Await Approval step to register."
+    }
+    if (steps.length === 1 && steps[0] === "fields") {
       return "Add a Pay or Await Approval step — guests can't register for free."
     }
   }
-  return "This combination isn't available. Adjust the steps."
+  return "This combination isn't available yet. Adjust the steps."
 }
