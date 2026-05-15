@@ -1,13 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { generateObject } from 'ai';
-import { anthropic } from '@ai-sdk/anthropic';
+import { NextRequest, NextResponse, after } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { ApplySchema, answerQuestions } from '@/lib/apply-config';
-
-const TagSchema = z.object({ tags: z.array(z.string()) });
-
-const SUBSTANTIVE_KEYS = new Set(['workingOn', 'greatEnergy', 'learnedThisYear', 'meetPeople']);
+import { tagApplication } from '@/lib/ai/tag-application';
+import { attachEventRsvpAfterApply } from '@/lib/apply-event-rsvp';
 
 export async function POST(
   req: NextRequest,
@@ -32,7 +28,17 @@ export async function POST(
       { status: 400 },
     );
   }
-  const data = parsed.data as Record<string, string | boolean | undefined>;
+  const data = parsed.data as {
+    email: string;
+    phone?: string;
+    city?: string;
+    referredBy?: string;
+    consentEmail?: boolean;
+    consentSms?: boolean;
+    rsvpEventId?: string;
+    [key: string]: unknown;
+  };
+  const email = data.email;
 
   const workspace = await db.workspace.findUnique({ where: { slug } });
   if (!workspace) {
@@ -41,8 +47,6 @@ export async function POST(
       { status: 404 },
     );
   }
-
-  const email = data.email as string;
 
   const existing = await db.application.findFirst({
     where: {
@@ -55,46 +59,50 @@ export async function POST(
     return NextResponse.json({ status: 'already_applied' });
   }
 
-  // Split "full name" → firstName + lastName
-  const fullName = ((data.fullName as string) ?? '').trim();
-  const spaceIdx = fullName.indexOf(' ');
-  const firstName = spaceIdx >= 0 ? fullName.slice(0, spaceIdx) : fullName;
-  const lastName = spaceIdx >= 0 ? fullName.slice(spaceIdx + 1) : '';
+  const fullName = ((data as Record<string, unknown>).fullName as string ?? '').trim();
 
-  const redListed = await db.member.findFirst({
+  const redListedMember = await db.member.findFirst({
     where: { workspaceId: workspace.id, email, redListed: true },
   });
-  if (redListed) {
+  const redListedEntry = await db.redList.findFirst({
+    where: {
+      workspaceId: workspace.id,
+      OR: [
+        { email: email },
+        fullName ? { namePattern: { contains: fullName.split(' ')[0], mode: 'insensitive' } } : {},
+      ],
+    },
+  });
+  if (redListedMember || redListedEntry) {
     await db.application.create({
       data: {
         workspaceId: workspace.id,
         email,
-        firstName,
-        lastName,
-        phone: data.phone as string | undefined,
-        city: data.city as string | undefined,
-        referredBy: data.referredBy as string | undefined,
-        consentEmail: (data.consentEmail as boolean) ?? false,
-        consentSms: (data.consentSms as boolean) ?? false,
-        status: 'REJECTED',
+        fullName,
+        phone: data.phone,
+        city: data.city,
+        referredBy: data.referredBy,
+        consentEmail: data.consentEmail ?? false,
+        consentSms: data.consentSms ?? false,
+        status: 'HOLD',
+        duplicateFlag: true,
         aiTags: [],
       },
     });
     return NextResponse.json({ status: 'success' });
   }
 
-  const application = await db.$transaction(async tx => {
+  const application = await db.$transaction(async (tx) => {
     const app = await tx.application.create({
       data: {
         workspaceId: workspace.id,
         email,
-        firstName,
-        lastName,
-        phone: data.phone as string | undefined,
-        city: data.city as string | undefined,
-        referredBy: data.referredBy as string | undefined,
-        consentEmail: (data.consentEmail as boolean) ?? false,
-        consentSms: (data.consentSms as boolean) ?? false,
+        fullName,
+        phone: data.phone,
+        city: data.city,
+        referredBy: data.referredBy,
+        consentEmail: data.consentEmail ?? false,
+        consentSms: data.consentSms ?? false,
         status: 'PENDING',
         aiTags: [],
       },
@@ -106,7 +114,7 @@ export async function POST(
           data: {
             applicationId: app.id,
             questionKey: q.key,
-            answer: String(data[q.key] ?? ''),
+            answer: String(data[q.key as keyof typeof data] ?? ''),
           },
         }),
       ),
@@ -115,30 +123,23 @@ export async function POST(
     return app;
   });
 
-  try {
-    const answerContext = answerQuestions
-      .filter(q => SUBSTANTIVE_KEYS.has(q.key))
-      .map(q => `${q.label}:\n${String(data[q.key] ?? '')}`)
-      .join('\n\n');
+  after(
+    tagApplication(application.id).catch(err => {
+      console.error('[apply] tagApplication failed:', err);
+    }),
+  );
 
-    const { object } = await generateObject({
-      model: anthropic('claude-sonnet-4-6'),
-      schema: TagSchema,
-      prompt: `Extract 3–8 short descriptive tags from this No Bad Company membership application. Cover: industry/profession, personality/vibe signals, referral source, seniority signals, and location context. Tags should be lowercase, 1–3 words each, useful for filtering applicants.
-
-Applicant: ${firstName} ${lastName}
-City: ${(data.city as string) || 'not provided'}
-How they heard about us: ${(data.referredBy as string) || 'not provided'}
-
-${answerContext}`,
+  const { userId } = await auth();
+  if (userId && data.rsvpEventId) {
+    await attachEventRsvpAfterApply({
+      workspaceId: workspace.id,
+      clerkUserId: userId,
+      eventId: data.rsvpEventId,
+      email,
+      fullName,
+      phone: data.phone,
+      actorIdForAudit: userId,
     });
-
-    await db.application.update({
-      where: { id: application.id },
-      data: { aiTags: object.tags },
-    });
-  } catch (err) {
-    console.error('[apply] AI tagging failed:', err);
   }
 
   return NextResponse.json({ status: 'success' });

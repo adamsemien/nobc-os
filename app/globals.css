@@ -1,13 +1,100 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #F5EFE8;
   --foreground: #171717;
   --apply-cream: #F5EDE0;
   --apply-crimson: #C1121F;
   --apply-ink: #1C1008;
   --apply-muted: #8B7B6E;
   --apply-rule: #D4C4B4;
+
+  /* Operator / NoBC brand */
+  --nobc-red: #b22e21;
+  --nobc-red-hover: color-mix(in oklab, var(--nobc-red) 86%, black);
+  --nobc-on-red: oklch(0.99 0.004 85);
+  --nobc-ivory: #f5efe8;
+  --nobc-ink: #1c1c1c;
+  --nobc-dark: #2a1f1a;
+  --nobc-hairline: rgba(0, 0, 0, 0.06);
+
+  /* Member UI — semantic (no hex in components) */
+  --primary: oklch(0.48 0.14 275);
+  --primary-hover: oklch(0.42 0.14 275);
+  --primary-foreground: oklch(0.99 0 0);
+  --text-primary: oklch(0.22 0.02 55);
+  --text-secondary: oklch(0.45 0.02 55);
+  --text-muted: oklch(0.55 0.02 55);
+  --border: oklch(0.9 0.01 55);
+  --surface: oklch(0.99 0.005 55);
+  --surface-elevated: oklch(1 0 0);
+  --muted: oklch(0.96 0.01 55);
+  --accent: oklch(0.94 0.03 275);
+  --badge-open: oklch(0.55 0.12 155);
+  --badge-open-bg: oklch(0.94 0.04 155);
+  --badge-ticketed: oklch(0.48 0.14 275);
+  --badge-ticketed-bg: oklch(0.94 0.03 275);
+  --badge-apply: oklch(0.52 0.12 45);
+  --badge-apply-bg: oklch(0.96 0.04 45);
+
+  /* Operator queue — AI recommendation + actions (oklch only) */
+  --op-rec-strong-yes-bg: oklch(0.32 0.07 155);
+  --op-rec-strong-yes-fg: oklch(0.98 0.01 155);
+  --op-rec-yes-bg: oklch(0.92 0.05 155);
+  --op-rec-yes-fg: oklch(0.32 0.1 155);
+  --op-rec-unclear-bg: oklch(0.94 0.06 85);
+  --op-rec-unclear-fg: oklch(0.4 0.1 75);
+  --op-rec-no-bg: oklch(0.94 0.05 25);
+  --op-rec-no-fg: oklch(0.45 0.16 25);
+  --op-rec-strong-no-bg: oklch(0.32 0.12 22);
+  --op-rec-strong-no-fg: oklch(0.98 0.02 22);
+  --op-approve: oklch(0.45 0.14 155);
+  --op-approve-hover: oklch(0.38 0.14 155);
+  --op-approve-fg: oklch(0.99 0 0);
+  --op-reject: oklch(0.48 0.18 25);
+  --op-reject-hover: oklch(0.42 0.18 25);
+  --op-reject-fg: oklch(0.99 0 0);
+
+  /* Member events — private club / gallery invite (dark warm canvas, cream type) */
+  --events-canvas: oklch(0.21 0.011 48);
+  --events-canvas-raised: oklch(0.24 0.012 48);
+  --events-canvas-deep: oklch(0.17 0.01 45);
+  --events-fg: oklch(0.93 0.018 82);
+  --events-fg-soft: oklch(0.72 0.022 72);
+  --events-fg-quiet: oklch(0.52 0.02 62);
+  --events-line: oklch(0.34 0.014 52);
+  --events-line-soft: oklch(0.28 0.012 50);
+  --events-card: oklch(0.235 0.011 48);
+  --events-card-edge: oklch(0.3 0.014 52);
+  --events-shine: oklch(0.98 0.01 85 / 0.04);
+  --events-warm-accent: oklch(0.62 0.055 62);
+  --events-badge-open: oklch(0.72 0.08 150);
+  --events-badge-open-bg: oklch(0.3 0.04 150);
+  --events-badge-ticketed: oklch(0.72 0.06 280);
+  --events-badge-ticketed-bg: oklch(0.3 0.04 280);
+  --events-badge-apply: oklch(0.76 0.07 55);
+  --events-badge-apply-bg: oklch(0.32 0.04 55);
+  --events-cta-border: oklch(0.55 0.03 70);
+  --events-cta-fg: oklch(0.93 0.018 82);
+  --events-cta-hover: oklch(0.93 0.018 82 / 0.1);
+
+  /* Events editorial reference — cream field, terracotta accent, charcoal type */
+  --events-ref-cream: oklch(0.985 0.006 85);
+  --events-ref-cream-warm: oklch(0.97 0.009 78);
+  --events-ref-ink: oklch(0.22 0.014 48);
+  --events-ref-muted: oklch(0.44 0.018 52);
+  --events-ref-faint: oklch(0.62 0.02 55);
+  --events-ref-accent: oklch(0.52 0.11 38);
+  --events-ref-rule: oklch(0.88 0.012 72);
+  --events-ref-placeholder-a: oklch(0.94 0.022 78);
+  --events-ref-placeholder-b: oklch(0.9 0.028 72);
+
+  /* Apply + thanks: same canvas/type as member events editorial; brand red = NoBC */
+  --apply-cream: var(--events-ref-cream);
+  --apply-ink: var(--events-ref-ink);
+  --apply-muted: var(--events-ref-muted);
+  --apply-rule: var(--events-ref-rule);
+  --apply-crimson: var(--nobc-red);
 }
 
 @theme inline {
@@ -18,6 +105,72 @@
   --color-apply-ink: var(--apply-ink);
   --color-apply-muted: var(--apply-muted);
   --color-apply-rule: var(--apply-rule);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-badge-open: var(--badge-open);
+  --color-badge-open-bg: var(--badge-open-bg);
+  --color-badge-ticketed: var(--badge-ticketed);
+  --color-badge-ticketed-bg: var(--badge-ticketed-bg);
+  --color-badge-apply: var(--badge-apply);
+  --color-badge-apply-bg: var(--badge-apply-bg);
+  --color-op-rec-strong-yes-bg: var(--op-rec-strong-yes-bg);
+  --color-op-rec-strong-yes-fg: var(--op-rec-strong-yes-fg);
+  --color-op-rec-yes-bg: var(--op-rec-yes-bg);
+  --color-op-rec-yes-fg: var(--op-rec-yes-fg);
+  --color-op-rec-unclear-bg: var(--op-rec-unclear-bg);
+  --color-op-rec-unclear-fg: var(--op-rec-unclear-fg);
+  --color-op-rec-no-bg: var(--op-rec-no-bg);
+  --color-op-rec-no-fg: var(--op-rec-no-fg);
+  --color-op-rec-strong-no-bg: var(--op-rec-strong-no-bg);
+  --color-op-rec-strong-no-fg: var(--op-rec-strong-no-fg);
+  --color-op-approve: var(--op-approve);
+  --color-op-approve-hover: var(--op-approve-hover);
+  --color-op-approve-fg: var(--op-approve-fg);
+  --color-op-reject: var(--op-reject);
+  --color-op-reject-hover: var(--op-reject-hover);
+  --color-op-reject-fg: var(--op-reject-fg);
+  --color-events-canvas: var(--events-canvas);
+  --color-events-canvas-raised: var(--events-canvas-raised);
+  --color-events-canvas-deep: var(--events-canvas-deep);
+  --color-events-fg: var(--events-fg);
+  --color-events-fg-soft: var(--events-fg-soft);
+  --color-events-fg-quiet: var(--events-fg-quiet);
+  --color-events-line: var(--events-line);
+  --color-events-line-soft: var(--events-line-soft);
+  --color-events-card: var(--events-card);
+  --color-events-card-edge: var(--events-card-edge);
+  --color-events-shine: var(--events-shine);
+  --color-events-warm-accent: var(--events-warm-accent);
+  --color-events-badge-open: var(--events-badge-open);
+  --color-events-badge-open-bg: var(--events-badge-open-bg);
+  --color-events-badge-ticketed: var(--events-badge-ticketed);
+  --color-events-badge-ticketed-bg: var(--events-badge-ticketed-bg);
+  --color-events-badge-apply: var(--events-badge-apply);
+  --color-events-badge-apply-bg: var(--events-badge-apply-bg);
+  --color-events-cta-border: var(--events-cta-border);
+  --color-events-cta-fg: var(--events-cta-fg);
+  --color-events-cta-hover: var(--events-cta-hover);
+  --color-events-ref-cream: var(--events-ref-cream);
+  --color-events-ref-cream-warm: var(--events-ref-cream-warm);
+  --color-events-ref-ink: var(--events-ref-ink);
+  --color-events-ref-muted: var(--events-ref-muted);
+  --color-events-ref-faint: var(--events-ref-faint);
+  --color-events-ref-accent: var(--events-ref-accent);
+  --color-events-ref-rule: var(--events-ref-rule);
+  --color-events-ref-placeholder-a: var(--events-ref-placeholder-a);
+  --color-events-ref-placeholder-b: var(--events-ref-placeholder-b);
+  --color-nobc-red: var(--nobc-red);
+  --color-nobc-red-hover: var(--nobc-red-hover);
+  --color-nobc-on-red: var(--nobc-on-red);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-playfair: var(--font-playfair-display);
@@ -33,5 +186,67 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Member events hero: scrim + no hex in JSX */
+.events-hero-scrim {
+  background: linear-gradient(
+    to top,
+    var(--events-canvas) 0%,
+    color-mix(in oklab, var(--events-canvas) 55%, transparent) 38%,
+    transparent 72%
+  );
+}
+
+.events-card-shine {
+  box-shadow:
+    inset 0 1px 0 0 var(--events-shine),
+    0 1px 0 0 var(--events-line-soft);
+}
+
+/* Editorial events list — warm image placeholder (no initials) */
+.events-ref-ph {
+  background: linear-gradient(
+    152deg,
+    var(--events-ref-placeholder-a),
+    var(--events-ref-placeholder-b)
+  );
+}
+
+/* WCAG 2.2 AA — Focus rings for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--primary, #4338ca);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Remove outline from mouse interactions, keep for keyboard */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Skip-to-main for screen readers */
+.skip-to-main {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.skip-to-main:focus {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: auto;
+  height: auto;
+  padding: 12px 20px;
+  background: var(--primary, #4338ca);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 9999;
+  border-radius: 0 0 6px 0;
+  outline: none;
 }

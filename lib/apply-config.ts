@@ -216,5 +216,10 @@ function buildZodShape() {
   return shape;
 }
 
-export const ApplySchema = z.object(buildZodShape());
+export const ApplySchema = z
+  .object(buildZodShape())
+  .extend({
+    /** When set, authenticated apply may attach an event RSVP (apply_or_pay sub-modes). */
+    rsvpEventId: z.string().optional(),
+  });
 export type ApplyFormValues = z.infer<typeof ApplySchema>;

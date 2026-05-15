@@ -1,0 +1,138 @@
+import { auth } from '@clerk/nextjs/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { getMemberWorkspaceId } from '@/lib/auth';
+import { getOrCreateMemberFromClerk } from '@/lib/clerk-member';
+import { stripe } from '@/lib/stripe';
+
+export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const workspaceId = await getMemberWorkspaceId(userId);
+  if (!workspaceId) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
+
+  let body: { eventId: string; customAnswers?: Record<string, string | boolean | number | null> };
+  try {
+    body = (await req.json()) as { eventId: string; customAnswers?: Record<string, string | boolean | number | null> };
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
+
+  const { eventId, customAnswers } = body;
+  if (!eventId) return NextResponse.json({ error: 'eventId required' }, { status: 400 });
+
+  const event = await db.event.findFirst({
+    where: { id: eventId, workspaceId, status: 'PUBLISHED' },
+    select: {
+      id: true,
+      title: true,
+      priceInCents: true,
+      nonMemberPriceInCents: true,
+      capacity: true,
+      accessMode: true,
+    },
+  });
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  let member = await db.member.findFirst({
+    where: { workspaceId, clerkUserId: userId },
+    select: { id: true, approved: true, email: true, firstName: true, lastName: true },
+  });
+  if (!member && event.accessMode === 'APPLY_OR_PAY') {
+    member = await getOrCreateMemberFromClerk(workspaceId, userId);
+  }
+
+  if (!member) return NextResponse.json({ error: 'Members only' }, { status: 403 });
+
+  if (event.accessMode === 'TICKETED' && !member.approved) {
+    return NextResponse.json({ error: 'Members only' }, { status: 403 });
+  }
+
+  let amountCents = event.priceInCents ?? 0;
+  if (event.accessMode === 'APPLY_OR_PAY' && !member.approved) {
+    amountCents = event.nonMemberPriceInCents ?? event.priceInCents ?? 0;
+  }
+
+  if (!amountCents || amountCents <= 0) {
+    return NextResponse.json({ error: 'Event has no price' }, { status: 400 });
+  }
+
+  if (event.capacity) {
+    const taken = await db.rSVP.count({
+      where: { workspaceId, eventId, ticketStatus: { in: ['confirmed', 'held'] } },
+    });
+    if (taken >= event.capacity) {
+      return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+    }
+  }
+
+  const existing = await db.rSVP.findFirst({
+    where: { workspaceId, eventId, memberId: member.id },
+    select: { id: true, ticketStatus: true, stripePaymentIntentId: true },
+  });
+
+  if (existing) {
+    if (existing.ticketStatus === 'confirmed') {
+      return NextResponse.json({ error: 'Already reserved' }, { status: 409 });
+    }
+    if (existing.ticketStatus === 'held' && existing.stripePaymentIntentId) {
+      const pi = await stripe.paymentIntents.retrieve(existing.stripePaymentIntentId);
+      if (['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(pi.status)) {
+        return NextResponse.json({
+          clientSecret: pi.client_secret,
+          rsvpId: existing.id,
+          amountCents: pi.amount ?? amountCents,
+        });
+      }
+      if (pi.status !== 'canceled') {
+        await stripe.paymentIntents.cancel(existing.stripePaymentIntentId);
+      }
+    }
+  }
+
+  const pi = await stripe.paymentIntents.create({
+    amount: amountCents,
+    currency: 'usd',
+    capture_method: 'manual',
+    description: event.title,
+    receipt_email: member.email,
+    metadata: { workspaceId, eventId, memberId: member.id },
+  });
+
+  if (existing) {
+    await db.rSVP.update({
+      where: { id: existing.id },
+      data: {
+        stripePaymentIntentId: pi.id,
+        ticketStatus: 'held',
+        customAnswers: customAnswers ?? undefined,
+      },
+    });
+    return NextResponse.json({ clientSecret: pi.client_secret, rsvpId: existing.id, amountCents });
+  }
+
+  const rsvp = await db.rSVP.create({
+    data: {
+      workspaceId,
+      eventId,
+      memberId: member.id,
+      status: 'CONFIRMED',
+      ticketStatus: 'held',
+      stripePaymentIntentId: pi.id,
+      customAnswers: customAnswers ?? undefined,
+    },
+  });
+
+  await db.auditEvent.create({
+    data: {
+      workspaceId,
+      actorId: userId,
+      action: 'rsvp.payment_initiated',
+      entityType: 'RSVP',
+      entityId: rsvp.id,
+    },
+  });
+
+  return NextResponse.json({ clientSecret: pi.client_secret, rsvpId: rsvp.id, amountCents });
+}

@@ -1,0 +1,450 @@
+'use client';
+
+import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
+
+type EventFull = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  heroImageAssetId: string | null;
+  startAt: string;
+  endAt: string | null;
+  location: string | null;
+  status: string;
+  accessMode: string;
+  applyMode: string | null;
+  capacity: number | null;
+  showCapacity: boolean;
+  approvalRequired: boolean;
+  plusOnesAllowed: boolean;
+  priceInCents: number | null;
+  nonMemberPriceInCents: number | null;
+  runOfShow: string | null;
+  customQuestions: {
+    id: string;
+    label: string;
+    fieldType: string;
+    options: string[];
+    required: boolean;
+    order: number;
+  }[];
+  _count: { rsvps: number };
+};
+
+type Props = { event: EventFull };
+
+function toDateInput(iso: string | null): string {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
+function toTimeInput(iso: string | null): string {
+  if (!iso) return '';
+  return iso.slice(11, 16);
+}
+
+function combineDatetime(date: string, time: string): string | null {
+  if (!date) return null;
+  const t = time || '00:00';
+  return new Date(`${date}T${t}`).toISOString();
+}
+
+export function EventSettingsTab({ event }: Props) {
+  const [title, setTitle] = useState(event.title);
+  const [slug, setSlug] = useState(event.slug);
+  const [slugError, setSlugError] = useState('');
+  const [description, setDescription] = useState(event.description ?? '');
+  const [startDate, setStartDate] = useState(toDateInput(event.startAt));
+  const [startTime, setStartTime] = useState(toTimeInput(event.startAt));
+  const [endDate, setEndDate] = useState(toDateInput(event.endAt));
+  const [endTime, setEndTime] = useState(toTimeInput(event.endAt));
+  const [location, setLocation] = useState(event.location ?? '');
+  const [heroImageAssetId, setHeroImageAssetId] = useState(event.heroImageAssetId ?? '');
+  const [capacity, setCapacity] = useState(event.capacity ? String(event.capacity) : '');
+  const [accessMode, setAccessMode] = useState<'OPEN' | 'TICKETED' | 'APPLY_OR_PAY'>(
+    event.accessMode as 'OPEN' | 'TICKETED' | 'APPLY_OR_PAY',
+  );
+  const [memberPrice, setMemberPrice] = useState(
+    event.priceInCents ? (event.priceInCents / 100).toFixed(2) : '',
+  );
+  const [nonMemberPrice, setNonMemberPrice] = useState(
+    event.nonMemberPriceInCents ? (event.nonMemberPriceInCents / 100).toFixed(2) : '',
+  );
+  const [approvalRequired, setApprovalRequired] = useState(event.approvalRequired);
+  const [plusOnesAllowed, setPlusOnesAllowed] = useState(event.plusOnesAllowed);
+  const [showCapacity, setShowCapacity] = useState(event.showCapacity);
+  const [runOfShow, setRunOfShow] = useState(event.runOfShow ?? '');
+
+  const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [statusPending, setStatusPending] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(event.status);
+
+  const needsPrice = accessMode === 'TICKETED' || accessMode === 'APPLY_OR_PAY';
+
+  function handleSlugChange(val: string) {
+    setSlug(val);
+    if (val && !/^[a-z0-9-]+$/.test(val)) {
+      setSlugError('Only lowercase letters, numbers, and hyphens');
+    } else {
+      setSlugError('');
+    }
+  }
+
+  async function patch(body: Record<string, unknown>) {
+    const res = await fetch(`/api/operator/events/${event.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(text || `Request failed (${res.status})`);
+    }
+    return res.json();
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (slugError) return;
+    setSaving(true);
+    setFlash(null);
+    try {
+      const body: Record<string, unknown> = {
+        title,
+        slug: slug || undefined,
+        description: description || undefined,
+        startAt: combineDatetime(startDate, startTime),
+        endAt: combineDatetime(endDate, endTime) || undefined,
+        location: location || undefined,
+        heroImageAssetId: heroImageAssetId || undefined,
+        capacity: capacity ? parseInt(capacity, 10) : null,
+        accessMode,
+        approvalRequired,
+        plusOnesAllowed,
+        showCapacity,
+        runOfShow: runOfShow || undefined,
+        priceInCents: needsPrice && memberPrice ? Math.round(parseFloat(memberPrice) * 100) : null,
+        nonMemberPriceInCents:
+          accessMode === 'APPLY_OR_PAY' && nonMemberPrice
+            ? Math.round(parseFloat(nonMemberPrice) * 100)
+            : null,
+      };
+      await patch(body);
+      setFlash({ type: 'success', message: 'Event saved.' });
+    } catch (e) {
+      setFlash({ type: 'error', message: e instanceof Error ? e.message : 'Save failed.' });
+    } finally {
+      setSaving(false);
+      window.setTimeout(() => setFlash(null), 4000);
+    }
+  }
+
+  async function handleStatusChange(newStatus: 'PUBLISHED' | 'DRAFT') {
+    setStatusPending(true);
+    setFlash(null);
+    try {
+      await patch({ status: newStatus });
+      setCurrentStatus(newStatus);
+      setFlash({ type: 'success', message: newStatus === 'PUBLISHED' ? 'Event published.' : 'Event unpublished.' });
+    } catch (e) {
+      setFlash({ type: 'error', message: e instanceof Error ? e.message : 'Failed.' });
+    } finally {
+      setStatusPending(false);
+      window.setTimeout(() => setFlash(null), 4000);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} className="space-y-6">
+      {flash && (
+        <div
+          className={`rounded-md border border-border px-4 py-3 text-sm ${
+            flash.type === 'success' ? 'bg-surface text-text-primary' : 'bg-surface text-text-secondary'
+          }`}
+          style={{ borderRadius: '6px' }}
+        >
+          {flash.message}
+        </div>
+      )}
+
+      {/* Title */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">Title</label>
+        <input
+          required
+          type="text"
+          className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          style={{ borderRadius: '6px' }}
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+        />
+      </div>
+
+      {/* Slug */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">Slug</label>
+        <input
+          type="text"
+          className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 font-mono text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          style={{ borderRadius: '6px' }}
+          value={slug}
+          onChange={e => handleSlugChange(e.target.value)}
+        />
+        {slugError && <p className="mt-1 text-xs text-text-muted">{slugError}</p>}
+        {slug && !slugError && (
+          <p className="mt-1 text-xs text-text-muted">
+            /m/events/<span className="text-text-secondary">{slug}</span>
+          </p>
+        )}
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">Description</label>
+        <textarea
+          rows={5}
+          className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          style={{ borderRadius: '6px' }}
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
+      </div>
+
+      {/* Start date + time */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">
+          Start date &amp; time
+        </label>
+        <div className="flex gap-2">
+          <input
+            required
+            type="date"
+            className="flex-1 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ borderRadius: '6px' }}
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+          />
+          <input
+            type="time"
+            className="w-36 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ borderRadius: '6px' }}
+            value={startTime}
+            onChange={e => setStartTime(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* End date + time */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">
+          End date &amp; time <span className="text-text-muted">(optional)</span>
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            className="flex-1 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ borderRadius: '6px' }}
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+          />
+          <input
+            type="time"
+            className="w-36 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ borderRadius: '6px' }}
+            value={endTime}
+            onChange={e => setEndTime(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Location */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">Location</label>
+        <input
+          type="text"
+          className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          style={{ borderRadius: '6px' }}
+          value={location}
+          onChange={e => setLocation(e.target.value)}
+        />
+      </div>
+
+      {/* Hero image URL */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">Hero image URL</label>
+        <input
+          type="url"
+          className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+          style={{ borderRadius: '6px' }}
+          placeholder="https://..."
+          value={heroImageAssetId}
+          onChange={e => setHeroImageAssetId(e.target.value)}
+        />
+      </div>
+
+      {/* Capacity */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">
+          Capacity <span className="text-text-muted">(optional)</span>
+        </label>
+        <input
+          type="number"
+          min={1}
+          className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          style={{ borderRadius: '6px' }}
+          value={capacity}
+          onChange={e => setCapacity(e.target.value)}
+        />
+      </div>
+
+      {/* Access mode */}
+      <div>
+        <label className="mb-2 block text-sm font-medium text-text-secondary">Access mode</label>
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+          {(['OPEN', 'TICKETED', 'APPLY_OR_PAY'] as const).map(mode => (
+            <label key={mode} className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
+              <input
+                type="radio"
+                name="accessMode"
+                value={mode}
+                checked={accessMode === mode}
+                onChange={() => setAccessMode(mode)}
+                className="accent-primary"
+              />
+              {mode === 'OPEN' ? 'Open' : mode === 'TICKETED' ? 'Ticketed' : 'Apply or Pay'}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {needsPrice && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-secondary">Member price ($)</label>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ borderRadius: '6px' }}
+            placeholder="0.00"
+            value={memberPrice}
+            onChange={e => setMemberPrice(e.target.value)}
+          />
+        </div>
+      )}
+
+      {accessMode === 'APPLY_OR_PAY' && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-secondary">Non-member price ($)</label>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ borderRadius: '6px' }}
+            placeholder="0.00"
+            value={nonMemberPrice}
+            onChange={e => setNonMemberPrice(e.target.value)}
+          />
+        </div>
+      )}
+
+      {/* Toggles */}
+      <div className="space-y-3 rounded-lg border border-border p-4" style={{ borderRadius: '8px' }}>
+        <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
+          <input
+            type="checkbox"
+            className="accent-primary h-4 w-4"
+            checked={approvalRequired}
+            onChange={e => setApprovalRequired(e.target.checked)}
+          />
+          Approval required
+        </label>
+        <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
+          <input
+            type="checkbox"
+            className="accent-primary h-4 w-4"
+            checked={plusOnesAllowed}
+            onChange={e => setPlusOnesAllowed(e.target.checked)}
+          />
+          Plus-ones allowed
+        </label>
+        <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
+          <input
+            type="checkbox"
+            className="accent-primary h-4 w-4"
+            checked={showCapacity}
+            onChange={e => setShowCapacity(e.target.checked)}
+          />
+          Show capacity to members
+        </label>
+      </div>
+
+      {/* Run of show */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">Run of show</label>
+        <textarea
+          rows={4}
+          className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 font-mono text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          style={{ borderRadius: '6px' }}
+          value={runOfShow}
+          onChange={e => setRunOfShow(e.target.value)}
+        />
+      </div>
+
+      {/* Save */}
+      <button
+        type="submit"
+        disabled={saving || !!slugError}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity disabled:opacity-50"
+        style={{ borderRadius: '6px' }}
+      >
+        {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+        {saving ? 'Saving…' : 'Save Changes'}
+      </button>
+
+      {/* Status actions */}
+      <div className="flex flex-col gap-3 border-t border-border pt-6 sm:flex-row">
+        {currentStatus === 'DRAFT' && (
+          <button
+            type="button"
+            onClick={() => handleStatusChange('PUBLISHED')}
+            disabled={statusPending}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface-elevated px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-muted disabled:opacity-50"
+            style={{ borderRadius: '6px' }}
+          >
+            {statusPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Publish
+          </button>
+        )}
+        {currentStatus === 'PUBLISHED' && (
+          <button
+            type="button"
+            onClick={() => handleStatusChange('DRAFT')}
+            disabled={statusPending}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface-elevated px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-muted disabled:opacity-50"
+            style={{ borderRadius: '6px' }}
+          >
+            {statusPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Unpublish
+          </button>
+        )}
+        {currentStatus === 'DRAFT' && (
+          <button
+            type="button"
+            disabled
+            title="Can only delete drafts via database"
+            className="inline-flex flex-1 cursor-not-allowed items-center justify-center rounded-md border border-border bg-muted px-4 py-2.5 text-sm font-semibold text-text-muted opacity-50"
+            style={{ borderRadius: '6px' }}
+          >
+            Delete
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}

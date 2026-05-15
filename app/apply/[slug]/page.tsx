@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Playfair_Display } from 'next/font/google';
 import * as Checkbox from '@radix-ui/react-checkbox';
@@ -26,7 +27,7 @@ function buildInitialState(): Record<string, string | boolean> {
 }
 
 const inputCls =
-  'w-full border-0 border-b border-apply-rule bg-transparent py-3 text-base text-apply-ink placeholder:text-apply-muted/40 focus:outline-none focus:border-apply-ink transition-colors';
+  'w-full border-0 border-b border-apply-rule bg-transparent py-3 text-[15px] text-apply-ink placeholder:text-apply-muted/40 focus:outline-none focus:border-apply-ink transition-colors';
 
 function InputField({
   q,
@@ -39,7 +40,7 @@ function InputField({
 }) {
   return (
     <div>
-      <label htmlFor={q.key} className="block text-sm text-apply-muted mb-1">
+      <label htmlFor={q.key} className="block text-[15px] text-apply-muted mb-1">
         {q.label}
       </label>
       <input
@@ -65,7 +66,7 @@ function TextareaField({
 }) {
   return (
     <div>
-      <label htmlFor={q.key} className="block text-sm text-apply-muted mb-1">
+      <label htmlFor={q.key} className="block text-[15px] text-apply-muted mb-1">
         {q.label}
       </label>
       {q.note && (
@@ -95,12 +96,12 @@ function RadioField({
 }) {
   return (
     <div>
-      <span className="block text-sm text-apply-muted mb-3">{q.label}</span>
+      <span className="block text-[15px] text-apply-muted mb-3">{q.label}</span>
       <div className="flex gap-8">
         {(q.options ?? []).map(opt => (
           <label
             key={opt}
-            className="flex items-center gap-2 cursor-pointer text-sm text-apply-ink"
+            className="flex items-center gap-2 cursor-pointer text-[15px] text-apply-ink"
           >
             <input
               type="radio"
@@ -108,7 +109,7 @@ function RadioField({
               value={opt}
               checked={value === opt}
               onChange={() => onChange(opt)}
-              className="accent-apply-crimson"
+              className="accent-nobc-red"
             />
             {opt}
           </label>
@@ -141,7 +142,7 @@ function ConsentField({
       </Checkbox.Root>
       <label
         htmlFor={q.key}
-        className="text-sm text-apply-ink leading-snug cursor-pointer"
+        className="text-[15px] text-apply-ink leading-snug cursor-pointer"
       >
         {q.label}
       </label>
@@ -149,21 +150,86 @@ function ConsentField({
   );
 }
 
-function AlreadyAppliedView({ fontClass }: { fontClass: string }) {
+function SiteNav({ slug }: { slug: string }) {
   return (
-    <main
-      className={`${fontClass} min-h-screen bg-apply-cream flex flex-col items-center justify-center px-6 text-center`}
-    >
-      <p className="text-[11px] tracking-[0.25em] uppercase text-apply-muted mb-12">
-        THE <span className="text-apply-crimson">NO BAD</span> COMPANY
-      </p>
-      <h1 className="font-playfair text-4xl text-apply-ink mb-4">
-        You&rsquo;re already on the list.
-      </h1>
-      <p className="text-sm text-apply-muted max-w-xs">
-        We have your application. We&rsquo;ll be in touch.
-      </p>
-    </main>
+    <nav className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-5 sm:px-8">
+      <Link
+        href="/m/events"
+        className="text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-ref-ink sm:text-[0.7rem] sm:tracking-[0.16em]"
+      >
+        <span>THE </span>
+        <span className="text-events-ref-accent">NO BAD </span>
+        <span>COMPANY</span>
+      </Link>
+      <div className="flex items-center gap-6 sm:gap-8">
+        <Link
+          href="/m/events"
+          className="text-[0.65rem] font-normal uppercase tracking-[0.2em] text-events-ref-ink"
+        >
+          Events
+        </Link>
+        <Link
+          href={`/apply/${slug}`}
+          className="border border-nobc-red bg-nobc-red px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-nobc-on-red transition-colors hover:bg-nobc-red-hover sm:px-4 sm:text-[0.65rem]"
+          style={{ borderRadius: '4px' }}
+          aria-current="page"
+        >
+          Apply
+        </Link>
+      </div>
+    </nav>
+  );
+}
+
+function SiteFooter({ slug }: { slug: string }) {
+  return (
+    <footer className="border-t border-events-ref-rule bg-apply-cream">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10 sm:flex-row sm:items-start sm:justify-between sm:gap-8 sm:px-8 sm:py-12">
+        <p className="text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-ref-ink sm:text-[0.7rem] sm:tracking-[0.16em]">
+          <span>THE </span>
+          <span className="text-events-ref-accent">NO BAD </span>
+          <span>COMPANY</span>
+        </p>
+        <div className="flex flex-col gap-3 text-[0.65rem] font-normal uppercase tracking-[0.18em] text-events-ref-ink">
+          <Link href="/m/events" className="w-fit hover:text-nobc-red">
+            Programme
+          </Link>
+          <Link href={`/apply/${slug}`} className="w-fit hover:text-nobc-red" aria-current="page">
+            Apply
+          </Link>
+        </div>
+        <a
+          href="mailto:hello@thenobadcompany.com"
+          className="text-sm font-normal tracking-wide text-events-ref-muted underline-offset-4 hover:underline"
+        >
+          hello@thenobadcompany.com
+        </a>
+      </div>
+      <div className="mx-auto max-w-6xl px-6 pb-8 sm:px-8">
+        <p className="text-[0.6rem] font-normal uppercase tracking-[0.14em] text-events-ref-muted">
+          <span>The </span>
+          <span className="text-events-ref-accent">No Bad </span>
+          <span>Company · By application</span>
+        </p>
+      </div>
+    </footer>
+  );
+}
+
+function AlreadyAppliedView({ fontClass, slug }: { fontClass: string; slug: string }) {
+  return (
+    <div className={`${fontClass} min-h-screen bg-apply-cream flex flex-col`}>
+      <SiteNav slug={slug} />
+      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <h1 className="font-playfair text-4xl text-apply-ink mb-4">
+          You&rsquo;re already on the list.
+        </h1>
+        <p className="text-[15px] text-apply-muted max-w-xs">
+          We have your application. We&rsquo;ll be in touch.
+        </p>
+      </main>
+      <SiteFooter slug={slug} />
+    </div>
   );
 }
 
@@ -209,7 +275,7 @@ export default function ApplyPage({
 
   const fontClass = playfair.variable;
 
-  if (status === 'already_applied') return <AlreadyAppliedView fontClass={fontClass} />;
+  if (status === 'already_applied') return <AlreadyAppliedView fontClass={fontClass} slug={slug} />;
 
   const questionsBySection = APPLY_SECTIONS.map(s => ({
     section: s,
@@ -217,104 +283,119 @@ export default function ApplyPage({
   }));
 
   return (
-    <main className={`${fontClass} min-h-screen bg-apply-cream px-6 py-14 md:py-20`}>
-      <div className="max-w-lg mx-auto">
-        {/* Wordmark */}
-        <p className="text-[11px] tracking-[0.25em] uppercase text-apply-ink mb-16">
-          THE <span className="text-apply-crimson">NO BAD</span> COMPANY
-        </p>
+    <div className={`${fontClass} min-h-screen bg-apply-cream flex flex-col`}>
+      <SiteNav slug={slug} />
 
-        {/* Headline */}
-        <h1 className="font-playfair text-5xl leading-[1.15] text-apply-ink mb-5">
-          Tell us who you are.
-          <br />
-          <em>Not what you do.</em>
-        </h1>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-12 sm:px-8 md:py-16">
+        <div className="mx-auto w-full max-w-3xl">
+          {/* Breadcrumb */}
+          <p className="text-[10px] tracking-[0.25em] uppercase text-apply-muted mb-12">
+            MEMBERSHIP <span className="text-nobc-red mx-1.5">·</span> BY APPLICATION
+          </p>
 
-        {/* Subhead */}
-        <p className="text-sm text-apply-muted mb-16">
-          Ten minutes. No r&eacute;sum&eacute;. We read every word.
-        </p>
+          {/* Headline */}
+          <h1 className="font-playfair text-5xl sm:text-6xl lg:text-[72px] leading-[1.1] text-apply-ink mb-5">
+            Tell us who you are.
+            <br />
+            <em>Not what you do.</em>
+          </h1>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-16">
-            {questionsBySection.map(({ section, questions }) => (
-              <div key={section.key}>
-                {/* Section divider */}
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="flex-1 border-t border-apply-rule" />
-                  <p className="text-[10px] tracking-[0.2em] uppercase text-apply-muted shrink-0">
+          {/* Subhead */}
+          <p className="text-[15px] text-apply-muted mb-16">
+            Ten minutes. No r&eacute;sum&eacute;. We read every word.
+          </p>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-16">
+              {questionsBySection.map(({ section, questions }) => (
+                <div key={section.key}>
+                  {/* Section header */}
+                  <p className="font-playfair italic text-[18px] text-apply-ink mb-8">
                     {section.label}
                   </p>
-                  <div className="flex-1 border-t border-apply-rule" />
-                </div>
 
-                <div className="space-y-10">
-                  {questions.map(q => {
-                    if (q.type === 'checkbox') {
-                      return (
-                        <ConsentField
-                          key={q.key}
-                          q={q}
-                          checked={form[q.key] as boolean}
-                          onCheckedChange={v => setField(q.key, v)}
-                        />
-                      );
-                    }
-                    if (q.type === 'radio') {
-                      return (
-                        <RadioField
+                  {section.key === 'basics' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-10">
+                      {questions.map(q => (
+                        <InputField
                           key={q.key}
                           q={q}
                           value={form[q.key] as string}
                           onChange={v => setField(q.key, v)}
                         />
-                      );
-                    }
-                    if (q.type === 'textarea') {
-                      return (
-                        <TextareaField
-                          key={q.key}
-                          q={q}
-                          value={form[q.key] as string}
-                          onChange={v => setField(q.key, v)}
-                        />
-                      );
-                    }
-                    return (
-                      <InputField
-                        key={q.key}
-                        q={q}
-                        value={form[q.key] as string}
-                        onChange={v => setField(q.key, v)}
-                      />
-                    );
-                  })}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-10">
+                      {questions.map(q => {
+                        if (q.type === 'checkbox') {
+                          return (
+                            <ConsentField
+                              key={q.key}
+                              q={q}
+                              checked={form[q.key] as boolean}
+                              onCheckedChange={v => setField(q.key, v)}
+                            />
+                          );
+                        }
+                        if (q.type === 'radio') {
+                          return (
+                            <RadioField
+                              key={q.key}
+                              q={q}
+                              value={form[q.key] as string}
+                              onChange={v => setField(q.key, v)}
+                            />
+                          );
+                        }
+                        if (q.type === 'textarea') {
+                          return (
+                            <TextareaField
+                              key={q.key}
+                              q={q}
+                              value={form[q.key] as string}
+                              onChange={v => setField(q.key, v)}
+                            />
+                          );
+                        }
+                        return (
+                          <InputField
+                            key={q.key}
+                            q={q}
+                            value={form[q.key] as string}
+                            onChange={v => setField(q.key, v)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {status === 'error' && (
-            <p className="text-sm text-apply-crimson mt-6">{errorMsg}</p>
-          )}
+            {status === 'error' && (
+              <p className="text-[15px] text-apply-crimson mt-6">{errorMsg}</p>
+            )}
 
-          <div className="mt-16 space-y-8">
-            <button
-              type="submit"
-              disabled={status === 'loading'}
-              className="w-full bg-apply-crimson text-white py-4 text-[11px] tracking-[0.2em] uppercase disabled:opacity-50 hover:opacity-90 transition-opacity"
-            >
-              {status === 'loading' ? 'Sending…' : 'SEND IT →'}
-            </button>
+            <div className="mt-16 space-y-8">
+              <button
+                type="submit"
+                disabled={status === 'loading'}
+                className="w-full bg-nobc-red py-4 text-[11px] font-medium uppercase tracking-[0.2em] text-nobc-on-red transition-colors hover:bg-nobc-red-hover disabled:opacity-50"
+              >
+                {status === 'loading' ? 'Sending…' : 'SEND IT →'}
+              </button>
 
-            <p className="text-xs text-apply-muted text-center pb-12">
-              We read every word. You&rsquo;ll hear from us within two weeks. Sometimes sooner.
-            </p>
-          </div>
-        </form>
-      </div>
-    </main>
+              <p className="text-xs text-apply-muted text-center pb-4">
+                We read every word. You&rsquo;ll hear from us within two weeks. Sometimes sooner.
+              </p>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <SiteFooter slug={slug} />
+    </div>
   );
 }

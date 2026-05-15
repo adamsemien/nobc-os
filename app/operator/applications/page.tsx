@@ -1,0 +1,162 @@
+import Link from 'next/link';
+import { operatorServerFetch } from '@/lib/operator-server-fetch';
+import {
+  ApplicationsQueue,
+  type ApplicationsQueueItem,
+} from './_components/ApplicationsQueue';
+
+type StatusTab = 'pending' | 'approved' | 'rejected' | 'hold' | 'all';
+
+type ApiApplication = {
+  id: string;
+  fullName: string;
+  email: string;
+  city: string | null;
+  phone: string | null;
+  submittedAt: string;
+  status: string;
+  aiTags: string[];
+  aiScore: number | null;
+  aiRecommendation: string | null;
+  aiReasoning: string | null;
+  answers: Record<string, string>;
+};
+
+type StatusCounts = {
+  pending: number;
+  approved: number;
+  rejected: number;
+  hold: number;
+};
+
+function tabFromSearch(status: string | undefined): StatusTab {
+  const s = (status ?? 'pending').toLowerCase();
+  if (s === 'approved' || s === 'rejected' || s === 'all' || s === 'hold') return s;
+  return 'pending';
+}
+
+function toQueueItem(row: ApiApplication): ApplicationsQueueItem {
+  const rec = row.aiRecommendation;
+  const allowed = new Set(['strong_yes', 'yes', 'unclear', 'no', 'strong_no']);
+  return {
+    id: row.id,
+    fullName: row.fullName,
+    email: row.email,
+    city: row.city,
+    phone: row.phone,
+    submittedAt: row.submittedAt,
+    aiTags: row.aiTags ?? [],
+    aiScore: row.aiScore,
+    aiReasoning: row.aiReasoning,
+    answers: row.answers ?? {},
+    aiRecommendation:
+      rec && allowed.has(rec) ? (rec as ApplicationsQueueItem['aiRecommendation']) : null,
+  };
+}
+
+const TABS: { label: string; value: StatusTab }[] = [
+  { label: 'Pending', value: 'pending' },
+  { label: 'Hold', value: 'hold' },
+  { label: 'Approved', value: 'approved' },
+  { label: 'Rejected', value: 'rejected' },
+  { label: 'All', value: 'all' },
+];
+
+function tabCount(tab: StatusTab, counts: StatusCounts): number | null {
+  if (tab === 'pending') return counts.pending;
+  if (tab === 'approved') return counts.approved;
+  if (tab === 'rejected') return counts.rejected;
+  if (tab === 'hold') return counts.hold;
+  return null;
+}
+
+export default async function OperatorApplicationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const { status: statusParam } = await searchParams;
+  const tab = tabFromSearch(statusParam);
+  const res = await operatorServerFetch(
+    `/api/operator/applications?status=${encodeURIComponent(tab)}`,
+  );
+
+  if (!res.ok) {
+    return (
+      <div className="px-4 py-16 text-center text-sm text-text-secondary">
+        Unable to load applications. Refresh or sign in again.
+      </div>
+    );
+  }
+
+  const data = (await res.json()) as {
+    applications: ApiApplication[];
+    pendingCount: number;
+    counts: StatusCounts;
+  };
+  const { applications, pendingCount, counts } = data;
+  const queueItems = applications.map(toQueueItem);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col px-4 pb-16 pt-8 sm:px-6">
+      <div className="mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col">
+        <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1
+              className="text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+              style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
+            >
+              Applications
+            </h1>
+            <span className="rounded-full bg-primary px-2.5 py-0.5 text-sm font-medium tabular-nums text-primary-foreground">
+              {pendingCount}
+            </span>
+          </div>
+        </header>
+
+        <nav className="mb-6 flex flex-wrap gap-1 border-b border-border" aria-label="Filter applications">
+          {TABS.map(({ label, value }) => {
+            const active = tab === value;
+            const count = tabCount(value, counts);
+            const href =
+              value === 'pending' ? '/operator/applications' : `/operator/applications?status=${value}`;
+            const isHold = value === 'hold';
+            return (
+              <Link
+                key={value}
+                href={href}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? 'text-text-primary underline decoration-primary underline-offset-4'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+                aria-current={active ? 'page' : undefined}
+              >
+                {label}
+                {count != null && count > 0 ? (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold tabular-nums ${
+                      isHold
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-muted text-text-secondary'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {tab === 'hold' ? (
+          <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            These applications matched a Red List entry and were placed on hold automatically. Review each one manually before approving or rejecting.
+          </p>
+        ) : null}
+
+        <ApplicationsQueue key={tab} applications={queueItems} />
+      </div>
+    </div>
+  );
+}

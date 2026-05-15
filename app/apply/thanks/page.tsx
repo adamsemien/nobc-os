@@ -12,7 +12,7 @@ export default function ApplyThanksPage() {
       className={`${playfair.variable} min-h-screen bg-apply-cream flex flex-col items-center justify-center px-6 text-center`}
     >
       <p className="text-[11px] tracking-[0.25em] uppercase text-apply-muted mb-12">
-        THE <span className="text-apply-crimson">NO BAD</span> COMPANY
+        THE <span className="text-events-ref-accent">NO BAD</span> COMPANY
       </p>
       <h1 className="font-playfair text-4xl text-apply-ink mb-4">
         We got it.

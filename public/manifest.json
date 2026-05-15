@@ -1,0 +1,17 @@
+{
+  "name": "NoBC Check-In",
+  "short_name": "Check-In",
+  "description": "Staff event check-in PWA",
+  "start_url": "/check-in",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

@@ -22,6 +22,8 @@ model Workspace {
   payments        Payment[]
   waitlistEntries WaitlistEntry[]
   auditEvents     AuditEvent[]
+  redList         RedList[]
+  svixAppId       String?
 }
 
 enum MemberStatus {
@@ -46,6 +48,13 @@ model Member {
   networkValueScore Int?
   aiSummary         String?
   redListed         Boolean      @default(false)
+  approved          Boolean      @default(false)
+  approvedAt        DateTime?
+  memberQrCode      String?      @unique
+  walletPassId      String?
+  passIssuedAt      DateTime?
+  totalEventsAttended Int        @default(0)
+  lastAttendedDate  DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -54,6 +63,7 @@ model Member {
   waitlistEntries WaitlistEntry[]
 
   @@unique([workspaceId, clerkUserId])
+  @@unique([workspaceId, email])
   @@index([workspaceId])
 }
 
@@ -64,14 +74,21 @@ enum ApplicationStatus {
   HOLD
 }
 
+enum AiApplicationRecommendation {
+  strong_yes
+  yes
+  unclear
+  no
+  strong_no
+}
+
 model Application {
   id          String            @id @default(cuid())
   workspaceId String
   workspace   Workspace         @relation(fields: [workspaceId], references: [id])
   memberId    String?
   email       String
-  firstName   String
-  lastName    String
+  fullName    String
   phone        String?
   city         String?
   referredBy   String?
@@ -80,7 +97,12 @@ model Application {
   status       ApplicationStatus @default(PENDING)
   reviewedAt  DateTime?
   reviewedBy  String?
+  rejectionReason String?
   aiTags      String[]
+  aiScore          Float?
+  aiRecommendation AiApplicationRecommendation?
+  aiReasoning      String?
+  duplicateFlag    Boolean           @default(false)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -106,6 +128,12 @@ enum EventAccessMode {
   APPLY_OR_PAY
 }
 
+/// Sub-mode when accessMode is APPLY_OR_PAY (non-member / hybrid flows).
+enum EventApplyMode {
+  APPROVAL_HOLDS_TICKET
+  SUBMIT_CONFIRMS_ENTRY
+}
+
 enum EventStatus {
   DRAFT
   PUBLISHED
@@ -119,16 +147,26 @@ model Event {
   slug             String
   title            String
   description      String?
+  /// R2 object key or asset id used to build a presigned GET URL for hero imagery.
+  heroImageAssetId      String?
   startAt          DateTime
   endAt            DateTime?
   location         String?
+  /// Optional deep link (Google Maps, Apple Maps, etc.).
+  mapsUrl               String?
   capacity         Int?
-  accessMode       EventAccessMode @default(OPEN)
-  approvalRequired Boolean         @default(false)
-  plusOnesAllowed  Boolean         @default(false)
-  status           EventStatus     @default(DRAFT)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  accessMode            EventAccessMode @default(OPEN)
+  applyMode             EventApplyMode?
+  approvalRequired      Boolean         @default(false)
+  plusOnesAllowed       Boolean         @default(false)
+  status                EventStatus     @default(DRAFT)
+  showCapacity          Boolean         @default(false)
+  priceInCents          Int?
+  nonMemberPriceInCents Int?
+  refundWindowHours     Int?
+  runOfShow             String?         @db.Text
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 
   customQuestions EventCustomQuestion[]
   rsvps           RSVP[]
@@ -179,10 +217,18 @@ model RSVP {
   event       Event      @relation(fields: [eventId], references: [id])
   memberId    String
   member      Member     @relation(fields: [memberId], references: [id])
-  status      RSVPStatus @default(CONFIRMED)
-  checkedInAt DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  status             RSVPStatus @default(CONFIRMED)
+  ticketStatus       String     @default("confirmed")
+  origin             String     @default("direct")
+  plusOneOfMemberId  String?
+  customAnswers      Json?
+  checkedIn          Boolean    @default(false)
+  checkedInAt        DateTime?
+  stripePaymentIntentId String?
+  refundedAt         DateTime?
+  refundAmountCents  Int?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   tickets Ticket[]
 
@@ -255,13 +301,17 @@ model WaitlistEntry {
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
   eventId     String
   event       Event     @relation(fields: [eventId], references: [id])
-  memberId    String
-  member      Member    @relation(fields: [memberId], references: [id])
+  memberId    String?
+  member      Member?   @relation(fields: [memberId], references: [id])
+  email       String
+  name        String
   position    Int
+  notifiedAt  DateTime?
+  claimedAt   DateTime?
+  expiresAt   DateTime?
   promotedAt  DateTime?
   createdAt   DateTime  @default(now())
 
-  @@unique([workspaceId, eventId, memberId])
   @@index([workspaceId])
   @@index([eventId])
 }
@@ -279,4 +329,18 @@ model AuditEvent {
 
   @@index([workspaceId])
   @@index([entityType, entityId])
+}
+
+model RedList {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  email           String?
+  namePattern     String?
+  reason          String?
+  addedByPersonId String?
+  createdAt       DateTime  @default(now())
+
+  @@index([workspaceId])
+  @@index([email])
 }
