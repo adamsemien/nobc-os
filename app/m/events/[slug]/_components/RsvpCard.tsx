@@ -33,14 +33,6 @@ function formatTimeLine(d: Date): string {
   }).format(d);
 }
 
-function formatPrice(cents: number): string {
-  return (cents / 100).toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-  });
-}
-
 function QrDisplay({ code }: { code: string }) {
   const [svg, setSvg] = useState<string | null>(null);
 
@@ -252,9 +244,7 @@ function PlusOneSection({
 function getAccessBadgeLabel(event: EventDetailDTO): string {
   const r = event.resolved;
   if (r.kind === 'closed') return 'Closed';
-  if (/pay/.test(r.gate as string) && r.priceCents > 0) {
-    return r.kind === 'member' ? `Member ${formatPrice(r.priceCents)}` : `Guest ${formatPrice(r.priceCents)}`;
-  }
+  if (/pay/.test(r.gate as string)) return 'Ticketed';
   if (r.gate === 'apply' || /approval$/.test(r.gate as string)) return 'Apply to Attend';
   if (r.kind === 'member') return 'Members';
   return 'Open';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { TemplatePicker, type TemplateKey } from '../../new/_components/TemplatePicker';
 import { AccessGroupsCard } from '../../new/_components/AccessGroupsCard';
 import {
@@ -9,15 +9,11 @@ import {
 } from '@/lib/event-access';
 import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
 import type { EventAccess } from '@/lib/event-access-schema';
-
-type LocalQuestion = {
-  tempId: string;
-  id?: string;
-  label: string;
-  fieldType: 'TEXT' | 'TEXTAREA' | 'SELECT' | 'CHECKBOX' | 'DATE';
-  required: boolean;
-  options: string;
-};
+import {
+  type AccessQuestion,
+  fromApiQuestion,
+  toApiQuestion,
+} from '@/lib/registration-fields';
 
 type EventFull = {
   id: string;
@@ -47,6 +43,8 @@ type EventFull = {
     options: string[];
     required: boolean;
     order: number;
+    showToMember: boolean;
+    showToGuest: boolean;
   }[];
   _count: { rsvps: number };
 };
@@ -88,23 +86,9 @@ export function EventSettingsTab({ event }: Props) {
   const [template, setTemplate] = useState<TemplateKey>(
     (event.template as TemplateKey) ?? 'editorial',
   );
-  const [questions, setQuestions] = useState<LocalQuestion[]>(() =>
-    event.customQuestions.map(q => ({
-      tempId: q.id,
-      id: q.id,
-      label: q.label,
-      fieldType: q.fieldType as LocalQuestion['fieldType'],
-      required: q.required,
-      options: q.options.join(', '),
-    })),
+  const [questions, setQuestions] = useState<AccessQuestion[]>(() =>
+    event.customQuestions.map(fromApiQuestion),
   );
-  const [addingQ, setAddingQ] = useState(false);
-  const [newQ, setNewQ] = useState<Omit<LocalQuestion, 'tempId' | 'id'>>({
-    label: '',
-    fieldType: 'TEXT',
-    required: false,
-    options: '',
-  });
 
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -144,13 +128,9 @@ export function EventSettingsTab({ event }: Props) {
     setFlash(null);
     try {
       const body: Record<string, unknown> = {
-        customQuestions: questions.map((q, i) => ({
+        customQuestions: questions.map(q => ({
+          ...toApiQuestion(q),
           id: q.id ?? '',
-          type: q.fieldType.toLowerCase(),
-          label: q.label,
-          required: q.required,
-          options: q.fieldType === 'SELECT' ? q.options.split(',').map(s => s.trim()).filter(Boolean) : [],
-          order: i,
         })),
         title,
         slug: slug || undefined,
@@ -196,12 +176,9 @@ export function EventSettingsTab({ event }: Props) {
           showCapacity,
           customQuestions: questions.map(q => ({
             label: q.label,
-            type: q.fieldType.toLowerCase(),
+            type: q.type,
             required: q.required,
-            options:
-              q.fieldType === 'SELECT'
-                ? q.options.split(',').map(s => s.trim()).filter(Boolean)
-                : [],
+            options: q.type === 'select' ? q.options : [],
           })),
         }),
         credentials: 'include',
@@ -375,10 +352,15 @@ export function EventSettingsTab({ event }: Props) {
         />
       </div>
 
-      {/* Access — three-group config */}
+      {/* Access — three-group flow builder */}
       <div className="border-t border-border pt-6">
         <p className="mb-3 text-[11px] font-medium uppercase tracking-widest text-text-secondary">Access</p>
-        <AccessGroupsCard value={eventAccess} onChange={setEventAccess} />
+        <AccessGroupsCard
+          value={eventAccess}
+          onChange={setEventAccess}
+          questions={questions}
+          onQuestionsChange={setQuestions}
+        />
       </div>
 
       {/* Toggles */}
@@ -419,78 +401,6 @@ export function EventSettingsTab({ event }: Props) {
       <div>
         <label className="mb-2 block text-sm font-medium text-text-secondary">Template</label>
         <TemplatePicker value={template} onChange={setTemplate} compact />
-      </div>
-
-      {/* Custom questions */}
-      <div className="space-y-3 border-t border-border pt-6">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-text-secondary">Custom questions</p>
-          {!addingQ && (
-            <button type="button" onClick={() => setAddingQ(true)}
-              className="flex items-center gap-1 text-xs text-primary hover:underline underline-offset-4">
-              <Plus className="h-3.5 w-3.5" />Add question
-            </button>
-          )}
-        </div>
-        {questions.length > 0 && (
-          <ul className="space-y-2">
-            {questions.map(q => (
-              <li key={q.tempId} className="flex items-start justify-between gap-3 rounded-md border border-border bg-muted px-3 py-2.5" style={{ borderRadius: '6px' }}>
-                <div>
-                  <p className="text-sm text-text-primary">{q.label}</p>
-                  <p className="text-xs text-text-muted">{q.fieldType.toLowerCase()}{q.required ? ' · required' : ''}{q.fieldType === 'SELECT' && q.options ? ` · ${q.options}` : ''}</p>
-                </div>
-                <button type="button" onClick={() => setQuestions(prev => prev.filter(x => x.tempId !== q.tempId))}
-                  className="shrink-0 text-text-muted hover:text-text-primary transition-colors" aria-label={`Remove: ${q.label}`}>
-                  <X className="h-4 w-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {addingQ && (
-          <div className="rounded-md border border-border bg-surface-elevated p-4 space-y-3" style={{ borderRadius: '6px' }}>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-text-secondary">Label</label>
-              <input type="text" value={newQ.label} onChange={e => setNewQ(p => ({ ...p, label: e.target.value }))}
-                className="w-full rounded border border-border bg-surface px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30" style={{ borderRadius: '4px' }} placeholder="e.g. Dietary restrictions" />
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Type</label>
-                <select value={newQ.fieldType} onChange={e => setNewQ(p => ({ ...p, fieldType: e.target.value as LocalQuestion['fieldType'] }))}
-                  className="w-full rounded border border-border bg-surface px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30" style={{ borderRadius: '4px' }}>
-                  <option value="TEXT">Short text</option>
-                  <option value="TEXTAREA">Long text</option>
-                  <option value="SELECT">Dropdown</option>
-                  <option value="CHECKBOX">Checkbox</option>
-                  <option value="DATE">Date</option>
-                </select>
-              </div>
-              <div className="flex items-end pb-1">
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
-                  <input type="checkbox" className="accent-primary h-4 w-4" checked={newQ.required} onChange={e => setNewQ(p => ({ ...p, required: e.target.checked }))} />
-                  Required
-                </label>
-              </div>
-            </div>
-            {newQ.fieldType === 'SELECT' && (
-              <div>
-                <label className="mb-1 block text-xs font-medium text-text-secondary">Options <span className="text-text-muted">(comma-separated)</span></label>
-                <input type="text" value={newQ.options} onChange={e => setNewQ(p => ({ ...p, options: e.target.value }))}
-                  className="w-full rounded border border-border bg-surface px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30" style={{ borderRadius: '4px' }} placeholder="Option A, Option B" />
-              </div>
-            )}
-            <div className="flex gap-3 pt-1">
-              <button type="button" onClick={() => { if (!newQ.label.trim()) return; setQuestions(p => [...p, { ...newQ, tempId: `new-${Date.now()}`, label: newQ.label.trim() }]); setNewQ({ label: '', fieldType: 'TEXT', required: false, options: '' }); setAddingQ(false); }}
-                disabled={!newQ.label.trim()} className="rounded bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50" style={{ borderRadius: '4px' }}>
-                Add
-              </button>
-              <button type="button" onClick={() => { setAddingQ(false); setNewQ({ label: '', fieldType: 'TEXT', required: false, options: '' }); }}
-                className="text-xs text-text-muted underline-offset-4 hover:underline">Cancel</button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Save as flow template */}

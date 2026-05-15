@@ -9,6 +9,11 @@ import { HeroImageUpload } from './_components/HeroImageUpload';
 import { AccessGroupsCard } from './_components/AccessGroupsCard';
 import { TemplatePicker, type TemplateKey } from './_components/TemplatePicker';
 import { defaultEventAccess, type EventAccess } from '@/lib/event-access-schema';
+import {
+  type AccessQuestion,
+  toApiQuestion,
+  coerceFieldType,
+} from '@/lib/registration-fields';
 
 type FlowTemplate = {
   id: string;
@@ -172,6 +177,7 @@ export default function NewEventPage() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [slugEdited, setSlugEdited] = useState(false);
   const [access, setAccess] = useState<EventAccess>(() => defaultEventAccess());
+  const [questions, setQuestions] = useState<AccessQuestion[]>([]);
   const [template, setTemplate] = useState<TemplateKey>('editorial');
 
   // AI builder state
@@ -334,6 +340,17 @@ export default function NewEventPage() {
     } else {
       setAccess(defaultEventAccess());
     }
+
+    setQuestions(
+      t.customQuestions.map((q, i) => ({
+        tempId: `tpl-${i}-${Date.now()}`,
+        label: q.label,
+        type: coerceFieldType(q.type),
+        required: q.required,
+        options: q.options ?? [],
+        showTo: 'both' as const,
+      })),
+    );
   }
 
   function flowTemplateLabel(accessMode: string, applyMode: string | null): string {
@@ -380,8 +397,8 @@ export default function NewEventPage() {
           plusOnesAllowed: appliedTemplate.plusOnesAllowed,
           showCapacity: appliedTemplate.showCapacity,
         }),
-        ...(appliedTemplate?.customQuestions.length && {
-          customQuestions: appliedTemplate.customQuestions,
+        ...(questions.length > 0 && {
+          customQuestions: questions.map(toApiQuestion),
         }),
       };
 
@@ -640,7 +657,12 @@ export default function NewEventPage() {
               </div>
             )}
 
-            <AccessGroupsCard value={access} onChange={setAccess} />
+            <AccessGroupsCard
+              value={access}
+              onChange={setAccess}
+              questions={questions}
+              onQuestionsChange={setQuestions}
+            />
           </section>
         )}
 

@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemberApplyHref } from '../../_components/MemberShell';
 import { RsvpCard } from './RsvpCard';
 import type { EventDetailDTO } from './EventDetail';
 
@@ -38,7 +37,6 @@ function getAccessLabel(event: EventDetailDTO): string {
 }
 
 export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
-  const applyHref = useMemberApplyHref();
   const start = parseDate(event.startAt);
 
   return (
@@ -108,15 +106,8 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
         <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
           <span>The </span>
           <span className="text-[var(--nobc-red)]">No Bad </span>
-          <span>Company · By application</span>
+          <span>Company</span>
         </p>
-
-        <a
-          href={applyHref}
-          className="mt-4 inline-block text-[10px] uppercase tracking-[0.24em] text-[var(--apply-muted)] underline-offset-4 hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
-        >
-          Apply to Join
-        </a>
       </main>
     </div>
   );

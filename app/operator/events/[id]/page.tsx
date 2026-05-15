@@ -39,6 +39,8 @@ type EventFull = {
     options: string[];
     required: boolean;
     order: number;
+    showToMember: boolean;
+    showToGuest: boolean;
   }[];
   _count: { rsvps: number };
   _stats: {

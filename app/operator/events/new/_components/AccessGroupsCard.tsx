@@ -1,35 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import type { EventAccess, MemberGate, GuestGate } from '@/lib/event-access-schema';
-import { isGateSupported } from '@/lib/event-access-schema';
-import { GateRadio, type GateOption } from './GateRadio';
-
-const MEMBER_GATE_OPTIONS: Omit<GateOption, 'supported'>[] = [
-  { value: 'auto_confirm', label: 'Reserve My Spot', description: 'One tap, instantly confirmed.' },
-  { value: 'questions', label: 'Register with fields', description: 'Answer required fields, auto-confirmed.' },
-  { value: 'questions_approval', label: 'Apply to Attend', description: 'Answer fields, you approve manually.' },
-  { value: 'pay', label: 'Ticketed', description: 'Pay member price, auto-confirmed.' },
-  { value: 'pay_questions', label: 'Ticketed, fields after', description: 'Pay, then answer fields.' },
-  { value: 'questions_pay', label: 'Fields, then ticketed', description: 'Answer fields, then pay.' },
-  { value: 'questions_pay_approval', label: 'Apply + ticketed', description: 'Fields, hold payment, you approve.' },
-];
-
-const GUEST_GATE_OPTIONS: Omit<GateOption, 'supported'>[] = [
-  { value: 'pay', label: 'Ticketed', description: 'Pay and confirmed instantly.' },
-  { value: 'apply', label: 'Apply to Attend', description: 'Answer fields, you approve. No payment.' },
-  { value: 'pay_questions', label: 'Ticketed, fields after', description: 'Pay, then answer fields.' },
-  { value: 'questions_pay', label: 'Fields, then ticketed', description: 'Answer fields, then pay.' },
-  { value: 'questions_approval', label: 'Apply to Attend (alt)', description: 'Fields, you approve. No payment.' },
-  { value: 'apply_pay', label: 'Apply + ticketed', description: 'Fields, you approve, then payment.' },
-];
+import {
+  type AccessQuestion,
+  appliesToMember,
+  appliesToGuest,
+} from '@/lib/registration-fields';
+import { FlowBuilder } from './FlowBuilder';
+import { RegistrationFieldsEditor } from './RegistrationFieldsEditor';
 
 type Props = {
   value: EventAccess;
   onChange: (v: EventAccess) => void;
+  questions: AccessQuestion[];
+  onQuestionsChange: (q: AccessQuestion[]) => void;
 };
 
-export function AccessGroupsCard({ value, onChange }: Props) {
+export function AccessGroupsCard({
+  value,
+  onChange,
+  questions,
+  onQuestionsChange,
+}: Props) {
+  const memberFields = questions.filter(appliesToMember).map((q) => q.label);
+  const guestFields = questions.filter(appliesToGuest).map((q) => q.label);
+
   return (
     <div className="flex flex-col gap-4">
       <AccessGroup
@@ -38,19 +33,18 @@ export function AccessGroupsCard({ value, onChange }: Props) {
         enabled={value.member.enabled}
         onToggle={(b) => onChange({ ...value, member: { ...value.member, enabled: b } })}
       >
-        <GateRadio
-          name="member-gate"
-          value={value.member.gate}
-          onChange={(g) => onChange({ ...value, member: { ...value.member, gate: g as MemberGate } })}
-          options={MEMBER_GATE_OPTIONS.map((o) => ({ ...o, supported: isGateSupported(o.value) }))}
+        <FlowBuilder
+          group="member"
+          gate={value.member.gate}
+          onGateChange={(g) =>
+            onChange({ ...value, member: { ...value.member, gate: g as MemberGate } })
+          }
+          priceCents={value.member.priceCents}
+          onPriceChange={(cents) =>
+            onChange({ ...value, member: { ...value.member, priceCents: cents } })
+          }
+          previewFields={memberFields}
         />
-        {/pay/.test(value.member.gate) && (
-          <PriceField
-            label="Member price"
-            valueCents={value.member.priceCents}
-            onChange={(cents) => onChange({ ...value, member: { ...value.member, priceCents: cents } })}
-          />
-        )}
       </AccessGroup>
 
       <AccessGroup
@@ -59,19 +53,18 @@ export function AccessGroupsCard({ value, onChange }: Props) {
         enabled={value.guest.enabled}
         onToggle={(b) => onChange({ ...value, guest: { ...value.guest, enabled: b } })}
       >
-        <GateRadio
-          name="guest-gate"
-          value={value.guest.gate}
-          onChange={(g) => onChange({ ...value, guest: { ...value.guest, gate: g as GuestGate } })}
-          options={GUEST_GATE_OPTIONS.map((o) => ({ ...o, supported: isGateSupported(o.value) }))}
+        <FlowBuilder
+          group="guest"
+          gate={value.guest.gate}
+          onGateChange={(g) =>
+            onChange({ ...value, guest: { ...value.guest, gate: g as GuestGate } })
+          }
+          priceCents={value.guest.priceCents}
+          onPriceChange={(cents) =>
+            onChange({ ...value, guest: { ...value.guest, priceCents: cents } })
+          }
+          previewFields={guestFields}
         />
-        {/pay/.test(value.guest.gate) && (
-          <PriceField
-            label="Guest price"
-            valueCents={value.guest.priceCents}
-            onChange={(cents) => onChange({ ...value, guest: { ...value.guest, priceCents: cents } })}
-          />
-        )}
       </AccessGroup>
 
       <AccessGroup
@@ -86,9 +79,7 @@ export function AccessGroupsCard({ value, onChange }: Props) {
         />
       </AccessGroup>
 
-      <p className="text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)] mt-2">
-        Registration fields and flow design live in event settings after saving.
-      </p>
+      <RegistrationFieldsEditor questions={questions} onChange={onQuestionsChange} />
     </div>
   );
 }
@@ -119,7 +110,7 @@ function AccessGroup({
         </div>
         <Toggle checked={enabled} onChange={onToggle} />
       </div>
-      {enabled && <div className="mt-5 flex flex-col gap-4">{children}</div>}
+      {enabled && <div className="mt-5">{children}</div>}
     </div>
   );
 }
@@ -141,48 +132,6 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (b: boolean
         }`}
       />
     </button>
-  );
-}
-
-function PriceField({
-  label,
-  valueCents,
-  onChange,
-}: {
-  label: string;
-  valueCents: number;
-  onChange: (cents: number) => void;
-}) {
-  const [text, setText] = useState((valueCents / 100).toString());
-
-  useEffect(() => {
-    setText((valueCents / 100).toString());
-  }, [valueCents]);
-
-  return (
-    <div>
-      <label className="mb-1 block text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-        {label}
-      </label>
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-          $
-        </span>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            const num = parseFloat(e.target.value);
-            if (!Number.isNaN(num) && num >= 0) onChange(Math.round(num * 100));
-            if (e.target.value === '') onChange(0);
-          }}
-          className="w-full rounded-sm border border-[var(--apply-rule)] bg-white pl-7 pr-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
-          placeholder="0"
-        />
-      </div>
-    </div>
   );
 }
 
