@@ -7,6 +7,7 @@ import { EventAttendeesTab } from './_components/EventAttendeesTab';
 import { EventApplicationsTab } from './_components/EventApplicationsTab';
 import { EventCheckinTab } from './_components/EventCheckinTab';
 import { EventSettingsTab } from './_components/EventSettingsTab';
+import { CopyInviteLinkButton } from './_components/CopyInviteLinkButton';
 
 const PRODUCER_URL = process.env.NEXT_PUBLIC_PRODUCER_URL ?? null;
 
@@ -28,7 +29,9 @@ type EventFull = {
   plusOnesAllowed: boolean;
   priceInCents: number | null;
   nonMemberPriceInCents: number | null;
+  eventAccess: unknown;
   runOfShow: string | null;
+  template: string;
   customQuestions: {
     id: string;
     label: string;
@@ -38,6 +41,12 @@ type EventFull = {
     order: number;
   }[];
   _count: { rsvps: number };
+  _stats: {
+    confirmedCount: number;
+    heldCount: number;
+    capacityUsed: number;
+    revenueCents: number;
+  };
 };
 
 type RsvpRow = {
@@ -148,16 +157,6 @@ export default async function OperatorEventDetailPage({
           >
             ← All events
           </Link>
-          {PRODUCER_URL && (
-            <a
-              href={`${PRODUCER_URL}/events/${event.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-text-muted underline-offset-4 hover:text-text-secondary hover:underline"
-            >
-              Open in Producer →
-            </a>
-          )}
         </div>
 
         <h1
@@ -166,7 +165,7 @@ export default async function OperatorEventDetailPage({
         >
           {event.title}
         </h1>
-        <p className="mb-6 flex items-center gap-2 text-sm text-text-muted">
+        <p className="mb-4 flex items-center gap-2 text-sm text-text-muted">
           <span>{formattedDate}</span>
           <span>·</span>
           <span
@@ -175,6 +174,29 @@ export default async function OperatorEventDetailPage({
             {event.status.toLowerCase()}
           </span>
         </p>
+
+        {/* Action bar */}
+        <div className="mb-8 flex flex-wrap items-center gap-2">
+          <CopyInviteLinkButton slug={event.slug} />
+          <a
+            href={`/m/events/${event.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
+          >
+            Preview Member Page ↗
+          </a>
+          {PRODUCER_URL && (
+            <a
+              href={`${PRODUCER_URL}/events/${event.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
+            >
+              Open in Producer ↗
+            </a>
+          )}
+        </div>
 
         {/* Tab nav */}
         <Suspense fallback={null}>

@@ -1,7 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, X } from 'lucide-react';
+import { TemplatePicker, type TemplateKey } from '../../new/_components/TemplatePicker';
+import { AccessGroupsCard } from '../../new/_components/AccessGroupsCard';
+import {
+  parseEventAccess,
+} from '@/lib/event-access';
+import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
+import type { EventAccess } from '@/lib/event-access-schema';
+
+type LocalQuestion = {
+  tempId: string;
+  id?: string;
+  label: string;
+  fieldType: 'TEXT' | 'TEXTAREA' | 'SELECT' | 'CHECKBOX' | 'DATE';
+  required: boolean;
+  options: string;
+};
 
 type EventFull = {
   id: string;
@@ -21,7 +37,9 @@ type EventFull = {
   plusOnesAllowed: boolean;
   priceInCents: number | null;
   nonMemberPriceInCents: number | null;
+  eventAccess: unknown;
   runOfShow: string | null;
+  template: string;
   customQuestions: {
     id: string;
     label: string;
@@ -63,26 +81,38 @@ export function EventSettingsTab({ event }: Props) {
   const [location, setLocation] = useState(event.location ?? '');
   const [heroImageAssetId, setHeroImageAssetId] = useState(event.heroImageAssetId ?? '');
   const [capacity, setCapacity] = useState(event.capacity ? String(event.capacity) : '');
-  const [accessMode, setAccessMode] = useState<'OPEN' | 'TICKETED' | 'APPLY_OR_PAY'>(
-    event.accessMode as 'OPEN' | 'TICKETED' | 'APPLY_OR_PAY',
-  );
-  const [memberPrice, setMemberPrice] = useState(
-    event.priceInCents ? (event.priceInCents / 100).toFixed(2) : '',
-  );
-  const [nonMemberPrice, setNonMemberPrice] = useState(
-    event.nonMemberPriceInCents ? (event.nonMemberPriceInCents / 100).toFixed(2) : '',
-  );
-  const [approvalRequired, setApprovalRequired] = useState(event.approvalRequired);
+  const [eventAccess, setEventAccess] = useState<EventAccess>(() => parseEventAccess(event.eventAccess));
   const [plusOnesAllowed, setPlusOnesAllowed] = useState(event.plusOnesAllowed);
   const [showCapacity, setShowCapacity] = useState(event.showCapacity);
   const [runOfShow, setRunOfShow] = useState(event.runOfShow ?? '');
+  const [template, setTemplate] = useState<TemplateKey>(
+    (event.template as TemplateKey) ?? 'editorial',
+  );
+  const [questions, setQuestions] = useState<LocalQuestion[]>(() =>
+    event.customQuestions.map(q => ({
+      tempId: q.id,
+      id: q.id,
+      label: q.label,
+      fieldType: q.fieldType as LocalQuestion['fieldType'],
+      required: q.required,
+      options: q.options.join(', '),
+    })),
+  );
+  const [addingQ, setAddingQ] = useState(false);
+  const [newQ, setNewQ] = useState<Omit<LocalQuestion, 'tempId' | 'id'>>({
+    label: '',
+    fieldType: 'TEXT',
+    required: false,
+    options: '',
+  });
 
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [statusPending, setStatusPending] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(event.status);
-
-  const needsPrice = accessMode === 'TICKETED' || accessMode === 'APPLY_OR_PAY';
+  const [templateName, setTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateFlash, setTemplateFlash] = useState('');
 
   function handleSlugChange(val: string) {
     setSlug(val);
@@ -114,6 +144,14 @@ export function EventSettingsTab({ event }: Props) {
     setFlash(null);
     try {
       const body: Record<string, unknown> = {
+        customQuestions: questions.map((q, i) => ({
+          id: q.id ?? '',
+          type: q.fieldType.toLowerCase(),
+          label: q.label,
+          required: q.required,
+          options: q.fieldType === 'SELECT' ? q.options.split(',').map(s => s.trim()).filter(Boolean) : [],
+          order: i,
+        })),
         title,
         slug: slug || undefined,
         description: description || undefined,
@@ -122,16 +160,11 @@ export function EventSettingsTab({ event }: Props) {
         location: location || undefined,
         heroImageAssetId: heroImageAssetId || undefined,
         capacity: capacity ? parseInt(capacity, 10) : null,
-        accessMode,
-        approvalRequired,
         plusOnesAllowed,
         showCapacity,
         runOfShow: runOfShow || undefined,
-        priceInCents: needsPrice && memberPrice ? Math.round(parseFloat(memberPrice) * 100) : null,
-        nonMemberPriceInCents:
-          accessMode === 'APPLY_OR_PAY' && nonMemberPrice
-            ? Math.round(parseFloat(nonMemberPrice) * 100)
-            : null,
+        template,
+        eventAccess,
       };
       await patch(body);
       setFlash({ type: 'success', message: 'Event saved.' });
@@ -140,6 +173,47 @@ export function EventSettingsTab({ event }: Props) {
     } finally {
       setSaving(false);
       window.setTimeout(() => setFlash(null), 4000);
+    }
+  }
+
+  async function handleSaveTemplate() {
+    if (!templateName.trim()) return;
+    setSavingTemplate(true);
+    setTemplateFlash('');
+    try {
+      const derived = deriveLegacyFromAccess(eventAccess);
+      const res = await fetch('/api/operator/event-flow-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: templateName.trim(),
+          accessMode: derived.accessMode,
+          applyMode: derived.applyMode,
+          priceInCents: derived.priceInCents,
+          nonMemberPriceInCents: derived.nonMemberPriceInCents,
+          approvalRequired: derived.approvalRequired,
+          plusOnesAllowed,
+          showCapacity,
+          customQuestions: questions.map(q => ({
+            label: q.label,
+            type: q.fieldType.toLowerCase(),
+            required: q.required,
+            options:
+              q.fieldType === 'SELECT'
+                ? q.options.split(',').map(s => s.trim()).filter(Boolean)
+                : [],
+          })),
+        }),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      setTemplateName('');
+      setTemplateFlash('Flow template saved.');
+    } catch (e) {
+      setTemplateFlash(e instanceof Error ? e.message : 'Failed to save template.');
+    } finally {
+      setSavingTemplate(false);
+      window.setTimeout(() => setTemplateFlash(''), 4000);
     }
   }
 
@@ -301,69 +375,14 @@ export function EventSettingsTab({ event }: Props) {
         />
       </div>
 
-      {/* Access mode */}
-      <div>
-        <label className="mb-2 block text-sm font-medium text-text-secondary">Access mode</label>
-        <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
-          {(['OPEN', 'TICKETED', 'APPLY_OR_PAY'] as const).map(mode => (
-            <label key={mode} className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
-              <input
-                type="radio"
-                name="accessMode"
-                value={mode}
-                checked={accessMode === mode}
-                onChange={() => setAccessMode(mode)}
-                className="accent-primary"
-              />
-              {mode === 'OPEN' ? 'Open' : mode === 'TICKETED' ? 'Ticketed' : 'Apply or Pay'}
-            </label>
-          ))}
-        </div>
+      {/* Access — three-group config */}
+      <div className="border-t border-border pt-6">
+        <p className="mb-3 text-[11px] font-medium uppercase tracking-widest text-text-secondary">Access</p>
+        <AccessGroupsCard value={eventAccess} onChange={setEventAccess} />
       </div>
-
-      {needsPrice && (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text-secondary">Member price ($)</label>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            style={{ borderRadius: '6px' }}
-            placeholder="0.00"
-            value={memberPrice}
-            onChange={e => setMemberPrice(e.target.value)}
-          />
-        </div>
-      )}
-
-      {accessMode === 'APPLY_OR_PAY' && (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text-secondary">Non-member price ($)</label>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            style={{ borderRadius: '6px' }}
-            placeholder="0.00"
-            value={nonMemberPrice}
-            onChange={e => setNonMemberPrice(e.target.value)}
-          />
-        </div>
-      )}
 
       {/* Toggles */}
       <div className="space-y-3 rounded-lg border border-border p-4" style={{ borderRadius: '8px' }}>
-        <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
-          <input
-            type="checkbox"
-            className="accent-primary h-4 w-4"
-            checked={approvalRequired}
-            onChange={e => setApprovalRequired(e.target.checked)}
-          />
-          Approval required
-        </label>
         <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
           <input
             type="checkbox"
@@ -394,6 +413,117 @@ export function EventSettingsTab({ event }: Props) {
           value={runOfShow}
           onChange={e => setRunOfShow(e.target.value)}
         />
+      </div>
+
+      {/* Template */}
+      <div>
+        <label className="mb-2 block text-sm font-medium text-text-secondary">Template</label>
+        <TemplatePicker value={template} onChange={setTemplate} compact />
+      </div>
+
+      {/* Custom questions */}
+      <div className="space-y-3 border-t border-border pt-6">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-text-secondary">Custom questions</p>
+          {!addingQ && (
+            <button type="button" onClick={() => setAddingQ(true)}
+              className="flex items-center gap-1 text-xs text-primary hover:underline underline-offset-4">
+              <Plus className="h-3.5 w-3.5" />Add question
+            </button>
+          )}
+        </div>
+        {questions.length > 0 && (
+          <ul className="space-y-2">
+            {questions.map(q => (
+              <li key={q.tempId} className="flex items-start justify-between gap-3 rounded-md border border-border bg-muted px-3 py-2.5" style={{ borderRadius: '6px' }}>
+                <div>
+                  <p className="text-sm text-text-primary">{q.label}</p>
+                  <p className="text-xs text-text-muted">{q.fieldType.toLowerCase()}{q.required ? ' · required' : ''}{q.fieldType === 'SELECT' && q.options ? ` · ${q.options}` : ''}</p>
+                </div>
+                <button type="button" onClick={() => setQuestions(prev => prev.filter(x => x.tempId !== q.tempId))}
+                  className="shrink-0 text-text-muted hover:text-text-primary transition-colors" aria-label={`Remove: ${q.label}`}>
+                  <X className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {addingQ && (
+          <div className="rounded-md border border-border bg-surface-elevated p-4 space-y-3" style={{ borderRadius: '6px' }}>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">Label</label>
+              <input type="text" value={newQ.label} onChange={e => setNewQ(p => ({ ...p, label: e.target.value }))}
+                className="w-full rounded border border-border bg-surface px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30" style={{ borderRadius: '4px' }} placeholder="e.g. Dietary restrictions" />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Type</label>
+                <select value={newQ.fieldType} onChange={e => setNewQ(p => ({ ...p, fieldType: e.target.value as LocalQuestion['fieldType'] }))}
+                  className="w-full rounded border border-border bg-surface px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30" style={{ borderRadius: '4px' }}>
+                  <option value="TEXT">Short text</option>
+                  <option value="TEXTAREA">Long text</option>
+                  <option value="SELECT">Dropdown</option>
+                  <option value="CHECKBOX">Checkbox</option>
+                  <option value="DATE">Date</option>
+                </select>
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
+                  <input type="checkbox" className="accent-primary h-4 w-4" checked={newQ.required} onChange={e => setNewQ(p => ({ ...p, required: e.target.checked }))} />
+                  Required
+                </label>
+              </div>
+            </div>
+            {newQ.fieldType === 'SELECT' && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-text-secondary">Options <span className="text-text-muted">(comma-separated)</span></label>
+                <input type="text" value={newQ.options} onChange={e => setNewQ(p => ({ ...p, options: e.target.value }))}
+                  className="w-full rounded border border-border bg-surface px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30" style={{ borderRadius: '4px' }} placeholder="Option A, Option B" />
+              </div>
+            )}
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={() => { if (!newQ.label.trim()) return; setQuestions(p => [...p, { ...newQ, tempId: `new-${Date.now()}`, label: newQ.label.trim() }]); setNewQ({ label: '', fieldType: 'TEXT', required: false, options: '' }); setAddingQ(false); }}
+                disabled={!newQ.label.trim()} className="rounded bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50" style={{ borderRadius: '4px' }}>
+                Add
+              </button>
+              <button type="button" onClick={() => { setAddingQ(false); setNewQ({ label: '', fieldType: 'TEXT', required: false, options: '' }); }}
+                className="text-xs text-text-muted underline-offset-4 hover:underline">Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Save as flow template */}
+      <div className="space-y-3 border-t border-border pt-6">
+        <div>
+          <p className="text-sm font-medium text-text-secondary">Save as flow template</p>
+          <p className="mt-0.5 text-xs text-text-muted">
+            Reuse this event&apos;s access mode, pricing, and questions on future events.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="e.g. Members Apply, Others Pay"
+            value={templateName}
+            onChange={e => setTemplateName(e.target.value)}
+            className="flex-1 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ borderRadius: '6px' }}
+          />
+          <button
+            type="button"
+            disabled={!templateName.trim() || savingTemplate}
+            onClick={handleSaveTemplate}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-elevated px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-muted disabled:opacity-50"
+            style={{ borderRadius: '6px' }}
+          >
+            {savingTemplate && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Save
+          </button>
+        </div>
+        {templateFlash && (
+          <p className="text-xs text-text-secondary">{templateFlash}</p>
+        )}
       </div>
 
       {/* Save */}
