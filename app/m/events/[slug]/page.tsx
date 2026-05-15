@@ -127,6 +127,9 @@ export default async function EventDetailPage({
         }
       : null,
     template: (event.template ?? 'editorial') as 'editorial' | 'split' | 'minimal',
+    // Member pages are org-gated, so any viewer who isn't an approved member
+    // is an operator previewing the page.
+    isOperator: viewer !== 'member',
   };
 
   return <EventDetail event={dto} />;

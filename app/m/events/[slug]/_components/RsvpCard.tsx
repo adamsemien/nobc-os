@@ -10,29 +10,6 @@ import type { EventDetailDTO } from './EventDetail';
 import { EventAccessFlow } from './EventAccessFlow';
 import { formatGateCTA } from '@/lib/event-access';
 
-function parseDate(value: string | Date): Date {
-  return typeof value === 'string' ? new Date(value) : value;
-}
-
-function formatDateLine(d: Date): string {
-  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short' })
-    .format(d)
-    .toUpperCase();
-  const dayNum = d.getDate();
-  const mon = new Intl.DateTimeFormat('en-GB', { month: 'short' })
-    .format(d)
-    .toUpperCase();
-  const yr = d.getFullYear();
-  return `${weekday} · ${dayNum} ${mon} · ${yr}`;
-}
-
-function formatTimeLine(d: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(d);
-}
-
 function QrDisplay({ code }: { code: string }) {
   const [svg, setSvg] = useState<string | null>(null);
 
@@ -290,7 +267,6 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
     }
   }
 
-  const start = parseDate(event.startAt);
   const cardWrapper =
     variant === 'card'
       ? 'rounded-sm border border-[var(--apply-rule)] bg-[#FFFCF6] p-6 shadow-[0_1px_2px_rgba(28,16,8,0.04)]'
@@ -308,23 +284,16 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
 
   return (
     <div className={cardWrapper}>
-      <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-        {formatDateLine(start)}
-      </p>
-      <p className="mt-1 text-[13px] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-        {formatTimeLine(start)}
-        {event.location ? ` · ${event.location}` : ''}
-      </p>
-
-      {remaining != null && remaining > 0 ? (
-        <p className="mt-3 text-[11px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-          {remaining} spot{remaining === 1 ? '' : 's'} remaining
-        </p>
-      ) : null}
-
-      <p className="mt-3 inline-block rounded-sm border border-[var(--apply-rule)] px-2 py-1 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-        {getAccessBadgeLabel(event)}
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-block rounded-sm border border-[var(--apply-rule)] px-2 py-1 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+          {getAccessBadgeLabel(event)}
+        </span>
+        {remaining != null && remaining > 0 ? (
+          <span className="text-[11px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            {remaining} spot{remaining === 1 ? '' : 's'} remaining
+          </span>
+        ) : null}
+      </div>
 
       <div className="my-5 h-px w-full bg-[var(--apply-rule)]" />
 

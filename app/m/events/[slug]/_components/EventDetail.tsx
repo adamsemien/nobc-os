@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import type { EventAccess } from '@/lib/event-access-schema';
 import type { ResolvedAccess, ViewerKind, StepId } from '@/lib/event-access';
+import { resolveAccessForViewer, buildSteps } from '@/lib/event-access';
 import { TemplateEditorial } from './TemplateEditorial';
 import { TemplateSplit } from './TemplateSplit';
 import { TemplateMinimal } from './TemplateMinimal';
@@ -43,10 +45,78 @@ export type EventDetailDTO = {
   customQuestions: CustomQuestionDTO[];
   plusOneRsvp: { id: string; guestName: string; guestEmail: string } | null;
   template: 'editorial' | 'split' | 'minimal';
+  isOperator: boolean;
 };
 
-export function EventDetail({ event }: { event: EventDetailDTO }) {
+type PreviewViewer = 'guest' | 'member';
+
+function deriveForViewer(event: EventDetailDTO, viewer: PreviewViewer): EventDetailDTO {
+  const resolved = resolveAccessForViewer(event.eventAccess, viewer);
+  const steps = buildSteps(
+    resolved,
+    viewer,
+    event.customQuestions.map((q) => ({
+      whenInFlow: q.whenInFlow,
+      showToMember: q.showToMember,
+      showToGuest: q.showToGuest,
+    })),
+  );
+  return { ...event, viewer, resolved, steps };
+}
+
+function renderTemplate(event: EventDetailDTO) {
   if (event.template === 'split') return <TemplateSplit event={event} />;
   if (event.template === 'minimal') return <TemplateMinimal event={event} />;
   return <TemplateEditorial event={event} />;
+}
+
+export function EventDetail({ event }: { event: EventDetailDTO }) {
+  // Operators preview the page; everyone else sees their real resolved view.
+  // Default to the guest path — NoBC has no members yet.
+  const [previewViewer, setPreviewViewer] = useState<PreviewViewer>('guest');
+
+  if (!event.isOperator) {
+    return renderTemplate(event);
+  }
+
+  const displayEvent = deriveForViewer(event, previewViewer);
+
+  return (
+    <>
+      <ViewToggle value={previewViewer} onChange={setPreviewViewer} />
+      {renderTemplate(displayEvent)}
+    </>
+  );
+}
+
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: PreviewViewer;
+  onChange: (v: PreviewViewer) => void;
+}) {
+  return (
+    <div className="fixed right-3 top-3 z-40 flex items-center gap-2 rounded-sm border border-[var(--apply-rule)] bg-[#FFFCF6]/95 px-2 py-1.5 shadow-[0_1px_4px_rgba(28,16,8,0.12)] backdrop-blur">
+      <span className="pl-1 text-[9px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        Preview
+      </span>
+      <div className="flex items-center rounded-sm bg-[#F1ECE2] p-0.5">
+        {(['guest', 'member'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            className={`rounded-sm px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest transition-colors font-[family-name:var(--font-dm-sans)] ${
+              value === v
+                ? 'bg-[var(--nobc-red)] text-[var(--nobc-on-red)]'
+                : 'text-[var(--apply-muted)] hover:text-[var(--apply-ink)]'
+            }`}
+          >
+            {v === 'guest' ? 'Guest view' : 'Member view'}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }

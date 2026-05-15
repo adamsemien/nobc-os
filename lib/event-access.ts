@@ -105,7 +105,8 @@ export function buildSteps(
 
   if (isMember && viewer !== "member") {
     steps.push("auth")
-  } else if (isGuest && viewer === "anon") {
+  } else if (isGuest && viewer !== "member") {
+    // Any non-member on a guest flow supplies their name + email in the modal.
     steps.push("guestInfo")
   }
 
