@@ -1,9 +1,49 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Check, Loader2, Sparkles } from 'lucide-react';
+
+import { HeroImageUpload } from './_components/HeroImageUpload';
+import { AccessGroupsCard } from './_components/AccessGroupsCard';
+import { TemplatePicker, type TemplateKey } from './_components/TemplatePicker';
+import { defaultEventAccess, type EventAccess } from '@/lib/event-access-schema';
+
+type FlowTemplate = {
+  id: string;
+  name: string;
+  accessMode: string;
+  applyMode: string | null;
+  priceInCents: number | null;
+  nonMemberPriceInCents: number | null;
+  approvalRequired: boolean;
+  plusOnesAllowed: boolean;
+  showCapacity: boolean;
+  customQuestions: Array<{ label: string; type: string; required: boolean; options: string[] }>;
+};
+
+type Step = 1 | 2 | 3 | 4;
+
+type FormState = {
+  title: string;
+  slug: string;
+  description: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  location: string;
+  heroImageUrl: string;
+  capacity: string;
+};
+
+const STEP_LABELS: Array<{ step: Step; label: string }> = [
+  { step: 1, label: 'Draft' },
+  { step: 2, label: 'Details' },
+  { step: 3, label: 'Access' },
+  { step: 4, label: 'Template' },
+];
 
 function toKebab(str: string): string {
   return str
@@ -20,28 +60,100 @@ function combineDatetime(date: string, time: string): string | null {
   return new Date(`${date}T${t}`).toISOString();
 }
 
-type FormState = {
-  title: string;
-  slug: string;
-  description: string;
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
-  location: string;
-  heroImageAssetId: string;
-  capacity: string;
-  accessMode: 'OPEN' | 'TICKETED' | 'APPLY_OR_PAY';
-  memberPrice: string;
-  nonMemberPrice: string;
-  approvalRequired: boolean;
-  plusOnesAllowed: boolean;
-  showCapacity: boolean;
-  status: 'DRAFT' | 'PUBLISHED';
-  runOfShow: string;
-};
+function parseIsoToDateTime(iso: string): { date: string; time: string } | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
 
-const INITIAL: FormState = {
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="mb-1 block text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      {children}
+    </label>
+  );
+}
+
+function StepIndicator({ current }: { current: Step }) {
+  return (
+    <ol className="mb-10 flex items-center gap-2 sm:gap-4">
+      {STEP_LABELS.map(({ step, label }, idx) => {
+        const active = step === current;
+        const done = step < current;
+        return (
+          <li key={step} className="flex items-center gap-2 sm:gap-3">
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] font-medium font-[family-name:var(--font-dm-sans)] ${
+                active
+                  ? 'border-[var(--nobc-red)] bg-[var(--nobc-red)] text-[var(--nobc-on-red)]'
+                  : done
+                    ? 'border-[var(--apply-rule)] bg-[#F9F7F2] text-[var(--apply-ink)]'
+                    : 'border-[var(--apply-rule)] bg-white text-[var(--apply-muted)]'
+              }`}
+              aria-current={active ? 'step' : undefined}
+            >
+              {done ? <Check className="h-3 w-3" strokeWidth={2.5} /> : step}
+            </span>
+            <span
+              className={`text-[11px] uppercase tracking-widest font-[family-name:var(--font-dm-sans)] ${
+                active ? 'text-[var(--apply-ink)]' : 'text-[var(--apply-muted)]'
+              }`}
+            >
+              {label}
+            </span>
+            {idx < STEP_LABELS.length - 1 ? (
+              <span className="hidden h-px w-6 bg-[var(--apply-rule)] sm:inline-block" aria-hidden />
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const { className = '', ...rest } = props;
+  return (
+    <input
+      {...rest}
+      className={`w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)] ${className}`}
+    />
+  );
+}
+
+function PrimaryButton({
+  children,
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...rest}
+      className={`inline-flex items-center justify-center gap-2 rounded-sm bg-[var(--nobc-red)] px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-colors hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)] ${rest.className ?? ''}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GhostButton({
+  children,
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...rest}
+      className={`inline-flex items-center justify-center gap-2 rounded-sm border border-[var(--apply-rule)] bg-white px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] disabled:opacity-50 font-[family-name:var(--font-dm-sans)] ${rest.className ?? ''}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const INITIAL_FORM: FormState = {
   title: '',
   slug: '',
   description: '',
@@ -50,37 +162,54 @@ const INITIAL: FormState = {
   endDate: '',
   endTime: '',
   location: '',
-  heroImageAssetId: '',
+  heroImageUrl: '',
   capacity: '',
-  accessMode: 'OPEN',
-  memberPrice: '',
-  nonMemberPrice: '',
-  approvalRequired: false,
-  plusOnesAllowed: false,
-  showCapacity: false,
-  status: 'DRAFT',
-  runOfShow: '',
 };
 
 export default function NewEventPage() {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(INITIAL);
+  const [step, setStep] = useState<Step>(1);
+  const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [slugEdited, setSlugEdited] = useState(false);
-  const [slugError, setSlugError] = useState('');
-  const [submitError, setSubmitError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [access, setAccess] = useState<EventAccess>(() => defaultEventAccess());
+  const [template, setTemplate] = useState<TemplateKey>('editorial');
 
   // AI builder state
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [aiFilled, setAiFilled] = useState(false);
+  const [highlightFields, setHighlightFields] = useState(false);
 
-  // Auto-generate slug from title
+  const [flowTemplates, setFlowTemplates] = useState<FlowTemplate[]>([]);
+  const [appliedTemplate, setAppliedTemplate] = useState<FlowTemplate | null>(null);
+
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  // Auto-generate slug from title until user edits it
   useEffect(() => {
-    if (!slugEdited) {
+    if (!slugEdited && form.title) {
       setForm(prev => ({ ...prev, slug: toKebab(prev.title) }));
     }
   }, [form.title, slugEdited]);
+
+  // Clear field flash after a moment
+  useEffect(() => {
+    if (!highlightFields) return;
+    const t = window.setTimeout(() => setHighlightFields(false), 1600);
+    return () => window.clearTimeout(t);
+  }, [highlightFields]);
+
+  // Fetch saved flow templates when entering Step 3
+  useEffect(() => {
+    if (step !== 3) return;
+    fetch('/api/operator/event-flow-templates', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { templates: [] })
+      .then((d: { templates?: FlowTemplate[] }) => setFlowTemplates(d.templates ?? []))
+      .catch(() => {});
+  }, [step]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -89,14 +218,9 @@ export default function NewEventPage() {
   function handleSlugChange(val: string) {
     setSlugEdited(true);
     set('slug', val);
-    if (val && !/^[a-z0-9-]+$/.test(val)) {
-      setSlugError('Only lowercase letters, numbers, and hyphens');
-    } else {
-      setSlugError('');
-    }
   }
 
-  async function handleAiFill() {
+  async function handleAiGenerate() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
     setAiError('');
@@ -108,66 +232,158 @@ export default function NewEventPage() {
         credentials: 'include',
       });
       if (!res.ok) throw new Error(`Request failed (${res.status})`);
-      const data = await res.json();
+      const data = (await res.json()) as {
+        title?: string;
+        slug?: string;
+        description?: string;
+        startDatetime?: string;
+        endDatetime?: string;
+        venue?: string;
+        capacity?: number;
+        accessMode?: 'OPEN' | 'TICKETED' | 'APPLY_OR_PAY';
+        template?: TemplateKey;
+      };
+
       setForm(prev => {
         const next = { ...prev };
-        if (data.title) { next.title = data.title; }
-        if (data.description) { next.description = data.description; }
-        if (data.suggestedLocation) { next.location = data.suggestedLocation; }
-        if (data.suggestedStartTime) {
-          try {
-            const d = new Date(data.suggestedStartTime);
-            if (!isNaN(d.getTime())) {
-              next.startDate = d.toISOString().slice(0, 10);
-              next.startTime = d.toISOString().slice(11, 16);
-            }
-          } catch {}
+        if (data.title) next.title = data.title;
+        if (data.slug) {
+          next.slug = data.slug;
+        } else if (data.title) {
+          next.slug = toKebab(data.title);
         }
-        if (Array.isArray(data.runOfShow)) {
-          next.runOfShow = data.runOfShow.join('\n');
+        if (data.description) next.description = data.description;
+        if (data.startDatetime) {
+          const parsed = parseIsoToDateTime(data.startDatetime);
+          if (parsed) {
+            next.startDate = parsed.date;
+            next.startTime = parsed.time;
+          }
         }
+        if (data.endDatetime) {
+          const parsed = parseIsoToDateTime(data.endDatetime);
+          if (parsed) {
+            next.endDate = parsed.date;
+            next.endTime = parsed.time;
+          }
+        }
+        if (data.venue) next.location = data.venue;
+        if (data.capacity != null) next.capacity = String(data.capacity);
         return next;
       });
-      // Reset slug so it re-generates from new title
-      setSlugEdited(false);
+      if (data.slug) setSlugEdited(true);
+
+      // Map accessMode → EventAccess roughly
+      if (data.accessMode === 'TICKETED') {
+        setAccess({
+          member: { enabled: true, gate: 'pay', priceCents: 0 },
+          guest: { enabled: true, gate: 'pay', priceCents: 0 },
+          comp: { enabled: false, budgetCap: null },
+        });
+      } else if (data.accessMode === 'APPLY_OR_PAY') {
+        setAccess({
+          member: { enabled: true, gate: 'questions_approval', priceCents: 0 },
+          guest: { enabled: true, gate: 'pay', priceCents: 0 },
+          comp: { enabled: false, budgetCap: null },
+        });
+      } else if (data.accessMode === 'OPEN') {
+        setAccess(defaultEventAccess());
+      }
+
+      if (data.template) setTemplate(data.template);
+
+      setAiFilled(true);
+      setHighlightFields(true);
+      setStep(2);
     } catch (e) {
-      setAiError(e instanceof Error ? e.message : 'AI fill failed. Try again.');
+      setAiError(e instanceof Error ? e.message : 'AI generation failed. Try again.');
     } finally {
       setAiLoading(false);
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (form.slug && !/^[a-z0-9-]+$/.test(form.slug)) {
-      setSlugError('Only lowercase letters, numbers, and hyphens');
+  function handleStartFromScratch() {
+    setAiFilled(true);
+    setStep(2);
+  }
+
+  function applyFlowTemplate(t: FlowTemplate) {
+    setAppliedTemplate(t);
+    const memberPrice = t.priceInCents ?? 0;
+    const guestPrice = t.nonMemberPriceInCents ?? 0;
+    const approved = t.approvalRequired;
+
+    if (t.accessMode === 'OPEN') {
+      setAccess({
+        member: { enabled: true, gate: approved ? 'questions_approval' : 'auto_confirm', priceCents: 0 },
+        guest: { enabled: false, gate: 'pay', priceCents: 0 },
+        comp: { enabled: false, budgetCap: null },
+      });
+    } else if (t.accessMode === 'TICKETED') {
+      setAccess({
+        member: { enabled: true, gate: memberPrice > 0 ? 'pay' : 'auto_confirm', priceCents: memberPrice },
+        guest: { enabled: guestPrice > 0, gate: 'pay', priceCents: guestPrice },
+        comp: { enabled: false, budgetCap: null },
+      });
+    } else if (t.accessMode === 'APPLY_OR_PAY') {
+      setAccess({
+        member: { enabled: true, gate: approved ? 'questions_approval' : 'auto_confirm', priceCents: 0 },
+        guest: { enabled: true, gate: approved ? 'apply' : 'pay', priceCents: guestPrice },
+        comp: { enabled: false, budgetCap: null },
+      });
+    } else {
+      setAccess(defaultEventAccess());
+    }
+  }
+
+  function flowTemplateLabel(accessMode: string, applyMode: string | null): string {
+    if (accessMode === 'OPEN') return 'RSVP (Free)';
+    if (accessMode === 'TICKETED') return 'Paid Ticket';
+    if (accessMode === 'APPLY_OR_PAY' && applyMode === 'APPROVAL_HOLDS_TICKET') return 'Members Apply / Others Pay';
+    if (accessMode === 'APPLY_OR_PAY') return 'Application Only';
+    return accessMode;
+  }
+
+  async function submitForm(status: 'DRAFT' | 'PUBLISHED') {
+    if (!form.title.trim()) {
+      setSubmitError('Title is required.');
       return;
     }
-    setSubmitting(true);
+    const startAt = combineDatetime(form.startDate, form.startTime);
+    if (!startAt) {
+      setSubmitError('Start date is required.');
+      return;
+    }
+    if (form.slug && !/^[a-z0-9-]+$/.test(form.slug)) {
+      setSubmitError('Slug must be lowercase letters, numbers, and hyphens.');
+      return;
+    }
+
     setSubmitError('');
+    if (status === 'DRAFT') setSavingDraft(true);
+    else setSubmitting(true);
+
     try {
       const body: Record<string, unknown> = {
         title: form.title,
-        slug: form.slug || undefined,
+        slug: form.slug || toKebab(form.title),
         description: form.description || undefined,
-        startAt: combineDatetime(form.startDate, form.startTime),
+        startAt,
         endAt: combineDatetime(form.endDate, form.endTime) || undefined,
         location: form.location || undefined,
-        heroImageAssetId: form.heroImageAssetId || undefined,
+        heroImageAssetId: form.heroImageUrl || undefined,
         capacity: form.capacity ? parseInt(form.capacity, 10) : undefined,
-        accessMode: form.accessMode,
-        approvalRequired: form.approvalRequired,
-        plusOnesAllowed: form.plusOnesAllowed,
-        showCapacity: form.showCapacity,
-        status: form.status,
-        runOfShow: form.runOfShow || undefined,
+        template,
+        status,
+        eventAccess: access,
+        ...(appliedTemplate && {
+          plusOnesAllowed: appliedTemplate.plusOnesAllowed,
+          showCapacity: appliedTemplate.showCapacity,
+        }),
+        ...(appliedTemplate?.customQuestions.length && {
+          customQuestions: appliedTemplate.customQuestions,
+        }),
       };
-      if (form.accessMode === 'TICKETED' || form.accessMode === 'APPLY_OR_PAY') {
-        body.priceInCents = form.memberPrice ? Math.round(parseFloat(form.memberPrice) * 100) : undefined;
-      }
-      if (form.accessMode === 'APPLY_OR_PAY') {
-        body.nonMemberPriceInCents = form.nonMemberPrice ? Math.round(parseFloat(form.nonMemberPrice) * 100) : undefined;
-      }
 
       const res = await fetch('/api/operator/events', {
         method: 'POST',
@@ -179,355 +395,340 @@ export default function NewEventPage() {
         const text = await res.text().catch(() => '');
         throw new Error(text || `Save failed (${res.status})`);
       }
-      const { event } = await res.json();
+      const { event } = (await res.json()) as { event: { id: string } };
       router.push(`/operator/events/${event.id}`);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Save failed. Try again.');
     } finally {
+      setSavingDraft(false);
       setSubmitting(false);
     }
   }
 
-  const needsPrice = form.accessMode === 'TICKETED' || form.accessMode === 'APPLY_OR_PAY';
+  const canAdvanceFromStep1 = aiFilled;
+  const canAdvanceFromStep2 = !!form.title.trim() && !!form.startDate;
+  const flashCls = highlightFields ? 'ring-2 ring-[var(--nobc-red)]/30' : '';
+
+  const heroEnvelopeClass = useMemo(
+    () =>
+      `transition-shadow duration-500 rounded-sm ${highlightFields ? 'ring-2 ring-[var(--nobc-red)]/30' : ''}`,
+    [highlightFields],
+  );
 
   return (
-    <div className="px-4 pb-20 pt-8 sm:px-6">
-      <div className="mx-auto max-w-2xl">
+    <div className="min-h-screen bg-[#F9F7F2] px-4 pb-24 pt-10 sm:px-6">
+      <div className="mx-auto max-w-3xl">
         <Link
           href="/operator/events"
-          className="mb-6 inline-block text-sm text-primary underline-offset-4 hover:underline"
+          className="mb-8 inline-block text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
         >
           ← All events
         </Link>
 
-        <h1
-          className="mb-8 text-3xl font-normal text-text-primary"
-          style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
-        >
+        <h1 className="mb-8 text-[40px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
           New Event
         </h1>
 
-        {/* AI Builder */}
-        <div className="mb-8 rounded-lg bg-muted p-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-muted">
-            ✦ AI Event Builder
-          </p>
-          <textarea
-            className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-            style={{ borderRadius: '6px' }}
-            rows={3}
-            placeholder="Describe your event concept..."
-            value={aiPrompt}
-            onChange={e => setAiPrompt(e.target.value)}
-          />
-          {aiError && <p className="mt-1 text-xs text-text-muted">{aiError}</p>}
-          <button
-            type="button"
-            onClick={handleAiFill}
-            disabled={aiLoading || !aiPrompt.trim()}
-            className="mt-2 inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-50"
-            style={{ borderRadius: '6px' }}
-          >
-            {aiLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {aiLoading ? 'Filling…' : '✦ Fill with AI'}
-          </button>
-        </div>
+        <StepIndicator current={step} />
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Title <span className="text-text-muted">*</span>
-            </label>
-            <input
-              required
-              type="text"
-              className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-              style={{ borderRadius: '6px' }}
-              value={form.title}
-              onChange={e => set('title', e.target.value)}
-            />
-          </div>
-
-          {/* Slug */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Slug
-            </label>
-            <input
-              type="text"
-              className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-              style={{ borderRadius: '6px' }}
-              value={form.slug}
-              onChange={e => handleSlugChange(e.target.value)}
-            />
-            {slugError && <p className="mt-1 text-xs text-text-muted">{slugError}</p>}
-            {form.slug && !slugError && (
-              <p className="mt-1 text-xs text-text-muted">
-                /m/events/<span className="text-text-secondary">{form.slug}</span>
+        {step === 1 && (
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-[36px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+                Start with AI
+              </h2>
+              <p className="mt-2 text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                Describe your event in plain language. AI fills the form.
               </p>
+            </div>
+
+            <textarea
+              rows={4}
+              value={aiPrompt}
+              onChange={e => setAiPrompt(e.target.value)}
+              placeholder="A late summer rooftop dinner for 24 — long shared table, natural wine pairings, a chef from Saigon for one night only..."
+              className="w-full rounded-sm border border-[var(--apply-rule)] bg-white p-4 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+            />
+
+            {aiError ? (
+              <p role="alert" className="text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+                {aiError}
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-4">
+              <PrimaryButton
+                type="button"
+                onClick={handleAiGenerate}
+                disabled={aiLoading || !aiPrompt.trim()}
+              >
+                {aiLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Thinking…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Generate →
+                  </>
+                )}
+              </PrimaryButton>
+
+              <button
+                type="button"
+                onClick={handleStartFromScratch}
+                className="text-[12px] uppercase tracking-widest text-[var(--apply-muted)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+              >
+                Start from scratch →
+              </button>
+            </div>
+          </section>
+        )}
+
+        {step === 2 && (
+          <section className="space-y-6">
+            <h2 className="text-[32px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+              Details
+            </h2>
+
+            <div className={flashCls + ' rounded-sm'}>
+              <FieldLabel>Title *</FieldLabel>
+              <TextInput
+                required
+                type="text"
+                value={form.title}
+                onChange={e => set('title', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <FieldLabel>Slug</FieldLabel>
+              <TextInput
+                type="text"
+                value={form.slug}
+                onChange={e => handleSlugChange(e.target.value)}
+                className="font-mono"
+              />
+              {form.slug ? (
+                <p className="mt-1 text-[11px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                  /m/events/{form.slug}
+                </p>
+              ) : null}
+            </div>
+
+            <div className={flashCls + ' rounded-sm'}>
+              <FieldLabel>Description</FieldLabel>
+              <textarea
+                rows={6}
+                value={form.description}
+                onChange={e => set('description', e.target.value)}
+                className="w-full rounded-sm border border-[var(--apply-rule)] bg-white px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              />
+            </div>
+
+            <div>
+              <FieldLabel>Start date &amp; time *</FieldLabel>
+              <div className="flex gap-2">
+                <TextInput
+                  type="date"
+                  required
+                  value={form.startDate}
+                  onChange={e => set('startDate', e.target.value)}
+                  className="flex-1"
+                />
+                <TextInput
+                  type="time"
+                  value={form.startTime}
+                  onChange={e => set('startTime', e.target.value)}
+                  className="w-36"
+                />
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel>End date &amp; time (optional)</FieldLabel>
+              <div className="flex gap-2">
+                <TextInput
+                  type="date"
+                  value={form.endDate}
+                  onChange={e => set('endDate', e.target.value)}
+                  className="flex-1"
+                />
+                <TextInput
+                  type="time"
+                  value={form.endTime}
+                  onChange={e => set('endTime', e.target.value)}
+                  className="w-36"
+                />
+              </div>
+            </div>
+
+            <div className={flashCls + ' rounded-sm'}>
+              <FieldLabel>Venue / Location</FieldLabel>
+              <TextInput
+                type="text"
+                value={form.location}
+                onChange={e => set('location', e.target.value)}
+              />
+            </div>
+
+            <div className={heroEnvelopeClass}>
+              <FieldLabel>Hero Image</FieldLabel>
+              <HeroImageUpload
+                value={form.heroImageUrl}
+                onChange={url => set('heroImageUrl', url)}
+              />
+            </div>
+
+            <div>
+              <FieldLabel>Capacity (optional)</FieldLabel>
+              <TextInput
+                type="number"
+                min={1}
+                value={form.capacity}
+                onChange={e => set('capacity', e.target.value)}
+              />
+            </div>
+          </section>
+        )}
+
+        {step === 3 && (
+          <section className="space-y-6">
+            <h2 className="text-[32px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+              Access
+            </h2>
+            <p className="text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+              How do people get in?
+            </p>
+
+            {flowTemplates.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                  Start from a saved flow
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {flowTemplates.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => applyFlowTemplate(t)}
+                      className={`flex flex-col items-start rounded-sm border px-4 py-3 text-left transition-colors ${
+                        appliedTemplate?.id === t.id
+                          ? 'border-[var(--nobc-red)] bg-[#F9F7F2]'
+                          : 'border-[var(--apply-rule)] bg-white hover:border-[var(--nobc-red)]'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+                        {t.name}
+                      </span>
+                      <span className="mt-0.5 text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                        {flowTemplateLabel(t.accessMode, t.applyMode)}
+                        {t.customQuestions.length > 0
+                          ? ` · ${t.customQuestions.length}q`
+                          : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {appliedTemplate && (
+                  <p className="text-[11px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                    Template applied — adjust settings below if needed.
+                  </p>
+                )}
+                <div className="border-t border-[var(--apply-rule)]" />
+              </div>
+            )}
+
+            <AccessGroupsCard value={access} onChange={setAccess} />
+          </section>
+        )}
+
+        {step === 4 && (
+          <section className="space-y-6">
+            <h2 className="text-[32px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+              Template
+            </h2>
+            <p className="text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+              Pick the layout for the member-facing event page.
+            </p>
+            <TemplatePicker value={template} onChange={setTemplate} />
+          </section>
+        )}
+
+        {submitError ? (
+          <p
+            role="alert"
+            className="mt-6 rounded-sm border border-[var(--apply-rule)] bg-white px-4 py-3 text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+          >
+            {submitError}
+          </p>
+        ) : null}
+
+        {/* Nav */}
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            {step > 1 ? (
+              <GhostButton
+                type="button"
+                onClick={() => setStep(prev => (Math.max(1, prev - 1) as Step))}
+              >
+                ← Back
+              </GhostButton>
+            ) : (
+              <span />
             )}
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Description
-            </label>
-            <textarea
-              rows={5}
-              className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-              style={{ borderRadius: '6px' }}
-              value={form.description}
-              onChange={e => set('description', e.target.value)}
-            />
-          </div>
-
-          {/* Start date + time */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Start date &amp; time <span className="text-text-muted">*</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                required
-                type="date"
-                className="flex-1 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ borderRadius: '6px' }}
-                value={form.startDate}
-                onChange={e => set('startDate', e.target.value)}
-              />
-              <input
-                type="time"
-                className="w-36 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ borderRadius: '6px' }}
-                value={form.startTime}
-                onChange={e => set('startTime', e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* End date + time */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              End date &amp; time <span className="text-text-muted">(optional)</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                className="flex-1 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ borderRadius: '6px' }}
-                value={form.endDate}
-                onChange={e => set('endDate', e.target.value)}
-              />
-              <input
-                type="time"
-                className="w-36 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ borderRadius: '6px' }}
-                value={form.endTime}
-                onChange={e => set('endTime', e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Location */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Venue / Location
-            </label>
-            <input
-              type="text"
-              className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-              style={{ borderRadius: '6px' }}
-              value={form.location}
-              onChange={e => set('location', e.target.value)}
-            />
-          </div>
-
-          {/* Hero image URL */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Hero image URL
-            </label>
-            <input
-              type="url"
-              className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-              style={{ borderRadius: '6px' }}
-              placeholder="https://..."
-              value={form.heroImageAssetId}
-              onChange={e => set('heroImageAssetId', e.target.value)}
-            />
-          </div>
-
-          {/* Capacity */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Capacity <span className="text-text-muted">(optional)</span>
-            </label>
-            <input
-              type="number"
-              min={1}
-              className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-              style={{ borderRadius: '6px' }}
-              value={form.capacity}
-              onChange={e => set('capacity', e.target.value)}
-            />
-          </div>
-
-          {/* Access mode */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-text-secondary">
-              Access mode
-            </label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
-              {(['OPEN', 'TICKETED', 'APPLY_OR_PAY'] as const).map(mode => (
-                <label key={mode} className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
-                  <input
-                    type="radio"
-                    name="accessMode"
-                    value={mode}
-                    checked={form.accessMode === mode}
-                    onChange={() => set('accessMode', mode)}
-                    className="accent-primary"
-                  />
-                  {mode === 'OPEN' ? 'Open' : mode === 'TICKETED' ? 'Ticketed' : 'Apply or Pay'}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Member price */}
-          {needsPrice && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-secondary">
-                Member price ($)
-              </label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ borderRadius: '6px' }}
-                placeholder="0.00"
-                value={form.memberPrice}
-                onChange={e => set('memberPrice', e.target.value)}
-              />
-            </div>
-          )}
-
-          {/* Non-member price */}
-          {form.accessMode === 'APPLY_OR_PAY' && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-secondary">
-                Non-member price ($)
-              </label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ borderRadius: '6px' }}
-                placeholder="0.00"
-                value={form.nonMemberPrice}
-                onChange={e => set('nonMemberPrice', e.target.value)}
-              />
-            </div>
-          )}
-
-          {/* Toggles */}
-          <div className="space-y-3 rounded-lg border border-border p-4" style={{ borderRadius: '8px' }}>
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
-              <input
-                type="checkbox"
-                className="accent-primary h-4 w-4"
-                checked={form.approvalRequired}
-                onChange={e => set('approvalRequired', e.target.checked)}
-              />
-              Approval required
-            </label>
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
-              <input
-                type="checkbox"
-                className="accent-primary h-4 w-4"
-                checked={form.plusOnesAllowed}
-                onChange={e => set('plusOnesAllowed', e.target.checked)}
-              />
-              Plus-ones allowed
-            </label>
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
-              <input
-                type="checkbox"
-                className="accent-primary h-4 w-4"
-                checked={form.showCapacity}
-                onChange={e => set('showCapacity', e.target.checked)}
-              />
-              Show capacity to members
-            </label>
-          </div>
-
-          {/* Run of show */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-secondary">
-              Run of show
-            </label>
-            <textarea
-              rows={4}
-              className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-              style={{ borderRadius: '6px' }}
-              placeholder="8:00 PM - Doors open&#10;9:00 PM - DJ set begins"
-              value={form.runOfShow}
-              onChange={e => set('runOfShow', e.target.value)}
-            />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-text-secondary">
-              Status
-            </label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
-                <input
-                  type="radio"
-                  name="status"
-                  value="DRAFT"
-                  checked={form.status === 'DRAFT'}
-                  onChange={() => set('status', 'DRAFT')}
-                  className="accent-primary"
-                />
+          <div className="flex flex-wrap items-center gap-3">
+            {step >= 2 ? (
+              <GhostButton
+                type="button"
+                onClick={() => void submitForm('DRAFT')}
+                disabled={savingDraft || submitting}
+              >
+                {savingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Save as Draft
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
-                <input
-                  type="radio"
-                  name="status"
-                  value="PUBLISHED"
-                  checked={form.status === 'PUBLISHED'}
-                  onChange={() => set('status', 'PUBLISHED')}
-                  className="accent-primary"
-                />
-                Publish immediately
-              </label>
-            </div>
+              </GhostButton>
+            ) : null}
+
+            {step === 1 && (
+              <PrimaryButton
+                type="button"
+                onClick={() => setStep(2)}
+                disabled={!canAdvanceFromStep1}
+              >
+                Next →
+              </PrimaryButton>
+            )}
+            {step === 2 && (
+              <PrimaryButton
+                type="button"
+                onClick={() => setStep(3)}
+                disabled={!canAdvanceFromStep2}
+              >
+                Next →
+              </PrimaryButton>
+            )}
+            {step === 3 && (
+              <PrimaryButton type="button" onClick={() => setStep(4)}>
+                Next →
+              </PrimaryButton>
+            )}
+            {step === 4 && (
+              <PrimaryButton
+                type="button"
+                onClick={() => void submitForm('PUBLISHED')}
+                disabled={submitting || savingDraft}
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Publish
+              </PrimaryButton>
+            )}
           </div>
-
-          {submitError && (
-            <p className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
-              {submitError}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity disabled:opacity-50"
-            style={{ borderRadius: '6px' }}
-          >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {submitting ? 'Saving…' : 'Save Event'}
-          </button>
-        </form>
+        </div>
       </div>
     </div>
   );
 }
+
