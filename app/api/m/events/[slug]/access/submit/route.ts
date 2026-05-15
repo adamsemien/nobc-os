@@ -1,0 +1,154 @@
+import { auth } from '@clerk/nextjs/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { db } from '@/lib/db';
+import { getMemberWorkspaceId } from '@/lib/auth';
+import { resolveViewer } from '@/lib/event-access';
+import {
+  loadAccessContext,
+  priceForResolved,
+  gateNeedsApproval,
+  findOrCreateGuestMember,
+  hasCapacity,
+} from '@/lib/event-access-submit';
+
+const BodySchema = z.object({
+  guestEmail: z.string().email().optional(),
+  guestName: z.string().min(1).optional(),
+  customAnswers: z.record(z.string(), z.union([z.string(), z.boolean(), z.number(), z.null()])).optional(),
+});
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> },
+) {
+  const { slug } = await params;
+  const { userId } = await auth();
+
+  // Resolve workspace: prefer member workspace; otherwise look up by slug for guest access.
+  let workspaceId: string | null = userId ? await getMemberWorkspaceId(userId) : null;
+  if (!workspaceId) {
+    const evt = await db.event.findFirst({
+      where: { slug, status: 'PUBLISHED' },
+      select: { workspaceId: true },
+    });
+    workspaceId = evt?.workspaceId ?? null;
+  }
+  if (!workspaceId) {
+    return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+  }
+
+  const evt = await db.event.findFirst({
+    where: { workspaceId, slug, status: 'PUBLISHED' },
+    select: { id: true },
+  });
+  if (!evt) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  let body: z.infer<typeof BodySchema>;
+  try {
+    body = BodySchema.parse(await req.json());
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
+
+  const member = userId
+    ? await db.member.findFirst({
+        where: { workspaceId, clerkUserId: userId },
+        select: { id: true, status: true, memberQrCode: true, email: true },
+      })
+    : null;
+
+  const viewer = resolveViewer(member, userId);
+  const ctx = await loadAccessContext(workspaceId, evt.id, viewer);
+  if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+
+  const { resolved, event } = ctx;
+  const price = priceForResolved(resolved);
+  if (price > 0) {
+    return NextResponse.json(
+      { error: 'This path requires payment — use payment-intent endpoint.' },
+      { status: 400 },
+    );
+  }
+
+  // Resolve the member who will own the RSVP.
+  let rsvpMember: { id: string; memberQrCode: string | null };
+  if (resolved.kind === 'guest') {
+    if (!body.guestEmail || !body.guestName) {
+      return NextResponse.json({ error: 'Name and email required' }, { status: 400 });
+    }
+    const guest = await findOrCreateGuestMember(workspaceId, body.guestEmail, body.guestName);
+    rsvpMember = { id: guest.id, memberQrCode: guest.memberQrCode };
+  } else {
+    if (!member) return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
+    rsvpMember = { id: member.id, memberQrCode: member.memberQrCode };
+  }
+
+  // Capacity check (skipped for approval gates — they create pending requests, not held seats).
+  const needsApproval = gateNeedsApproval(resolved.gate as string);
+  if (!needsApproval && !(await hasCapacity(workspaceId, evt.id, event.capacity))) {
+    return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+  }
+
+  const ticketStatus = needsApproval ? 'pending_approval' : 'confirmed';
+  const rsvpStatus = needsApproval ? 'WAITLISTED' : 'CONFIRMED';
+
+  // Upsert RSVP (memberId is the unique-with-event partner).
+  const existing = await db.rSVP.findFirst({
+    where: { workspaceId, eventId: evt.id, memberId: rsvpMember.id },
+    select: { id: true, ticketStatus: true },
+  });
+
+  let rsvpId: string;
+  if (existing) {
+    if (existing.ticketStatus === 'confirmed' || existing.ticketStatus === 'pending_approval') {
+      return NextResponse.json({
+        rsvpId: existing.id,
+        ticketStatus: existing.ticketStatus,
+        memberQrCode: rsvpMember.memberQrCode,
+      });
+    }
+    const updated = await db.rSVP.update({
+      where: { id: existing.id },
+      data: {
+        status: rsvpStatus,
+        ticketStatus,
+        customAnswers: body.customAnswers ?? undefined,
+        guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
+        guestName: resolved.kind === 'guest' ? body.guestName : null,
+      },
+    });
+    rsvpId = updated.id;
+  } else {
+    const created = await db.rSVP.create({
+      data: {
+        workspaceId,
+        eventId: evt.id,
+        memberId: rsvpMember.id,
+        status: rsvpStatus,
+        ticketStatus,
+        customAnswers: body.customAnswers ?? undefined,
+        guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
+        guestName: resolved.kind === 'guest' ? body.guestName : null,
+      },
+    });
+    rsvpId = created.id;
+  }
+
+  await db.auditEvent.create({
+    data: {
+      workspaceId,
+      actorId: userId ?? `guest:${body.guestEmail ?? 'unknown'}`,
+      action: 'rsvp.created',
+      entityType: 'RSVP',
+      entityId: rsvpId,
+      metadata: { ticketStatus, viewer, gate: resolved.gate },
+    },
+  });
+
+  return NextResponse.json({
+    rsvpId,
+    ticketStatus,
+    memberQrCode: rsvpMember.memberQrCode,
+  });
+}
