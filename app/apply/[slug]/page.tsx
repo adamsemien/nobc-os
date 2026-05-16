@@ -199,10 +199,10 @@ function SiteFooter({ slug }: { slug: string }) {
           </Link>
         </div>
         <a
-          href="mailto:hello@thenobadcompany.com"
+          href="mailto:team@thenobadcompany.com"
           className="text-sm font-normal tracking-wide text-events-ref-muted underline-offset-4 hover:underline"
         >
-          hello@thenobadcompany.com
+          team@thenobadcompany.com
         </a>
       </div>
       <div className="mx-auto max-w-6xl px-6 pb-8 sm:px-8">

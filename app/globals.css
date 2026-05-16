@@ -1,6 +1,38 @@
 @import "tailwindcss";
 
 /* ============================================================
+   FONTS: PP Editorial New + Neue Haas Grotesk Display Pro
+   ============================================================ */
+
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-Thin.otf') format('opentype'), url('/fonts/PPEditorialNew-Thin.ttf') format('truetype'); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-ThinItalic.otf') format('opentype'), url('/fonts/PPEditorialNew-ThinItalic.ttf') format('truetype'); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-Ultralight.otf') format('opentype'), url('/fonts/PPEditorialNew-Ultralight.ttf') format('truetype'); font-weight: 200; font-style: normal; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-UltralightItalic.otf') format('opentype'), url('/fonts/PPEditorialNew-UltralightItalic.ttf') format('truetype'); font-weight: 200; font-style: italic; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-Regular.otf') format('opentype'), url('/fonts/PPEditorialNew-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-Italic.otf') format('opentype'), url('/fonts/PPEditorialNew-Italic.ttf') format('truetype'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-Bold.otf') format('opentype'), url('/fonts/PPEditorialNew-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-BoldItalic.otf') format('opentype'), url('/fonts/PPEditorialNew-BoldItalic.ttf') format('truetype'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-Heavy.otf') format('opentype'), url('/fonts/PPEditorialNew-Heavy.ttf') format('truetype'); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: 'PP Editorial New'; src: url('/fonts/PPEditorialNew-HeavyItalic.otf') format('opentype'), url('/fonts/PPEditorialNew-HeavyItalic.ttf') format('truetype'); font-weight: 800; font-style: italic; font-display: swap; }
+
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-15UltTh.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-15UltTh.ttf') format('truetype'); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-16UltThIt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-16UltThIt.ttf') format('truetype'); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-25Th.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-25Th.ttf') format('truetype'); font-weight: 200; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-26ThIt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-26ThIt.ttf') format('truetype'); font-weight: 200; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-35XLt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-35XLt.ttf') format('truetype'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-36XLtIt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-36XLtIt.ttf') format('truetype'); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-45Lt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-45Lt.ttf') format('truetype'); font-weight: 350; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-46LtIt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-46LtIt.ttf') format('truetype'); font-weight: 350; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-55Rg.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-55Rg.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-56It.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-56It.ttf') format('truetype'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-65Md.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-65Md.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-66MdIt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-66MdIt.ttf') format('truetype'); font-weight: 500; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-75Bd.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-75Bd.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-76BdIt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-76BdIt.ttf') format('truetype'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-95Blk.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-95Blk.ttf') format('truetype'); font-weight: 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Neue Haas Grotesk Display Pro'; src: url('/fonts/NHaasGroteskDSPro-96BlkIt.otf') format('opentype'), url('/fonts/NHaasGroteskDSPro-96BlkIt.ttf') format('truetype'); font-weight: 900; font-style: italic; font-display: swap; }
+
+/* ============================================================
    THEME: NoBC (light) — default. Operator-tool token system.
    ============================================================ */
 :root,
@@ -95,6 +127,239 @@
 }
 
 /* ============================================================
+   THEME: Obsidian — near-future private intelligence
+   ============================================================ */
+[data-theme="obsidian"] {
+  --bg: #080808;
+  --surface: #0f0f0f;
+  --raised: #161616;
+  --card: #0f0f0f;
+  --sidebar: #080808;
+  --sidebar-active-bg: rgba(201, 168, 76, 0.08);
+  --border: rgba(255, 215, 100, 0.08);
+  --border-strong: rgba(255, 215, 100, 0.2);
+  --text-primary: #e8e2d4;
+  --text-secondary: rgba(232, 226, 212, 0.4);
+  --text-tertiary: rgba(232, 226, 212, 0.25);
+  --primary: #c9a84c;
+  --primary-hover: #d4b55a;
+  --primary-soft: rgba(201, 168, 76, 0.15);
+  --accent: #c9a84c;
+  --accent-hover: #d4b55a;
+  --accent-soft: rgba(201, 168, 76, 0.15);
+  --on-primary: #080808;
+  --success: #1a4a2e;
+  --success-soft: rgba(26, 74, 46, 0.25);
+  --warning: #6b4e12;
+  --warning-soft: rgba(107, 78, 18, 0.25);
+  --danger: #8b2020;
+  --danger-soft: rgba(139, 32, 32, 0.25);
+  --neutral-soft: rgba(201, 168, 76, 0.08);
+  --radius-base: 6px;
+  --font-display: var(--font-cormorant), Georgia, serif;
+  --font-body: var(--font-dm-mono), monospace;
+  --card-shadow: 0 0 0 1px rgba(255, 215, 100, 0.08);
+  --card-shadow-hover: 0 0 0 1px rgba(255, 215, 100, 0.2), 0 4px 32px rgba(201, 168, 76, 0.06);
+  --sidebar-shadow: inset -1px 0 0 rgba(255, 215, 100, 0.08);
+  --page-bg: radial-gradient(ellipse at 50% 35%, #111010 0%, #080808 65%);
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--raised);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+
+  /* Recommendation + action badges */
+  --op-rec-strong-yes-bg: rgba(26, 74, 46, 0.6);
+  --op-rec-strong-yes-fg: rgba(160, 240, 185, 0.9);
+  --op-rec-yes-bg: rgba(26, 74, 46, 0.25);
+  --op-rec-yes-fg: rgba(120, 200, 145, 0.8);
+  --op-rec-unclear-bg: rgba(201, 168, 76, 0.12);
+  --op-rec-unclear-fg: rgba(201, 168, 76, 0.8);
+  --op-rec-no-bg: rgba(139, 32, 32, 0.25);
+  --op-rec-no-fg: rgba(240, 160, 160, 0.8);
+  --op-rec-strong-no-bg: rgba(139, 32, 32, 0.55);
+  --op-rec-strong-no-fg: rgba(255, 200, 200, 0.9);
+  --op-approve: rgba(26, 74, 46, 0.7);
+  --op-approve-hover: rgba(30, 90, 55, 0.85);
+  --op-approve-fg: rgba(160, 240, 185, 0.95);
+  --op-reject: rgba(139, 32, 32, 0.7);
+  --op-reject-hover: rgba(168, 38, 38, 0.85);
+  --op-reject-fg: rgba(255, 210, 210, 0.95);
+}
+
+/* ============================================================
+   OBSIDIAN — motion, cards, typography, utilities
+   ============================================================ */
+
+/* Slower, more deliberate transitions */
+[data-theme="obsidian"] button:not(:disabled),
+[data-theme="obsidian"] [role="button"]:not([aria-disabled="true"]) {
+  transition:
+    transform 500ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 400ms ease,
+    border-color 400ms ease,
+    color 400ms ease,
+    box-shadow 400ms ease;
+}
+
+/* Card hover: breathing scale, not lift */
+[data-theme="obsidian"] .op-card-hover:hover {
+  transform: scale(1.005);
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* Thin gold scrollbars */
+[data-theme="obsidian"] * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 168, 76, 0.1) transparent;
+}
+[data-theme="obsidian"] *::-webkit-scrollbar { width: 4px; height: 4px; }
+[data-theme="obsidian"] *::-webkit-scrollbar-track { background: transparent; }
+[data-theme="obsidian"] *::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 76, 0.1);
+  border-radius: 2px;
+}
+[data-theme="obsidian"] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 168, 76, 0.2);
+}
+
+/* Focus rings — gold only, never blue */
+[data-theme="obsidian"] :focus-visible {
+  outline: 1px solid rgba(201, 168, 76, 0.4);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Application list card: Obsidian layout ── */
+
+/* Name: Cormorant Garamond italic */
+[data-theme="obsidian"] .obs-app-name {
+  font-family: var(--font-cormorant), Georgia, serif;
+  font-weight: 300;
+  font-style: italic;
+  font-size: 1.125rem;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+}
+
+/* City · time row: DM Mono tiny gold */
+[data-theme="obsidian"] .obs-app-meta {
+  font-family: var(--font-dm-mono), monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  color: rgba(201, 168, 76, 0.5);
+  margin-top: 4px;
+  text-transform: lowercase;
+}
+
+/* Archetype pill: monospaced, faint gold */
+[data-theme="obsidian"] .obs-app-archetype {
+  font-family: var(--font-dm-mono), monospace;
+  font-size: 0.575rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-color: rgba(201, 168, 76, 0.15) !important;
+  background: transparent !important;
+  color: rgba(201, 168, 76, 0.45);
+}
+
+/* Score number badge: hidden normally, large DM Mono in Obsidian */
+.obs-score-badge { display: none; }
+[data-theme="obsidian"] .obs-score-badge {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-dm-mono), monospace;
+  font-size: 1.875rem;
+  font-weight: 400;
+  color: rgba(201, 168, 76, 0.55);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Score progress bar: replaced by number in Obsidian */
+[data-theme="obsidian"] .obs-score-bar { display: none; }
+
+/* Card button: Obsidian hover + active states */
+[data-theme="obsidian"] .obs-app-button {
+  transition:
+    background-color 400ms ease,
+    border-color 400ms ease,
+    box-shadow 400ms ease,
+    transform 500ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+[data-theme="obsidian"] .obs-app-button:hover {
+  background: #161616 !important;
+  border-color: rgba(255, 215, 100, 0.18) !important;
+  transform: scale(1.005);
+}
+[data-theme="obsidian"] .obs-app-button.obs-app-active {
+  background: #161616 !important;
+  border-color: rgba(201, 168, 76, 0.35) !important;
+  border-left: 2px solid #c9a84c !important;
+  box-shadow: -2px 0 12px rgba(201, 168, 76, 0.08);
+}
+
+/* Count-up numbers */
+[data-theme="obsidian"] .obs-count-up {
+  font-family: var(--font-dm-mono), monospace;
+  color: #c9a84c;
+}
+
+/* Page stagger: children fade up 8px, 40ms apart */
+@keyframes obs-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+[data-theme="obsidian"] .obs-stagger > * {
+  animation: obs-fade-up 600ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+[data-theme="obsidian"] .obs-stagger > *:nth-child(1)  { animation-delay:   0ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(2)  { animation-delay:  40ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(3)  { animation-delay:  80ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(4)  { animation-delay: 120ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(5)  { animation-delay: 160ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(6)  { animation-delay: 200ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(7)  { animation-delay: 240ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(8)  { animation-delay: 280ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(9)  { animation-delay: 320ms; }
+[data-theme="obsidian"] .obs-stagger > *:nth-child(10) { animation-delay: 360ms; }
+
+/* Idle easter egg whisper */
+@keyframes obs-whisper {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  75%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.obs-idle-whisper {
+  position: fixed;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-cormorant), Georgia, serif;
+  font-weight: 300;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: rgba(201, 168, 76, 0.55);
+  pointer-events: none;
+  z-index: 9999;
+  animation: obs-whisper 4s ease-in-out forwards;
+}
+
+/* ============================================================
    Brand constants — member-facing identity, theme-independent.
    ============================================================ */
 :root {
@@ -169,12 +434,27 @@
   --events-ref-placeholder-a: oklch(0.94 0.022 78);
   --events-ref-placeholder-b: oklch(0.9 0.028 72);
 
+  --font-display: 'PP Editorial New', Georgia, serif;
+  --font-body: 'Neue Haas Grotesk Display Pro', system-ui, sans-serif;
+
   /* Apply + thanks: same canvas/type as member events editorial; brand red = NoBC */
   --apply-cream: var(--events-ref-cream);
   --apply-ink: var(--events-ref-ink);
   --apply-muted: var(--events-ref-muted);
   --apply-rule: var(--events-ref-rule);
   --apply-crimson: var(--nobc-red);
+
+  /* Apply form — night mode */
+  --bg-night: #1a1528;
+  --text-night: #f5f0ee;
+  --accent-night: #7F77DD;
+  --muted-night: #9e9a9a;
+  --border-night: rgba(255,255,255,0.12);
+  --tertiary-night: rgba(255,255,255,0.35);
+
+  /* Reveal screen — slightly darker bg */
+  --bg-reveal: #120f1e;
+  --bg-reveal-surface: rgba(255,255,255,0.025);
 }
 
 @theme inline {
@@ -278,11 +558,15 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-body);
   transition:
     background-color 200ms ease,
     border-color 200ms ease,
     color 200ms ease;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
 }
 
 /* Operator card surface */
@@ -485,6 +769,146 @@ button:not(:disabled):active,
   );
 }
 
+/* ============================================================
+   THEME: Rosé — a very good Saturday afternoon
+   ============================================================ */
+[data-theme="rose"] {
+  --bg: #fdf6f0;
+  --surface: #fef8f5;
+  --raised: #fef0e8;
+  --card: #fef8f5;
+  --sidebar: #f7ede3;
+  --sidebar-active-bg: rgba(196, 92, 58, 0.1);
+  --border: rgba(196, 92, 58, 0.12);
+  --border-strong: rgba(196, 92, 58, 0.3);
+  --text-primary: #2d1810;
+  --text-secondary: rgba(45, 24, 16, 0.45);
+  --text-tertiary: rgba(45, 24, 16, 0.3);
+  --primary: #c45c3a;
+  --primary-hover: #b04f2f;
+  --primary-soft: rgba(196, 92, 58, 0.12);
+  --accent: #c45c3a;
+  --accent-hover: #b04f2f;
+  --accent-soft: rgba(196, 92, 58, 0.12);
+  --on-primary: #fdf6f0;
+  --success: #4a7c59;
+  --success-soft: rgba(74, 124, 89, 0.12);
+  --warning: #a06020;
+  --warning-soft: rgba(160, 96, 32, 0.12);
+  --danger: #b03a2e;
+  --danger-soft: rgba(176, 58, 46, 0.12);
+  --neutral-soft: rgba(196, 92, 58, 0.08);
+  --radius-base: 6px;
+  --card-shadow: 0 1px 4px rgba(196, 92, 58, 0.05), 0 0 0 1px rgba(196, 92, 58, 0.08);
+  --card-shadow-hover: 0 2px 12px rgba(196, 92, 58, 0.1), 0 0 0 1px rgba(196, 92, 58, 0.18);
+  --sidebar-shadow: inset -1px 0 0 rgba(196, 92, 58, 0.1);
+  --page-bg: var(--bg);
+  --font-display: var(--font-playfair-display), Georgia, serif;
+  --font-body: var(--font-plus-jakarta), system-ui, sans-serif;
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--raised);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+
+  --op-rec-strong-yes-bg: rgba(74, 124, 89, 0.5);
+  --op-rec-strong-yes-fg: rgba(30, 80, 50, 0.95);
+  --op-rec-yes-bg: rgba(74, 124, 89, 0.15);
+  --op-rec-yes-fg: rgba(50, 100, 65, 0.9);
+  --op-rec-unclear-bg: rgba(196, 92, 58, 0.12);
+  --op-rec-unclear-fg: rgba(140, 55, 25, 0.85);
+  --op-rec-no-bg: rgba(176, 58, 46, 0.12);
+  --op-rec-no-fg: rgba(140, 40, 30, 0.85);
+  --op-rec-strong-no-bg: rgba(176, 58, 46, 0.35);
+  --op-rec-strong-no-fg: rgba(100, 20, 15, 0.95);
+  --op-approve: #c45c3a;
+  --op-approve-hover: #b04f2f;
+  --op-approve-fg: #fdf6f0;
+  --op-reject: rgba(176, 58, 46, 0.15);
+  --op-reject-hover: rgba(176, 58, 46, 0.25);
+  --op-reject-fg: #b03a2e;
+}
+
+/* Rosé sidebar: very subtle warm gradient */
+[data-theme="rose"] aside {
+  background: linear-gradient(to bottom, #f7ede3, #f2e3d0) !important;
+}
+
+/* Rosé cards: hover lifts 2px */
+[data-theme="rose"] .op-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* Rosé app card name: Playfair Display 17px */
+[data-theme="rose"] .obs-app-name {
+  font-family: var(--font-playfair-display), Georgia, serif;
+  font-size: 1.0625rem;
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0.005em;
+  color: var(--text-primary);
+}
+
+/* Rosé score badge: terracotta pill */
+[data-theme="rose"] .obs-score-badge {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #c45c3a;
+  color: #fdf6f0;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  user-select: none;
+}
+[data-theme="rose"] .obs-score-bar { display: none; }
+
+/* Rosé active card: terracotta left border, blush bg */
+[data-theme="rose"] .obs-app-active {
+  border-left: 2px solid #c45c3a !important;
+  background: #fef0e8 !important;
+}
+
+/* ── Rosé confetti — CSS-only, approval celebration ── */
+.rose-confetti {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  top: 0;
+  left: 50%;
+  opacity: 0;
+  animation-duration: 1.2s;
+  animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  animation-fill-mode: forwards;
+}
+.rose-confetti-0 { background: #c45c3a; animation-name: rc0; }
+.rose-confetti-1 { background: #f9c4ae; animation-name: rc1; }
+.rose-confetti-2 { background: #fdf6f0; border-radius: 50%; width: 6px; height: 6px; animation-name: rc2; }
+.rose-confetti-3 { background: #c45c3a; width: 10px; height: 5px; animation-name: rc3; }
+.rose-confetti-4 { background: #f9c4ae; border-radius: 50%; animation-name: rc4; }
+.rose-confetti-5 { background: #fdf6f0; animation-name: rc5; }
+
+@keyframes rc0 { 0% { transform: translate(-20px, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(-44px, 64px) rotate(-50deg); opacity: 0; } }
+@keyframes rc1 { 0% { transform: translate(-8px, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(-18px, 58px) rotate(35deg); opacity: 0; } }
+@keyframes rc2 { 0% { transform: translate(2px, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(10px, 70px) rotate(60deg); opacity: 0; } }
+@keyframes rc3 { 0% { transform: translate(14px, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(28px, 54px) rotate(-25deg); opacity: 0; } }
+@keyframes rc4 { 0% { transform: translate(26px, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(40px, 62px) rotate(80deg); opacity: 0; } }
+@keyframes rc5 { 0% { transform: translate(-34px, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(-52px, 48px) rotate(-65deg); opacity: 0; } }
+
 /* WCAG 2.2 AA — Focus rings for keyboard navigation */
 :focus-visible {
   outline: 2px solid var(--primary, #4338ca);
@@ -520,4 +944,24 @@ button:not(:disabled):active,
   z-index: 9999;
   border-radius: 0 0 6px 0;
   outline: none;
+}
+
+/* ============================================================
+   /apply — mobile layout utilities
+   ============================================================ */
+
+/* Dot nav — visible above 480px, hidden on narrow phones */
+.apply-nav-dots {
+  display: flex;
+}
+
+@media (max-width: 479px) {
+  .apply-nav-dots {
+    display: none;
+  }
+}
+
+/* Event creation — prevent horizontal overflow on mobile */
+.event-form-wrapper {
+  overflow-x: hidden;
 }
