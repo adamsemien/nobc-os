@@ -120,11 +120,22 @@ All workspace-scoped with `workspaceId` indexed:
 ## Key Files
 
 ```
-prisma/schema.prisma     — all models
-prisma.config.ts         — Prisma 7 config with Neon adapter (datasource nested, path.resolve)
-lib/db.ts                — PrismaClient singleton via PrismaNeon adapter
-lib/auth.ts              — getOrCreateWorkspaceForUser + requireWorkspaceId
-middleware.ts            — Clerk protecting /m/* and /operator/*
+prisma/schema.prisma                          — all models (Application has neighborhood field)
+prisma.config.ts                              — Prisma 7 config with Neon adapter
+lib/db.ts                                     — PrismaClient singleton via PrismaNeon adapter
+lib/auth.ts                                   — getOrCreateWorkspaceForUser + requireWorkspaceId
+lib/theme.ts                                  — 4-theme system config (NoBC, Midnight, Ember, Ink)
+lib/event-access.ts                           — event access resolution + gate logic
+lib/event-access-schema.ts                    — EventAccess Zod schema
+lib/event-hero-url.ts                         — hero image Blob URL passthrough
+lib/event-gates.ts                            — gate type definitions
+config/archetypes.ts                          — 6 archetype definitions with stories + tags
+app/apply/_components/MembershipForm.tsx       — 7-step cinematic application form
+app/apply/_components/FroggerGame.tsx          — easter egg Frogger game
+app/m/events/_components/MemberEventsExplorer.tsx — member event calendar grid
+app/m/events/[slug]/_components/EventDetail.tsx   — event detail with template system
+app/operator/events/_components/EventsTable.tsx   — bulk-selectable events table
+middleware.ts                                 — Clerk protecting /m/* and /operator/*
 ```
 
 ---
@@ -200,32 +211,35 @@ All SMS through Runtype House Phone sub-agent. NoBC OS never imports Twilio SDK.
 
 ### Tool Rules
 
-Claude Code = backend only (schema, API, auth, email, server logic, anything without JSX).
-Cursor = frontend only (pages, components, styling, anything that renders in browser).
-When finishing a backend task that needs a UI built next, always say "Switch to Cursor now" and describe what to build.
+Claude Code handles full-stack: schema, API, auth, email, pages, components, styling.
+Run `npm run build` before every deploy. `vercel deploy --prod` to ship.
 
 ### V1 Scope Status
 
-1. /apply form - DONE
-2. Schema - DONE
+1. /apply form - DONE (cinematic 7-step flow, reveal screen, demo mode, Frogger easter egg)
+2. Schema - DONE (Application model includes neighborhood field)
 3. Clerk auth - DONE
-4. Approval workflow + welcome email - IN PROGRESS
-5. AI tagging on submit - PARTIAL (runs in apply API route)
-6. Events calendar + detail pages - PENDING
-7. RSVP system - PENDING
-8. Approval required toggle - PENDING
+4. Approval workflow + welcome email - DONE (approve/reject/hold/waitlist + email templates)
+5. AI tagging on submit - DONE (Claude Sonnet 4.6 archetype scoring + personalizedCopy)
+6. Events calendar + detail pages - DONE (/m/events grid + /m/events/[slug] with 3 templates)
+7. RSVP system - IN PROGRESS (basic RSVP creation works, gate logic resolved)
+8. Approval required toggle - DONE (part of event access system)
 9. Stripe payments - PENDING
 10. Refund system - PENDING
 11. Wallet passes - PENDING
-12. Check-in PWA - PENDING
-13. Custom question builder - PENDING
-14. Capacity + waitlist - PENDING
-15. Plus-ones - PENDING
+12. Check-in PWA - DONE (offline-first with IndexedDB, QR scanning)
+13. Custom question builder - DONE (6 field types, per-event, when-in-flow placement)
+14. Capacity + waitlist - DONE (showCapacity, auto-promotion logic)
+15. Plus-ones - DONE (per-event toggle, plusOneOfMemberId tracking)
 16. Red list + duplicate handling - DONE (in apply route)
 17. NoBC OS MCP server - PENDING
 18. AI chat panel - PENDING
-19. AI Event Builder - PENDING
-20. Audit events + webhooks + WCAG - PENDING
+19. AI Event Builder - DONE (text generation for titles, descriptions, run of show)
+20. Audit events + webhooks + WCAG - PARTIAL (audit_events table live, webhooks PENDING)
+21. Comp tickets - DONE (operator issue comp, QR generation, email confirmation)
+22. 4-theme system - DONE (NoBC, Midnight, Ember, Ink via CSS variables + operator toggle)
+23. Hero image system - DONE (Blob URL passthrough for event hero images)
+24. Operator bulk delete - DONE (events list with checkboxes + confirmation dialog)
 
 ### Validation System (add to apply-config.ts)
 
@@ -257,11 +271,14 @@ Email template editor, event page template engine, custom font upload, Brand Bui
 ## Design System (NoBC preset — match Producer quality exactly)
 
 - Background: #F9F7F2, Accent/Primary: #B22E21
-- Headlines: Cormorant Garamond serif, Body: DM Sans
+- Headlines: PP Editorial New (italic for display), Body: Neue Haas Grotesk Display Pro
 - Border radius: 10px cards, 6px buttons
 - No hex literals in components — CSS variables only
 - No generic Tailwind defaults — no text-gray-*, no blue buttons
 - Density: Notion/Stripe level — dense but breathable
+- 4 themes: NoBC (warm cream), Midnight (dark), Ember, Ink — toggled via data-theme attribute
+- Theme config: lib/theme.ts, globals.css :root + [data-theme] selectors
+- Operator toggle in sidebar (ThemeToggle.tsx) persists to localStorage
 
 ## Stack
 
