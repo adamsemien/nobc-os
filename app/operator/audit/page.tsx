@@ -11,11 +11,12 @@ function formatAction(action: string): string {
 }
 
 function actionColor(action: string): string {
-  if (action.startsWith('application.approved')) return '#16a34a';
-  if (action.startsWith('application.rejected')) return '#dc2626';
-  if (action.startsWith('rsvp.refunded')) return '#d97706';
-  if (action.startsWith('rsvp.checked_in')) return '#2563eb';
-  return '#6b7280';
+  if (action.startsWith('application.approved')) return 'var(--success)';
+  if (action.startsWith('application.rejected')) return 'var(--danger)';
+  if (action.startsWith('rsvp.refunded')) return 'var(--warning)';
+  if (action.startsWith('rsvp.checked_in')) return 'var(--text-primary)';
+  if (action.startsWith('rsvp.comp_issued')) return 'var(--accent)';
+  return 'var(--text-secondary)';
 }
 
 export default async function AuditPage({

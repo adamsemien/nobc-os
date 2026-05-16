@@ -502,7 +502,7 @@ function FlowToast({ message }: { message: string }) {
   return (
     <div
       role="status"
-      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-sm bg-[var(--apply-ink)] px-4 py-2.5 text-[12px] font-medium text-[#F9F7F2] shadow-[0_4px_16px_rgba(28,16,8,0.25)]"
+      className="toast-in fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-sm bg-[var(--text-primary)] px-4 py-2.5 text-[12px] font-medium text-[var(--bg)] shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
     >
       {message}
     </div>

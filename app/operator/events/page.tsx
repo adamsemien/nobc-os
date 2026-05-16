@@ -18,8 +18,8 @@ type EventRow = {
 
 function statusBadgeCls(status: string, startAt: string): string {
   if (new Date(startAt) < new Date()) return 'bg-muted text-text-muted';
-  if (status === 'PUBLISHED') return 'bg-emerald-100 text-emerald-900';
-  if (status === 'CANCELLED') return 'bg-red-50 text-red-800';
+  if (status === 'PUBLISHED') return 'bg-success-soft text-success';
+  if (status === 'CANCELLED') return 'bg-danger-soft text-danger';
   return 'bg-muted text-text-muted';
 }
 

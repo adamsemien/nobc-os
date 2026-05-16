@@ -23,7 +23,13 @@ export async function GET(
       refundedAt: true,
       refundAmountCents: true,
       checkedIn: true,
+      checkedInAt: true,
       createdAt: true,
+      isComp: true,
+      compType: true,
+      guestName: true,
+      guestEmail: true,
+      plusOneOfMemberId: true,
       member: {
         select: { firstName: true, lastName: true, email: true },
       },

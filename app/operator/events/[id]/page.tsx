@@ -8,6 +8,7 @@ import { EventApplicationsTab } from './_components/EventApplicationsTab';
 import { EventCheckinTab } from './_components/EventCheckinTab';
 import { EventSettingsTab } from './_components/EventSettingsTab';
 import { CopyInviteLinkButton } from './_components/CopyInviteLinkButton';
+import { getEventHeroDisplayUrl } from '@/lib/event-hero-url';
 
 const PRODUCER_URL = process.env.NEXT_PUBLIC_PRODUCER_URL ?? null;
 
@@ -56,10 +57,15 @@ type RsvpRow = {
   ticketStatus: string;
   origin: string;
   checkedIn: boolean;
+  checkedInAt: string | null;
   createdAt: string;
   stripePaymentIntentId: string | null;
   refundAmountCents: number | null;
   refundedAt: string | null;
+  isComp: boolean;
+  compType: string | null;
+  guestName: string | null;
+  guestEmail: string | null;
   member: { firstName: string; lastName: string; email: string };
   plusOneOfMemberId: string | null;
 };
@@ -79,10 +85,10 @@ type ApplicationRow = {
   answers: Record<string, string>;
 };
 
-function statusBadgeCls(status: string): string {
-  if (status === 'PUBLISHED') return 'bg-emerald-100 text-emerald-900';
-  if (status === 'CANCELLED') return 'bg-red-50 text-red-800';
-  return 'bg-muted text-text-muted';
+function statusBadgeStyle(status: string): { background: string; color: string } {
+  if (status === 'PUBLISHED') return { background: 'var(--success-soft)', color: 'var(--success)' };
+  if (status === 'CANCELLED') return { background: 'var(--danger-soft)', color: 'var(--danger)' };
+  return { background: 'var(--muted)', color: 'var(--text-muted)' };
 }
 
 export default async function OperatorEventDetailPage({
@@ -141,6 +147,8 @@ export default async function OperatorEventDetailPage({
     }
   }
 
+  const heroImageUrl = await getEventHeroDisplayUrl(event.heroImageAssetId);
+
   const formattedDate = new Date(event.startAt).toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
@@ -171,7 +179,8 @@ export default async function OperatorEventDetailPage({
           <span>{formattedDate}</span>
           <span>·</span>
           <span
-            className={`rounded px-2 py-0.5 text-xs font-medium ${statusBadgeCls(event.status)}`}
+            className="rounded px-2 py-0.5 text-xs font-medium"
+            style={statusBadgeStyle(event.status)}
           >
             {event.status.toLowerCase()}
           </span>
@@ -188,16 +197,14 @@ export default async function OperatorEventDetailPage({
           >
             Preview Member Page ↗
           </a>
-          {PRODUCER_URL && (
-            <a
-              href={`${PRODUCER_URL}/events/${event.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
-            >
-              Open in Producer ↗
-            </a>
-          )}
+          <a
+            href={PRODUCER_URL ? `${PRODUCER_URL}/events/${event.slug}` : '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
+          >
+            Open in Producer →
+          </a>
         </div>
 
         {/* Tab nav */}
@@ -206,7 +213,7 @@ export default async function OperatorEventDetailPage({
         </Suspense>
 
         {/* Tab content */}
-        {tab === 'overview' && <EventOverviewTab event={event} />}
+        {tab === 'overview' && <EventOverviewTab event={event} heroImageUrl={heroImageUrl} />}
         {tab === 'attendees' && (
           <EventAttendeesTab
             rsvps={rsvps}

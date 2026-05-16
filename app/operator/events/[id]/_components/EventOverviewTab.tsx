@@ -22,7 +22,7 @@ type EventFull = {
   };
 };
 
-type Props = { event: EventFull };
+type Props = { event: EventFull; heroImageUrl: string | null };
 
 function formatEventDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -40,23 +40,26 @@ function formatEventTime(iso: string): string {
   });
 }
 
-function daysUntilLabel(iso: string): { label: string; isPast: boolean } {
+function daysUntil(iso: string): { value: string; sub: string } {
   const diff = new Date(iso).getTime() - Date.now();
-  if (diff < 0) return { label: 'Past', isPast: true };
+  if (diff < 0) return { value: 'Past', sub: 'event has ended' };
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return { label: 'Today', isPast: false };
-  if (days === 1) return { label: 'Tomorrow', isPast: false };
-  return { label: `${days} days away`, isPast: false };
+  if (days === 0) return { value: 'Today', sub: 'happening now' };
+  if (days === 1) return { value: '1', sub: 'day away' };
+  return { value: String(days), sub: 'days away' };
 }
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div
-      className="flex flex-1 flex-col gap-1 rounded-lg border border-border bg-surface-elevated px-4 py-3"
-      style={{ minWidth: '120px' }}
+      className="op-card flex flex-1 flex-col gap-1 border border-border px-4 py-3.5"
+      style={{ minWidth: '140px' }}
     >
-      <span className="text-xs font-medium uppercase tracking-widest text-text-muted">{label}</span>
-      <span className="text-2xl font-light text-text-primary" style={{ fontFamily: 'var(--font-cormorant, Georgia, serif)' }}>
+      <span className="text-[0.65rem] font-medium uppercase tracking-widest text-text-muted">{label}</span>
+      <span
+        className="text-3xl font-light text-text-primary"
+        style={{ fontFamily: 'var(--font-cormorant), Georgia, serif' }}
+      >
         {value}
       </span>
       {sub && <span className="text-xs text-text-muted">{sub}</span>}
@@ -64,14 +67,12 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
-export function EventOverviewTab({ event }: Props) {
-  const { label: until, isPast } = daysUntilLabel(event.startAt);
+export function EventOverviewTab({ event, heroImageUrl }: Props) {
   const { _stats } = event;
+  const until = daysUntil(event.startAt);
 
   const capacityRemaining =
-    event.capacity != null
-      ? Math.max(0, event.capacity - _stats.capacityUsed)
-      : null;
+    event.capacity != null ? Math.max(0, event.capacity - _stats.capacityUsed) : null;
 
   const revenueLabel =
     _stats.revenueCents > 0
@@ -79,105 +80,77 @@ export function EventOverviewTab({ event }: Props) {
       : '$0';
 
   return (
-    <div className="space-y-8">
-      {/* Hero */}
-      {event.heroImageAssetId ? (
-        <div className="overflow-hidden rounded-lg" style={{ borderRadius: '8px' }}>
+    <div className="space-y-8 page-fade-in">
+      {/* Hero — 16:9 cover, never a member-page template */}
+      {heroImageUrl ? (
+        <div className="overflow-hidden rounded-lg border border-border" style={{ borderRadius: '10px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={event.heroImageAssetId}
+            src={heroImageUrl}
             alt={event.title}
-            className="h-64 w-full object-cover sm:h-80"
+            className="aspect-[16/9] w-full object-cover"
           />
         </div>
       ) : (
         <div
-          className="flex h-48 w-full items-center justify-center rounded-lg"
+          className="flex aspect-[16/9] w-full items-center justify-center rounded-lg border border-border"
           style={{
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, var(--apply-bg, #F5EFE8) 0%, var(--surface-elevated, #EDE8E0) 100%)',
-            border: '1px solid var(--border)',
+            borderRadius: '10px',
+            background: 'linear-gradient(135deg, var(--raised) 0%, var(--surface) 100%)',
           }}
         >
           <span
-            className="text-lg tracking-widest text-text-muted"
-            style={{ fontFamily: 'var(--font-cormorant, Georgia, serif)', letterSpacing: '0.2em' }}
+            className="text-lg text-text-tertiary"
+            style={{ fontFamily: 'var(--font-cormorant), Georgia, serif', letterSpacing: '0.2em' }}
           >
             NO BAD COMPANY
           </span>
         </div>
       )}
 
-      {/* Date / location meta */}
+      {/* Date / venue meta — small caps */}
       <div className="space-y-1">
         <p
-          className="text-sm font-medium text-text-secondary"
-          style={{ letterSpacing: '0.08em', textTransform: 'uppercase', fontSize: '0.7rem' }}
+          className="text-text-secondary"
+          style={{ letterSpacing: '0.1em', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 600 }}
         >
-          {formatEventDate(event.startAt)}
-          {event.endAt && ` — ${formatEventTime(event.endAt)}`}
-          {!event.endAt && ` · ${formatEventTime(event.startAt)}`}
+          {formatEventDate(event.startAt)} · {formatEventTime(event.startAt)}
+          {event.endAt && ` – ${formatEventTime(event.endAt)}`}
         </p>
         {event.location && (
           <p
-            className="text-sm text-text-muted"
-            style={{ letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: '0.7rem' }}
+            className="text-text-muted"
+            style={{ letterSpacing: '0.08em', textTransform: 'uppercase', fontSize: '0.7rem' }}
           >
             {event.location}
           </p>
         )}
-        <p className="flex items-center gap-2 pt-1">
-          <span
-            className="rounded-full px-2 py-0.5 text-xs font-medium"
-            style={{
-              background: isPast
-                ? 'var(--surface-elevated)'
-                : 'color-mix(in srgb, var(--primary) 12%, transparent)',
-              color: isPast ? 'var(--text-muted)' : 'var(--primary)',
-            }}
-          >
-            {until}
-          </span>
-          <span className="text-xs text-text-muted">{accessModeLabel(event.accessMode)}</span>
-        </p>
+        <p className="pt-1 text-xs text-text-muted">{accessModeLabel(event.accessMode)}</p>
       </div>
 
-      {/* Stats row */}
+      {/* Stat cards */}
       <div className="flex flex-wrap gap-3">
         <StatCard
-          label="Confirmed"
+          label="Confirmed RSVPs"
           value={String(_stats.confirmedCount)}
-          sub={event.capacity ? `of ${event.capacity} capacity` : 'no cap'}
+          sub={event.capacity ? `of ${event.capacity} capacity` : 'no capacity cap'}
         />
         <StatCard
           label="Capacity Left"
           value={capacityRemaining != null ? String(capacityRemaining) : '∞'}
-          sub={
-            _stats.heldCount > 0
-              ? `${_stats.heldCount} held`
-              : undefined
-          }
+          sub={_stats.heldCount > 0 ? `${_stats.heldCount} held` : 'open spots'}
         />
-        <StatCard
-          label="Revenue"
-          value={revenueLabel}
-          sub="confirmed only"
-        />
-        <StatCard
-          label={isPast ? 'Event' : 'Until Event'}
-          value={isPast ? 'Past' : until.replace(' days away', 'd').replace('Tomorrow', '1d').replace('Today', '0d')}
-        />
+        <StatCard label="Revenue" value={revenueLabel} sub="confirmed only" />
+        <StatCard label="Days Until" value={until.value} sub={until.sub} />
       </div>
 
       {/* Description */}
       {event.description && (
         <div>
-          <h3
-            className="mb-3 text-xs font-medium uppercase tracking-widest text-text-muted"
-          >
+          <h3 className="mb-3 text-xs font-medium uppercase tracking-widest text-text-muted">
             About this event
           </h3>
-          <p className="text-base leading-relaxed text-text-secondary" style={{ maxWidth: '60ch' }}>
+          <p className="whitespace-pre-wrap text-base leading-relaxed text-text-secondary" style={{ maxWidth: '62ch' }}>
             {event.description}
           </p>
         </div>
@@ -191,7 +164,11 @@ export function EventOverviewTab({ event }: Props) {
           </h3>
           <pre
             className="rounded-lg border border-border bg-surface-elevated px-4 py-3 text-sm leading-relaxed text-text-primary"
-            style={{ borderRadius: '8px', fontFamily: 'var(--font-dm-sans, var(--font-geist-sans, system-ui))', whiteSpace: 'pre-wrap' }}
+            style={{
+              borderRadius: '8px',
+              fontFamily: 'var(--font-dm-sans), var(--font-geist-sans), system-ui',
+              whiteSpace: 'pre-wrap',
+            }}
           >
             {event.runOfShow}
           </pre>

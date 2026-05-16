@@ -10,6 +10,8 @@ export interface CachedRsvp {
   ticketStatus: string;
   checkedIn: boolean;
   checkedInAt: string | null;
+  isComp: boolean;
+  compType: string | null;
 }
 
 export interface PendingCheckIn {

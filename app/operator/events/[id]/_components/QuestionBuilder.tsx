@@ -81,7 +81,7 @@ function SortableQuestion({
         type="button"
         onClick={() => onDelete(q.id)}
         aria-label="Delete question"
-        className="mt-0.5 text-text-muted hover:text-red-600 transition-colors"
+        className="mt-0.5 text-text-muted hover:text-danger transition-colors"
       >
         <Trash2 className="h-4 w-4" />
       </button>

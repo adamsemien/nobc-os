@@ -20,6 +20,9 @@ type ApiApplication = {
   aiRecommendation: string | null;
   aiReasoning: string | null;
   answers: Record<string, string>;
+  archetype: string | null;
+  archetypeScores: Record<string, number> | null;
+  referredBy: string | null;
 };
 
 type StatusCounts = {
@@ -49,6 +52,9 @@ function toQueueItem(row: ApiApplication): ApplicationsQueueItem {
     aiScore: row.aiScore,
     aiReasoning: row.aiReasoning,
     answers: row.answers ?? {},
+    archetype: row.archetype ?? null,
+    archetypeScores: row.archetypeScores ?? null,
+    referredBy: row.referredBy ?? null,
     aiRecommendation:
       rec && allowed.has(rec) ? (rec as ApplicationsQueueItem['aiRecommendation']) : null,
   };
@@ -134,7 +140,7 @@ export default async function OperatorApplicationsPage({
                   <span
                     className={`rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold tabular-nums ${
                       isHold
-                        ? 'bg-amber-100 text-amber-800'
+                        ? 'bg-warning-soft text-warning'
                         : 'bg-muted text-text-secondary'
                     }`}
                   >
@@ -147,7 +153,7 @@ export default async function OperatorApplicationsPage({
         </nav>
 
         {tab === 'hold' ? (
-          <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="mb-4 rounded border border-warning bg-warning-soft px-4 py-3 text-sm text-warning">
             These applications matched a Red List entry and were placed on hold automatically. Review each one manually before approving or rejecting.
           </p>
         ) : null}

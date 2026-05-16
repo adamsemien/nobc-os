@@ -114,7 +114,7 @@ export function EventCheckinTab({ rsvps: initialRsvps, eventId: _eventId }: Prop
                 )}
               </div>
               {rsvp.checkedIn ? (
-                <span className="rounded bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900">
+                <span className="rounded bg-success-soft px-2.5 py-1 text-xs font-semibold text-success">
                   Checked In
                 </span>
               ) : (

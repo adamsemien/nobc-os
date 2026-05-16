@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
       ticketStatus: true,
       checkedIn: true,
       checkedInAt: true,
+      isComp: true,
+      compType: true,
       member: {
         select: {
           firstName: true,
@@ -64,6 +66,8 @@ export async function GET(req: NextRequest) {
       ticketStatus: r.ticketStatus,
       checkedIn: r.checkedIn,
       checkedInAt: r.checkedInAt?.toISOString() ?? null,
+      isComp: r.isComp,
+      compType: r.compType,
     })),
   });
 }

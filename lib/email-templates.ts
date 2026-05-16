@@ -28,6 +28,29 @@ ${locationLine}
   };
 }
 
+export function compTicketEmail(
+  name: string,
+  eventTitle: string,
+  startAt: Date,
+  location: string | null | undefined,
+  rsvpId: string,
+  qrDataUrl: string,
+): { subject: string; html: string } {
+  const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
+  const verifyUrl = `${appUrl}/check-in/verify/${rsvpId}`;
+  return {
+    subject: `Your invitation — ${eventTitle}`,
+    html: `<p>Hi ${name},</p>
+<p>You're confirmed for <strong>${eventTitle}</strong> — this one's on us.</p>
+<p><strong>Date:</strong> ${formatDate(startAt)}</p>
+${locationLine}
+<p>Show this QR code at the door and staff will scan you in:</p>
+<p><img src="${qrDataUrl}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>
+<p>Can't load the image? Use this link instead:<br><a href="${verifyUrl}">${verifyUrl}</a></p>
+<p>See you there — The NoBC Team</p>`,
+  };
+}
+
 export function applicationApprovedEmail(
   name: string,
 ): { subject: string; html: string } {

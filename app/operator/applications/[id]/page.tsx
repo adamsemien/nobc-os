@@ -31,9 +31,9 @@ function labelForModelField(key: string): string {
 }
 
 function statusBadgeClass(status: DetailPayload['application']['status']): string {
-  if (status === 'PENDING' || status === 'HOLD') return 'bg-amber-100 text-amber-950';
-  if (status === 'APPROVED') return 'bg-emerald-100 text-emerald-900';
-  return 'bg-red-50 text-red-900';
+  if (status === 'PENDING' || status === 'HOLD') return 'bg-warning-soft text-warning';
+  if (status === 'APPROVED') return 'bg-success-soft text-success';
+  return 'bg-danger-soft text-danger';
 }
 
 export default async function OperatorApplicationDetailPage({

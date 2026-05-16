@@ -47,7 +47,7 @@ export default function WebhooksPage() {
         </p>
 
         {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm text-danger">
             {error}
           </div>
         )}

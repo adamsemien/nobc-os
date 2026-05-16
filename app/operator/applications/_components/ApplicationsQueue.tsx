@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowLeft, Check, Loader2, Mail, MapPin, Phone, X, XCircle } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Loader2, Mail, MapPin, Phone, Search, X, XCircle } from 'lucide-react';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { EmptyState } from '../../_components/EmptyState';
 
@@ -24,14 +24,64 @@ export type ApplicationsQueueItem = {
     | null;
   aiReasoning: string | null;
   answers: Record<string, string>;
+  archetype: string | null;
+  archetypeScores: Record<string, number> | null;
+  referredBy: string | null;
 };
 
 const ANSWER_ORDER = new Map(
   APPLY_QUESTIONS.filter(q => q.storage === 'answer').map((q, i) => [q.key, i]),
 );
 
-function labelForQuestionKey(key: string): string {
-  return APPLY_QUESTIONS.find(q => q.key === key)?.label ?? key;
+const LEGACY_LABELS: Record<string, string> = {
+  'BASICS.CITYNEIGHBORHOOD': 'city / neighborhood',
+  'BASICS.FROMORIGINALLY': 'from originally',
+  'BASICS.BIRTHDAY': 'birthday',
+  'BASICS.LINKS': 'links',
+  'BASICS.REFERRERS': 'referred by',
+  'REAL.WORKINGON': 'what are you working on',
+  'REAL.OBSESSEDWITH': 'obsessed with right now',
+  'REAL.ALWAYSCALLEDABOUT': 'what people call you about',
+};
+
+function labelForKey(key: string): string {
+  return APPLY_QUESTIONS.find(q => q.key === key)?.label ?? LEGACY_LABELS[key] ?? key;
+}
+
+function parseReferrer(v: string): string {
+  if (v.trimStart().startsWith('[')) {
+    try {
+      const arr = JSON.parse(v) as unknown[];
+      const names = arr.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+      if (names.length) return names.join(', ');
+    } catch {
+      // fall through
+    }
+  }
+  return v;
+}
+
+function getReferrers(app: ApplicationsQueueItem): string[] {
+  const result: string[] = [];
+  if (app.referredBy?.trim()) result.push(app.referredBy.trim());
+  for (const key of ['referrer2', 'referrer3', 'referrer4']) {
+    const v = String(app.answers[key] ?? '').trim();
+    if (v) result.push(parseReferrer(v));
+  }
+  return result;
+}
+
+function displayAnswerValue(value: string): string {
+  if (value.trimStart().startsWith('[')) {
+    try {
+      const arr = JSON.parse(value) as unknown[];
+      const names = arr.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+      if (names.length) return names.join(', ');
+    } catch {
+      // fall through
+    }
+  }
+  return value;
 }
 
 function formatRecommendationLabel(value: string): string {
@@ -54,13 +104,16 @@ function formatSubmitted(iso: string): string {
   }).format(d);
 }
 
-function formatSubmittedShort(iso: string): string {
-  const d = new Date(iso);
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(d);
+function formatRelative(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function recommendationBadgeVars(
@@ -68,30 +121,15 @@ function recommendationBadgeVars(
 ): { background: string; color: string } | null {
   switch (rec) {
     case 'strong_yes':
-      return {
-        background: 'var(--op-rec-strong-yes-bg)',
-        color: 'var(--op-rec-strong-yes-fg)',
-      };
+      return { background: 'var(--success)', color: 'var(--on-primary)' };
     case 'yes':
-      return {
-        background: 'var(--op-rec-yes-bg)',
-        color: 'var(--op-rec-yes-fg)',
-      };
+      return { background: 'var(--success-soft)', color: 'var(--success)' };
     case 'unclear':
-      return {
-        background: 'var(--op-rec-unclear-bg)',
-        color: 'var(--op-rec-unclear-fg)',
-      };
+      return { background: 'var(--warning-soft)', color: 'var(--warning)' };
     case 'no':
-      return {
-        background: 'var(--op-rec-no-bg)',
-        color: 'var(--op-rec-no-fg)',
-      };
+      return { background: 'var(--danger-soft)', color: 'var(--danger)' };
     case 'strong_no':
-      return {
-        background: 'var(--op-rec-strong-no-bg)',
-        color: 'var(--op-rec-strong-no-fg)',
-      };
+      return { background: 'var(--danger)', color: 'var(--on-primary)' };
     default:
       return null;
   }
@@ -113,8 +151,26 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
     initialApplications[0]?.id ?? null,
   );
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | 'waitlist' | 'hold' | null>(null);
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [searchRaw, setSearchRaw] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'score' | 'alpha'>('newest');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pendingBulkAction, setPendingBulkAction] = useState<string | null>(null);
+  const [reviewNote, setReviewNote] = useState('');
+
+  const searchRef = useRef<HTMLInputElement>(null);
+  const selectedIdRef = useRef(selectedId);
+  const visibleAppsRef = useRef<ApplicationsQueueItem[]>([]);
+  const postActionRef = useRef<(id: string, path: 'approve' | 'reject' | 'waitlist' | 'hold') => void>(() => {});
+
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setSearch(searchRaw), 300);
+    return () => window.clearTimeout(t);
+  }, [searchRaw]);
 
   useEffect(() => {
     setApplications(initialApplications);
@@ -131,51 +187,127 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
     });
   }, [applications]);
 
+  const visibleApps = useMemo(() => {
+    let result = applications;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(app =>
+        app.fullName.toLowerCase().includes(q) ||
+        app.email.toLowerCase().includes(q) ||
+        app.city?.toLowerCase().includes(q) ||
+        getReferrers(app).join(' ').toLowerCase().includes(q) ||
+        Object.values(app.answers).join(' ').toLowerCase().includes(q)
+      );
+    }
+    const sorted = [...result];
+    switch (sortOrder) {
+      case 'oldest':
+        sorted.sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+        break;
+      case 'score':
+        sorted.sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1));
+        break;
+      case 'alpha':
+        sorted.sort((a, b) => a.fullName.localeCompare(b.fullName));
+        break;
+      default:
+        sorted.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    }
+    return sorted;
+  }, [applications, search, sortOrder]);
+
+  useEffect(() => { visibleAppsRef.current = visibleApps; }, [visibleApps]);
+
   const selected = useMemo(
     () => applications.find(a => a.id === selectedId) ?? null,
     [applications, selectedId],
   );
 
   const removeAndNotify = useCallback((id: string, message: string) => {
-    setApplications(prev => prev.filter(a => a.id !== id));
+    setApplications(prev => {
+      const next = prev.filter(a => a.id !== id);
+      setSelectedId(old => {
+        if (old !== id) return old;
+        const visibles = visibleAppsRef.current.filter(a => a.id !== id);
+        return visibles[0]?.id ?? null;
+      });
+      return next;
+    });
+    setReviewNote('');
     setFlash({ type: 'success', message });
     setSheetOpen(false);
     window.setTimeout(() => setFlash(null), 4000);
   }, []);
 
   const postAction = useCallback(
-    async (id: string, path: 'approve' | 'reject') => {
+    async (id: string, path: 'approve' | 'reject' | 'waitlist' | 'hold') => {
       setFlash(null);
       setPendingAction(path);
       try {
         const res = await fetch(`/api/operator/applications/${id}/${path}`, {
           method: 'POST',
           credentials: 'include',
-          ...(path === 'reject'
-            ? {
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}),
-              }
-            : {}),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note: reviewNote }),
         });
         if (!res.ok) {
           const text = await res.text().catch(() => '');
           throw new Error(text || `Request failed (${res.status})`);
         }
-        removeAndNotify(
-          id,
-          path === 'approve' ? 'Application approved.' : 'Application rejected.',
-        );
+        const messages: Record<typeof path, string> = {
+          approve: 'Application approved.',
+          reject: 'Application rejected.',
+          waitlist: 'Application waitlisted.',
+          hold: 'Application moved to hold.',
+        };
+        removeAndNotify(id, messages[path]);
       } catch (e) {
-        const message =
-          e instanceof Error ? e.message : 'Something went wrong. Try again.';
+        const message = e instanceof Error ? e.message : 'Something went wrong. Try again.';
         setFlash({ type: 'error', message });
       } finally {
         setPendingAction(null);
       }
     },
-    [removeAndNotify],
+    [removeAndNotify, reviewNote],
   );
+
+  useEffect(() => { postActionRef.current = postAction; }, [postAction]);
+
+  const bulkAction = useCallback(async (action: 'approve' | 'reject' | 'hold') => {
+    setPendingBulkAction(action);
+    const ids = Array.from(selectedIds);
+    await Promise.allSettled(
+      ids.map(id => fetch(`/api/operator/applications/${id}/${action}`, { method: 'POST', credentials: 'include' }))
+    );
+    setApplications(prev => prev.filter(a => !selectedIds.has(a.id)));
+    setSelectedIds(new Set());
+    const label = action === 'approve' ? 'approved' : action === 'hold' ? 'moved to hold' : 'rejected';
+    setFlash({ type: 'success', message: `${ids.length} application${ids.length > 1 ? 's' : ''} ${label}.` });
+    setPendingBulkAction(null);
+    window.setTimeout(() => setFlash(null), 4000);
+  }, [selectedIds]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if (e.key === '/') {
+        if (!isInput) { e.preventDefault(); searchRef.current?.focus(); }
+        return;
+      }
+      if (isInput) return;
+      const apps = visibleAppsRef.current;
+      const cur = selectedIdRef.current;
+      const idx = apps.findIndex(a => a.id === cur);
+      if (e.key === 'j') { const n = apps[Math.min(idx + 1, apps.length - 1)]; if (n) setSelectedId(n.id); }
+      else if (e.key === 'k') { const p = apps[Math.max(idx - 1, 0)]; if (p) setSelectedId(p.id); }
+      else if (e.key === 'a' && cur) postActionRef.current(cur, 'approve');
+      else if (e.key === 'h' && cur) postActionRef.current(cur, 'hold');
+      else if (e.key === 'r' && cur) postActionRef.current(cur, 'reject');
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []); // no deps — uses refs
 
   const headingFont: CSSProperties = {
     fontFamily: 'var(--font-playfair-display), Georgia, serif',
@@ -185,8 +317,8 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
     return (
       <EmptyState
         icon="applications"
-        title="The room is quiet."
-        body="Applications will appear here when people apply to your events."
+        title="nothing pending."
+        body="you're caught up."
       />
     );
   }
@@ -218,21 +350,100 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
 
       <div className="grid min-h-0 min-w-0 flex-1 gap-5 overflow-hidden lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] lg:gap-8">
         <div className="flex min-h-0 min-w-0 flex-col overflow-hidden border-border lg:border-r lg:pr-1">
+          {selectedIds.size > 0 && (
+            <div
+              className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-surface-elevated px-3 py-2 text-sm"
+              style={{ borderRadius: '8px' }}
+            >
+              <span className="text-text-secondary">{selectedIds.size} selected</span>
+              <div className="ml-auto flex gap-2">
+                <button
+                  onClick={() => bulkAction('hold')}
+                  disabled={!!pendingBulkAction}
+                  className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:bg-muted disabled:opacity-50"
+                >
+                  Hold
+                </button>
+                <button
+                  onClick={() => bulkAction('approve')}
+                  disabled={!!pendingBulkAction}
+                  className="rounded px-2 py-1 text-xs font-medium text-success hover:bg-muted disabled:opacity-50"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => bulkAction('reject')}
+                  disabled={!!pendingBulkAction}
+                  className="rounded px-2 py-1 text-xs font-medium text-danger hover:bg-muted disabled:opacity-50"
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="rounded px-2 py-1 text-xs text-text-muted hover:bg-muted"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="mb-3 flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search applicants..."
+                value={searchRaw}
+                onChange={e => setSearchRaw(e.target.value)}
+                className="w-full rounded-md border border-border bg-surface py-2 pl-8 pr-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
+                style={{ borderRadius: '6px' }}
+              />
+            </div>
+            <select
+              value={sortOrder}
+              onChange={e => setSortOrder(e.target.value as typeof sortOrder)}
+              className="rounded-md border border-border bg-surface px-2 py-2 text-sm text-text-secondary focus:outline-none"
+              style={{ borderRadius: '6px' }}
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="score">Score</option>
+              <option value="alpha">A–Z</option>
+            </select>
+          </div>
+
           <ul className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pb-4 pr-0.5">
-            {applications.map(app => {
+            {visibleApps.map(app => {
               const active = app.id === selectedId;
               const badge = recommendationBadgeVars(app.aiRecommendation);
               const score = app.aiScore ?? 0;
+              const refs = getReferrers(app);
+              const isChecked = selectedIds.has(app.id);
               return (
-                <li key={app.id}>
+                <li key={app.id} className="group relative">
+                  <div className={`absolute left-2 top-2 z-10 transition-opacity ${isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={e => {
+                        e.stopPropagation();
+                        setSelectedIds(prev => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(app.id); else next.delete(app.id);
+                          return next;
+                        });
+                      }}
+                      className="h-4 w-4 rounded border-border accent-primary"
+                      onClick={e => e.stopPropagation()}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedId(app.id);
-                      if (
-                        typeof window !== 'undefined' &&
-                        window.matchMedia('(max-width: 1023px)').matches
-                      ) {
+                      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
                         setSheetOpen(true);
                       }
                     }}
@@ -246,18 +457,25 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                     <p className="truncate font-medium text-text-primary" style={headingFont}>
                       {app.fullName}
                     </p>
-                    <p className="mt-1 text-xs text-text-muted">
-                      {[app.city, formatSubmittedShort(app.submittedAt)].filter(Boolean).join(' · ')}
+                    <p className="mt-0.5 text-xs text-text-muted">
+                      {[app.city, formatRelative(app.submittedAt)].filter(Boolean).join(' · ')}
                     </p>
+                    {app.archetype && (
+                      <span
+                        className="mt-1.5 inline-block rounded border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-text-secondary"
+                        style={{ borderRadius: '4px' }}
+                      >
+                        {app.archetype}
+                      </span>
+                    )}
+                    {refs.length > 0 && (
+                      <p className="mt-1 truncate text-[11px] text-text-muted">via {refs.join(', ')}</p>
+                    )}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {badge && app.aiRecommendation ? (
                         <span
                           className="inline-flex max-w-full items-center rounded border border-border px-2.5 py-1 text-[11px] font-semibold leading-tight shadow-sm ring-1 ring-border/60"
-                          style={{
-                            borderRadius: '6px',
-                            background: badge.background,
-                            color: badge.color,
-                          }}
+                          style={{ borderRadius: '6px', background: badge.background, color: badge.color }}
                         >
                           <span className="truncate">{formatRecommendationLabel(app.aiRecommendation)}</span>
                         </span>
@@ -285,6 +503,10 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
               );
             })}
           </ul>
+
+          <p className="mt-2 select-none text-[10px] text-text-muted opacity-60">
+            j/k navigate · a approve · h hold · r reject · / search
+          </p>
         </div>
 
         <div className="hidden min-h-0 min-w-0 flex-col overflow-hidden lg:flex">
@@ -293,8 +515,12 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
               app={selected}
               headingFont={headingFont}
               pendingAction={pendingAction}
+              reviewNote={reviewNote}
+              onNoteChange={setReviewNote}
               onApprove={() => postAction(selected.id, 'approve')}
               onReject={() => postAction(selected.id, 'reject')}
+              onWaitlist={() => postAction(selected.id, 'waitlist')}
+              onHold={() => postAction(selected.id, 'hold')}
             />
           ) : null}
         </div>
@@ -303,9 +529,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
       {sheetOpen && selected ? (
         <div
           className="fixed inset-0 z-50 flex flex-col lg:hidden"
-          style={{
-            backgroundColor: 'color-mix(in srgb, var(--foreground) 18%, var(--background))',
-          }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--foreground) 18%, var(--background))' }}
         >
           <div className="flex items-center gap-2 border-b border-border bg-surface-elevated px-3 py-3">
             <button
@@ -333,8 +557,12 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
               app={selected}
               headingFont={headingFont}
               pendingAction={pendingAction}
+              reviewNote={reviewNote}
+              onNoteChange={setReviewNote}
               onApprove={() => postAction(selected.id, 'approve')}
               onReject={() => postAction(selected.id, 'reject')}
+              onWaitlist={() => postAction(selected.id, 'waitlist')}
+              onHold={() => postAction(selected.id, 'hold')}
             />
           </div>
         </div>
@@ -343,18 +571,41 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
   );
 }
 
+function memberWorthScores(scores: Record<string, number>): { influence: number; contribution: number; activation: number; total: number } {
+  const get = (k: string) => Math.min(100, Math.max(0, scores[k] ?? 0));
+  const influence = Math.round((get('Connector') + get('Curator')) / 20);
+  const contribution = Math.round((get('Builder') + get('Maker')) / 20);
+  const activation = Math.round((get('Host') + get('Patron')) / 20);
+  const total = influence + contribution + activation;
+  return { influence, contribution, activation, total };
+}
+
+function memberTier(total: number): { label: string; className: string } {
+  if (total >= 22) return { label: 'Charter', className: 'text-success' };
+  if (total >= 16) return { label: 'Standard', className: 'text-text-secondary' };
+  return { label: 'Waitlist', className: 'text-danger' };
+}
+
 function DetailPanel({
   app,
   headingFont,
   pendingAction,
+  reviewNote,
+  onNoteChange,
   onApprove,
   onReject,
+  onWaitlist,
+  onHold,
 }: {
   app: ApplicationsQueueItem;
   headingFont: CSSProperties;
-  pendingAction: 'approve' | 'reject' | null;
+  pendingAction: 'approve' | 'reject' | 'waitlist' | 'hold' | null;
+  reviewNote: string;
+  onNoteChange: (v: string) => void;
   onApprove: () => void;
   onReject: () => void;
+  onWaitlist: () => void;
+  onHold: () => void;
 }) {
   const entries = orderedAnswerEntries(app.answers);
 
@@ -429,21 +680,86 @@ function DetailPanel({
         </ul>
       ) : null}
 
+      {(app.archetype || app.archetypeScores) && (
+        <div className="mt-5 rounded-lg border border-border bg-muted p-4 sm:p-5" style={{ borderRadius: '8px' }}>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">AI profile</p>
+
+          {app.archetype && (
+            <p className="mt-2 text-lg font-semibold text-text-primary">{app.archetype}</p>
+          )}
+
+          {app.archetypeScores && (() => {
+            const worth = memberWorthScores(app.archetypeScores!);
+            const tier = memberTier(worth.total);
+            return (
+              <>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                  {([
+                    { label: 'Influence', value: worth.influence },
+                    { label: 'Contribution', value: worth.contribution },
+                    { label: 'Activation', value: worth.activation },
+                  ] as const).map(({ label, value }) => (
+                    <div key={label} className="rounded border border-border bg-surface p-2" style={{ borderRadius: '6px' }}>
+                      <p className="text-xl font-semibold tabular-nums text-text-primary">{value}</p>
+                      <p className="text-[10px] text-text-muted">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-sm text-text-secondary">{worth.total}/30</span>
+                  <span className={`text-sm font-semibold ${tier.className}`}>{tier.label}</span>
+                </div>
+
+                <div className="mt-3 space-y-1.5">
+                  {['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'].map(name => (
+                    <div key={name} className="flex items-center gap-2">
+                      <span className="w-20 shrink-0 text-[10px] text-text-muted">{name}</span>
+                      <div className="flex-1 overflow-hidden rounded-full bg-border" style={{ height: 4 }}>
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${app.archetypeScores![name] ?? 0}%` }}
+                        />
+                      </div>
+                      <span className="w-6 shrink-0 text-right text-[10px] tabular-nums text-text-muted">
+                        {app.archetypeScores![name] ?? 0}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       <section className="mt-8 border-t border-border pt-6">
         <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Answers</h3>
         <div className="mt-4 space-y-6">
-          {entries.map(([key, value]) => (
-            <div key={key} className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
-                {labelForQuestionKey(key)}
-              </p>
-              <p className="mt-2 whitespace-pre-wrap text-[15px] font-medium leading-relaxed text-text-primary">
-                {value.trim() ? value : '—'}
-              </p>
-            </div>
-          ))}
+          {entries
+            .filter(([, v]) => v.trim())
+            .map(([key, value]) => (
+              <div key={key} className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                  {labelForKey(key)}
+                </p>
+                <p className="mt-2 whitespace-pre-wrap text-[15px] font-medium leading-relaxed text-text-primary">
+                  {displayAnswerValue(value)}
+                </p>
+              </div>
+            ))}
         </div>
       </section>
+
+      <div className="mt-4">
+        <textarea
+          value={reviewNote}
+          onChange={e => onNoteChange(e.target.value)}
+          placeholder="Private note (optional)..."
+          rows={2}
+          className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
+          style={{ borderRadius: '6px' }}
+        />
+      </div>
 
       <div className="mt-auto flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:gap-4">
         <button
@@ -459,6 +775,20 @@ function DetailPanel({
             <Check className="h-5 w-5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
           )}
           <span className="text-center leading-tight">Approve application</span>
+        </button>
+        <button
+          type="button"
+          onClick={onWaitlist}
+          disabled={pendingAction !== null}
+          className="inline-flex min-h-[3.25rem] flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-base font-semibold text-text-secondary shadow-sm transition-colors hover:bg-surface-elevated disabled:opacity-50"
+          style={{ borderRadius: '6px' }}
+        >
+          {pendingAction === 'waitlist' ? (
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+          ) : (
+            <Clock className="h-5 w-5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+          )}
+          <span className="text-center leading-tight">Waitlist</span>
         </button>
         <button
           type="button"
