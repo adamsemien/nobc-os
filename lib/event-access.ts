@@ -1,12 +1,13 @@
 import type { EventAccess, FlowStep } from "./event-access-schema"
 import { EventAccessSchema, defaultEventAccess } from "./event-access-schema"
+import type { Gate } from "./event-gates"
 import type { Member } from "@prisma/client"
 
 export type ViewerKind = "member" | "guest" | "anon"
 
 export type ResolvedAccess =
-  | { kind: "member"; flow: FlowStep[]; priceCents: number }
-  | { kind: "guest"; flow: FlowStep[]; priceCents: number }
+  | { kind: "member"; flow: FlowStep[]; gates: Gate[]; priceCents: number }
+  | { kind: "guest"; flow: FlowStep[]; gates: Gate[]; priceCents: number }
   | { kind: "closed"; reason: string }
 
 export type StepId = "auth" | "guestInfo" | "fieldsBefore" | "pay" | "fieldsAfter" | "submit"
@@ -15,6 +16,44 @@ export type QuestionVisibility = {
   whenInFlow: "BEFORE_SUBMIT" | "AFTER_PAYMENT" | "BEFORE_APPROVAL"
   showToMember: boolean
   showToGuest: boolean
+}
+
+/** Convert Gate[] to legacy FlowStep[] for downstream checkout code. */
+export function deriveFlow(gates: Gate[]): FlowStep[] {
+  const flow: FlowStep[] = []
+  for (const gate of gates) {
+    switch (gate.type) {
+      case "application":
+        if (!flow.includes("fields")) flow.push("fields")
+        if (gate.approvalRequired !== false && !flow.includes("approval")) flow.push("approval")
+        break
+      case "ticket":
+        if (!flow.includes("pay")) flow.push("pay")
+        break
+      case "waitlist":
+        if (!flow.includes("approval")) flow.push("approval")
+        break
+    }
+  }
+  return flow
+}
+
+/** Best-effort conversion of FlowStep[] to Gate[] for migration. */
+function flowToGates(flow: FlowStep[], idPrefix: string): Gate[] {
+  const gates: Gate[] = []
+  const hasFields = flow.includes("fields")
+  const hasPay = flow.includes("pay")
+  const hasApproval = flow.includes("approval")
+  if (hasFields) {
+    gates.push({ id: `${idPrefix}-app`, type: "application", label: "Application", approvalRequired: hasApproval })
+  }
+  if (hasPay) {
+    gates.push({ id: `${idPrefix}-ticket`, type: "ticket", label: "Ticket", priceCents: 0 })
+  }
+  if (hasApproval && !hasFields) {
+    gates.push({ id: `${idPrefix}-waitlist`, type: "waitlist", label: "Waitlist" })
+  }
+  return gates
 }
 
 /** Legacy gate enums → ordered flow, for events stored before the flow rebuild. */
@@ -40,27 +79,53 @@ function migrateLegacyAccess(raw: unknown): EventAccess | null {
   if (!raw || typeof raw !== "object") return null
   const r = raw as Record<string, Record<string, unknown>>
   if (!r.member || !r.guest) return null
-  if (!("gate" in r.member) && !("gate" in r.guest)) return null
   const def = defaultEventAccess()
-  return {
-    member: {
-      enabled: Boolean(r.member.enabled),
-      flow: LEGACY_MEMBER_GATE[String(r.member.gate)] ?? [],
-      priceCents: Number(r.member.priceCents) || 0,
-    },
-    guest: {
-      enabled: Boolean(r.guest.enabled),
-      flow: LEGACY_GUEST_GATE[String(r.guest.gate)] ?? ["pay"],
-      priceCents: Number(r.guest.priceCents) || 0,
-    },
-    comp: r.comp
-      ? {
-          enabled: Boolean(r.comp.enabled),
-          budgetCap:
-            r.comp.budgetCap == null ? null : Number(r.comp.budgetCap) || 0,
-        }
-      : def.comp,
+
+  // Old gate enum format (pre-flow rebuild)
+  if ("gate" in r.member || "gate" in r.guest) {
+    const memberFlow = LEGACY_MEMBER_GATE[String(r.member.gate)] ?? []
+    const guestFlow = LEGACY_GUEST_GATE[String(r.guest.gate)] ?? ["pay"]
+    return {
+      member: {
+        enabled: Boolean(r.member.enabled),
+        gates: flowToGates(memberFlow, "m"),
+        priceCents: Number(r.member.priceCents) || 0,
+      },
+      guest: {
+        enabled: Boolean(r.guest.enabled),
+        gates: flowToGates(guestFlow, "g"),
+        priceCents: Number(r.guest.priceCents) || 0,
+      },
+      comp: r.comp
+        ? { enabled: Boolean(r.comp.enabled), budgetCap: r.comp.budgetCap == null ? null : Number(r.comp.budgetCap) || 0 }
+        : def.comp,
+      registrationStyle: "all_at_once",
+    }
   }
+
+  // Old flow: FlowStep[] format (pre-gate rebuild)
+  if ("flow" in r.member || "flow" in r.guest) {
+    const memberFlow = Array.isArray(r.member.flow) ? (r.member.flow as FlowStep[]) : []
+    const guestFlow = Array.isArray(r.guest.flow) ? (r.guest.flow as FlowStep[]) : []
+    return {
+      member: {
+        enabled: Boolean(r.member.enabled),
+        gates: flowToGates(memberFlow, "m"),
+        priceCents: Number(r.member.priceCents) || 0,
+      },
+      guest: {
+        enabled: Boolean(r.guest.enabled),
+        gates: flowToGates(guestFlow, "g"),
+        priceCents: Number(r.guest.priceCents) || 0,
+      },
+      comp: r.comp
+        ? { enabled: Boolean(r.comp.enabled), budgetCap: r.comp.budgetCap == null ? null : Number(r.comp.budgetCap) || 0 }
+        : def.comp,
+      registrationStyle: "all_at_once",
+    }
+  }
+
+  return null
 }
 
 export function parseEventAccess(raw: unknown): EventAccess {
@@ -89,27 +154,18 @@ export function resolveAccessForViewer(
 ): ResolvedAccess {
   if (viewer === "member") {
     if (access.member.enabled) {
-      return {
-        kind: "member",
-        flow: access.member.flow,
-        priceCents: access.member.priceCents,
-      }
+      const gates = access.member.gates
+      return { kind: "member", gates, flow: deriveFlow(gates), priceCents: access.member.priceCents }
     }
     if (access.guest.enabled) {
-      return {
-        kind: "guest",
-        flow: access.guest.flow,
-        priceCents: access.guest.priceCents,
-      }
+      const gates = access.guest.gates
+      return { kind: "guest", gates, flow: deriveFlow(gates), priceCents: access.guest.priceCents }
     }
     return { kind: "closed", reason: "This event is not open right now." }
   }
   if (access.guest.enabled) {
-    return {
-      kind: "guest",
-      flow: access.guest.flow,
-      priceCents: access.guest.priceCents,
-    }
+    const gates = access.guest.gates
+    return { kind: "guest", gates, flow: deriveFlow(gates), priceCents: access.guest.priceCents }
   }
   if (access.member.enabled) {
     return { kind: "closed", reason: "This event is open to members only." }
@@ -148,7 +204,6 @@ export function buildSteps(
     isMember ? q.showToMember : q.showToGuest,
   ).length
 
-  // Only the steps before the first gate happen in this session.
   for (const step of inSessionFlow(resolved.flow)) {
     if (step === "fields") {
       if (visibleCount > 0) steps.push("fieldsBefore")

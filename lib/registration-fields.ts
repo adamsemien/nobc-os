@@ -1,5 +1,16 @@
 /** Operator-editable registration field, used by the access settings UI. */
-export type FieldType = "text" | "textarea" | "select" | "checkbox" | "phone" | "email"
+export type FieldType =
+  | "text"
+  | "textarea"
+  | "select"
+  | "multiselect"
+  | "yes_no"
+  | "number"
+  | "date"
+  | "file"
+  | "checkbox"
+  | "phone"
+  | "email"
 
 export type ShowTo = "members" | "guests" | "both"
 
@@ -28,6 +39,11 @@ export const FIELD_TYPE_OPTIONS: { value: FieldType; label: string }[] = [
   { value: "text", label: "Short text" },
   { value: "textarea", label: "Long text" },
   { value: "select", label: "Dropdown" },
+  { value: "multiselect", label: "Multiple choice" },
+  { value: "yes_no", label: "Yes / No" },
+  { value: "number", label: "Number" },
+  { value: "date", label: "Date" },
+  { value: "file", label: "File upload" },
   { value: "checkbox", label: "Checkbox" },
   { value: "phone", label: "Phone" },
   { value: "email", label: "Email" },
@@ -41,9 +57,11 @@ export const SHOW_TO_OPTIONS: { value: ShowTo; label: string }[] = [
 
 export function coerceFieldType(raw: string): FieldType {
   const t = raw.toLowerCase()
-  if (t === "textarea" || t === "select" || t === "checkbox" || t === "phone" || t === "email") {
-    return t
-  }
+  const valid: FieldType[] = [
+    "text", "textarea", "select", "multiselect", "yes_no",
+    "number", "date", "file", "checkbox", "phone", "email",
+  ]
+  if ((valid as string[]).includes(t)) return t as FieldType
   return "text"
 }
 
@@ -54,7 +72,10 @@ export function toApiQuestion(q: AccessQuestion): ApiQuestion {
     label: q.label.trim(),
     type: q.type,
     required: q.required,
-    options: q.type === "select" ? q.options.filter(Boolean) : [],
+    options:
+      q.type === "select" || q.type === "multiselect"
+        ? q.options.filter(Boolean)
+        : [],
     showToMember: q.showTo === "members" || q.showTo === "both",
     showToGuest: q.showTo === "guests" || q.showTo === "both",
     whenInFlow: "BEFORE_SUBMIT",
@@ -100,18 +121,16 @@ export const QUESTION_BANK: {
   type: FieldType
   options?: string[]
 }[] = [
-  { label: "What's your vibe?", type: "text" },
-  {
-    label: "How did you hear about us?",
-    type: "select",
-    options: ["Friend referral", "Instagram", "Newsletter", "Existing member", "Other"],
-  },
+  { label: "How did you hear about us?", type: "select", options: ["Friend referral", "Instagram", "Newsletter", "Existing member", "Other"] },
   { label: "What do you do?", type: "text" },
   { label: "What are you hoping to get out of tonight?", type: "textarea" },
-  { label: "Are you bringing a plus one?", type: "checkbox" },
+  { label: "Are you bringing a plus one?", type: "yes_no" },
   { label: "Any dietary restrictions or allergies?", type: "text" },
-  { label: "What's your Instagram handle?", type: "text" },
+  { label: "Instagram handle", type: "text" },
   { label: "What city are you based in?", type: "text" },
+  { label: "What's your vibe?", type: "text" },
+  { label: "I agree to be photographed at this event", type: "yes_no" },
+  { label: "How would you describe your role?", type: "select", options: ["Founder / CEO", "Creative", "Investor", "Operator", "Artist", "Other"] },
 ]
 
 let bankSeq = 0

@@ -1,4 +1,5 @@
 import type { EventAccess } from "./event-access-schema"
+import { deriveFlow } from "./event-access"
 
 export type DerivedLegacy = {
   accessMode: "OPEN" | "TICKETED" | "APPLY_OR_PAY"
@@ -8,10 +9,10 @@ export type DerivedLegacy = {
   nonMemberPriceInCents: number | null
 }
 
-/** Derives the legacy Event columns from the flow-based access config. */
+/** Derives the legacy Event columns from the gate-based access config. */
 export function deriveLegacyFromAccess(access: EventAccess): DerivedLegacy {
-  const memberFlow = access.member.enabled ? access.member.flow : []
-  const guestFlow = access.guest.enabled ? access.guest.flow : []
+  const memberFlow = access.member.enabled ? deriveFlow(access.member.gates) : []
+  const guestFlow = access.guest.enabled ? deriveFlow(access.guest.gates) : []
 
   const anyPay = memberFlow.includes("pay") || guestFlow.includes("pay")
   const anyApproval =

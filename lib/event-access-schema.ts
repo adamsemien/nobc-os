@@ -1,13 +1,24 @@
 import { z } from "zod"
+import { GATE_TYPES } from "./event-gates"
+import type { Gate, GateType } from "./event-gates"
 
-/**
- * A flow is the ordered list of step blocks an operator stacks after the
- * implicit "Register" anchor. Every group stores its flow directly — the
- * ordered sequence IS the configuration. A "Gate: Approval" step can sit at
- * any position.
- */
+export type { Gate, GateType }
+
+// Keep FlowStep for legacy references
 export const FlowStepSchema = z.enum(["fields", "pay", "approval"])
 export type FlowStep = z.infer<typeof FlowStepSchema>
+
+const GateSchema = z.object({
+  id: z.string(),
+  type: z.enum([...GATE_TYPES] as [GateType, ...GateType[]]),
+  label: z.string(),
+  capacity: z.number().int().min(0).nullable().optional(),
+  approvalRequired: z.boolean().optional(),
+  deadline: z.string().nullable().optional(),
+  priceCents: z.number().int().min(0).optional(),
+  question: z.string().optional(),
+  questionType: z.enum(["yes_no", "short_text"]).optional(),
+})
 
 export const CompTypeSchema = z.enum([
   "sponsor",
@@ -21,7 +32,7 @@ export type CompType = z.infer<typeof CompTypeSchema>
 
 export const GroupAccessSchema = z.object({
   enabled: z.boolean(),
-  flow: z.array(FlowStepSchema),
+  gates: z.array(GateSchema).default([]),
   priceCents: z.number().int().min(0),
 })
 export type GroupAccess = z.infer<typeof GroupAccessSchema>
@@ -31,7 +42,6 @@ export const CompAccessSchema = z.object({
   budgetCap: z.number().int().min(0).nullable(),
 })
 
-/** How registration fields are presented to the attendee in the checkout modal. */
 export const RegistrationStyleSchema = z.enum(["all_at_once", "one_at_a_time"])
 export type RegistrationStyle = z.infer<typeof RegistrationStyleSchema>
 
@@ -43,19 +53,19 @@ export const EventAccessSchema = z.object({
 })
 export type EventAccess = z.infer<typeof EventAccessSchema>
 
-/** Default flow for a group the first time it is enabled. */
+export function defaultEventAccess(): EventAccess {
+  return {
+    member: { enabled: true, gates: [], priceCents: 0 },
+    guest: { enabled: false, gates: [], priceCents: 0 },
+    comp: { enabled: false, budgetCap: null },
+    registrationStyle: "all_at_once",
+  }
+}
+
+// Legacy helpers — kept for any code that still references them
 export function defaultMemberFlow(): FlowStep[] {
   return ["fields", "approval"]
 }
 export function defaultGuestFlow(): FlowStep[] {
   return ["pay"]
-}
-
-export function defaultEventAccess(): EventAccess {
-  return {
-    member: { enabled: true, flow: defaultMemberFlow(), priceCents: 0 },
-    guest: { enabled: false, flow: defaultGuestFlow(), priceCents: 0 },
-    comp: { enabled: false, budgetCap: null },
-    registrationStyle: "all_at_once",
-  }
 }
