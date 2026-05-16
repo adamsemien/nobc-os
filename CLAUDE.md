@@ -154,7 +154,8 @@ Follow Producer's conventions:
 ```
 /apply                  ← public application form
 /m/events               ← member-facing event calendar
-/m/events/[slug]        ← member-facing event detail
+/m/events/[slug]        ← member-facing event detail (Clerk-gated)
+/e/[slug]               ← public event page — guest RSVP, no login required
 /check-in/[slug]        ← staff check-in PWA
 /operator/*             ← operator dashboard (protected)
 /api/apply              ← application submission
@@ -217,3 +218,48 @@ Email template editor, event page template engine, custom font upload, Brand Bui
 
 ### V1.5 Gate
 3+ live events, full apply→approve→event→check-in lifecycle, Stripe Live activated, first paying SaaS customer signed.
+
+---
+
+## Production Readiness
+
+The work to cross from "V1 built" to "live with real members and real money." This is the
+bridge between the V1 build-out and the V1.5 Gate above — the V1.5 Gate cannot be met until
+these are done. Grouped by area; each item carries a rough size (S / M / L).
+
+### Auth — promote Clerk, do NOT replace it
+Clerk is wired through ~15+ files (`clerkMiddleware`, `auth()`, `clerkClient()`, `ClerkProvider`,
+the Workspace=Org mapping). The fix for the dev-instance friction is a production instance, not
+a migration off Clerk. Migrating to another provider is weeks of work for no real gain.
+- [ ] Create a Clerk **production instance** on a real domain; add DNS (CNAMEs for `clerk.` / `accounts.`). — M
+- [ ] Swap to `pk_live_…` / `sk_live_…` in Vercel production env. — S
+- [ ] Build real `/sign-in` + `/sign-up` pages (referenced today, currently 404). — M
+- [ ] Add a Clerk webhook → sync Clerk users into the `Member` table (only Stripe has a webhook today). — M
+- [ ] Decide member onboarding: operator-invites-to-org vs. auto-create workspace on signup. — M
+- Note: event guests already skip login via the public `/e/[slug]` route — this is members/operators only.
+
+### Payments — go live
+- [ ] Stripe live keys + live webhook endpoint + `STRIPE_WEBHOOK_SECRET`. — S
+- [ ] Terms / Privacy / Refund policy pages — Stripe requires these before live mode. — M
+- [ ] Verify the `capture-payments` cron behaves under live mode. — S
+
+### Infrastructure & deploy
+- [ ] Custom domain on Vercel (replace `nobc-os.vercel.app`). — S
+- [ ] All env vars set in Vercel production scope (DB, Clerk live, Stripe live, Resend, PassNinja, R2/S3, `NEXT_PUBLIC_APP_URL`). — S
+- [ ] Git workflow: `main` = production, feature branch → preview → merge. No more `gitDirty` CLI deploys. — S
+- [ ] Prisma migrations with history (replace `db push`); confirm DB backups. — M
+
+### Correctness & safety
+- [ ] Green `next build` + lint enforced in CI on every PR. — M
+- [ ] Rate limiting / bot protection on the public `/e/` route and guest RSVP API — new abuse surface. — M
+- [ ] Error tracking (Sentry); stop swallowing errors in empty `catch {}` blocks. — M
+- [ ] Workspace-scoping audit — confirm every read and write is workspace-scoped. — M
+
+### Polish & content
+- [ ] Real landing page at `/` (currently the create-next-app placeholder). — M
+- [ ] Resend: verify the `thenobadcompany.com` sending domain (SPF / DKIM / DMARC). — S
+- [ ] PassNinja production account + certs for Apple/Google wallet passes. — M
+- [ ] Smoke tests for apply → RSVP → payment → check-in (none exist today). — L
+
+**Highest leverage first:** Clerk production instance + Stripe live + a custom domain. That is
+the difference between "demo" and "real."
