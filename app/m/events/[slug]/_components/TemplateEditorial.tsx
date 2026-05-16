@@ -32,7 +32,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
       <section
         className="relative isolate w-full"
         aria-label="Event hero"
-        style={{ minHeight: '65vh' }}
+        style={{ height: '40vh', minHeight: 320 }}
       >
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -58,10 +58,10 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
         </div>
         <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-10 sm:px-10 sm:pb-14">
           <div className="mx-auto max-w-6xl">
-            <h1 className="max-w-4xl text-[clamp(2.5rem,5.5vw,4.5rem)] leading-[1.05] font-normal text-white font-[family-name:var(--font-cormorant)]">
+            <h1 className="max-w-4xl text-[clamp(2.5rem,5.5vw,4.5rem)] italic leading-[1.05] font-normal text-white" style={{ fontFamily: "'PP Editorial New', Georgia, serif" }}>
               {event.title}
             </h1>
-            <p className="mt-4 text-[11px] font-medium uppercase tracking-widest text-white/85 font-[family-name:var(--font-dm-sans)]">
+            <p className="mt-4 text-[12px] font-normal uppercase tracking-[0.18em] text-white/85">
               {dateCaps}
               {venueCaps ? ` · ${venueCaps}` : ''}
             </p>
@@ -71,7 +71,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
 
       {/* Body */}
       <div className="mx-auto w-full max-w-6xl flex-1 px-6 pb-20 pt-12 sm:px-10 sm:pt-16">
-        <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
+        <div className="grid gap-10 lg:grid-cols-[3fr_2fr]">
           <div>
             {event.description ? (
               <p className="whitespace-pre-wrap text-[20px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
