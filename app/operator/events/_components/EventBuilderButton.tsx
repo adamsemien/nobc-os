@@ -87,7 +87,7 @@ export function EventBuilderButton() {
           >
             <h2
               style={{
-                fontFamily: 'var(--font-playfair-display, Georgia, serif)',
+                fontFamily: "'PP Editorial New', Georgia, serif",
                 fontSize: 22,
                 fontWeight: 600,
                 marginBottom: 4,

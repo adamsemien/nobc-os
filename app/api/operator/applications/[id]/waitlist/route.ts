@@ -13,33 +13,23 @@ export async function POST(
   const workspaceId = await requireWorkspaceId(userId);
   const { id } = await params;
 
-  const app = await db.application.findUnique({ where: { id } });
-
-  if (!app) return Response.json({ error: 'Not found' }, { status: 404 });
-  if (app.workspaceId !== workspaceId) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  let reason: string | undefined;
   let reviewNote: string | null = null;
   try {
-    const body = (await req.json()) as { reason?: unknown; note?: unknown };
-    if (typeof body?.reason === 'string') {
-      reason = body.reason.trim().slice(0, 4000) || undefined;
-    }
-    reviewNote = typeof body?.note === 'string' ? body.note.trim().slice(0, 4000) || null : null;
-  } catch {
-    /* optional body */
-  }
+    const body = (await req.json()) as { note?: unknown };
+    if (typeof body?.note === 'string') reviewNote = body.note.trim().slice(0, 4000) || null;
+  } catch { /* optional */ }
+
+  const app = await db.application.findUnique({ where: { id } });
+  if (!app) return Response.json({ error: 'Not found' }, { status: 404 });
+  if (app.workspaceId !== workspaceId) return Response.json({ error: 'Forbidden' }, { status: 403 });
 
   const [updatedApp] = await db.$transaction([
     db.application.update({
       where: { id },
       data: {
-        status: 'REJECTED',
+        status: 'WAITLISTED',
         reviewedAt: new Date(),
         reviewedBy: userId,
-        rejectionReason: reason ?? null,
         reviewNote,
       },
     }),
@@ -47,7 +37,7 @@ export async function POST(
       data: {
         workspaceId,
         actorId: userId,
-        action: 'application.rejected',
+        action: 'application.waitlisted',
         entityType: 'APPLICATION',
         entityId: id,
       },
@@ -55,15 +45,16 @@ export async function POST(
   ]);
 
   if (process.env.RESEND_API_KEY) {
-    const { applicationRejectedEmail } = await import('@/lib/email-templates');
+    const { render } = await import('@react-email/render');
+    const WaitlistEmail = (await import('@/emails/WaitlistEmail')).default;
     const { resend } = await import('@/lib/resend');
-    const { subject, html } = applicationRejectedEmail(app.fullName);
+    const html = await render(WaitlistEmail({ name: app.fullName }));
     resend.emails.send({
-      from: 'NoBC <noreply@thenobadcompany.com>',
+      from: 'The No Bad Company <team@thenobadcompany.com>',
       to: app.email,
-      subject,
+      subject: 'your application — no bad company.',
       html,
-    }).catch(err => console.error('[reject] email failed:', err));
+    }).catch(err => console.error('[waitlist] email failed:', err));
   }
 
   return Response.json(updatedApp);

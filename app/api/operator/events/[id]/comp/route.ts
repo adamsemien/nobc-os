@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { findOrCreateGuestMember } from '@/lib/event-access-submit';
 
-export const COMP_TYPES = ['Sponsor', 'Vendor', 'Staff', 'Press', 'Partner', 'Other'] as const;
+const COMP_TYPES = ['Sponsor', 'Vendor', 'Staff', 'Press', 'Partner', 'Other'] as const;
 
 const BodySchema = z.object({
   firstName: z.string().trim().min(1, 'First name required'),

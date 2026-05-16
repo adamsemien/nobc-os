@@ -38,7 +38,7 @@ export default function WebhooksPage() {
       <div className="mx-auto max-w-4xl">
         <h1
           className="mb-2 text-3xl font-normal text-text-primary"
-          style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
+          style={{ fontFamily: "'PP Editorial New', Georgia, serif" }}
         >
           Webhooks
         </h1>

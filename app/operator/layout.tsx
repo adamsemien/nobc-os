@@ -1,5 +1,6 @@
 import { OperatorNav } from './operator-nav';
 import { AiChatPanel } from './_components/AiChatPanel';
+import { ObsidianIdleEgg } from './_components/ObsidianIdleEgg';
 
 export default function OperatorLayout({
   children,
@@ -14,6 +15,7 @@ export default function OperatorLayout({
       <OperatorNav />
       <main className="flex min-h-screen min-w-0 flex-1 flex-col">{children}</main>
       <AiChatPanel />
+      <ObsidianIdleEgg />
     </div>
   );
 }

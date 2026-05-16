@@ -147,7 +147,7 @@ export default async function OperatorEventDetailPage({
     }
   }
 
-  const heroImageUrl = await getEventHeroDisplayUrl(event.heroImageAssetId);
+  const heroImageUrl = getEventHeroDisplayUrl(event.heroImageAssetId);
 
   const formattedDate = new Date(event.startAt).toLocaleDateString('en-US', {
     weekday: 'short',
@@ -171,7 +171,7 @@ export default async function OperatorEventDetailPage({
 
         <h1
           className="mb-1 text-3xl font-normal text-text-primary"
-          style={{ fontFamily: 'var(--font-cormorant), Georgia, serif' }}
+          style={{ fontFamily: "'PP Editorial New', Georgia, serif" }}
         >
           {event.title}
         </h1>

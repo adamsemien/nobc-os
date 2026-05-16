@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import { ArrowLeft, Check, Clock, Loader2, Mail, MapPin, Phone, Search, X, XCircle } from 'lucide-react';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { EmptyState } from '../../_components/EmptyState';
+import { useTheme } from '../../_components/ThemeToggle';
 
 export type ApplicationsQueueItem = {
   id: string;
@@ -310,7 +311,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
   }, []); // no deps — uses refs
 
   const headingFont: CSSProperties = {
-    fontFamily: 'var(--font-playfair-display), Georgia, serif',
+    fontFamily: "'PP Editorial New', Georgia, serif",
   };
 
   if (applications.length === 0) {
@@ -447,22 +448,28 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                         setSheetOpen(true);
                       }
                     }}
-                    className={`min-w-0 w-full rounded-lg border px-3 py-3 text-left transition-colors lg:px-4 ${
+                    className={`obs-app-button min-w-0 w-full rounded-lg border px-3 py-3 text-left transition-colors lg:px-4 ${
                       active
-                        ? 'border-border bg-surface-elevated shadow-sm ring-1 ring-border'
+                        ? 'obs-app-active border-border bg-surface-elevated shadow-sm ring-1 ring-border'
                         : 'border-transparent bg-surface hover:bg-surface-elevated'
                     }`}
-                    style={{ borderRadius: '8px' }}
+                    style={{ borderRadius: '8px', position: 'relative' }}
                   >
-                    <p className="truncate font-medium text-text-primary" style={headingFont}>
+                    <p className="obs-app-name truncate font-medium text-text-primary" style={headingFont}>
                       {app.fullName}
                     </p>
-                    <p className="mt-0.5 text-xs text-text-muted">
+                    <span
+                      className="obs-score-badge"
+                      aria-hidden="true"
+                    >
+                      {String(Math.round(Math.min(1, Math.max(0, score)) * 100)).padStart(2, '0')}
+                    </span>
+                    <p className="obs-app-meta mt-0.5 text-xs text-text-muted">
                       {[app.city, formatRelative(app.submittedAt)].filter(Boolean).join(' · ')}
                     </p>
                     {app.archetype && (
                       <span
-                        className="mt-1.5 inline-block rounded border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-text-secondary"
+                        className="obs-app-archetype mt-1.5 inline-block rounded border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-text-secondary"
                         style={{ borderRadius: '4px' }}
                       >
                         {app.archetype}
@@ -486,7 +493,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                       )}
                     </div>
                     <div
-                      className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                      className="obs-score-bar mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
                       style={{ borderRadius: '4px' }}
                       aria-label="AI fit score"
                     >
@@ -607,7 +614,17 @@ function DetailPanel({
   onWaitlist: () => void;
   onHold: () => void;
 }) {
+  const { theme } = useTheme();
+  const [roseConfetti, setRoseConfetti] = useState(false);
   const entries = orderedAnswerEntries(app.answers);
+
+  const handleApprove = () => {
+    onApprove();
+    if (theme === 'rose') {
+      setRoseConfetti(true);
+      setTimeout(() => setRoseConfetti(false), 1300);
+    }
+  };
 
   return (
     <div
@@ -762,20 +779,29 @@ function DetailPanel({
       </div>
 
       <div className="mt-auto flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:gap-4">
-        <button
-          type="button"
-          onClick={onApprove}
-          disabled={pendingAction !== null}
-          className="inline-flex min-h-[3.25rem] flex-1 items-center justify-center gap-2 rounded-md bg-op-approve px-4 text-base font-semibold text-op-approve-fg shadow-sm transition-colors hover:bg-op-approve-hover disabled:opacity-50"
-          style={{ borderRadius: '6px' }}
-        >
-          {pendingAction === 'approve' ? (
-            <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
-          ) : (
-            <Check className="h-5 w-5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+        <div className="relative flex-1">
+          {roseConfetti && (
+            <div aria-hidden className="pointer-events-none">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <span key={i} className={`rose-confetti rose-confetti-${i}`} />
+              ))}
+            </div>
           )}
-          <span className="text-center leading-tight">Approve application</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleApprove}
+            disabled={pendingAction !== null}
+            className="inline-flex min-h-[3.25rem] w-full items-center justify-center gap-2 rounded-md bg-op-approve px-4 text-base font-semibold text-op-approve-fg shadow-sm transition-colors hover:bg-op-approve-hover disabled:opacity-50"
+            style={{ borderRadius: '6px' }}
+          >
+            {pendingAction === 'approve' ? (
+              <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+            ) : (
+              <Check className="h-5 w-5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+            )}
+            <span className="text-center leading-tight">Approve application</span>
+          </button>
+        </div>
         <button
           type="button"
           onClick={onWaitlist}

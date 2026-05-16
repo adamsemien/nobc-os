@@ -1,10 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { X, Plus, GripVertical, RotateCcw } from 'lucide-react';
-import type { FlowStep } from '@/lib/event-access-schema';
-import { defaultMemberFlow, defaultGuestFlow } from '@/lib/event-access-schema';
-import { FLOW_STEP_META } from '@/lib/event-access-flow';
+import { useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
+import type { Gate, GateType } from '@/lib/event-gates';
+import { GATE_META, GATE_TYPES, newGate } from '@/lib/event-gates';
 import type { AccessQuestion } from '@/lib/registration-fields';
 import { RegistrationFieldsEditor } from './RegistrationFieldsEditor';
 
@@ -12,279 +28,372 @@ type Group = 'member' | 'guest';
 
 type Props = {
   group: Group;
-  flow: FlowStep[];
-  onFlowChange: (flow: FlowStep[]) => void;
+  gates: Gate[];
+  onGatesChange: (gates: Gate[]) => void;
   priceCents: number;
   onPriceChange: (cents: number) => void;
   questions: AccessQuestion[];
   onQuestionsChange: (q: AccessQuestion[]) => void;
 };
 
-const ALL_STEPS: FlowStep[] = ['fields', 'pay', 'approval'];
-
-function defaultFlow(group: Group): FlowStep[] {
-  return group === 'member' ? defaultMemberFlow() : defaultGuestFlow();
-}
-
-type Template = { key: string; label: string; flow: FlowStep[] };
-
-function templatesFor(group: Group): Template[] {
-  const who = group === 'member' ? 'Members' : 'Guests';
-  return [
-    { key: 'apply', label: `${who} apply, you approve`, flow: ['fields', 'approval'] },
-    { key: 'pay', label: `${who} pay`, flow: ['pay'] },
-    { key: 'open', label: `${who} just show up`, flow: [] },
-  ];
-}
+const chrome = 'font-[family-name:var(--font-dm-sans)]';
 
 export function FlowBuilder({
   group,
-  flow,
-  onFlowChange,
+  gates,
+  onGatesChange,
   priceCents,
   onPriceChange,
   questions,
   onQuestionsChange,
 }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const menuWrapRef = useRef<HTMLDivElement>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onDoc(e: MouseEvent) {
-      if (!menuWrapRef.current?.contains(e.target as Node)) setMenuOpen(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const from = gates.findIndex((g) => g.id === active.id);
+      const to = gates.findIndex((g) => g.id === over.id);
+      onGatesChange(arrayMove(gates, from, to));
     }
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [menuOpen]);
-
-  function addStep(s: FlowStep) {
-    onFlowChange([...flow, s]);
-    setMenuOpen(false);
   }
 
-  function removeStep(idx: number) {
-    onFlowChange(flow.filter((_, i) => i !== idx));
+  function addGate(type: GateType) {
+    onGatesChange([...gates, newGate(type)]);
+    setModalOpen(false);
   }
 
-  function reorder(from: number, to: number) {
-    if (from === to || from < 0 || to < 0 || from >= flow.length) return;
-    const next = [...flow];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    onFlowChange(next);
+  function removeGate(id: string) {
+    onGatesChange(gates.filter((g) => g.id !== id));
+    if (editingId === id) setEditingId(null);
   }
 
-  const inactive = ALL_STEPS.filter((s) => !flow.includes(s));
-  const templates = templatesFor(group);
-  const isDefault =
-    JSON.stringify(flow) === JSON.stringify(defaultFlow(group));
+  function updateGate(id: string, patch: Partial<Gate>) {
+    onGatesChange(gates.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  }
+
+  function moveUp(idx: number) {
+    if (idx === 0) return;
+    onGatesChange(arrayMove(gates, idx, idx - 1));
+  }
+
+  function moveDown(idx: number) {
+    if (idx >= gates.length - 1) return;
+    onGatesChange(arrayMove(gates, idx, idx + 1));
+  }
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Templates */}
-      <div>
-        <p className="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-          Start from a template
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {templates.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => onFlowChange(t.flow)}
-              className="rounded-full border border-[var(--apply-rule)] px-2.5 py-1 text-[11px] text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
-            >
-              {t.label}
-            </button>
+      {/* Flow path */}
+      {gates.length > 0 && (
+        <div className={`flex flex-wrap items-center gap-1 text-[11px] text-[var(--apply-muted)] ${chrome}`}>
+          <span className="rounded-sm bg-raised px-1.5 py-0.5 font-medium text-[var(--apply-ink)]">Register</span>
+          {gates.map((g) => (
+            <span key={g.id} className="flex items-center gap-1">
+              <span aria-hidden className="opacity-40">→</span>
+              <span className="rounded-sm bg-raised px-1.5 py-0.5 font-medium text-[var(--apply-ink)]">
+                {GATE_META[g.type].emoji} {g.label}
+              </span>
+            </span>
           ))}
+          <span aria-hidden className="opacity-40">→</span>
+          <span>Done</span>
         </div>
-      </div>
+      )}
 
-      {/* Flow canvas */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            The flow
-          </p>
-          {!isDefault && (
-            <button
-              type="button"
-              onClick={() => onFlowChange(defaultFlow(group))}
-              className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Reset to default
-            </button>
-          )}
+      {/* Gate list */}
+      {gates.length === 0 ? (
+        <div className="flex items-center justify-center rounded-sm border border-dashed border-[var(--apply-rule)] py-8 text-center">
+          <div>
+            <p className={`text-sm font-medium text-[var(--apply-ink)] ${chrome}`}>No gates yet</p>
+            <p className={`mt-1 text-xs text-[var(--apply-muted)] ${chrome}`}>
+              Add a gate below — guests must pass each one in order.
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-raised p-3">
-          <span className="inline-flex items-center rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm font-medium text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            Register
-          </span>
-
-          {flow.map((s, i) => (
-            <div key={`${s}-${i}`} className="flex items-center gap-1.5">
-              <Arrow />
-              <StepBlock
-                step={s}
-                isDragging={dragIdx === i}
-                priceCents={priceCents}
-                onPriceChange={onPriceChange}
-                onRemove={() => removeStep(i)}
-                onDragStart={() => setDragIdx(i)}
-                onDragEnd={() => setDragIdx(null)}
-                onDropOnto={() => {
-                  if (dragIdx !== null) reorder(dragIdx, i);
-                  setDragIdx(null);
-                }}
-              />
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={gates.map((g) => g.id)} strategy={verticalListSortingStrategy}>
+            <div className="flex flex-col gap-2">
+              {gates.map((gate, idx) => (
+                <SortableGateCard
+                  key={gate.id}
+                  gate={gate}
+                  index={idx}
+                  total={gates.length}
+                  isEditing={editingId === gate.id}
+                  onToggleEdit={() => setEditingId(editingId === gate.id ? null : gate.id)}
+                  onUpdate={(patch) => updateGate(gate.id, patch)}
+                  onRemove={() => removeGate(gate.id)}
+                  onMoveUp={() => moveUp(idx)}
+                  onMoveDown={() => moveDown(idx)}
+                  priceCents={priceCents}
+                  onPriceChange={onPriceChange}
+                />
+              ))}
             </div>
-          ))}
+          </SortableContext>
+        </DndContext>
+      )}
 
-          {inactive.length > 0 && (
-            <div className="flex items-center gap-1.5" ref={menuWrapRef}>
-              <Arrow />
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((o) => !o)}
-                  className="inline-flex items-center gap-1.5 rounded-sm border border-dashed border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Step
-                </button>
-                {menuOpen && (
-                  <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-60 rounded-sm border border-[var(--apply-rule)] bg-card p-1 shadow-lg">
-                    {inactive.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => addStep(s)}
-                        className="flex w-full flex-col items-start rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-raised"
-                      >
-                        <span className="text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-                          {FLOW_STEP_META[s].label}
-                        </span>
-                        <span className="text-[11px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-                          {FLOW_STEP_META[s].hint}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Add gate */}
+      <button
+        type="button"
+        onClick={() => setModalOpen(true)}
+        className={`inline-flex w-fit items-center gap-2 rounded-sm border border-dashed border-[var(--apply-rule)] bg-card px-4 py-2.5 text-sm text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] ${chrome}`}
+      >
+        <Plus className="h-4 w-4" />
+        Add gate
+      </button>
 
-      {/* Per-group registration fields */}
-      <RegistrationFieldsEditor
-        group={group}
-        questions={questions}
-        onChange={onQuestionsChange}
-      />
+      {/* Registration fields */}
+      <RegistrationFieldsEditor group={group} questions={questions} onChange={onQuestionsChange} />
+
+      {/* Modal */}
+      {modalOpen && <GatePickerModal onSelect={addGate} onClose={() => setModalOpen(false)} />}
     </div>
   );
 }
 
-function Arrow() {
-  return (
-    <span className="text-[var(--apply-muted)]" aria-hidden>
-      →
-    </span>
-  );
-}
+// ─── Sortable gate card ──────────────────────────────────────────────────────
 
-function StepBlock({
-  step,
-  isDragging,
-  priceCents,
-  onPriceChange,
-  onRemove,
-  onDragStart,
-  onDragEnd,
-  onDropOnto,
+function SortableGateCard({
+  gate, index, total, isEditing, onToggleEdit, onUpdate, onRemove, onMoveUp, onMoveDown, priceCents, onPriceChange,
 }: {
-  step: FlowStep;
-  isDragging: boolean;
+  gate: Gate;
+  index: number;
+  total: number;
+  isEditing: boolean;
+  onToggleEdit: () => void;
+  onUpdate: (patch: Partial<Gate>) => void;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   priceCents: number;
   onPriceChange: (cents: number) => void;
-  onRemove: () => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDropOnto: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: gate.id });
+  const meta = GATE_META[gate.type];
+  const chrome = 'font-[family-name:var(--font-dm-sans)]';
+
   return (
-    <span
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDropOnto();
-      }}
-      className={`inline-flex items-center gap-1.5 rounded-sm border border-[var(--nobc-red)] bg-primary-soft px-2.5 py-2 text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)] ${
-        isDragging ? 'opacity-40' : ''
-      }`}
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      className="rounded-sm border border-[var(--apply-rule)] bg-card"
     >
-      <span
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        className="cursor-grab text-[var(--apply-muted)] active:cursor-grabbing"
-        aria-label="Drag to reorder"
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </span>
-      {FLOW_STEP_META[step].label}
-      {step === 'pay' && (
-        <PriceInput valueCents={priceCents} onChange={onPriceChange} />
+      {/* Header row */}
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        {/* Step badge */}
+        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--apply-rule)] text-[10px] font-semibold text-[var(--apply-muted)] ${chrome}`}>
+          {index + 1}
+        </div>
+
+        {/* Emoji */}
+        <span className="shrink-0 text-base leading-none" aria-hidden>{meta.emoji}</span>
+
+        {/* Label + hint */}
+        <div className="min-w-0 flex-1">
+          <p className={`truncate text-sm font-medium text-[var(--apply-ink)] ${chrome}`}>{gate.label}</p>
+          <p className={`text-[10px] text-[var(--apply-muted)] ${chrome}`}>
+            {meta.description.split('.')[0]}
+            {gate.capacity ? ` · ${gate.capacity} cap` : ''}
+            {gate.approvalRequired ? ' · approval' : ''}
+            {gate.deadline ? ' · deadline set' : ''}
+          </p>
+        </div>
+
+        {/* Mobile up/down */}
+        <div className="flex sm:hidden">
+          <button type="button" onClick={onMoveUp} disabled={index === 0} aria-label="Move up"
+            className="p-1 text-[var(--apply-muted)] hover:text-[var(--apply-ink)] disabled:opacity-25">
+            <ChevronUp className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={onMoveDown} disabled={index >= total - 1} aria-label="Move down"
+            className="p-1 text-[var(--apply-muted)] hover:text-[var(--apply-ink)] disabled:opacity-25">
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Desktop drag handle */}
+        <button type="button" {...attributes} {...listeners} aria-label="Drag to reorder"
+          className="hidden cursor-grab p-1 text-[var(--apply-muted)] hover:text-[var(--apply-ink)] active:cursor-grabbing sm:flex">
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        {/* Edit toggle */}
+        <button type="button" onClick={onToggleEdit}
+          className={`rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-widest transition-colors ${chrome} ${isEditing ? 'bg-raised text-[var(--nobc-red)]' : 'text-[var(--apply-muted)] hover:text-[var(--apply-ink)]'}`}>
+          {isEditing ? 'done' : 'edit'}
+        </button>
+
+        {/* Delete */}
+        <button type="button" onClick={onRemove} aria-label={`Remove ${gate.label}`}
+          className="p-1 text-[var(--apply-muted)] hover:text-[var(--nobc-red)]">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Expanded editor */}
+      {isEditing && (
+        <div className="border-t border-[var(--apply-rule)] px-3 py-3">
+          <GateEditor gate={gate} onUpdate={onUpdate} priceCents={priceCents} onPriceChange={onPriceChange} />
+        </div>
       )}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${FLOW_STEP_META[step].label}`}
-        className="text-[var(--apply-muted)] hover:text-[var(--nobc-red)]"
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
-    </span>
+    </div>
   );
 }
 
-function PriceInput({
-  valueCents,
-  onChange,
-}: {
-  valueCents: number;
-  onChange: (cents: number) => void;
-}) {
-  const [text, setText] = useState(valueCents ? (valueCents / 100).toString() : '');
+// ─── Gate inline editor ──────────────────────────────────────────────────────
 
-  useEffect(() => {
-    setText(valueCents ? (valueCents / 100).toString() : '');
-  }, [valueCents]);
+function GateEditor({
+  gate, onUpdate, priceCents, onPriceChange,
+}: {
+  gate: Gate;
+  onUpdate: (patch: Partial<Gate>) => void;
+  priceCents: number;
+  onPriceChange: (cents: number) => void;
+}) {
+  const chrome = 'font-[family-name:var(--font-dm-sans)]';
+  const inputCls = `w-full rounded-sm border border-[var(--apply-rule)] bg-surface px-3 py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none ${chrome}`;
+  const labelCls = `mb-1 block text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] ${chrome}`;
 
   return (
-    <span className="inline-flex items-center rounded-sm border border-[var(--apply-rule)] bg-card pl-1.5">
-      <span className="text-xs text-[var(--apply-muted)]">$</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        value={text}
-        placeholder="0"
-        onChange={(e) => {
-          setText(e.target.value);
-          if (e.target.value === '') {
-            onChange(0);
-            return;
-          }
-          const num = parseFloat(e.target.value);
-          if (!Number.isNaN(num) && num >= 0) onChange(Math.round(num * 100));
-        }}
-        className="w-12 bg-transparent px-1 py-0.5 text-xs text-[var(--apply-ink)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
-      />
-    </span>
+    <div className="flex flex-col gap-3">
+      {/* Label */}
+      <div>
+        <label className={labelCls}>Label</label>
+        <input type="text" value={gate.label} onChange={(e) => onUpdate({ label: e.target.value })} className={inputCls} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* Capacity */}
+        <div>
+          <label className={labelCls}>Capacity (optional)</label>
+          <input type="number" min={1} placeholder="No limit"
+            value={gate.capacity ?? ''}
+            onChange={(e) => onUpdate({ capacity: e.target.value ? parseInt(e.target.value, 10) : null })}
+            className={inputCls}
+          />
+        </div>
+
+        {/* Deadline */}
+        <div>
+          <label className={labelCls}>Deadline (optional)</label>
+          <input type="datetime-local"
+            value={gate.deadline ?? ''}
+            onChange={(e) => onUpdate({ deadline: e.target.value || null })}
+            className={inputCls}
+          />
+        </div>
+      </div>
+
+      {/* Approval toggle */}
+      {(gate.type === 'application' || gate.type === 'waitlist' || gate.type === 'referral') && (
+        <label className={`flex cursor-pointer items-center gap-2 text-sm text-[var(--apply-ink)] ${chrome}`}>
+          <input type="checkbox" checked={gate.approvalRequired ?? false}
+            onChange={(e) => onUpdate({ approvalRequired: e.target.checked })}
+            className="h-4 w-4 accent-[var(--nobc-red)]" />
+          Require manual approval before guest advances
+        </label>
+      )}
+
+      {/* Ticket price */}
+      {gate.type === 'ticket' && (
+        <div>
+          <label className={labelCls}>Ticket price</label>
+          <div className={`flex items-center gap-1 rounded-sm border border-[var(--apply-rule)] bg-surface px-3 py-2`}>
+            <span className={`text-sm text-[var(--apply-muted)] ${chrome}`}>$</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0"
+              value={priceCents ? (priceCents / 100).toString() : ''}
+              onChange={(e) => {
+                const num = parseFloat(e.target.value);
+                onPriceChange(Number.isNaN(num) ? 0 : Math.round(num * 100));
+              }}
+              className={`min-w-0 flex-1 bg-transparent text-sm text-[var(--apply-ink)] focus:outline-none ${chrome}`}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Custom question */}
+      {gate.type === 'custom_question' && (
+        <>
+          <div>
+            <label className={labelCls}>Question text</label>
+            <input type="text" placeholder="e.g. Are you 21 or older?"
+              value={gate.question ?? ''}
+              onChange={(e) => onUpdate({ question: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Response type</label>
+            <select value={gate.questionType ?? 'yes_no'}
+              onChange={(e) => onUpdate({ questionType: e.target.value as Gate['questionType'] })}
+              className={inputCls}
+            >
+              <option value="yes_no">Yes / No</option>
+              <option value="short_text">Short text</option>
+            </select>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Gate picker modal ───────────────────────────────────────────────────────
+
+function GatePickerModal({ onSelect, onClose }: { onSelect: (type: GateType) => void; onClose: () => void }) {
+  const chrome = 'font-[family-name:var(--font-dm-sans)]';
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-[10px] border border-[var(--apply-rule)] bg-card shadow-[0_8px_32px_rgba(0,0,0,0.14)]"
+      >
+        <div className="flex items-center justify-between border-b border-[var(--apply-rule)] px-4 py-3">
+          <p className={`text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] ${chrome}`}>
+            Choose gate type
+          </p>
+          <button type="button" onClick={onClose} className="text-[var(--apply-muted)] hover:text-[var(--apply-ink)]">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-col p-2">
+          {GATE_TYPES.map((type) => {
+            const meta = GATE_META[type];
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => onSelect(type)}
+                className="flex items-start gap-3 rounded-sm px-3 py-2.5 text-left transition-colors hover:bg-raised"
+              >
+                <span className="mt-0.5 text-xl leading-none" aria-hidden>{meta.emoji}</span>
+                <div>
+                  <p className={`text-sm font-medium text-[var(--apply-ink)] ${chrome}`}>{meta.label}</p>
+                  <p className={`mt-0.5 text-[11px] text-[var(--apply-muted)] ${chrome}`}>{meta.description}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }

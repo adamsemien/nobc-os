@@ -84,7 +84,7 @@ export default async function OperatorApplicationDetailPage({
             <h1
               className="text-3xl font-normal leading-tight sm:text-4xl"
               style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontFamily: "'PP Editorial New', Georgia, serif",
                 color: 'var(--nobc-ink)',
               }}
             >

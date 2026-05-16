@@ -9,7 +9,7 @@ import { resend } from '@/lib/resend';
 import { MemberStatus } from '@prisma/client';
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { userId } = await auth();
@@ -17,6 +17,12 @@ export async function POST(
 
   const workspaceId = await requireWorkspaceId(userId);
   const { id } = await params;
+
+  let reviewNote: string | undefined;
+  try {
+    const body = (await req.json()) as { note?: unknown };
+    if (typeof body?.note === 'string') reviewNote = body.note.trim().slice(0, 4000) || undefined;
+  } catch { /* optional */ }
 
   const app = await db.application.findUnique({ where: { id } });
 
@@ -36,7 +42,7 @@ export async function POST(
   const [updatedApp, member] = await db.$transaction([
     db.application.update({
       where: { id },
-      data: { status: 'APPROVED', reviewedAt: now, reviewedBy: userId },
+      data: { status: 'APPROVED', reviewedAt: now, reviewedBy: userId, reviewNote: reviewNote ?? null },
     }),
     db.member.upsert({
       where: { workspaceId_email: { workspaceId, email: app.email } },

@@ -13,8 +13,9 @@ function parseStatus(param: string | null): ApplicationStatus[] | 'ALL' {
   if (s === 'all') return 'ALL';
   if (s === 'approved') return ['APPROVED'];
   if (s === 'rejected') return ['REJECTED'];
-  if (s === 'pending') return ['PENDING', 'HOLD'];
-  return ['PENDING', 'HOLD'];
+  if (s === 'hold') return ['HOLD'];
+  if (s === 'pending') return ['PENDING'];
+  return ['PENDING'];
 }
 
 function answersRecord(
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
       include: { answers: true },
       orderBy: { createdAt: 'desc' },
     }),
-    db.application.count({ where: { workspaceId, status: { in: ['PENDING', 'HOLD'] } } }),
+    db.application.count({ where: { workspaceId, status: 'PENDING' } }),
     db.application.count({ where: { workspaceId, status: 'APPROVED' } }),
     db.application.count({ where: { workspaceId, status: 'REJECTED' } }),
     db.application.count({ where: { workspaceId, status: 'HOLD' } }),
@@ -62,6 +63,9 @@ export async function GET(req: NextRequest) {
     aiScore: app.aiScore,
     aiRecommendation: app.aiRecommendation,
     aiReasoning: app.aiReasoning,
+    archetype: app.archetype,
+    archetypeScores: app.archetypeScores as Record<string, number> | null,
+    referredBy: app.referredBy,
     answers: answersRecord(app.answers),
   }));
 

@@ -8,12 +8,9 @@ import { Check, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { HeroImageUpload } from './_components/HeroImageUpload';
 import { AccessGroupsCard } from './_components/AccessGroupsCard';
 import { TemplatePicker, type TemplateKey } from './_components/TemplatePicker';
-import { defaultEventAccess, type EventAccess, type FlowStep } from '@/lib/event-access-schema';
-import {
-  type AccessQuestion,
-  toApiQuestion,
-  coerceFieldType,
-} from '@/lib/registration-fields';
+import { defaultEventAccess, type EventAccess } from '@/lib/event-access-schema';
+import { newGate } from '@/lib/event-gates';
+import { type AccessQuestion, toApiQuestion, coerceFieldType } from '@/lib/registration-fields';
 
 type FlowTemplate = {
   id: string;
@@ -53,12 +50,7 @@ const STEP_LABELS: Array<{ step: Step; label: string }> = [
 const chrome = 'font-[family-name:var(--font-dm-sans)]';
 
 function toKebab(str: string): string {
-  return str
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+  return str.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
 }
 
 function combineDatetime(date: string, time: string): string | null {
@@ -88,45 +80,35 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 function SectionTitle({ children, sub }: { children: React.ReactNode; sub?: string }) {
   return (
     <div className="mb-6">
-      <h2 className={`text-[19px] font-semibold tracking-tight text-text-primary ${chrome}`}>
-        {children}
-      </h2>
-      {sub ? (
-        <p className={`mt-1 text-[13px] text-text-secondary ${chrome}`}>{sub}</p>
-      ) : null}
+      <h2 className={`text-[19px] font-semibold tracking-tight text-text-primary ${chrome}`}>{children}</h2>
+      {sub ? <p className={`mt-1 text-[13px] text-text-secondary ${chrome}`}>{sub}</p> : null}
     </div>
   );
 }
 
 function StepIndicator({ current }: { current: Step }) {
   return (
-    <ol className="mb-9 flex items-center gap-1.5 sm:gap-2">
+    <ol className="mb-9 flex flex-wrap items-center gap-1.5 sm:gap-2">
       {STEP_LABELS.map(({ step, label }, idx) => {
         const active = step === current;
         const done = step < current;
         return (
           <li key={step} className="flex items-center gap-1.5 sm:gap-2">
             <span
-              className={`flex h-7 w-7 items-center justify-center rounded-full border text-[12px] font-semibold ${chrome} ${
-                active
-                  ? 'border-primary bg-primary text-on-primary'
-                  : done
-                    ? 'border-primary bg-primary-soft text-primary'
-                    : 'border-border bg-card text-text-tertiary'
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[12px] font-semibold ${chrome} ${
+                active ? 'border-primary bg-primary text-on-primary'
+                  : done ? 'border-primary bg-primary-soft text-primary'
+                  : 'border-border bg-card text-text-tertiary'
               }`}
               aria-current={active ? 'step' : undefined}
             >
               {done ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : step}
             </span>
-            <span
-              className={`text-[11px] font-medium uppercase tracking-widest ${chrome} ${
-                active ? 'text-text-primary' : 'text-text-tertiary'
-              }`}
-            >
+            <span className={`hidden text-[11px] font-medium uppercase tracking-widest sm:inline ${chrome} ${active ? 'text-text-primary' : 'text-text-tertiary'}`}>
               {label}
             </span>
             {idx < STEP_LABELS.length - 1 ? (
-              <span className="mx-1 hidden h-px w-8 bg-border sm:inline-block" aria-hidden />
+              <span className="mx-1 hidden h-px w-6 bg-border md:inline-block" aria-hidden />
             ) : null}
           </li>
         );
@@ -145,10 +127,7 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
-function PrimaryButton({
-  children,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+function PrimaryButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...rest}
@@ -159,10 +138,7 @@ function PrimaryButton({
   );
 }
 
-function GhostButton({
-  children,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+function GhostButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...rest}
@@ -174,16 +150,9 @@ function GhostButton({
 }
 
 const INITIAL_FORM: FormState = {
-  title: '',
-  slug: '',
-  description: '',
-  startDate: '',
-  startTime: '',
-  endDate: '',
-  endTime: '',
-  location: '',
-  heroImageUrl: '',
-  capacity: '',
+  title: '', slug: '', description: '',
+  startDate: '', startTime: '', endDate: '', endTime: '',
+  location: '', heroImageUrl: '', capacity: '',
 };
 
 export default function NewEventPage() {
@@ -273,26 +242,10 @@ export default function NewEventPage() {
       setForm(prev => {
         const next = { ...prev };
         if (data.title) next.title = data.title;
-        if (data.slug) {
-          next.slug = data.slug;
-        } else if (data.title) {
-          next.slug = toKebab(data.title);
-        }
+        if (data.slug) { next.slug = data.slug; } else if (data.title) { next.slug = toKebab(data.title); }
         if (data.description) next.description = data.description;
-        if (data.startDatetime) {
-          const parsed = parseIsoToDateTime(data.startDatetime);
-          if (parsed) {
-            next.startDate = parsed.date;
-            next.startTime = parsed.time;
-          }
-        }
-        if (data.endDatetime) {
-          const parsed = parseIsoToDateTime(data.endDatetime);
-          if (parsed) {
-            next.endDate = parsed.date;
-            next.endTime = parsed.time;
-          }
-        }
+        if (data.startDatetime) { const p = parseIsoToDateTime(data.startDatetime); if (p) { next.startDate = p.date; next.startTime = p.time; } }
+        if (data.endDatetime) { const p = parseIsoToDateTime(data.endDatetime); if (p) { next.endDate = p.date; next.endTime = p.time; } }
         if (data.venue) next.location = data.venue;
         if (data.capacity != null) next.capacity = String(data.capacity);
         return next;
@@ -301,22 +254,21 @@ export default function NewEventPage() {
 
       if (data.accessMode === 'TICKETED') {
         setAccess({
-          member: { enabled: true, flow: ['pay'], priceCents: 0 },
-          guest: { enabled: true, flow: ['pay'], priceCents: 0 },
+          member: { enabled: true, gates: [newGate('ticket')], priceCents: 0 },
+          guest: { enabled: true, gates: [newGate('ticket')], priceCents: 0 },
           comp: { enabled: false, budgetCap: null },
         });
       } else if (data.accessMode === 'APPLY_OR_PAY') {
         setAccess({
-          member: { enabled: true, flow: ['fields', 'approval'], priceCents: 0 },
-          guest: { enabled: true, flow: ['pay'], priceCents: 0 },
+          member: { enabled: true, gates: [newGate('application')], priceCents: 0 },
+          guest: { enabled: true, gates: [newGate('ticket')], priceCents: 0 },
           comp: { enabled: false, budgetCap: null },
         });
-      } else if (data.accessMode === 'OPEN') {
+      } else {
         setAccess(defaultEventAccess());
       }
 
       if (data.template) setTemplate(data.template);
-
       setAiFilled(true);
       setHighlightFields(true);
       setStep(2);
@@ -338,26 +290,22 @@ export default function NewEventPage() {
     const guestPrice = t.nonMemberPriceInCents ?? 0;
     const approved = t.approvalRequired;
 
-    const applyFlow: FlowStep[] = ['fields', 'approval'];
-    const payFlow: FlowStep[] = ['pay'];
-    const openFlow: FlowStep[] = [];
-
     if (t.accessMode === 'OPEN') {
       setAccess({
-        member: { enabled: true, flow: approved ? applyFlow : openFlow, priceCents: 0 },
-        guest: { enabled: false, flow: payFlow, priceCents: 0 },
+        member: { enabled: true, gates: approved ? [newGate('application')] : [], priceCents: 0 },
+        guest: { enabled: false, gates: [], priceCents: 0 },
         comp: { enabled: false, budgetCap: null },
       });
     } else if (t.accessMode === 'TICKETED') {
       setAccess({
-        member: { enabled: true, flow: memberPrice > 0 ? payFlow : openFlow, priceCents: memberPrice },
-        guest: { enabled: guestPrice > 0, flow: payFlow, priceCents: guestPrice },
+        member: { enabled: true, gates: memberPrice > 0 ? [newGate('ticket')] : [], priceCents: memberPrice },
+        guest: { enabled: guestPrice > 0, gates: [newGate('ticket')], priceCents: guestPrice },
         comp: { enabled: false, budgetCap: null },
       });
     } else if (t.accessMode === 'APPLY_OR_PAY') {
       setAccess({
-        member: { enabled: true, flow: approved ? applyFlow : openFlow, priceCents: 0 },
-        guest: { enabled: true, flow: approved ? applyFlow : payFlow, priceCents: guestPrice },
+        member: { enabled: true, gates: approved ? [newGate('application')] : [], priceCents: 0 },
+        guest: { enabled: true, gates: approved ? [newGate('application')] : [newGate('ticket')], priceCents: guestPrice },
         comp: { enabled: false, budgetCap: null },
       });
     } else {
@@ -385,19 +333,10 @@ export default function NewEventPage() {
   }
 
   async function submitForm(status: 'DRAFT' | 'PUBLISHED') {
-    if (!form.title.trim()) {
-      setSubmitError('Title is required.');
-      return;
-    }
+    if (!form.title.trim()) { setSubmitError('Title is required.'); return; }
     const startAt = combineDatetime(form.startDate, form.startTime);
-    if (!startAt) {
-      setSubmitError('Start date is required.');
-      return;
-    }
-    if (form.slug && !/^[a-z0-9-]+$/.test(form.slug)) {
-      setSubmitError('Slug must be lowercase letters, numbers, and hyphens.');
-      return;
-    }
+    if (!startAt) { setSubmitError('Start date is required.'); return; }
+    if (form.slug && !/^[a-z0-9-]+$/.test(form.slug)) { setSubmitError('Slug must be lowercase letters, numbers, and hyphens.'); return; }
 
     setSubmitError('');
     if (status === 'DRAFT') setSavingDraft(true);
@@ -416,13 +355,8 @@ export default function NewEventPage() {
         template,
         status,
         eventAccess: access,
-        ...(appliedTemplate && {
-          plusOnesAllowed: appliedTemplate.plusOnesAllowed,
-          showCapacity: appliedTemplate.showCapacity,
-        }),
-        ...(questions.length > 0 && {
-          customQuestions: questions.map(toApiQuestion),
-        }),
+        ...(appliedTemplate && { plusOnesAllowed: appliedTemplate.plusOnesAllowed, showCapacity: appliedTemplate.showCapacity }),
+        ...(questions.length > 0 && { customQuestions: questions.map(toApiQuestion) }),
       };
 
       const res = await fetch('/api/operator/events', {
@@ -448,20 +382,16 @@ export default function NewEventPage() {
   const canAdvanceFromStep1 = aiFilled;
   const canAdvanceFromStep2 = !!form.title.trim() && !!form.startDate;
   const flashCls = highlightFields ? 'ring-2 ring-[var(--primary-soft)]' : '';
-
   const heroEnvelopeClass = useMemo(
-    () =>
-      `transition-shadow duration-500 rounded-[8px] ${highlightFields ? 'ring-2 ring-[var(--primary-soft)]' : ''}`,
+    () => `transition-shadow duration-500 rounded-[8px] ${highlightFields ? 'ring-2 ring-[var(--primary-soft)]' : ''}`,
     [highlightFields],
   );
 
   return (
-    <div className="min-h-screen px-6 py-8 lg:px-10">
+    <div className="min-h-screen overflow-x-hidden px-4 py-8 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-[1280px]">
-        <Link
-          href="/operator/events"
-          className={`mb-6 inline-block text-[11px] font-medium uppercase tracking-widest text-text-secondary transition-colors hover:text-primary ${chrome}`}
-        >
+        <Link href="/operator/events"
+          className={`mb-6 inline-block text-[11px] font-medium uppercase tracking-widest text-text-secondary transition-colors hover:text-primary ${chrome}`}>
           ← All events
         </Link>
 
@@ -479,35 +409,24 @@ export default function NewEventPage() {
 
             <div className="rounded-[10px] border border-border bg-card op-card">
               <div className="flex items-center gap-2 px-4 py-3">
-                <Sparkles className="h-4 w-4 text-primary" />
+                <Sparkles className="h-4 w-4 shrink-0 text-primary" />
                 <input
                   type="text"
                   value={aiPrompt}
                   onChange={e => setAiPrompt(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') void handleAiGenerate();
-                  }}
+                  onKeyDown={e => { if (e.key === 'Enter') void handleAiGenerate(); }}
                   placeholder="A late summer rooftop dinner for 24…"
                   className={`min-w-0 flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none ${chrome}`}
                 />
-                <button
-                  type="button"
-                  onClick={() => setAiExpanded(v => !v)}
-                  aria-label={aiExpanded ? 'Collapse' : 'Expand'}
-                  className="icon-btn text-text-tertiary hover:text-primary"
-                >
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform duration-200 ${aiExpanded ? 'rotate-180' : ''}`}
-                  />
+                <button type="button" onClick={() => setAiExpanded(v => !v)} aria-label={aiExpanded ? 'Collapse' : 'Expand'}
+                  className="icon-btn shrink-0 text-text-tertiary hover:text-primary">
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${aiExpanded ? 'rotate-180' : ''}`} />
                 </button>
               </div>
 
               {aiExpanded && (
                 <div className="page-fade-in border-t border-border px-4 py-3">
-                  <textarea
-                    rows={4}
-                    value={aiPrompt}
-                    onChange={e => setAiPrompt(e.target.value)}
+                  <textarea rows={4} value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}
                     placeholder="A late summer rooftop dinner for 24 — long shared table, natural wine pairings, a chef from Saigon for one night only…"
                     className={`w-full resize-none rounded-[8px] border border-border bg-surface p-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary focus:outline-none ${chrome}`}
                   />
@@ -515,35 +434,14 @@ export default function NewEventPage() {
               )}
             </div>
 
-            {aiError ? (
-              <p role="alert" className={`mt-3 text-sm text-danger ${chrome}`}>
-                {aiError}
-              </p>
-            ) : null}
+            {aiError ? <p role="alert" className={`mt-3 text-sm text-danger ${chrome}`}>{aiError}</p> : null}
 
             <div className="mt-5 flex flex-wrap items-center gap-4">
-              <PrimaryButton
-                type="button"
-                onClick={handleAiGenerate}
-                disabled={aiLoading || !aiPrompt.trim()}
-              >
-                {aiLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Thinking…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Generate →
-                  </>
-                )}
+              <PrimaryButton type="button" onClick={handleAiGenerate} disabled={aiLoading || !aiPrompt.trim()}>
+                {aiLoading ? <><Loader2 className="h-4 w-4 animate-spin" />Thinking…</> : <><Sparkles className="h-4 w-4" />Generate →</>}
               </PrimaryButton>
-              <button
-                type="button"
-                onClick={handleStartFromScratch}
-                className={`text-[12px] font-medium uppercase tracking-widest text-text-secondary transition-colors hover:text-primary ${chrome}`}
-              >
+              <button type="button" onClick={handleStartFromScratch}
+                className={`text-[12px] font-medium uppercase tracking-widest text-text-secondary transition-colors hover:text-primary ${chrome}`}>
                 Start from scratch →
               </button>
             </div>
@@ -559,33 +457,16 @@ export default function NewEventPage() {
               <div className="flex flex-col gap-5">
                 <div className={flashCls + ' rounded-[8px]'}>
                   <FieldLabel>Title *</FieldLabel>
-                  <TextInput
-                    required
-                    type="text"
-                    value={form.title}
-                    onChange={e => set('title', e.target.value)}
-                  />
+                  <TextInput required type="text" value={form.title} onChange={e => set('title', e.target.value)} />
                 </div>
                 <div>
                   <FieldLabel>Slug</FieldLabel>
-                  <TextInput
-                    type="text"
-                    value={form.slug}
-                    onChange={e => handleSlugChange(e.target.value)}
-                    className="font-mono"
-                  />
-                  {form.slug ? (
-                    <p className={`mt-1 text-[11px] text-text-tertiary ${chrome}`}>
-                      /m/events/{form.slug}
-                    </p>
-                  ) : null}
+                  <TextInput type="text" value={form.slug} onChange={e => handleSlugChange(e.target.value)} className="font-mono" />
+                  {form.slug ? <p className={`mt-1 text-[11px] text-text-tertiary ${chrome}`}>/m/events/{form.slug}</p> : null}
                 </div>
                 <div className={flashCls + ' rounded-[8px]'}>
                   <FieldLabel>Description</FieldLabel>
-                  <textarea
-                    rows={8}
-                    value={form.description}
-                    onChange={e => set('description', e.target.value)}
+                  <textarea rows={8} value={form.description} onChange={e => set('description', e.target.value)}
                     className={`w-full resize-none rounded-[8px] border border-border bg-card px-3 py-2.5 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary focus:bg-surface focus:outline-none ${chrome}`}
                   />
                 </div>
@@ -596,54 +477,24 @@ export default function NewEventPage() {
                 <div>
                   <FieldLabel>Start date &amp; time *</FieldLabel>
                   <div className="flex gap-2">
-                    <TextInput
-                      type="date"
-                      required
-                      value={form.startDate}
-                      onChange={e => set('startDate', e.target.value)}
-                      className="flex-1"
-                    />
-                    <TextInput
-                      type="time"
-                      value={form.startTime}
-                      onChange={e => set('startTime', e.target.value)}
-                      className="w-36"
-                    />
+                    <TextInput type="date" required value={form.startDate} onChange={e => set('startDate', e.target.value)} className="flex-1 min-w-0" />
+                    <TextInput type="time" value={form.startTime} onChange={e => set('startTime', e.target.value)} className="w-32 shrink-0" />
                   </div>
                 </div>
                 <div>
                   <FieldLabel>End date &amp; time (optional)</FieldLabel>
                   <div className="flex gap-2">
-                    <TextInput
-                      type="date"
-                      value={form.endDate}
-                      onChange={e => set('endDate', e.target.value)}
-                      className="flex-1"
-                    />
-                    <TextInput
-                      type="time"
-                      value={form.endTime}
-                      onChange={e => set('endTime', e.target.value)}
-                      className="w-36"
-                    />
+                    <TextInput type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} className="flex-1 min-w-0" />
+                    <TextInput type="time" value={form.endTime} onChange={e => set('endTime', e.target.value)} className="w-32 shrink-0" />
                   </div>
                 </div>
                 <div className={flashCls + ' rounded-[8px]'}>
                   <FieldLabel>Venue / Location</FieldLabel>
-                  <TextInput
-                    type="text"
-                    value={form.location}
-                    onChange={e => set('location', e.target.value)}
-                  />
+                  <TextInput type="text" value={form.location} onChange={e => set('location', e.target.value)} />
                 </div>
                 <div>
                   <FieldLabel>Capacity (optional)</FieldLabel>
-                  <TextInput
-                    type="number"
-                    min={1}
-                    value={form.capacity}
-                    onChange={e => set('capacity', e.target.value)}
-                  />
+                  <TextInput type="number" min={1} value={form.capacity} onChange={e => set('capacity', e.target.value)} />
                 </div>
               </div>
             </div>
@@ -651,11 +502,7 @@ export default function NewEventPage() {
             {/* Hero — full width */}
             <div className={`mt-6 ${heroEnvelopeClass}`}>
               <FieldLabel>Hero Image</FieldLabel>
-              <HeroImageUpload
-                value={form.heroImageUrl}
-                onChange={url => set('heroImageUrl', url)}
-                compact
-              />
+              <HeroImageUpload value={form.heroImageUrl} onChange={url => set('heroImageUrl', url)} compact />
             </div>
           </section>
         )}
@@ -671,19 +518,11 @@ export default function NewEventPage() {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {flowTemplates.map(t => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => applyFlowTemplate(t)}
+                    <button key={t.id} type="button" onClick={() => applyFlowTemplate(t)}
                       className={`flex flex-col items-start rounded-[8px] border px-4 py-3 text-left transition-colors ${
-                        appliedTemplate?.id === t.id
-                          ? 'border-primary bg-primary-soft'
-                          : 'border-border bg-card hover:border-border-strong'
-                      }`}
-                    >
-                      <span className={`text-sm font-medium text-text-primary ${chrome}`}>
-                        {t.name}
-                      </span>
+                        appliedTemplate?.id === t.id ? 'border-primary bg-primary-soft' : 'border-border bg-card hover:border-border-strong'
+                      }`}>
+                      <span className={`text-sm font-medium text-text-primary ${chrome}`}>{t.name}</span>
                       <span className={`mt-0.5 text-xs text-text-secondary ${chrome}`}>
                         {flowTemplateLabel(t.accessMode, t.applyMode)}
                         {t.customQuestions.length > 0 ? ` · ${t.customQuestions.length}q` : ''}
@@ -692,37 +531,24 @@ export default function NewEventPage() {
                   ))}
                 </div>
                 {appliedTemplate && (
-                  <p className={`text-[11px] text-text-tertiary ${chrome}`}>
-                    Template applied — adjust below if needed.
-                  </p>
+                  <p className={`text-[11px] text-text-tertiary ${chrome}`}>Template applied — adjust below if needed.</p>
                 )}
               </div>
             )}
 
-            <AccessGroupsCard
-              value={access}
-              onChange={setAccess}
-              questions={questions}
-              onQuestionsChange={setQuestions}
-              eventTitle={form.title}
-            />
+            <AccessGroupsCard value={access} onChange={setAccess} questions={questions} onQuestionsChange={setQuestions} eventTitle={form.title} />
           </section>
         )}
 
         {step === 4 && (
           <section key="s4" className="page-fade-in">
-            <SectionTitle sub="Pick the layout for the member-facing event page.">
-              Template
-            </SectionTitle>
+            <SectionTitle sub="Pick the layout for the member-facing event page.">Template</SectionTitle>
             <TemplatePicker value={template} onChange={setTemplate} />
           </section>
         )}
 
         {submitError ? (
-          <p
-            role="alert"
-            className={`mt-6 rounded-[8px] border border-danger-soft bg-danger-soft px-4 py-3 text-sm text-danger ${chrome}`}
-          >
+          <p role="alert" className={`mt-6 rounded-[8px] border border-danger-soft bg-danger-soft px-4 py-3 text-sm text-danger ${chrome}`}>
             {submitError}
           </p>
         ) : null}
@@ -731,56 +557,23 @@ export default function NewEventPage() {
         <div className="mt-9 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
           <div>
             {step > 1 ? (
-              <GhostButton
-                type="button"
-                onClick={() => setStep(prev => (Math.max(1, prev - 1) as Step))}
-              >
-                ← Back
-              </GhostButton>
-            ) : (
-              <span />
-            )}
+              <GhostButton type="button" onClick={() => setStep(prev => (Math.max(1, prev - 1) as Step))}>← Back</GhostButton>
+            ) : <span />}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {step >= 2 ? (
-              <GhostButton
-                type="button"
-                onClick={() => void submitForm('DRAFT')}
-                disabled={savingDraft || submitting}
-              >
+              <GhostButton type="button" onClick={() => void submitForm('DRAFT')} disabled={savingDraft || submitting}>
                 {savingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Save as Draft
               </GhostButton>
             ) : null}
 
-            {step === 1 && (
-              <PrimaryButton type="button" onClick={() => setStep(2)} disabled={!canAdvanceFromStep1}>
-                Next →
-              </PrimaryButton>
-            )}
-            {step === 2 && (
-              <PrimaryButton type="button" onClick={() => setStep(3)} disabled={!canAdvanceFromStep2}>
-                Next →
-              </PrimaryButton>
-            )}
-            {step === 3 && (
-              <PrimaryButton
-                type="button"
-                onClick={() => {
-                  setToast('Flow saved ✓');
-                  setStep(4);
-                }}
-              >
-                Next →
-              </PrimaryButton>
-            )}
+            {step === 1 && <PrimaryButton type="button" onClick={() => setStep(2)} disabled={!canAdvanceFromStep1}>Next →</PrimaryButton>}
+            {step === 2 && <PrimaryButton type="button" onClick={() => setStep(3)} disabled={!canAdvanceFromStep2}>Next →</PrimaryButton>}
+            {step === 3 && <PrimaryButton type="button" onClick={() => { setToast('Flow saved ✓'); setStep(4); }}>Next →</PrimaryButton>}
             {step === 4 && (
-              <PrimaryButton
-                type="button"
-                onClick={() => void submitForm('PUBLISHED')}
-                disabled={submitting || savingDraft}
-              >
+              <PrimaryButton type="button" onClick={() => void submitForm('PUBLISHED')} disabled={submitting || savingDraft}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Publish
               </PrimaryButton>
@@ -795,13 +588,8 @@ export default function NewEventPage() {
 
 function FlowToast({ message }: { message: string }) {
   return (
-    <div
-      role="status"
-      className="toast-in fixed bottom-6 right-6 z-50 overflow-hidden rounded-[8px] bg-text-primary px-4 py-2.5 shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
-    >
-      <span className="text-[12px] font-medium text-[var(--bg)] font-[family-name:var(--font-dm-sans)]">
-        {message}
-      </span>
+    <div role="status" className="toast-in fixed bottom-6 right-6 z-50 overflow-hidden rounded-[8px] bg-text-primary px-4 py-2.5 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+      <span className={`text-[12px] font-medium text-[var(--bg)] ${chrome}`}>{message}</span>
       <span className="toast-progress absolute bottom-0 left-0 h-0.5 w-full bg-primary" />
     </div>
   );
