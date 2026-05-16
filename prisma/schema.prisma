@@ -74,6 +74,8 @@ enum ApplicationStatus {
   APPROVED
   REJECTED
   HOLD
+  WAITLISTED
+  DECLINED
 }
 
 enum AiApplicationRecommendation {
@@ -93,18 +95,23 @@ model Application {
   fullName    String
   phone        String?
   city         String?
+  neighborhood String?
   referredBy   String?
   consentEmail Boolean           @default(false)
   consentSms   Boolean           @default(false)
   status       ApplicationStatus @default(PENDING)
   reviewedAt  DateTime?
   reviewedBy  String?
+  reviewNote  String?
   rejectionReason String?
   aiTags      String[]
   aiScore          Float?
   aiRecommendation AiApplicationRecommendation?
   aiReasoning      String?
   duplicateFlag    Boolean           @default(false)
+  archetype        String?
+  archetypeScores  Json?
+  personalizedCopy String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -149,7 +156,7 @@ model Event {
   slug             String
   title            String
   description      String?
-  /// R2 object key or asset id used to build a presigned GET URL for hero imagery.
+  /// Full public hero image URL (e.g. Vercel Blob). Used directly as img src.
   heroImageAssetId      String?
   startAt          DateTime
   endAt            DateTime?
