@@ -58,7 +58,7 @@ function listingDescriptionTeaser(description: string | null | undefined): strin
 }
 
 function EventHeroImage({ heroImageAssetId }: { heroImageAssetId: string | null }) {
-  const src = heroImageAssetId ? `/api/media/event-hero/${heroImageAssetId}` : null;
+  const src = heroImageAssetId?.trim() || null;
   return (
     <div className="relative aspect-[3/4] w-full overflow-hidden bg-events-ref-cream-warm">
       {src ? (

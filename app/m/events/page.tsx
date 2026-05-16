@@ -31,7 +31,7 @@ export default async function EventsPage() {
       showCapacity: e.showCapacity,
       capacity: e.capacity,
       confirmedRsvpCount: e.confirmedRsvpCount,
-      heroImageUrl: await getEventHeroDisplayUrl(e.heroImageAssetId),
+      heroImageUrl: getEventHeroDisplayUrl(e.heroImageAssetId),
       priceInCents: e.priceInCents,
     })),
   );

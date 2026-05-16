@@ -31,13 +31,14 @@ export default async function EventDetailPage({
   const event = await getEventBySlug(workspaceId, slug);
   if (!event) notFound();
 
-  const [member, capacityUsedCount, heroImageUrl] = await Promise.all([
+  const heroImageUrl = getEventHeroDisplayUrl(event.heroImageAssetId);
+
+  const [member, capacityUsedCount] = await Promise.all([
     db.member.findFirst({
       where: { workspaceId, clerkUserId: userId },
       select: { id: true, approved: true, status: true, memberQrCode: true },
     }),
     getCapacityUsedRsvpCount(event.id, workspaceId),
-    getEventHeroDisplayUrl(event.heroImageAssetId),
   ]);
 
   const existingRsvp = member

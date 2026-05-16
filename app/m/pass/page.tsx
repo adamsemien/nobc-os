@@ -71,7 +71,7 @@ export default async function MemberPassPage() {
             fontWeight: 600,
             color: 'var(--color-text-primary)',
             marginBottom: 24,
-            fontFamily: 'var(--font-playfair-display, Georgia, serif)',
+            fontFamily: "'PP Editorial New', Georgia, serif",
           }}
         >
           {member.firstName} {member.lastName}

@@ -114,14 +114,14 @@ export function MemberShellFooter({
         </div>
         <div>
           <a
-            href="mailto:hello@thenobadcompany.com"
+            href="mailto:team@thenobadcompany.com"
             className={
               dark
                 ? 'text-sm font-normal tracking-wide text-events-fg-quiet underline-offset-4 hover:underline'
                 : 'text-sm font-normal tracking-wide text-events-ref-muted underline-offset-4 hover:underline'
             }
           >
-            hello@thenobadcompany.com
+            team@thenobadcompany.com
           </a>
         </div>
       </div>

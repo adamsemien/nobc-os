@@ -85,7 +85,7 @@ function EventRowCard({ row }: { row: MemberEventsExplorerRow }) {
           <div className="flex h-full w-full flex-col justify-end bg-events-canvas-deep p-4">
             <p
               className="line-clamp-3 text-left text-xl font-normal leading-snug tracking-tight text-events-fg sm:text-2xl"
-              style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
+              style={{ fontFamily: "'PP Editorial New', Georgia, serif" }}
             >
               {row.title}
             </p>
@@ -105,7 +105,7 @@ function EventRowCard({ row }: { row: MemberEventsExplorerRow }) {
         </div>
         <h2
           className="font-playfair text-2xl font-normal leading-tight tracking-tight text-events-fg sm:text-[1.65rem]"
-          style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
+          style={{ fontFamily: "'PP Editorial New', Georgia, serif" }}
         >
           <Link
             href={`/m/events/${row.slug}`}
@@ -149,7 +149,7 @@ export default function MemberEventsExplorer({
         <p className="text-[0.65rem] font-medium uppercase tracking-[0.35em] text-events-warm-accent">Events</p>
         <h1
           className="mt-3 max-w-2xl text-[clamp(1.75rem,4vw,2.5rem)] font-normal leading-tight tracking-tight text-events-fg"
-          style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
+          style={{ fontFamily: "'PP Editorial New', Georgia, serif" }}
         >
           Upcoming gatherings
         </h1>
