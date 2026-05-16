@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Check, Loader2, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 
 import { HeroImageUpload } from './_components/HeroImageUpload';
 import { AccessGroupsCard } from './_components/AccessGroupsCard';
@@ -50,6 +50,8 @@ const STEP_LABELS: Array<{ step: Step; label: string }> = [
   { step: 4, label: 'Template' },
 ];
 
+const chrome = 'font-[family-name:var(--font-dm-sans)]';
+
 function toKebab(str: string): string {
   return str
     .toLowerCase()
@@ -77,41 +79,54 @@ function parseIsoToDateTime(iso: string): { date: string; time: string } | null 
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="mb-1 block text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+    <label className={`mb-1.5 block text-[11px] font-medium uppercase tracking-widest text-text-secondary ${chrome}`}>
       {children}
     </label>
   );
 }
 
+function SectionTitle({ children, sub }: { children: React.ReactNode; sub?: string }) {
+  return (
+    <div className="mb-6">
+      <h2 className={`text-[19px] font-semibold tracking-tight text-text-primary ${chrome}`}>
+        {children}
+      </h2>
+      {sub ? (
+        <p className={`mt-1 text-[13px] text-text-secondary ${chrome}`}>{sub}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function StepIndicator({ current }: { current: Step }) {
   return (
-    <ol className="mb-10 flex items-center gap-2 sm:gap-4">
+    <ol className="mb-9 flex items-center gap-1.5 sm:gap-2">
       {STEP_LABELS.map(({ step, label }, idx) => {
         const active = step === current;
         const done = step < current;
         return (
-          <li key={step} className="flex items-center gap-2 sm:gap-3">
+          <li key={step} className="flex items-center gap-1.5 sm:gap-2">
             <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] font-medium font-[family-name:var(--font-dm-sans)] ${
+              className={`flex h-7 w-7 items-center justify-center rounded-full border text-[12px] font-semibold ${chrome} ${
                 active
-                  ? 'border-[var(--nobc-red)] bg-[var(--nobc-red)] text-[var(--nobc-on-red)]'
+                  ? 'border-primary bg-primary text-on-primary'
                   : done
-                    ? 'border-[var(--apply-rule)] bg-raised text-[var(--apply-ink)]'
-                    : 'border-[var(--apply-rule)] bg-card text-[var(--apply-muted)]'
+                    ? 'border-primary bg-primary-soft text-primary'
+                    : 'border-border bg-card text-text-tertiary'
               }`}
               aria-current={active ? 'step' : undefined}
             >
-              {done ? <Check className="h-3 w-3" strokeWidth={2.5} /> : step}
+              {done ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : step}
             </span>
             <span
-              className={`text-[11px] uppercase tracking-widest font-[family-name:var(--font-dm-sans)] ${
-                active ? 'text-[var(--apply-ink)]' : 'text-[var(--apply-muted)]'
+              className={`text-[11px] font-medium uppercase tracking-widest ${chrome} ${
+                active ? 'text-text-primary' : 'text-text-tertiary'
               }`}
             >
               {label}
             </span>
             {idx < STEP_LABELS.length - 1 ? (
-              <span className="hidden h-px w-6 bg-[var(--apply-rule)] sm:inline-block" aria-hidden />
+              <span className="mx-1 hidden h-px w-8 bg-border sm:inline-block" aria-hidden />
             ) : null}
           </li>
         );
@@ -125,7 +140,7 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...rest}
-      className={`w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)] ${className}`}
+      className={`w-full rounded-[8px] border border-border bg-card px-3 py-2.5 text-sm text-text-primary placeholder:text-text-tertiary transition-colors focus:border-primary focus:bg-surface focus:outline-none ${chrome} ${className}`}
     />
   );
 }
@@ -137,7 +152,7 @@ function PrimaryButton({
   return (
     <button
       {...rest}
-      className={`inline-flex items-center justify-center gap-2 rounded-sm bg-[var(--nobc-red)] px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-colors hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)] ${rest.className ?? ''}`}
+      className={`btn-shimmer inline-flex items-center justify-center gap-2 rounded-[8px] bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-50 ${chrome} ${rest.className ?? ''}`}
     >
       {children}
     </button>
@@ -151,7 +166,7 @@ function GhostButton({
   return (
     <button
       {...rest}
-      className={`inline-flex items-center justify-center gap-2 rounded-sm border border-[var(--apply-rule)] bg-card px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)] disabled:opacity-50 font-[family-name:var(--font-dm-sans)] ${rest.className ?? ''}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-[8px] border border-border bg-card px-5 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-text-primary transition-colors hover:border-border-strong hover:text-primary disabled:opacity-50 ${chrome} ${rest.className ?? ''}`}
     >
       {children}
     </button>
@@ -180,8 +195,9 @@ export default function NewEventPage() {
   const [questions, setQuestions] = useState<AccessQuestion[]>([]);
   const [template, setTemplate] = useState<TemplateKey>('editorial');
 
-  // AI builder state
+  // AI builder
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiExpanded, setAiExpanded] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [aiFilled, setAiFilled] = useState(false);
@@ -201,21 +217,18 @@ export default function NewEventPage() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  // Auto-generate slug from title until user edits it
   useEffect(() => {
     if (!slugEdited && form.title) {
       setForm(prev => ({ ...prev, slug: toKebab(prev.title) }));
     }
   }, [form.title, slugEdited]);
 
-  // Clear field flash after a moment
   useEffect(() => {
     if (!highlightFields) return;
     const t = window.setTimeout(() => setHighlightFields(false), 1600);
     return () => window.clearTimeout(t);
   }, [highlightFields]);
 
-  // Fetch saved flow templates when entering Step 3
   useEffect(() => {
     if (step !== 3) return;
     fetch('/api/operator/event-flow-templates', { credentials: 'include' })
@@ -286,7 +299,6 @@ export default function NewEventPage() {
       });
       if (data.slug) setSlugEdited(true);
 
-      // Map accessMode → EventAccess flows roughly
       if (data.accessMode === 'TICKETED') {
         setAccess({
           member: { enabled: true, flow: ['pay'], priceCents: 0 },
@@ -435,56 +447,81 @@ export default function NewEventPage() {
 
   const canAdvanceFromStep1 = aiFilled;
   const canAdvanceFromStep2 = !!form.title.trim() && !!form.startDate;
-  const flashCls = highlightFields ? 'ring-2 ring-[var(--nobc-red)]/30' : '';
+  const flashCls = highlightFields ? 'ring-2 ring-[var(--primary-soft)]' : '';
 
   const heroEnvelopeClass = useMemo(
     () =>
-      `transition-shadow duration-500 rounded-sm ${highlightFields ? 'ring-2 ring-[var(--nobc-red)]/30' : ''}`,
+      `transition-shadow duration-500 rounded-[8px] ${highlightFields ? 'ring-2 ring-[var(--primary-soft)]' : ''}`,
     [highlightFields],
   );
 
   return (
-    <div className="min-h-screen bg-raised px-4 pb-24 pt-10 sm:px-6">
-      <div className="mx-auto max-w-3xl">
+    <div className="min-h-screen px-6 py-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[1280px]">
         <Link
           href="/operator/events"
-          className="mb-8 inline-block text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+          className={`mb-6 inline-block text-[11px] font-medium uppercase tracking-widest text-text-secondary transition-colors hover:text-primary ${chrome}`}
         >
           ← All events
         </Link>
 
-        <h1 className="mb-8 text-[40px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+        <h1 className={`mb-7 text-[24px] font-semibold tracking-tight text-text-primary ${chrome}`}>
           New Event
         </h1>
 
         <StepIndicator current={step} />
 
         {step === 1 && (
-          <section className="space-y-6">
-            <div>
-              <h2 className="text-[36px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
-                Start with AI
-              </h2>
-              <p className="mt-2 text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-                Describe your event in plain language. AI fills the form.
-              </p>
+          <section key="s1" className="page-fade-in">
+            <SectionTitle sub="Describe your event and AI fills the form — or start from scratch.">
+              Start a draft
+            </SectionTitle>
+
+            <div className="rounded-[10px] border border-border bg-card op-card">
+              <div className="flex items-center gap-2 px-4 py-3">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') void handleAiGenerate();
+                  }}
+                  placeholder="A late summer rooftop dinner for 24…"
+                  className={`min-w-0 flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none ${chrome}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setAiExpanded(v => !v)}
+                  aria-label={aiExpanded ? 'Collapse' : 'Expand'}
+                  className="icon-btn text-text-tertiary hover:text-primary"
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform duration-200 ${aiExpanded ? 'rotate-180' : ''}`}
+                  />
+                </button>
+              </div>
+
+              {aiExpanded && (
+                <div className="page-fade-in border-t border-border px-4 py-3">
+                  <textarea
+                    rows={4}
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    placeholder="A late summer rooftop dinner for 24 — long shared table, natural wine pairings, a chef from Saigon for one night only…"
+                    className={`w-full resize-none rounded-[8px] border border-border bg-surface p-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary focus:outline-none ${chrome}`}
+                  />
+                </div>
+              )}
             </div>
 
-            <textarea
-              rows={4}
-              value={aiPrompt}
-              onChange={e => setAiPrompt(e.target.value)}
-              placeholder="A late summer rooftop dinner for 24 — long shared table, natural wine pairings, a chef from Saigon for one night only..."
-              className="w-full rounded-sm border border-[var(--apply-rule)] bg-card p-4 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
-            />
-
             {aiError ? (
-              <p role="alert" className="text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+              <p role="alert" className={`mt-3 text-sm text-danger ${chrome}`}>
                 {aiError}
               </p>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="mt-5 flex flex-wrap items-center gap-4">
               <PrimaryButton
                 type="button"
                 onClick={handleAiGenerate}
@@ -502,11 +539,10 @@ export default function NewEventPage() {
                   </>
                 )}
               </PrimaryButton>
-
               <button
                 type="button"
                 onClick={handleStartFromScratch}
-                className="text-[12px] uppercase tracking-widest text-[var(--apply-muted)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+                className={`text-[12px] font-medium uppercase tracking-widest text-text-secondary transition-colors hover:text-primary ${chrome}`}
               >
                 Start from scratch →
               </button>
@@ -515,124 +551,122 @@ export default function NewEventPage() {
         )}
 
         {step === 2 && (
-          <section className="space-y-6">
-            <h2 className="text-[32px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
-              Details
-            </h2>
+          <section key="s2" className="page-fade-in">
+            <SectionTitle>Details</SectionTitle>
 
-            <div className={flashCls + ' rounded-sm'}>
-              <FieldLabel>Title *</FieldLabel>
-              <TextInput
-                required
-                type="text"
-                value={form.title}
-                onChange={e => set('title', e.target.value)}
-              />
-            </div>
+            <div className="grid gap-x-8 gap-y-5 lg:grid-cols-2">
+              {/* Left column */}
+              <div className="flex flex-col gap-5">
+                <div className={flashCls + ' rounded-[8px]'}>
+                  <FieldLabel>Title *</FieldLabel>
+                  <TextInput
+                    required
+                    type="text"
+                    value={form.title}
+                    onChange={e => set('title', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Slug</FieldLabel>
+                  <TextInput
+                    type="text"
+                    value={form.slug}
+                    onChange={e => handleSlugChange(e.target.value)}
+                    className="font-mono"
+                  />
+                  {form.slug ? (
+                    <p className={`mt-1 text-[11px] text-text-tertiary ${chrome}`}>
+                      /m/events/{form.slug}
+                    </p>
+                  ) : null}
+                </div>
+                <div className={flashCls + ' rounded-[8px]'}>
+                  <FieldLabel>Description</FieldLabel>
+                  <textarea
+                    rows={8}
+                    value={form.description}
+                    onChange={e => set('description', e.target.value)}
+                    className={`w-full resize-none rounded-[8px] border border-border bg-card px-3 py-2.5 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary focus:bg-surface focus:outline-none ${chrome}`}
+                  />
+                </div>
+              </div>
 
-            <div>
-              <FieldLabel>Slug</FieldLabel>
-              <TextInput
-                type="text"
-                value={form.slug}
-                onChange={e => handleSlugChange(e.target.value)}
-                className="font-mono"
-              />
-              {form.slug ? (
-                <p className="mt-1 text-[11px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-                  /m/events/{form.slug}
-                </p>
-              ) : null}
-            </div>
-
-            <div className={flashCls + ' rounded-sm'}>
-              <FieldLabel>Description</FieldLabel>
-              <textarea
-                rows={6}
-                value={form.description}
-                onChange={e => set('description', e.target.value)}
-                className="w-full rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-2 text-sm text-[var(--apply-ink)] placeholder:text-[var(--apply-muted)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
-              />
-            </div>
-
-            <div>
-              <FieldLabel>Start date &amp; time *</FieldLabel>
-              <div className="flex gap-2">
-                <TextInput
-                  type="date"
-                  required
-                  value={form.startDate}
-                  onChange={e => set('startDate', e.target.value)}
-                  className="flex-1"
-                />
-                <TextInput
-                  type="time"
-                  value={form.startTime}
-                  onChange={e => set('startTime', e.target.value)}
-                  className="w-36"
-                />
+              {/* Right column */}
+              <div className="flex flex-col gap-5">
+                <div>
+                  <FieldLabel>Start date &amp; time *</FieldLabel>
+                  <div className="flex gap-2">
+                    <TextInput
+                      type="date"
+                      required
+                      value={form.startDate}
+                      onChange={e => set('startDate', e.target.value)}
+                      className="flex-1"
+                    />
+                    <TextInput
+                      type="time"
+                      value={form.startTime}
+                      onChange={e => set('startTime', e.target.value)}
+                      className="w-36"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <FieldLabel>End date &amp; time (optional)</FieldLabel>
+                  <div className="flex gap-2">
+                    <TextInput
+                      type="date"
+                      value={form.endDate}
+                      onChange={e => set('endDate', e.target.value)}
+                      className="flex-1"
+                    />
+                    <TextInput
+                      type="time"
+                      value={form.endTime}
+                      onChange={e => set('endTime', e.target.value)}
+                      className="w-36"
+                    />
+                  </div>
+                </div>
+                <div className={flashCls + ' rounded-[8px]'}>
+                  <FieldLabel>Venue / Location</FieldLabel>
+                  <TextInput
+                    type="text"
+                    value={form.location}
+                    onChange={e => set('location', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Capacity (optional)</FieldLabel>
+                  <TextInput
+                    type="number"
+                    min={1}
+                    value={form.capacity}
+                    onChange={e => set('capacity', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <FieldLabel>End date &amp; time (optional)</FieldLabel>
-              <div className="flex gap-2">
-                <TextInput
-                  type="date"
-                  value={form.endDate}
-                  onChange={e => set('endDate', e.target.value)}
-                  className="flex-1"
-                />
-                <TextInput
-                  type="time"
-                  value={form.endTime}
-                  onChange={e => set('endTime', e.target.value)}
-                  className="w-36"
-                />
-              </div>
-            </div>
-
-            <div className={flashCls + ' rounded-sm'}>
-              <FieldLabel>Venue / Location</FieldLabel>
-              <TextInput
-                type="text"
-                value={form.location}
-                onChange={e => set('location', e.target.value)}
-              />
-            </div>
-
-            <div className={heroEnvelopeClass}>
+            {/* Hero — full width */}
+            <div className={`mt-6 ${heroEnvelopeClass}`}>
               <FieldLabel>Hero Image</FieldLabel>
               <HeroImageUpload
                 value={form.heroImageUrl}
                 onChange={url => set('heroImageUrl', url)}
-              />
-            </div>
-
-            <div>
-              <FieldLabel>Capacity (optional)</FieldLabel>
-              <TextInput
-                type="number"
-                min={1}
-                value={form.capacity}
-                onChange={e => set('capacity', e.target.value)}
+                compact
               />
             </div>
           </section>
         )}
 
         {step === 3 && (
-          <section className="space-y-6">
-            <h2 className="text-[32px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
-              Access
-            </h2>
-            <p className="text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-              How do people get in?
-            </p>
+          <section key="s3" className="page-fade-in">
+            <SectionTitle sub="How do people get in?">Access</SectionTitle>
 
             {flowTemplates.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+              <div className="mb-6 space-y-3">
+                <p className={`text-[11px] font-medium uppercase tracking-widest text-text-secondary ${chrome}`}>
                   Start from a saved flow
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -641,30 +675,27 @@ export default function NewEventPage() {
                       key={t.id}
                       type="button"
                       onClick={() => applyFlowTemplate(t)}
-                      className={`flex flex-col items-start rounded-sm border px-4 py-3 text-left transition-colors ${
+                      className={`flex flex-col items-start rounded-[8px] border px-4 py-3 text-left transition-colors ${
                         appliedTemplate?.id === t.id
-                          ? 'border-[var(--nobc-red)] bg-raised'
-                          : 'border-[var(--apply-rule)] bg-card hover:border-[var(--nobc-red)]'
+                          ? 'border-primary bg-primary-soft'
+                          : 'border-border bg-card hover:border-border-strong'
                       }`}
                     >
-                      <span className="text-sm font-medium text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+                      <span className={`text-sm font-medium text-text-primary ${chrome}`}>
                         {t.name}
                       </span>
-                      <span className="mt-0.5 text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                      <span className={`mt-0.5 text-xs text-text-secondary ${chrome}`}>
                         {flowTemplateLabel(t.accessMode, t.applyMode)}
-                        {t.customQuestions.length > 0
-                          ? ` · ${t.customQuestions.length}q`
-                          : ''}
+                        {t.customQuestions.length > 0 ? ` · ${t.customQuestions.length}q` : ''}
                       </span>
                     </button>
                   ))}
                 </div>
                 {appliedTemplate && (
-                  <p className="text-[11px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-                    Template applied — adjust settings below if needed.
+                  <p className={`text-[11px] text-text-tertiary ${chrome}`}>
+                    Template applied — adjust below if needed.
                   </p>
                 )}
-                <div className="border-t border-[var(--apply-rule)]" />
               </div>
             )}
 
@@ -679,13 +710,10 @@ export default function NewEventPage() {
         )}
 
         {step === 4 && (
-          <section className="space-y-6">
-            <h2 className="text-[32px] font-normal leading-tight text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <section key="s4" className="page-fade-in">
+            <SectionTitle sub="Pick the layout for the member-facing event page.">
               Template
-            </h2>
-            <p className="text-sm text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-              Pick the layout for the member-facing event page.
-            </p>
+            </SectionTitle>
             <TemplatePicker value={template} onChange={setTemplate} />
           </section>
         )}
@@ -693,14 +721,14 @@ export default function NewEventPage() {
         {submitError ? (
           <p
             role="alert"
-            className="mt-6 rounded-sm border border-[var(--apply-rule)] bg-card px-4 py-3 text-sm text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+            className={`mt-6 rounded-[8px] border border-danger-soft bg-danger-soft px-4 py-3 text-sm text-danger ${chrome}`}
           >
             {submitError}
           </p>
         ) : null}
 
         {/* Nav */}
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-9 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
           <div>
             {step > 1 ? (
               <GhostButton
@@ -727,20 +755,12 @@ export default function NewEventPage() {
             ) : null}
 
             {step === 1 && (
-              <PrimaryButton
-                type="button"
-                onClick={() => setStep(2)}
-                disabled={!canAdvanceFromStep1}
-              >
+              <PrimaryButton type="button" onClick={() => setStep(2)} disabled={!canAdvanceFromStep1}>
                 Next →
               </PrimaryButton>
             )}
             {step === 2 && (
-              <PrimaryButton
-                type="button"
-                onClick={() => setStep(3)}
-                disabled={!canAdvanceFromStep2}
-              >
+              <PrimaryButton type="button" onClick={() => setStep(3)} disabled={!canAdvanceFromStep2}>
                 Next →
               </PrimaryButton>
             )}
@@ -777,10 +797,12 @@ function FlowToast({ message }: { message: string }) {
   return (
     <div
       role="status"
-      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-sm bg-[var(--apply-ink)] px-4 py-2.5 text-[12px] font-medium text-[#F9F7F2] shadow-[0_4px_16px_rgba(28,16,8,0.25)] font-[family-name:var(--font-dm-sans)]"
+      className="toast-in fixed bottom-6 right-6 z-50 overflow-hidden rounded-[8px] bg-text-primary px-4 py-2.5 shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
     >
-      {message}
+      <span className="text-[12px] font-medium text-[var(--bg)] font-[family-name:var(--font-dm-sans)]">
+        {message}
+      </span>
+      <span className="toast-progress absolute bottom-0 left-0 h-0.5 w-full bg-primary" />
     </div>
   );
 }
-

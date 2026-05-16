@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowLeft, Check, Loader2, Mail, MapPin, Phone, X, XCircle } from 'lucide-react';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
+import { EmptyState } from '../../_components/EmptyState';
 
 export type ApplicationsQueueItem = {
   id: string;
@@ -182,9 +183,11 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
 
   if (applications.length === 0) {
     return (
-      <p className="py-12 text-center text-sm text-text-secondary">
-        No applications in this view.
-      </p>
+      <EmptyState
+        icon="applications"
+        title="The room is quiet."
+        body="Applications will appear here when people apply to your events."
+      />
     );
   }
 

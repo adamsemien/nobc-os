@@ -149,8 +149,8 @@ export default async function OperatorEventDetailPage({
   });
 
   return (
-    <div className="px-4 pb-20 pt-8 sm:px-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="px-6 pb-20 pt-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[1280px]">
         {/* Header */}
         <div className="mb-2 flex items-center justify-between gap-4">
           <Link
@@ -163,7 +163,7 @@ export default async function OperatorEventDetailPage({
 
         <h1
           className="mb-1 text-3xl font-normal text-text-primary"
-          style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
+          style={{ fontFamily: 'var(--font-cormorant), Georgia, serif' }}
         >
           {event.title}
         </h1>

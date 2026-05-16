@@ -99,13 +99,10 @@ export default async function OperatorApplicationsPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pb-16 pt-8 sm:px-6">
-      <div className="mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1
-              className="text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
-              style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
-            >
+            <h1 className="text-[24px] font-semibold tracking-tight text-text-primary font-[family-name:var(--font-dm-sans)]">
               Applications
             </h1>
             <span className="rounded-full bg-primary px-2.5 py-0.5 text-sm font-medium tabular-nums text-primary-foreground">

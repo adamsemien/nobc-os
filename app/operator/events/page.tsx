@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
+import { EmptyState } from '../_components/EmptyState';
 
 type EventRow = {
   id: string;
@@ -41,26 +42,26 @@ export default async function OperatorEventsPage() {
   const { events } = (await res.json()) as { events: EventRow[] };
 
   return (
-    <div className="px-4 pb-16 pt-8 sm:px-6">
-      <div className="mx-auto max-w-6xl">
+    <div className="px-6 pb-16 pt-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[1400px]">
         <div className="mb-8 flex items-center justify-between gap-4">
-          <h1
-            className="text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
-            style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
-          >
+          <h1 className="text-[24px] font-semibold tracking-tight text-text-primary font-[family-name:var(--font-dm-sans)]">
             Events
           </h1>
           <Link
             href="/operator/events/new"
-            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
-            style={{ borderRadius: '6px' }}
+            className="btn-shimmer inline-flex items-center rounded-[8px] bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover"
           >
             + New Event
           </Link>
         </div>
 
         {events.length === 0 ? (
-          <p className="py-12 text-center text-sm text-text-secondary">No events yet.</p>
+          <EmptyState
+            icon="event"
+            title="Nothing here yet."
+            action={{ label: 'Create your first event →', href: '/operator/events/new' }}
+          />
         ) : (
           <div className="overflow-hidden rounded-lg border border-border">
             <table className="w-full text-sm">

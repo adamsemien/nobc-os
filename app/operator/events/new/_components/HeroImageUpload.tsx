@@ -6,9 +6,10 @@ import { Loader2, Sparkles, Upload, X } from 'lucide-react';
 type Props = {
   value: string;
   onChange: (url: string) => void;
+  compact?: boolean;
 };
 
-export function HeroImageUpload({ value, onChange }: Props) {
+export function HeroImageUpload({ value, onChange, compact = false }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +84,7 @@ export function HeroImageUpload({ value, onChange }: Props) {
       />
 
       {value ? (
-        <div className="group relative aspect-video w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card">
+        <div className={`group relative w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card ${compact ? 'h-[180px]' : 'aspect-video'}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="Hero preview" className="h-full w-full object-cover" />
           <div className="absolute inset-0 hidden items-center justify-center gap-3 bg-[#1C1008]/40 group-hover:flex">
@@ -121,7 +122,9 @@ export function HeroImageUpload({ value, onChange }: Props) {
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
-          className={`flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-sm border-2 border-dashed bg-card px-4 text-center transition-colors ${
+          className={`flex w-full cursor-pointer flex-col items-center justify-center rounded-sm border-2 border-dashed bg-card px-4 text-center transition-colors ${
+            compact ? 'h-[120px]' : 'aspect-video'
+          } ${
             dragOver
               ? 'border-[var(--nobc-red)] bg-raised'
               : 'border-[var(--apply-rule)] hover:border-[var(--nobc-red)]'
@@ -131,7 +134,7 @@ export function HeroImageUpload({ value, onChange }: Props) {
             <Loader2 className="h-6 w-6 animate-spin text-[var(--apply-muted)]" />
           ) : (
             <>
-              <Upload className="mb-3 h-6 w-6 text-[var(--apply-muted)]" strokeWidth={1.25} />
+              <Upload className={`${compact ? 'mb-1.5 h-5 w-5' : 'mb-3 h-6 w-6'} text-[var(--apply-muted)]`} strokeWidth={1.25} />
               <p className="text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
                 Drag &amp; drop or click to upload
               </p>

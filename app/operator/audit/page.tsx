@@ -44,13 +44,10 @@ export default async function AuditPage({
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="px-4 pb-16 pt-8 sm:px-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="px-6 pb-16 pt-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[1280px]">
         <div className="mb-8 flex items-center justify-between">
-          <h1
-            className="text-3xl font-normal text-text-primary"
-            style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
-          >
+          <h1 className="text-[24px] font-semibold tracking-tight text-text-primary font-[family-name:var(--font-dm-sans)]">
             Audit Log
           </h1>
           <span className="text-sm text-text-muted">{total.toLocaleString()} events</span>

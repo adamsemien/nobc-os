@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { EmptyState } from '../../../_components/EmptyState';
 
 type RsvpRow = {
   id: string;
@@ -106,7 +107,11 @@ export function EventAttendeesTab({ rsvps, eventId: _eventId, priceInCents }: Pr
       />
 
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-text-secondary">No attendees found.</p>
+        <EmptyState
+          icon="attendees"
+          title="No one on the list yet."
+          body="Share your event link to start collecting registrations."
+        />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border" style={{ borderRadius: '8px' }}>
           <table className="w-full text-sm">

@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type {
   EventAccess,
   FlowStep,
@@ -24,9 +26,29 @@ export function AccessGroupsCard({
   onQuestionsChange,
   eventTitle,
 }: Props) {
+  const [previewOpen, setPreviewOpen] = useState(true);
+
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_268px]">
+    <div
+      className={`grid gap-5 ${
+        previewOpen ? 'lg:grid-cols-[58fr_42fr]' : 'grid-cols-1'
+      }`}
+    >
       <div className="flex flex-col gap-4">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setPreviewOpen((o) => !o)}
+            className="inline-flex items-center gap-1.5 rounded-[8px] border border-border bg-card px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-widest text-text-secondary transition-colors hover:border-border-strong hover:text-primary font-[family-name:var(--font-dm-sans)]"
+          >
+            {previewOpen ? (
+              <PanelRightClose className="h-3.5 w-3.5" />
+            ) : (
+              <PanelRightOpen className="h-3.5 w-3.5" />
+            )}
+            {previewOpen ? 'Hide preview' : 'Show preview'}
+          </button>
+        </div>
         <AccessGroup
           title="Member Access"
           subtitle="For approved NoBC members"
@@ -96,16 +118,18 @@ export function AccessGroupsCard({
       </div>
 
       {/* Live preview */}
-      <div className="h-fit lg:sticky lg:top-4">
-        <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-          Live preview
-        </p>
-        <FlowPreview
-          access={value}
-          questions={questions}
-          eventTitle={eventTitle}
-        />
-      </div>
+      {previewOpen && (
+        <div className="h-fit lg:sticky lg:top-4">
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            Live preview
+          </p>
+          <FlowPreview
+            access={value}
+            questions={questions}
+            eventTitle={eventTitle}
+          />
+        </div>
+      )}
     </div>
   );
 }
