@@ -1,32 +1,7 @@
 import Link from 'next/link';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { EmptyState } from '../_components/EmptyState';
-
-type EventRow = {
-  id: string;
-  slug: string;
-  title: string;
-  startAt: string;
-  location: string | null;
-  status: string;
-  accessMode: string;
-  capacity: number | null;
-  priceInCents: number | null;
-  capacityUsed: number;
-  revenueCents: number;
-};
-
-function statusBadgeCls(status: string, startAt: string): string {
-  if (new Date(startAt) < new Date()) return 'bg-muted text-text-muted';
-  if (status === 'PUBLISHED') return 'bg-success-soft text-success';
-  if (status === 'CANCELLED') return 'bg-danger-soft text-danger';
-  return 'bg-muted text-text-muted';
-}
-
-function statusLabel(status: string, startAt: string): string {
-  if (new Date(startAt) < new Date()) return 'past';
-  return status.toLowerCase();
-}
+import { EventsTable } from './_components/EventsTable';
 
 export default async function OperatorEventsPage() {
   const res = await operatorServerFetch('/api/operator/events');
@@ -39,7 +14,19 @@ export default async function OperatorEventsPage() {
     );
   }
 
-  const { events } = (await res.json()) as { events: EventRow[] };
+  const { events } = (await res.json()) as { events: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    startAt: string;
+    location: string | null;
+    status: string;
+    accessMode: string;
+    capacity: number | null;
+    priceInCents: number | null;
+    capacityUsed: number;
+    revenueCents: number;
+  }> };
 
   return (
     <div className="px-6 pb-16 pt-8 lg:px-10">
@@ -63,84 +50,7 @@ export default async function OperatorEventsPage() {
             action={{ label: 'Create your first event →', href: '/operator/events/new' }}
           />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">
-                    Event
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">
-                    Capacity
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">
-                    Revenue
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-text-muted" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {events.map(event => (
-                  <tr
-                    key={event.id}
-                    className="bg-surface-elevated transition-colors hover:bg-muted"
-                  >
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/operator/events/${event.id}`}
-                        className="font-medium text-text-primary underline-offset-2 hover:text-primary hover:underline"
-                      >
-                        {event.title}
-                      </Link>
-                      {event.location && (
-                        <p className="mt-0.5 text-xs text-text-muted">{event.location}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-text-secondary">
-                      {new Date(event.startAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded px-2 py-0.5 text-xs font-medium ${statusBadgeCls(event.status, event.startAt)}`}
-                      >
-                        {statusLabel(event.status, event.startAt)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-text-secondary">
-                      {event.capacity
-                        ? `${event.capacityUsed} / ${event.capacity}`
-                        : event.capacityUsed > 0
-                          ? String(event.capacityUsed)
-                          : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-text-secondary">
-                      {event.revenueCents > 0
-                        ? `$${(event.revenueCents / 100).toFixed(0)}`
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/operator/events/${event.id}`}
-                        className="text-xs font-medium text-primary underline-offset-4 hover:underline"
-                      >
-                        →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <EventsTable events={events} />
         )}
       </div>
     </div>
