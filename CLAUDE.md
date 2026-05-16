@@ -1,6 +1,7 @@
 # NoBC OS — Claude Code Reference
 
 ## What This Is
+
 NoBC OS is the member-facing platform for No Bad Company — a premium curated member club and event operator. It handles member applications, approvals, event RSVPs, ticketing, wallet passes, and check-in. It is part of a three-layer stack alongside Producer (operator-facing event ops, on Replit) and a Runtype + Tenur AI layer.
 
 **Tenant Zero is NoBC.** The platform is built multi-tenant from day one to sell as SaaS to other premium member clubs and event operators (Soho House-tier target).
@@ -8,6 +9,7 @@ NoBC OS is the member-facing platform for No Bad Company — a premium curated m
 ---
 
 ## Stack
+
 - **Framework:** Next.js 15, App Router, TypeScript, Tailwind CSS
 - **DB:** Postgres on Neon (serverless, pooled connection) + Prisma 7
 - **Auth:** Clerk with Organizations (org = workspace = tenant)
@@ -22,15 +24,19 @@ NoBC OS is the member-facing platform for No Bad Company — a premium curated m
 ## Absolute Rules
 
 ### No Twilio. Ever.
+
 NoBC OS never calls Twilio directly. All SMS flows through the House Phone, which is the Communications sub-agent inside Runtype. If a feature needs SMS: trigger Runtype. If Runtype is unavailable: degrade gracefully to email or queue for retry. Do not add the Twilio SDK. Do not add a Twilio env var. This is non-negotiable.
 
 ### Workspace scoping is the security boundary
+
 Every read and every write is workspace-scoped. `workspaceId` is on every user-data table, indexed, and checked on every query. No exceptions.
 
 ### No hex literals in components
+
 All colors are CSS variables. Follow Producer's pattern: `bg-primary`, `text-text-primary`, semantic tokens only. The theme system must support white-labeling for multi-tenant SaaS.
 
 ### Schema changes: generate then push manually
+
 Run `prisma generate` first. Show the diff. Never auto-push. Producer is on the same Postgres instance and schema changes are production-affecting.
 
 ---
@@ -65,28 +71,30 @@ Inbound SMS replies → Runtype webhook → write back to NoBC OS via MCP
 
 ## V1 Scope (20 items, 8-10 weeks)
 
-| # | Item | Status |
-|---|---|---|
-| 1 | Branded `/apply` form (Next.js, mobile-first, NoBC visual identity) | pending |
-| 2 | Postgres + Prisma schema with all NoBC OS models | ✅ done |
-| 3 | Clerk auth + workspace integration | ✅ done |
-| 4 | Approval workflow + welcome email (Resend only - no SMS) | pending |
-| 5 | AI tagging on application submit (Claude Sonnet 4.6, Vercel AI SDK) | pending |
-| 6 | Branded `/m/events` calendar + `/m/events/[slug]` detail pages | pending |
-| 7 | RSVP system (open / ticketed / apply_or_pay + sub-modes) | pending |
-| 8 | `approval_required` toggle | pending |
-| 9 | Stripe payments with authorize/capture | pending |
-| 10 | Operator-triggered refund system (Stripe API direct) | pending |
-| 11 | Apple Wallet + Google Wallet passes (PassKit.com or PassNinja) | pending |
-| 12 | Offline-first QR check-in PWA (IndexedDB + Dexie.js + Workbox) | pending |
-| 13 | Custom question builder per event (6 field types) | pending |
-| 14 | Capacity + waitlist with auto-promotion | pending |
-| 15 | Plus-ones (per-event toggle) | pending |
-| 16 | Red List + duplicate handling on application submission | pending |
-| 17 | NoBC OS MCP server (V1 read tools + critical write tools) | pending |
-| 18 | AI chat panel (Runtype master agent, fallback to direct Vercel AI SDK) | pending |
-| 19 | AI Event Builder (text only - titles, descriptions, run of show) | pending |
-| 20 | `audit_events` table + Svix webhook system + WCAG 2.2 AA via Radix UI | pending |
+
+| #   | Item                                                                   | Status  |
+| --- | ---------------------------------------------------------------------- | ------- |
+| 1   | Branded `/apply` form (Next.js, mobile-first, NoBC visual identity)    | pending |
+| 2   | Postgres + Prisma schema with all NoBC OS models                       | ✅ done  |
+| 3   | Clerk auth + workspace integration                                     | ✅ done  |
+| 4   | Approval workflow + welcome email (Resend only - no SMS)               | pending |
+| 5   | AI tagging on application submit (Claude Sonnet 4.6, Vercel AI SDK)    | pending |
+| 6   | Branded `/m/events` calendar + `/m/events/[slug]` detail pages         | pending |
+| 7   | RSVP system (open / ticketed / apply_or_pay + sub-modes)               | pending |
+| 8   | `approval_required` toggle                                             | pending |
+| 9   | Stripe payments with authorize/capture                                 | pending |
+| 10  | Operator-triggered refund system (Stripe API direct)                   | pending |
+| 11  | Apple Wallet + Google Wallet passes (PassKit.com or PassNinja)         | pending |
+| 12  | Offline-first QR check-in PWA (IndexedDB + Dexie.js + Workbox)         | pending |
+| 13  | Custom question builder per event (6 field types)                      | pending |
+| 14  | Capacity + waitlist with auto-promotion                                | pending |
+| 15  | Plus-ones (per-event toggle)                                           | pending |
+| 16  | Red List + duplicate handling on application submission                | pending |
+| 17  | NoBC OS MCP server (V1 read tools + critical write tools)              | pending |
+| 18  | AI chat panel (Runtype master agent, fallback to direct Vercel AI SDK) | pending |
+| 19  | AI Event Builder (text only - titles, descriptions, run of show)       | pending |
+| 20  | `audit_events` table + Svix webhook system + WCAG 2.2 AA via Radix UI  | pending |
+
 
 **V1.5 gate:** 3+ events run through platform live, full apply→approve→event→check-in lifecycle complete, first member completes full lifecycle, Stripe Live Mode activated.
 
@@ -104,6 +112,7 @@ All workspace-scoped with `workspaceId` indexed:
 - **AuditEvent** - full audit trail with actorType enum
 
 **Deferred models** (add when features need them, not before):
+
 - MembershipTier, SponsorBrandProfile, GeneratedAsset, WalletPass entity
 
 ---
@@ -123,12 +132,14 @@ middleware.ts            — Clerk protecting /m/* and /operator/*
 ## Environment Variables
 
 Required now:
+
 - `DATABASE_URL` — Neon pooled connection string (has `-pooler` in hostname)
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
 - `NEXT_PUBLIC_APP_URL`
 
 Fill in when feature lands:
+
 - `RESEND_API_KEY` — Step 3 (approval workflow)
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Step 9 (payments)
 - `RUNTYPE_API_URL` — V1.5 (House Phone integration)
@@ -140,6 +151,7 @@ Fill in when feature lands:
 ## Design System
 
 Follow Producer's conventions:
+
 - Warm grays for bg/border, indigo primary, green/amber/red semantics
 - All colors as CSS variables — no hex literals in components
 - Editorial New or Playfair Display for headlines, Inter/Geist for data
@@ -171,23 +183,29 @@ Follow Producer's conventions:
 ## Key Architectural Decisions
 
 ### BrandKit System (V1 schema required)
+
 Add BrandKit, ThemeVariant, CustomFont models to schema before building any more UI. Every UI component reads from BrandKit CSS variables - no hex literals ever. All colors, spacing, typography are tokens. This is the constraint-creativity system. Details in NoBC_Platform_Master_Spec_v2_2_BrandKit_Addendum.md.
 
 ### Form Engine (not hardcoded forms)
+
 Application forms are config-driven via lib/apply-config.ts. Future: operator edits forms via UI. Same engine powers membership applications, event-specific applications, vendor applications. Template engine in V1.2.
 
 ### Email Template System (V1.2)
+
 All email copy lives in lib/email-templates.ts as typed functions. No hardcoded strings in API routes. Operator edits email copy via UI in V1.2.
 
 ### No Twilio Ever
+
 All SMS through Runtype House Phone sub-agent. NoBC OS never imports Twilio SDK.
 
 ### Tool Rules
+
 Claude Code = backend only (schema, API, auth, email, server logic, anything without JSX).
 Cursor = frontend only (pages, components, styling, anything that renders in browser).
 When finishing a backend task that needs a UI built next, always say "Switch to Cursor now" and describe what to build.
 
 ### V1 Scope Status
+
 1. /apply form - DONE
 2. Schema - DONE
 3. Clerk auth - DONE
@@ -210,10 +228,50 @@ When finishing a backend task that needs a UI built next, always say "Switch to 
 20. Audit events + webhooks + WCAG - PENDING
 
 ### Validation System (add to apply-config.ts)
+
 Each question should support: required, minLength, maxLength, minWords, pattern. Inline feedback on blur. Character counter on textareas. Not yet built - add when next touching the form.
 
 ### V1.2 Hardening Pass (after V1 ships)
+
 Email template editor, event page template engine, custom font upload, Brand Builder wizard, starter template library, operator notification settings, bulk application actions, CSV exports.
 
 ### V1.5 Gate
+
 3+ live events, full apply→approve→event→check-in lifecycle, Stripe Live activated, first paying SaaS customer signed.
+
+## Canonical Terminology (locked — use everywhere, UI copy, variable names, comments)
+
+- How people get in → "Access" / "Event Access"
+- The three groups → "Member Access", "Guest Access", "Comp Access"
+- Free + no friction → "Open" / "Register"
+- Curated/approval → "Apply to Attend"
+- Requires payment → "Ticketed"
+- Complimentary ticket → "Comp"
+- Non-member ticket buyer → "Guest" (MemberStatus=GUEST)
+- Approved NoBC member → "Member"
+- Custom questions → "Registration fields"
+- Never: raw enums in UI (no "apply_or_pay", no "OPEN", no "TICKETED")
+- Never: "RSVP" in operator UI — operator surfaces say "Registrations" or "Attendees"
+- CTAs: "Register" (open), "Apply to Attend" (curated), "Get Ticket — $X" (ticketed), "Reserve My Spot" (member auto-confirm), "You're on the list" (comp)
+
+## Design System (NoBC preset — match Producer quality exactly)
+
+- Background: #F9F7F2, Accent/Primary: #B22E21
+- Headlines: Cormorant Garamond serif, Body: DM Sans
+- Border radius: 10px cards, 6px buttons
+- No hex literals in components — CSS variables only
+- No generic Tailwind defaults — no text-gray-*, no blue buttons
+- Density: Notion/Stripe level — dense but breathable
+
+## Stack
+
+Next.js 15, Prisma + Neon postgres, Clerk auth, Stripe, Vercel Blob, Resend, Tailwind v3
+
+## Rules
+
+- All DB queries scoped to workspaceId
+- Run npm run build before every deploy
+- vercel deploy --prod to ship
+- Never show raw enum values in UI
+- Member table: always filter status != GUEST when showing "members"
+
