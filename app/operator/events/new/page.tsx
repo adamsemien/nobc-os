@@ -576,7 +576,7 @@ export default function NewEventPage() {
                   />
                   {form.slug ? (
                     <p className={`mt-1 text-[11px] text-text-tertiary ${chrome}`}>
-                      /m/events/{form.slug}
+                      /e/{form.slug}
                     </p>
                   ) : null}
                 </div>

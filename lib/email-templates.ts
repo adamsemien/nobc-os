@@ -81,7 +81,7 @@ export function waitlistPromotedEmail(
   eventTitle: string,
   eventSlug: string,
 ): { subject: string; html: string } {
-  const eventUrl = `${appUrl}/m/events/${eventSlug}`;
+  const eventUrl = `${appUrl}/e/${eventSlug}`;
   return {
     subject: `Good news — a spot just opened for ${eventTitle}`,
     html: `<p>Hi ${name},</p>

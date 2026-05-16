@@ -95,8 +95,8 @@ export async function POST(req: NextRequest) {
       },
       quantity: 1,
     }],
-    success_url: `${appUrl}/m/events/${event.slug}?rsvp=success`,
-    cancel_url: `${appUrl}/m/events/${event.slug}`,
+    success_url: `${appUrl}/e/${event.slug}?rsvp=success`,
+    cancel_url: `${appUrl}/e/${event.slug}`,
     customer_email: member.email,
     metadata: { rsvpId: rsvp.id, workspaceId, memberId: member.id, eventId: event.id },
   });

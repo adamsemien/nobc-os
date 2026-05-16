@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
   if (process.env.RESEND_API_KEY) {
     const hostName = `${member.firstName} ${member.lastName}`.trim();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
-    const eventUrl = `${appUrl}/m/events/${event.slug}`;
+    const eventUrl = `${appUrl}/e/${event.slug}`;
     await resend.emails.send({
       from: 'NoBC <noreply@thenobadcompany.com>',
       to: guestEmail.trim(),

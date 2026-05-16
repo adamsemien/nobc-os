@@ -41,6 +41,9 @@ export function EventApplicationsTab({ applications, eventId: _eventId }: Props)
     aiRecommendation: a.aiRecommendation as ApplicationsQueueItem['aiRecommendation'],
     aiReasoning: a.aiReasoning,
     answers: a.answers,
+    archetype: null,
+    archetypeScores: null,
+    referredBy: null,
   }));
 
   return <ApplicationsQueue applications={items} />;
