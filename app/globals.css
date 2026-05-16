@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0a08;
+  --color-panel: #141210;
+  --color-panel-2: #1c1916;
+  --color-border: #2a2722;
+  --color-border-strong: #3a3630;
+  --color-gold: #c9a24a;
+  --color-gold-dim: #8a7338;
+  --color-ink: #ece9e2;
+  --color-muted: #8f897d;
+  --font-display: ui-serif, Georgia, "Times New Roman", serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  overflow-x: hidden;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* iOS: keep inputs at 16px so the browser never zooms on focus */
+input,
+textarea,
+select,
+button {
+  font-size: 16px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-muted);
+}
+
+/* hide scrollbars on the few intentionally-scrollable rows */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
