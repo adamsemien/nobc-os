@@ -1,9 +1,12 @@
 import { db } from './db';
 import { getSvix } from './svix';
+import type { AuditActorType } from '@prisma/client';
 
 interface EmitEventInput {
   workspaceId: string;
   actorId?: string;
+  /** Defaults to OPERATOR when omitted. Agent tools pass 'AGENT'. */
+  actorType?: AuditActorType;
   action: string;
   entityType: string;
   entityId: string;
@@ -12,11 +15,19 @@ interface EmitEventInput {
 
 export async function emitEvent(input: EmitEventEventInput): Promise<void>;
 export async function emitEvent(input: EmitEventInput): Promise<void> {
-  const { workspaceId, actorId, action, entityType, entityId, metadata } = input;
+  const { workspaceId, actorId, actorType, action, entityType, entityId, metadata } = input;
 
   // Always write to local audit log
   await db.auditEvent.create({
-    data: { workspaceId, actorId, action, entityType, entityId, metadata: metadata ?? undefined },
+    data: {
+      workspaceId,
+      actorId,
+      actorType,
+      action,
+      entityType,
+      entityId,
+      metadata: metadata ?? undefined,
+    },
   });
 
   // Deliver to Svix if workspace has a svixAppId and Svix is configured
@@ -38,6 +49,7 @@ export async function emitEvent(input: EmitEventInput): Promise<void> {
         entityType,
         entityId,
         actorId: actorId ?? null,
+        actorType: actorType ?? null,
         metadata: metadata ?? null,
         timestamp: new Date().toISOString(),
       },

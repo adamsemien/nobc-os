@@ -74,7 +74,7 @@ ${qaLines.join('\n\n')}
 `;
 
   const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-6'),
+    model: anthropic('claude-sonnet-4-20250514'),
     schema: ApplicationTaggingSchema,
     system: SYSTEM,
     prompt: userPrompt,

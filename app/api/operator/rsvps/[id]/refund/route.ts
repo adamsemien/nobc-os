@@ -42,6 +42,7 @@ export async function POST(
   await db.rSVP.update({
     where: { id },
     data: {
+      paymentStatus: 'REFUNDED',
       ticketStatus: 'refunded',
       refundedAt: new Date(),
       refundAmountCents,

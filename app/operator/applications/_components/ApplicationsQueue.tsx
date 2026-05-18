@@ -36,13 +36,30 @@ const ANSWER_ORDER = new Map(
 
 const LEGACY_LABELS: Record<string, string> = {
   'BASICS.CITYNEIGHBORHOOD': 'city / neighborhood',
+  'BASICS.CITY': 'city',
+  'BASICS.NEIGHBORHOOD': 'neighborhood',
   'BASICS.FROMORIGINALLY': 'from originally',
   'BASICS.BIRTHDAY': 'birthday',
   'BASICS.LINKS': 'links',
   'BASICS.REFERRERS': 'referred by',
-  'REAL.WORKINGON': 'what are you working on',
-  'REAL.OBSESSEDWITH': 'obsessed with right now',
-  'REAL.ALWAYSCALLEDABOUT': 'what people call you about',
+  'BASICS.PHONE': 'phone',
+  'BASICS.EMAIL': 'email',
+  'REAL.WORKINGON': "what they're working on",
+  'REAL.OBSESSEDWITH': 'obsessed with',
+  'REAL.ALWAYSCALLEDABOUT': 'what people call them about',
+  'WORLD.MOSTINTERESTING': 'most interesting people in their life',
+  'WORLD.CONNECTEDPEOPLE': 'a time they connected two people',
+  'WORLD.COMMUNITYLOYALTY': "community they've stayed loyal to",
+  'TASTE.PLACEDETAILS': 'place that gets the details right',
+  'TASTE.TRUSTTASTE': 'whose taste they trust',
+  'TASTE.RECOMMENDLIKE': "what they recommend like they're paid",
+  'TASTE.SPLURGEVSSAVE': 'splurge vs save',
+  'RAPID.KARAOKE': 'karaoke go-to',
+  'RAPID.COFFEETABLE': 'coffee table',
+  'RAPID.BUSYDAY': 'busy during the day',
+  'RAPID.SUNDAY': 'sunday morning',
+  'RAPID.SOCIALLINK': 'social link they revisit',
+  'RAPID.MOSTDONTKNOW': "something most people don't know",
 };
 
 function labelForKey(key: string): string {
@@ -160,6 +177,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingBulkAction, setPendingBulkAction] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [voidInverted, setVoidInverted] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const selectedIdRef = useRef(selectedId);
@@ -274,6 +292,26 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
 
   useEffect(() => { postActionRef.current = postAction; }, [postAction]);
 
+  useEffect(() => {
+    const sequence = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    let pos = 0;
+    const onKey = (e: KeyboardEvent) => {
+      if (document.documentElement.dataset.theme !== 'void') { pos = 0; return; }
+      if (e.key === sequence[pos]) {
+        pos++;
+        if (pos === sequence.length) {
+          pos = 0;
+          setVoidInverted(true);
+          setTimeout(() => setVoidInverted(false), 3000);
+        }
+      } else {
+        pos = e.key === sequence[0] ? 1 : 0;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const bulkAction = useCallback(async (action: 'approve' | 'reject' | 'hold') => {
     setPendingBulkAction(action);
     const ids = Array.from(selectedIds);
@@ -326,6 +364,13 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 lg:min-h-[calc(100vh-10rem)]">
+      {voidInverted && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: '#ffffff',
+          pointerEvents: 'none',
+        }} />
+      )}
       {flash ? (
         <div
           role="status"
@@ -419,9 +464,10 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
             {visibleApps.map(app => {
               const active = app.id === selectedId;
               const badge = recommendationBadgeVars(app.aiRecommendation);
-              const score = app.aiScore ?? 0;
               const refs = getReferrers(app);
               const isChecked = selectedIds.has(app.id);
+              const worth = app.archetypeScores ? memberWorthScores(app.archetypeScores) : null;
+              const tier = worth ? memberTier(worth.total) : null;
               return (
                 <li key={app.id} className="group relative">
                   <div className={`absolute left-2 top-2 z-10 transition-opacity ${isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -462,7 +508,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                       className="obs-score-badge"
                       aria-hidden="true"
                     >
-                      {String(Math.round(Math.min(1, Math.max(0, score)) * 100)).padStart(2, '0')}
+                      {worth ? worth.total : ''}
                     </span>
                     <p className="obs-app-meta mt-0.5 text-xs text-text-muted">
                       {[app.city, formatRelative(app.submittedAt)].filter(Boolean).join(' · ')}
@@ -486,11 +532,17 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                         >
                           <span className="truncate">{formatRecommendationLabel(app.aiRecommendation)}</span>
                         </span>
-                      ) : (
+                      ) : null}
+                      {worth ? (
+                        <span className="inline-flex items-center gap-1 text-[11px]">
+                          <span className="font-semibold tabular-nums text-text-primary">{worth.total}/30</span>
+                          <span className={`font-medium ${tier!.className}`}>· {tier!.label}</span>
+                        </span>
+                      ) : (!badge && !app.aiRecommendation ? (
                         <span className="inline-flex rounded border border-dashed border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-text-secondary">
                           No AI review yet
                         </span>
-                      )}
+                      ) : null)}
                     </div>
                     <div
                       className="obs-score-bar mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
@@ -501,7 +553,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                         className="h-full rounded-full bg-primary transition-[width]"
                         style={{
                           borderRadius: '4px',
-                          width: `${Math.round(Math.min(1, Math.max(0, score)) * 100)}%`,
+                          width: worth ? `${Math.round((worth.total / 30) * 100)}%` : '0%',
                         }}
                       />
                     </div>
@@ -615,23 +667,111 @@ function DetailPanel({
   onHold: () => void;
 }) {
   const { theme } = useTheme();
-  const [roseConfetti, setRoseConfetti] = useState(false);
+  const approveBtnRef = useRef<HTMLButtonElement>(null);
   const entries = orderedAnswerEntries(app.answers);
+
+  const [showEasterEgg, setShowEasterEgg] = useState(false);
+  const [eggVisible, setEggVisible] = useState(false);
+  const [eggLine, setEggLine] = useState(0);
+  const clickCountRef = useRef(0);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showScoringKey, setShowScoringKey] = useState(false);
 
   const handleApprove = () => {
     onApprove();
     if (theme === 'rose') {
-      setRoseConfetti(true);
-      setTimeout(() => setRoseConfetti(false), 1300);
+      const btn = approveBtnRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const colors = ['#c45c3a','#fef0e8','#ede8df','#f7ede3','#c45c3a','#fef0e8','#ede8df','#f7ede3'];
+      colors.forEach((color, i) => {
+        const el = document.createElement('div');
+        const cx = (Math.random() - 0.5) * 120;
+        const cy = -(80 + Math.random() * 80);
+        el.style.cssText = `
+          position:fixed;
+          left:${rect.left + rect.width / 2}px;
+          top:${rect.top + rect.height / 2}px;
+          width:7px;height:7px;
+          background:${color};
+          pointer-events:none;
+          z-index:9999;
+          border-radius:1px;
+          animation:rose-confetti-burst 1200ms ease-out ${i * 60}ms forwards;
+          --cx:${cx}px;--cy:${cy}px;
+        `;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1200 + i * 60 + 100);
+      });
     }
   };
+
+  const handleNameClick = () => {
+    clickCountRef.current += 1;
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = setTimeout(() => {
+      clickCountRef.current = 0;
+    }, 500);
+    if (clickCountRef.current >= 3) {
+      clickCountRef.current = 0;
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+      setShowEasterEgg(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!showEasterEgg) {
+      setEggVisible(false);
+      setEggLine(0);
+      return;
+    }
+    const t0 = setTimeout(() => setEggVisible(true), 10);
+    const t1 = setTimeout(() => setEggLine(1), 400);
+    const t2 = setTimeout(() => setEggLine(2), 1100);
+    const t3 = setTimeout(() => setEggLine(3), 1800);
+    const t4 = setTimeout(() => {
+      setEggVisible(false);
+      setTimeout(() => setShowEasterEgg(false), 500);
+    }, 3800);
+    return () => [t0, t1, t2, t3, t4].forEach(clearTimeout);
+  }, [showEasterEgg]);
 
   return (
     <div
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface-elevated p-4 sm:p-6 lg:max-h-[calc(100vh-11rem)]"
       style={{ borderRadius: '8px' }}
     >
-      <h2 className="truncate text-2xl font-semibold text-text-primary sm:text-3xl" style={headingFont}>
+      {showEasterEgg && (
+        <div
+          onClick={() => setShowEasterEgg(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9998,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32,
+            background: eggVisible ? 'rgba(0,0,0,0.95)' : 'rgba(0,0,0,0)',
+            transition: 'background 400ms ease',
+            cursor: 'pointer',
+          }}
+        >
+          {(['you built something real.', 'no bad company.', '— adam & chloe 🖤'] as const).map((line, i) => (
+            <p key={i} style={{
+              fontFamily: "'PP Editorial New', Georgia, serif",
+              fontStyle: 'italic',
+              color: '#ffffff',
+              fontSize: 'clamp(20px, 3vw, 36px)',
+              margin: 0,
+              opacity: eggLine > i ? 1 : 0,
+              transition: 'opacity 600ms ease',
+            }}>
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
+      <h2
+        className="truncate text-2xl font-semibold text-text-primary sm:text-3xl"
+        style={{ ...headingFont, cursor: 'default' }}
+        onClick={handleNameClick}
+      >
         {app.fullName}
       </h2>
 
@@ -699,7 +839,47 @@ function DetailPanel({
 
       {(app.archetype || app.archetypeScores) && (
         <div className="mt-5 rounded-lg border border-border bg-muted p-4 sm:p-5" style={{ borderRadius: '8px' }}>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">AI profile</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">AI profile</p>
+            <button
+              type="button"
+              onClick={() => setShowScoringKey(v => !v)}
+              aria-label="How scores work"
+              style={{
+                width: 14, height: 14, borderRadius: '50%',
+                background: 'var(--border)', border: 'none',
+                color: 'var(--text-secondary)', cursor: 'pointer',
+                fontSize: 9, fontWeight: 700, lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, padding: 0,
+              }}
+            >?</button>
+          </div>
+          {showScoringKey && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: '10px 12px',
+                borderRadius: 6,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                fontSize: 11,
+                color: 'var(--text-secondary)',
+                lineHeight: 1.6,
+              }}
+            >
+              <p style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>AI profile — how we score</p>
+              <p style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>archetype</span> — which of the 6 types best describes this person. confidence shown as a percentage.</p>
+              <p style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>influence</span> /10 — social reach, content, what people come to them for</p>
+              <p style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>contribution</span> /10 — how they show up for others, intros, community</p>
+              <p style={{ marginBottom: 10 }}><span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>activation</span> /10 — engagement signals, energy, rapid fire answers</p>
+              <p style={{ fontWeight: 600, marginBottom: 4 }}>total out of 30</p>
+              <p style={{ marginBottom: 2 }}><span style={{ color: 'var(--accent)', fontWeight: 600 }}>22+</span> — charter candidate. rare. move fast.</p>
+              <p style={{ marginBottom: 2 }}><span style={{ fontWeight: 500 }}>16–21</span> — standard member. good fit.</p>
+              <p style={{ marginBottom: 8 }}><span style={{ color: 'var(--text-tertiary)' }}>below 16</span> — waitlist or pass.</p>
+              <p><span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>ai recommendation</span> — strong yes / yes / unclear / no / strong no</p>
+            </div>
+          )}
 
           {app.archetype && (
             <p className="mt-2 text-lg font-semibold text-text-primary">{app.archetype}</p>
@@ -749,6 +929,31 @@ function DetailPanel({
         </div>
       )}
 
+      {theme === 'parchment' && app.archetypeScores && (() => {
+        const worth = memberWorthScores(app.archetypeScores!);
+        if (worth.total < 22) return null;
+        return (
+          <div style={{ position: 'relative', height: 0 }}>
+            <div
+              className="parchment-wax-seal"
+              style={{
+                position: 'absolute',
+                top: -60,
+                right: 0,
+                width: 64,
+                height: 64,
+              }}
+            >
+              <svg viewBox="0 0 64 64" style={{ width: 64, height: 64 }}>
+                <circle cx="32" cy="32" r="30" fill="#8b3a2a" />
+                <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,240,225,0.3)" strokeWidth="1" />
+                <text x="32" y="37" textAnchor="middle" fill="rgba(255,240,225,0.9)" fontSize="12" fontFamily="Georgia, serif" fontStyle="italic" letterSpacing="2">NBC</text>
+              </svg>
+            </div>
+          </div>
+        );
+      })()}
+
       <section className="mt-8 border-t border-border pt-6">
         <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Answers</h3>
         <div className="mt-4 space-y-6">
@@ -780,14 +985,8 @@ function DetailPanel({
 
       <div className="mt-auto flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:gap-4">
         <div className="relative flex-1">
-          {roseConfetti && (
-            <div aria-hidden className="pointer-events-none">
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <span key={i} className={`rose-confetti rose-confetti-${i}`} />
-              ))}
-            </div>
-          )}
           <button
+            ref={approveBtnRef}
             type="button"
             onClick={handleApprove}
             disabled={pendingAction !== null}

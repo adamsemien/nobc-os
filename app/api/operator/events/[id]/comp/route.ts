@@ -95,7 +95,7 @@ export async function POST(
       const { resend } = await import('@/lib/resend');
       const { compTicketEmail } = await import('@/lib/email-templates');
       await resend.emails.send({
-        from: 'NoBC <noreply@thenobadcompany.com>',
+        from: 'NoBC <team@thenobadcompany.com>',
         to: email.trim(),
         ...compTicketEmail(fullName, event.title, event.startAt, event.location, rsvp.id, qrDataUrl),
       });

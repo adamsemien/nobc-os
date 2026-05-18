@@ -60,6 +60,9 @@ type RsvpRow = {
   checkedInAt: string | null;
   createdAt: string;
   stripePaymentIntentId: string | null;
+  paymentStatus: string | null;
+  capturedAt: string | null;
+  amountCents: number | null;
   refundAmountCents: number | null;
   refundedAt: string | null;
   isComp: boolean;

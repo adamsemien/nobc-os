@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
-import { Inbox, CalendarDays, ScrollText, Webhook, Palette } from 'lucide-react';
-import { ThemeToggle, useTheme } from './_components/ThemeToggle';
+import { Inbox, CalendarDays, ScrollText, Webhook, BarChart3 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/operator/applications', label: 'Applications', match: '/operator/applications', Icon: Inbox },
+  { href: '/operator/intelligence', label: 'Intelligence', match: '/operator/intelligence', Icon: BarChart3 },
   { href: '/operator/events', label: 'Events', match: '/operator/events', Icon: CalendarDays },
   { href: '/operator/audit', label: 'Audit', match: '/operator/audit', Icon: ScrollText },
   { href: '/operator/settings/webhooks', label: 'Webhooks', match: '/operator/settings', Icon: Webhook },
@@ -15,7 +15,6 @@ const NAV_ITEMS = [
 
 export function OperatorNav() {
   const pathname = usePathname();
-  const { toggle } = useTheme();
 
   return (
     <aside
@@ -71,18 +70,9 @@ export function OperatorNav() {
         })}
       </nav>
 
-      {/* Footer — avatar + theme */}
-      <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] px-3 py-3 md:px-4">
-        <UserButton>
-          <UserButton.MenuItems>
-            <UserButton.Action
-              label="Switch theme"
-              labelIcon={<Palette className="h-4 w-4" />}
-              onClick={toggle}
-            />
-          </UserButton.MenuItems>
-        </UserButton>
-        <ThemeToggle />
+      {/* Footer — avatar */}
+      <div className="flex items-center justify-center border-t border-[var(--border)] px-3 py-3 md:px-4">
+        <UserButton />
       </div>
     </aside>
   );

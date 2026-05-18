@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Playfair_Display, Cormorant_Garamond, DM_Sans, DM_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display, Cormorant_Garamond, DM_Sans, DM_Mono, Plus_Jakarta_Sans, Fraunces, DM_Serif_Display, Space_Grotesk, Syne, Instrument_Serif } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -45,6 +45,39 @@ const plusJakarta = Plus_Jakarta_Sans({
   weight: ["400", "500"],
 });
 
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+  style: ["normal", "italic"],
+});
+
+const dmSerifDisplay = DM_Serif_Display({
+  variable: "--font-dm-serif-display",
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+});
+
+const syne = Syne({
+  variable: "--font-syne",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+});
+
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+});
+
 export const metadata: Metadata = {
   title: "NoBC OS",
   description: "No Bad Company member platform",
@@ -60,7 +93,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" data-theme="nobc" suppressHydrationWarning>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} ${dmSans.variable} ${dmMono.variable} ${plusJakarta.variable} font-sans antialiased`}
+          className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} ${dmSans.variable} ${dmMono.variable} ${plusJakarta.variable} ${fraunces.variable} ${dmSerifDisplay.variable} ${spaceGrotesk.variable} ${syne.variable} ${instrumentSerif.variable} font-sans antialiased`}
         >
           <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
           <a href="#main-content" className="skip-to-main">Skip to main content</a>

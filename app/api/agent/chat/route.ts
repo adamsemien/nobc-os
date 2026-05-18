@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (!messages?.length) return new Response('messages required', { status: 400 });
 
   const result = streamText({
-    model: anthropic('claude-sonnet-4-6'),
+    model: anthropic('claude-sonnet-4-20250514'),
     system: SYSTEM,
     messages: messages as NonNullable<Parameters<typeof streamText>[0]['messages']>,
   });

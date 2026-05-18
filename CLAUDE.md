@@ -10,34 +10,36 @@ NoBC OS is the member-facing platform for No Bad Company — a premium curated m
 
 ## Stack
 
-- **Framework:** Next.js 15, App Router, TypeScript, Tailwind CSS
+- **Framework:** Next.js 15, App Router, TypeScript, Tailwind CSS v3
 - **DB:** Postgres on Neon (serverless, pooled connection) + Prisma 7
 - **Auth:** Clerk with Organizations (org = workspace = tenant)
-- **Email:** Resend (transactional only — welcome, approval, event confirmations)
-- **Payments:** Stripe (authorize/capture pattern, test mode until compliance pages live)
-- **AI:** Claude Sonnet 4.6 via Vercel AI SDK (direct API calls for tagging/inference)
-- **Agent runtime:** Runtype (V1.5 - master agent + House Phone sub-agent)
-- **Deploy target:** Vercel
+- **Email:** Resend (transactional only) — `from` is always `team@thenobadcompany.com`
+- **Payments:** Stripe (authorize/capture pattern)
+- **AI:** Claude via direct Anthropic API. **Model for all AI calls: `claude-sonnet-4-20250514`**
+- **Agent runtime:** Runtype (V1.5 — master agent + House Phone sub-agent)
+- **Deploy target:** Vercel — `vercel deploy --prod`
 
 ---
 
 ## Absolute Rules
 
 ### No Twilio. Ever.
-
-NoBC OS never calls Twilio directly. All SMS flows through the House Phone, which is the Communications sub-agent inside Runtype. If a feature needs SMS: trigger Runtype. If Runtype is unavailable: degrade gracefully to email or queue for retry. Do not add the Twilio SDK. Do not add a Twilio env var. This is non-negotiable.
+NoBC OS never calls Twilio directly. All SMS flows through the House Phone (Communications sub-agent inside Runtype). No Twilio SDK, no Twilio env var. Non-negotiable.
 
 ### Workspace scoping is the security boundary
-
 Every read and every write is workspace-scoped. `workspaceId` is on every user-data table, indexed, and checked on every query. No exceptions.
 
 ### No hex literals in components
-
-All colors are CSS variables. Follow Producer's pattern: `bg-primary`, `text-text-primary`, semantic tokens only. The theme system must support white-labeling for multi-tenant SaaS.
+All colors are CSS variables — semantic tokens only (`bg-primary`, `text-text-primary`). Hex values live only in `app/globals.css` (`:root` + `[data-theme]` selectors). The theme system supports white-labeling for multi-tenant SaaS.
 
 ### Schema changes: generate then push manually
+Run `prisma generate` first. Show the diff. Never auto-push. Producer shares the same Postgres instance — schema changes are production-affecting.
 
-Run `prisma generate` first. Show the diff. Never auto-push. Producer is on the same Postgres instance and schema changes are production-affecting.
+### Locked decisions
+- Email `from` address: `team@thenobadcompany.com` — always.
+- AI model: `claude-sonnet-4-20250514` — every call.
+- Never modify legal copy in the `/apply` waiver.
+- Never break `/apply`, archetype config, or existing scoring.
 
 ---
 
@@ -46,95 +48,92 @@ Run `prisma generate` first. Show the diff. Never auto-push. Producer is on the 
 ```
 Producer (Replit) ←→ NoBC OS (Vercel) via Phase J HMAC webhook
     Both connect to same Postgres (Neon)
-    
+
 NoBC OS → Runtype Master Agent → House Phone (Communications sub-agent) → Twilio
     NoBC OS never calls Twilio directly
-    
+
 House Phone reads member data via NoBC OS MCP (V1.5)
-Inbound SMS replies → Runtype webhook → write back to NoBC OS via MCP
 ```
 
-**Phase J webhook:** Producer already has `/api/webhooks/nobc-os/event-notify` live. When NoBC OS publishes/updates/cancels an event, fire a HMAC-signed POST to that endpoint. Secret: `PRODUCER_WEBHOOK_SECRET` env var.
+**Phase J webhook:** When NoBC OS publishes/updates/cancels an event, it fires an HMAC-SHA256-signed POST to Producer's `/api/webhooks/nobc-os/event-notify` with an `X-NoBC-Signature` header. Fire-and-forget, one retry, never blocks the operator action. Result logged to `AuditEvent`. Env: `PRODUCER_WEBHOOK_URL`, `PRODUCER_WEBHOOK_SECRET`.
 
 ---
 
-## House Phone (Communications Sub-Agent)
+## V1 Scope Status
 
-- Lives inside Runtype, not in NoBC OS code
-- Built by Nathan Booker, currently on Nathan's Runtype account (migrating to Adam's in V1.5)
-- Transport: Twilio (green bubbles, decision locked)
-- Interface: Slack (operator MVP), web app (long-term)
-- V1: NoBC OS ships email-only. SMS welcome deferred to V1.5.
-- V1.5: House Phone migrates to Adam's Runtype account, reads member data from NoBC OS MCP, inbound RSVP via SMS writes back to RSVP records
-
----
-
-## V1 Scope (20 items, 8-10 weeks)
-
-
-| #   | Item                                                                   | Status  |
-| --- | ---------------------------------------------------------------------- | ------- |
-| 1   | Branded `/apply` form (Next.js, mobile-first, NoBC visual identity)    | pending |
-| 2   | Postgres + Prisma schema with all NoBC OS models                       | ✅ done  |
-| 3   | Clerk auth + workspace integration                                     | ✅ done  |
-| 4   | Approval workflow + welcome email (Resend only - no SMS)               | pending |
-| 5   | AI tagging on application submit (Claude Sonnet 4.6, Vercel AI SDK)    | pending |
-| 6   | Branded `/m/events` calendar + `/m/events/[slug]` detail pages         | pending |
-| 7   | RSVP system (open / ticketed / apply_or_pay + sub-modes)               | pending |
-| 8   | `approval_required` toggle                                             | pending |
-| 9   | Stripe payments with authorize/capture                                 | pending |
-| 10  | Operator-triggered refund system (Stripe API direct)                   | pending |
-| 11  | Apple Wallet + Google Wallet passes (PassKit.com or PassNinja)         | pending |
-| 12  | Offline-first QR check-in PWA (IndexedDB + Dexie.js + Workbox)         | pending |
-| 13  | Custom question builder per event (6 field types)                      | pending |
-| 14  | Capacity + waitlist with auto-promotion                                | pending |
-| 15  | Plus-ones (per-event toggle)                                           | pending |
-| 16  | Red List + duplicate handling on application submission                | pending |
-| 17  | NoBC OS MCP server (V1 read tools + critical write tools)              | pending |
-| 18  | AI chat panel (Runtype master agent, fallback to direct Vercel AI SDK) | pending |
-| 19  | AI Event Builder (text only - titles, descriptions, run of show)       | pending |
-| 20  | `audit_events` table + Svix webhook system + WCAG 2.2 AA via Radix UI  | pending |
-
-
-**V1.5 gate:** 3+ events run through platform live, full apply→approve→event→check-in lifecycle complete, first member completes full lifecycle, Stripe Live Mode activated.
+| #  | Item | Status |
+|----|------|--------|
+| 1  | Branded `/apply` form (cinematic 7-step, reveal screen, demo mode, Frogger easter egg) | ✅ done |
+| 2  | Postgres + Prisma schema with all NoBC OS models | ✅ done |
+| 3  | Clerk auth + workspace integration | ✅ done |
+| 4  | Approval workflow + welcome email (Resend — approve/reject/hold/waitlist) | ✅ done |
+| 5  | AI scoring on application submit (archetype + dimension scoring) | ✅ done — **question-agnostic as of this build** |
+| 6  | Branded `/m/events` calendar + `/m/events/[slug]` detail pages (3 templates) | ✅ done |
+| 7  | RSVP system (open / ticketed / apply_or_pay + sub-modes) | ✅ done |
+| 8  | `approval_required` toggle | ✅ done |
+| 9  | Stripe payments (authorize/capture) | ✅ done |
+| 10 | Operator-triggered refund system | ✅ done |
+| 11 | Apple Wallet + Google Wallet passes | 🔶 partial (routes scaffolded) |
+| 12 | Offline-first QR check-in PWA (IndexedDB + Dexie) | ✅ done |
+| 13 | Custom question builder per event (8 field types) | ✅ done |
+| 14 | Capacity + waitlist with auto-promotion | ✅ done |
+| 15 | Plus-ones (per-event toggle) | ✅ done |
+| 16 | Red List + duplicate handling on application submit | ✅ done |
+| 17 | NoBC OS MCP server (read + write tools) | 🔶 partial (`/api/mcp` live) |
+| 18 | AI chat panel (operator Cmd+K) | ✅ done |
+| 19 | AI Event Builder (text generation) | ✅ done |
+| 20 | `AuditEvent` table + Svix webhooks + WCAG 2.2 AA | ✅ done |
+| 21 | Comp tickets (operator issue, QR, email) | ✅ done |
+| 22 | 7-theme operator theme system | ✅ done |
+| 23 | Hero image system (Blob URL passthrough) | ✅ done |
+| 24 | Operator bulk delete | ✅ done |
+| 25 | Compliance pages (`/terms`, `/privacy`, `/refund-policy`) | ✅ done |
+| 26 | Producer Phase J event-notify webhook | ✅ done |
+| 27 | Question resilience + Intelligence system | ✅ done |
+| 28 | Roles & permissions (Clerk Organizations) | ✅ done |
 
 ---
 
-## Schema Models (Live on Neon)
+## Schema Models (Postgres / Neon)
 
 All workspace-scoped with `workspaceId` indexed:
 
-- **Workspace** - tenant boundary
-- **Member** - approved members, links to DirectoryPerson
-- **Application** - application workflow with AI enrichment fields
-- **Event** - NoBC-facing events with accessMode/approvalRequired/plus-ones
-- **RSVP** - all access modes, Stripe payment fields, check-in fields, wallet pass fields
-- **AuditEvent** - full audit trail with actorType enum
+- **Workspace** — tenant boundary. White-label fields: `logoUrl`, `primaryColor`, `contactEmail`, tier names, `defaultTemplateId`.
+- **Member** — approved members; `status != GUEST` when listing "members".
+- **Application** — application workflow with AI enrichment; `templateId` links to its `ApplicationTemplate`.
+- **ApplicationAnswer** — per-question answers keyed by `questionKey` (= `QuestionDefinition.stableKey`).
+- **ApplicationTemplate** — named application form definitions, one per `slug` → `/apply/[slug]`.
+- **QuestionDefinition** — question registry with stable keys, insight metadata, and per-question scoring logic. Drives question-agnostic AI scoring.
+- **Event** — NoBC events with `accessMode` / `approvalRequired` / plus-ones / `eventAccess` JSON.
+- **EventCustomQuestion** — per-event registration fields (8 field types).
+- **RSVP** — all access modes, Stripe payment fields, check-in fields, wallet pass fields.
+- **Ticket / Payment** — Stripe authorize/capture lifecycle.
+- **WaitlistEntry** — capacity overflow with auto-promotion.
+- **AuditEvent** — full audit trail with `actorType` enum (`OPERATOR`, `AGENT`, `MEMBER`, `SYSTEM`).
+- **RedList** — denylist for application submission.
+- **EventFlowTemplate** — reusable event configuration presets.
 
-**Deferred models** (add when features need them, not before):
-
-- MembershipTier, SponsorBrandProfile, GeneratedAsset, WalletPass entity
+**Roles** are stored in Clerk Organization membership metadata (`owner`, `admin`, `manager`, `staff`, `readonly`), not in Postgres.
 
 ---
 
 ## Key Files
 
 ```
-prisma/schema.prisma                          — all models (Application has neighborhood field)
+prisma/schema.prisma                          — all models
 prisma.config.ts                              — Prisma 7 config with Neon adapter
 lib/db.ts                                     — PrismaClient singleton via PrismaNeon adapter
 lib/auth.ts                                   — getOrCreateWorkspaceForUser + requireWorkspaceId
-lib/theme.ts                                  — 4-theme system config (NoBC, Midnight, Ember, Ink)
+lib/permissions.ts                            — checkPermission(userId, action) — role-based access
+lib/theme.ts                                  — 7-theme system config
 lib/event-access.ts                           — event access resolution + gate logic
-lib/event-access-schema.ts                    — EventAccess Zod schema
-lib/event-hero-url.ts                         — hero image Blob URL passthrough
-lib/event-gates.ts                            — gate type definitions
-config/archetypes.ts                          — 6 archetype definitions with stories + tags
+lib/audit.ts                                  — AuditEvent writer (actorType-aware)
+lib/scoring.ts                                — question-agnostic AI scoring
+lib/producer-webhook.ts                       — Phase J HMAC webhook to Producer
+lib/demo-data.ts                              — synthetic data for Intelligence demo mode
+config/archetypes.ts                          — 6 archetype definitions
 app/apply/_components/MembershipForm.tsx       — 7-step cinematic application form
-app/apply/_components/FroggerGame.tsx          — easter egg Frogger game
-app/m/events/_components/MemberEventsExplorer.tsx — member event calendar grid
-app/m/events/[slug]/_components/EventDetail.tsx   — event detail with template system
-app/operator/events/_components/EventsTable.tsx   — bulk-selectable events table
+app/operator/_components/AgentPanel.tsx        — Cmd+K operator AI chat panel
 middleware.ts                                 — Clerk protecting /m/* and /operator/*
 ```
 
@@ -142,118 +141,118 @@ middleware.ts                                 — Clerk protecting /m/* and /ope
 
 ## Environment Variables
 
-Required now:
+```
+# Database
+DATABASE_URL                          — Neon pooled connection string (-pooler in hostname)
 
-- `DATABASE_URL` — Neon pooled connection string (has `-pooler` in hostname)
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
-- `NEXT_PUBLIC_APP_URL`
+# Auth (Clerk)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+CLERK_SECRET_KEY
+CLERK_WEBHOOK_SECRET
 
-Fill in when feature lands:
+# App
+NEXT_PUBLIC_APP_URL
 
-- `RESEND_API_KEY` — Step 3 (approval workflow)
-- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Step 9 (payments)
-- `RUNTYPE_API_URL` — V1.5 (House Phone integration)
-- `PRODUCER_WEBHOOK_URL` — Phase J outbound (event publish sync to Producer)
-- `PRODUCER_WEBHOOK_SECRET` — HMAC secret shared with Producer
+# Email
+RESEND_API_KEY
 
----
+# Payments (Stripe)
+STRIPE_SECRET_KEY
+STRIPE_PUBLISHABLE_KEY
+STRIPE_WEBHOOK_SECRET
 
-## Design System
+# Webhooks
+SVIX_SECRET                           — Svix webhook signing
+PRODUCER_WEBHOOK_URL                  — Phase J outbound to Producer
+PRODUCER_WEBHOOK_SECRET               — HMAC secret shared with Producer
 
-Follow Producer's conventions:
+# AI
+ANTHROPIC_API_KEY                     — Claude API (model claude-sonnet-4-20250514)
 
-- Warm grays for bg/border, indigo primary, green/amber/red semantics
-- All colors as CSS variables — no hex literals in components
-- Editorial New or Playfair Display for headlines, Inter/Geist for data
-- Radix UI primitives for accessible components (required for WCAG 2.2 AA - V1 item 20)
-- Rounded corners: 6-8px on cards, 4px on buttons
-- Lucide React for icons
+# V1.5
+RUNTYPE_API_URL                       — House Phone integration
+```
 
 ---
 
 ## Routing
 
 ```
-/apply                  ← public application form
-/m/events               ← member-facing event calendar
-/m/events/[slug]        ← member-facing event detail
-/check-in/[slug]        ← staff check-in PWA
-/operator/*             ← operator dashboard (protected)
-/api/apply              ← application submission
-/api/rsvp               ← RSVP submission
-/api/check-in/*         ← check-in handlers
-/api/webhooks/nobc/*    ← inbound webhooks (Clerk, Stripe, Runtype)
-/api/agent              ← operator AI chat
-/api/mcp                ← NoBC OS MCP server
-/api/stripe/*           ← Stripe webhooks
+PUBLIC
+/apply                          ← default public application form
+/apply/[slug]                   ← application form for a named ApplicationTemplate
+/apply/thanks                   ← post-submission screen
+/terms /privacy /refund-policy  ← compliance pages
+
+MEMBER (Clerk-protected /m/*)
+/m/events                       ← member event calendar
+/m/events/[slug]                ← member event detail
+/m/pass                         ← member wallet pass
+
+CHECK-IN
+/check-in/[slug]                ← staff check-in PWA (staff role and above)
+
+OPERATOR (Clerk-protected /operator/*)
+/operator/applications          /operator/applications/[id]
+/operator/events                /operator/events/new        /operator/events/[id]
+/operator/intelligence          ← community / insights / sponsors / trends dashboard
+/operator/audit
+/operator/settings/questions    ← question builder
+/operator/settings/applications ← application template builder
+/operator/settings/team         ← team & roles management
+/operator/settings/workspace    ← white-label workspace settings
+/operator/settings/webhooks
+
+API
+/api/apply/membership/*         ← membership application submit + review
+/api/apply/[slug]               ← named-template submission
+/api/agent                      ← operator AI chat agent (read + write tools)
+/api/agent/chat /api/agent/event-builder
+/api/mcp                         ← NoBC OS MCP server
+/api/rsvp/* /api/check-in/* /api/stripe/* /api/wallet/*
+/api/operator/*                  ← operator actions (permission-gated)
+/api/webhooks/nobc/* /api/webhooks/stripe
 ```
 
 ---
 
-## Key Architectural Decisions
+## Operator Theme System
 
-### BrandKit System (V1 schema required)
+7 themes, toggled via `data-theme` attribute, persisted to `localStorage`. Config in `lib/theme.ts`; CSS variable values in `app/globals.css` (`:root` + `[data-theme=...]`).
 
-Add BrandKit, ThemeVariant, CustomFont models to schema before building any more UI. Every UI component reads from BrandKit CSS variables - no hex literals ever. All colors, spacing, typography are tokens. This is the constraint-creativity system. Details in NoBC_Platform_Master_Spec_v2_2_BrandKit_Addendum.md.
+| id | label | id | label |
+|----|-------|----|-------|
+| `nobc` | Light | `parchment` | Parchment |
+| `midnight` | Midnight | `void` | Void |
+| `obsidian` | Obsidian | `ember` | Ember |
+| `rose` | Rosé | | |
 
-### Form Engine (not hardcoded forms)
+---
 
-Application forms are config-driven via lib/apply-config.ts. Future: operator edits forms via UI. Same engine powers membership applications, event-specific applications, vendor applications. Template engine in V1.2.
+## AI Scoring (question-agnostic)
 
-### Email Template System (V1.2)
+As of this build, AI scoring is **fully question-agnostic**. The scoring prompt no longer references hardcoded field names. It receives the active `QuestionDefinition` records (`stableKey`, `insightLabel`, `scoringDimension`, `scoringWeight`, `scoringLogic`) and scores each answer against its own `scoringLogic`. Adding a question automatically includes it in scoring; removing or renaming one never breaks scoring. Logic lives in `lib/scoring.ts`.
 
-All email copy lives in lib/email-templates.ts as typed functions. No hardcoded strings in API routes. Operator edits email copy via UI in V1.2.
+Dimensions: `influence`, `contribution`, `activation`, `taste`.
+Archetypes: Connector, Host, Curator, Builder, Maker, Patron.
 
-### No Twilio Ever
+**Score scale (canonical):** `Application.aiScore` is `0–1` — the rebuilt `scoring.ts` output. Any `/30` is **display-only** (`aiScore × 30`); percentage display is `aiScore × 100`. Tier cutoffs on the 0–1 scale: **charter ≥ 0.73** (22/30), **standard ≥ 0.53** (16/30), **waitlist** below. Note: `lib/intelligence/worth.ts` computes a separate `worthTotal` (0–30) from the six archetype scores — a different metric, not `aiScore`.
 
-All SMS through Runtype House Phone sub-agent. NoBC OS never imports Twilio SDK.
+---
 
-### Tool Rules
+## Roles & Permissions
 
-Claude Code handles full-stack: schema, API, auth, email, pages, components, styling.
-Run `npm run build` before every deploy. `vercel deploy --prod` to ship.
+Roles live in Clerk Organization membership metadata. `lib/permissions.ts` exposes `checkPermission(userId, action)`. Every operator API route is permission-gated (403 on failure) and every check logs an `AuditEvent`. The operator UI hides/disables unauthorized actions — but the API is the real boundary.
 
-### V1 Scope Status
+- **owner** — full access incl. workspace settings + billing. One per workspace.
+- **admin** — full access except billing + workspace deletion.
+- **manager** — approve/reject applications, create/publish events, view intelligence, issue comps.
+- **staff** — check-in PWA only.
+- **readonly** — view applications/events/intelligence; no writes.
 
-1. /apply form - DONE (cinematic 7-step flow, reveal screen, demo mode, Frogger easter egg)
-2. Schema - DONE (Application model includes neighborhood field)
-3. Clerk auth - DONE
-4. Approval workflow + welcome email - DONE (approve/reject/hold/waitlist + email templates)
-5. AI tagging on submit - DONE (Claude Sonnet 4.6 archetype scoring + personalizedCopy)
-6. Events calendar + detail pages - DONE (/m/events grid + /m/events/[slug] with 3 templates)
-7. RSVP system - IN PROGRESS (basic RSVP creation works, gate logic resolved)
-8. Approval required toggle - DONE (part of event access system)
-9. Stripe payments - PENDING
-10. Refund system - PENDING
-11. Wallet passes - PENDING
-12. Check-in PWA - DONE (offline-first with IndexedDB, QR scanning)
-13. Custom question builder - DONE (6 field types, per-event, when-in-flow placement)
-14. Capacity + waitlist - DONE (showCapacity, auto-promotion logic)
-15. Plus-ones - DONE (per-event toggle, plusOneOfMemberId tracking)
-16. Red list + duplicate handling - DONE (in apply route)
-17. NoBC OS MCP server - PENDING
-18. AI chat panel - PENDING
-19. AI Event Builder - DONE (text generation for titles, descriptions, run of show)
-20. Audit events + webhooks + WCAG - PARTIAL (audit_events table live, webhooks PENDING)
-21. Comp tickets - DONE (operator issue comp, QR generation, email confirmation)
-22. 4-theme system - DONE (NoBC, Midnight, Ember, Ink via CSS variables + operator toggle)
-23. Hero image system - DONE (Blob URL passthrough for event hero images)
-24. Operator bulk delete - DONE (events list with checkboxes + confirmation dialog)
+---
 
-### Validation System (add to apply-config.ts)
-
-Each question should support: required, minLength, maxLength, minWords, pattern. Inline feedback on blur. Character counter on textareas. Not yet built - add when next touching the form.
-
-### V1.2 Hardening Pass (after V1 ships)
-
-Email template editor, event page template engine, custom font upload, Brand Builder wizard, starter template library, operator notification settings, bulk application actions, CSV exports.
-
-### V1.5 Gate
-
-3+ live events, full apply→approve→event→check-in lifecycle, Stripe Live activated, first paying SaaS customer signed.
-
-## Canonical Terminology (locked — use everywhere, UI copy, variable names, comments)
+## Canonical Terminology (locked — UI copy, variables, comments)
 
 - How people get in → "Access" / "Event Access"
 - The three groups → "Member Access", "Guest Access", "Comp Access"
@@ -261,34 +260,81 @@ Email template editor, event page template engine, custom font upload, Brand Bui
 - Curated/approval → "Apply to Attend"
 - Requires payment → "Ticketed"
 - Complimentary ticket → "Comp"
-- Non-member ticket buyer → "Guest" (MemberStatus=GUEST)
+- Non-member ticket buyer → "Guest" (`MemberStatus=GUEST`)
 - Approved NoBC member → "Member"
 - Custom questions → "Registration fields"
-- Never: raw enums in UI (no "apply_or_pay", no "OPEN", no "TICKETED")
-- Never: "RSVP" in operator UI — operator surfaces say "Registrations" or "Attendees"
+- Never: raw enums in UI (no "apply_or_pay", no "OPEN")
+- Never: "RSVP" in operator UI — say "Registrations" or "Attendees"
 - CTAs: "Register" (open), "Apply to Attend" (curated), "Get Ticket — $X" (ticketed), "Reserve My Spot" (member auto-confirm), "You're on the list" (comp)
 
-## Design System (NoBC preset — match Producer quality exactly)
+---
 
-- Background: #F9F7F2, Accent/Primary: #B22E21
-- Headlines: PP Editorial New (italic for display), Body: Neue Haas Grotesk Display Pro
+## Design System (NoBC preset — match Producer quality)
+
+- Background `#F9F7F2`, Accent/Primary `#B22E21` — as CSS variables only
+- Headlines: PP Editorial New (italic for display). Body: Neue Haas Grotesk Display Pro
 - Border radius: 10px cards, 6px buttons
-- No hex literals in components — CSS variables only
-- No generic Tailwind defaults — no text-gray-*, no blue buttons
+- No generic Tailwind defaults — no `text-gray-*`, no blue buttons
 - Density: Notion/Stripe level — dense but breathable
-- 4 themes: NoBC (warm cream), Midnight (dark), Ember, Ink — toggled via data-theme attribute
-- Theme config: lib/theme.ts, globals.css :root + [data-theme] selectors
-- Operator toggle in sidebar (ThemeToggle.tsx) persists to localStorage
+- Lucide React for icons; Radix UI primitives for accessibility (WCAG 2.2 AA)
 
-## Stack
-
-Next.js 15, Prisma + Neon postgres, Clerk auth, Stripe, Vercel Blob, Resend, Tailwind v3
+---
 
 ## Rules
 
-- All DB queries scoped to workspaceId
-- Run npm run build before every deploy
-- vercel deploy --prod to ship
+- All DB queries scoped to `workspaceId`
+- Run `npm run build` before every deploy; `vercel deploy --prod` to ship
 - Never show raw enum values in UI
-- Member table: always filter status != GUEST when showing "members"
+- Member listings: filter `status != GUEST`
+- Schema changes: show diff, never auto-push
 
+---
+
+## Delight Features
+
+Personality features that make the platform feel like No Bad Company. **Do not break these.**
+
+| # | Feature | Status |
+|---|---------|--------|
+| — | `lib/operator-location.ts` — operator city resolver (override → member city → IP geo → Austin) | ✅ built |
+| 1 | Time-aware operator greeting (`lib/greeting.ts`) | 🔶 helper built; not yet wired into a dashboard header |
+| 2 | Local weather pill (Open-Meteo, operator city) | ⬜ pending |
+| 3 | Charter-tier approval personal note ("approve — say something?") | ⬜ pending |
+| 4 | Empty states in Adam's voice | 🔶 Applications queue done; events/members/RSVP/notifications/search/audit pending |
+| 5 | Warm error messages | 🔶 `app/error.tsx` (500) done; form-validation + auth copy pending |
+| 6 | Custom 404 (`app/not-found.tsx`) — "you wandered off." | ✅ built |
+| 7 | AI chat thinking indicator (three dots, italic) | ⬜ pending (tied to deferred Task 2) |
+| 8 | Milestone overlays (1/10/50/100/500/1000th member) | ⬜ pending |
+| 9 | Application of the week (Monday 9am local) | ⬜ pending |
+| 10 | Closed-loop referral notification | ⬜ pending |
+| 11 | Birthday spotlight on member profile | ⬜ pending |
+| 12 | Fun facts widget on Intelligence Community tab | ⬜ pending (`lib/fun-facts.ts`) |
+| 13 | `/credits` slash command (`CONTRIBUTORS.md` created: Adam, Chloe, Nathan) | 🔶 file built; command pending (Task 2) |
+| 13 | `/austin`, `/whoami`, `/heatmap`, `/silence` slash commands | ⬜ pending (Task 2) |
+| 14 | Founder greeting (type "adam"/"chloe" → 🖤 corner pop) | ⬜ pending |
+| 15 | Platform sounds toggle (operator preferences) | ⬜ pending |
+| 16 | `/apply` reveal auto-night-mode 11pm–4am | ✅ built |
+| 17 | Post-Frogger reverse mode ("you became the system") | ⬜ pending |
+| 18 | Time-of-day favicon swap | ⬜ deferred (waiting on brand mark) |
+| 19 | Post-approval email P.S. line (AI-picked quote) | ⬜ pending |
+
+---
+
+## Backlog — Deferred This Build
+
+Built and deployed in the question-resilience build: Tasks 1, 3, 4, 5A–C, 5F–G.
+
+**Near-term (next sessions):**
+- **Task 2** — Cmd+K operator AI chat panel with ~25 read/write tools. Deferred: needs a focused build.
+- **Task 13** — RBAC (Clerk Organizations: owner/admin/manager/staff/readonly), invite flow, `/operator/settings/team`, `/operator/settings/workspace`. Deferred: foundational SaaS work, needs a careful design pass.
+- **Task 5 D** — Question builder UI (`/operator/settings/questions`, dnd-kit reorder, AI Assist).
+- **Task 5 E** — Application template builder UI (`/operator/settings/applications`).
+- **Remaining delight features** — see table above.
+- **`/apply` label-casing fix** — `labelStyle`/`chapterLabelStyle` apply `textTransform:uppercase`; design intent is lowercase. Rapid-fire field labels are literal ALL CAPS and need relabeling.
+- **Per-theme fonts** — Obsidian (Cormorant + DM Mono), Rosé (Playfair + Jakarta), Parchment (Fraunces + Instrument), Void (Syne + DM Serif). Themes currently change colors only.
+- **`/operator/playground`** — owner-only delight-feature trigger page.
+
+## V2 + SaaS Scalability Backlog
+
+Documented for future milestones — not in scope now. Categories: **Security** (audit hardening, secrets rotation, pen-test), **Compliance** (SOC 2, DPA templates, sub-processor registry), **Payments** (Stripe live mode, payouts, multi-currency), **Member Experience** (mobile app, member directory, DMs), **Operator Experience** (CSV exports, email template editor, notification settings), **SaaS Platform** (self-serve onboarding, billing, white-label brand builder), **Infrastructure** (read replicas, queue workers, observability), **AI** (NoBC OS MCP server V1.5, House Phone migration, agentic eval harness), **Integrations** (calendar sync, CRM, Producer Phase K+), **Sales & Growth** (referral program, public event pages, SEO).
+```

@@ -108,6 +108,7 @@ export async function POST(
   const pi = await stripe.paymentIntents.create({
     amount: amountCents,
     currency: 'usd',
+    capture_method: 'manual',
     description: event.title,
     receipt_email: rsvpMember.email,
     automatic_payment_methods: { enabled: true },
@@ -120,6 +121,8 @@ export async function POST(
       where: { id: existing.id },
       data: {
         stripePaymentIntentId: pi.id,
+        paymentStatus: 'AUTHORIZED',
+        amountCents,
         ticketStatus: 'held',
         customAnswers: body.customAnswers ?? undefined,
         guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
@@ -136,6 +139,8 @@ export async function POST(
         status: 'CONFIRMED',
         ticketStatus: 'held',
         stripePaymentIntentId: pi.id,
+        paymentStatus: 'AUTHORIZED',
+        amountCents,
         customAnswers: body.customAnswers ?? undefined,
         guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
         guestName: resolved.kind === 'guest' ? body.guestName : null,

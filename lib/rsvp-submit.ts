@@ -190,7 +190,7 @@ export async function submitMemberRsvp(
       const memberName = `${member.firstName} ${member.lastName}`.trim();
       if (emailAddress) {
         resend.emails.send({
-          from: 'NoBC <noreply@thenobadcompany.com>',
+          from: 'NoBC <team@thenobadcompany.com>',
           to: emailAddress,
           ...rsvpConfirmedEmail(memberName, eventRecord.title, eventRecord.startAt, eventRecord.location, eventRecord.slug, rsvp.id),
         }).catch(err => console.error('[rsvp] confirmation email failed:', err));

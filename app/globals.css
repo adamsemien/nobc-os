@@ -81,6 +81,22 @@
 }
 
 /* ============================================================
+   Archetype + insight palette — brand constants, theme-independent.
+   Used by the Intelligence dashboard charts (no hex literals in components).
+   ============================================================ */
+:root {
+  --archetype-connector: #B22E21;
+  --archetype-host: #C47A3A;
+  --archetype-curator: #8B6914;
+  --archetype-builder: #2D5A3D;
+  --archetype-maker: #4A3580;
+  --archetype-patron: #1A3A5C;
+  --worth-charter: #8B6914;
+  --worth-standard: #2D5A3D;
+  --worth-waitlist: #A8978A;
+}
+
+/* ============================================================
    THEME: Midnight (dark)
    ============================================================ */
 [data-theme="midnight"] {
@@ -964,4 +980,387 @@ button:not(:disabled):active,
 /* Event creation — prevent horizontal overflow on mobile */
 .event-form-wrapper {
   overflow-x: hidden;
+}
+
+/* ============================================================
+   THEME: Parchment — luxury private members club letterhead
+   ============================================================ */
+[data-theme="parchment"] {
+  --bg: #f5f0e8;
+  --surface: #faf7f2;
+  --raised: #ede8dc;
+  --card: #faf7f2;
+  --sidebar: #ede8dc;
+  --sidebar-active-bg: rgba(139,58,42,0.08);
+  --border: rgba(28,23,18,0.1);
+  --border-strong: rgba(28,23,18,0.2);
+  --text-primary: #1c1712;
+  --text-secondary: rgba(28,23,18,0.5);
+  --text-tertiary: rgba(28,23,18,0.35);
+  --primary: #8b3a2a;
+  --primary-hover: #7a3225;
+  --primary-soft: rgba(139,58,42,0.1);
+  --accent: #8b3a2a;
+  --accent-hover: #7a3225;
+  --accent-soft: rgba(139,58,42,0.1);
+  --on-primary: #faf7f2;
+  --success: #2d5a3d;
+  --success-soft: rgba(45,90,61,0.12);
+  --warning: #8b5a00;
+  --warning-soft: rgba(139,90,0,0.12);
+  --danger: #8b2020;
+  --danger-soft: rgba(139,32,32,0.12);
+  --neutral-soft: rgba(28,23,18,0.06);
+  --radius-base: 0px;
+  --card-shadow: none;
+  --card-shadow-hover: none;
+  --sidebar-shadow: inset -1px 0 0 rgba(28,23,18,0.08);
+  --page-bg: var(--bg);
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-instrument-serif), Georgia, serif;
+  --font-ui: var(--font-space-grotesk), system-ui, sans-serif;
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: #ffffff;
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+
+  --op-rec-strong-yes-bg: rgba(45,90,61,0.15);
+  --op-rec-strong-yes-fg: #2d5a3d;
+  --op-rec-yes-bg: rgba(45,90,61,0.08);
+  --op-rec-yes-fg: #2d5a3d;
+  --op-rec-unclear-bg: rgba(139,90,0,0.08);
+  --op-rec-unclear-fg: #8b5a00;
+  --op-rec-no-bg: rgba(139,32,32,0.08);
+  --op-rec-no-fg: #8b2020;
+  --op-rec-strong-no-bg: rgba(139,32,32,0.15);
+  --op-rec-strong-no-fg: #8b2020;
+  --op-approve: #2d5a3d;
+  --op-approve-hover: #245030;
+  --op-approve-fg: #faf7f2;
+  --op-reject: #8b2020;
+  --op-reject-hover: #7a1a1a;
+  --op-reject-fg: #faf7f2;
+}
+
+[data-theme="parchment"] * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(28,23,18,0.3) transparent;
+}
+[data-theme="parchment"] *::-webkit-scrollbar { width: 3px; height: 3px; }
+[data-theme="parchment"] *::-webkit-scrollbar-track { background: transparent; }
+[data-theme="parchment"] *::-webkit-scrollbar-thumb {
+  background: rgba(28,23,18,0.3);
+  border-radius: 0;
+}
+
+[data-theme="parchment"] :focus-visible {
+  outline: 1px solid rgba(139,58,42,0.5);
+  outline-offset: 2px;
+}
+
+[data-theme="parchment"] button:not(:disabled),
+[data-theme="parchment"] [role="button"]:not([aria-disabled="true"]) {
+  transition: background-color 350ms ease-out, border-color 350ms ease-out, color 350ms ease-out, box-shadow 350ms ease-out;
+}
+
+@keyframes parchment-fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+[data-theme="parchment"] .obs-stagger > * {
+  animation: parchment-fade-up 350ms ease-out both;
+}
+[data-theme="parchment"] .obs-stagger > *:nth-child(1)  { animation-delay:   0ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(2)  { animation-delay:  25ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(3)  { animation-delay:  50ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(4)  { animation-delay:  75ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(5)  { animation-delay: 100ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(6)  { animation-delay: 125ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(7)  { animation-delay: 150ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(8)  { animation-delay: 175ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(9)  { animation-delay: 200ms; }
+[data-theme="parchment"] .obs-stagger > *:nth-child(10) { animation-delay: 225ms; }
+
+[data-theme="parchment"] .obs-app-name {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-weight: 300;
+  font-style: italic;
+  font-size: 1.1875rem;
+  color: #1c1712;
+}
+
+[data-theme="parchment"] .obs-app-button:hover {
+  background: #f0eade !important;
+}
+
+[data-theme="parchment"] .obs-app-button.obs-app-active {
+  background: #f5f0e8 !important;
+  border-left: 3px solid #8b3a2a !important;
+}
+
+[data-theme="parchment"] .obs-score-badge { display: none; }
+[data-theme="parchment"] .obs-score-bar { display: block; }
+
+/* Parchment wax seal easter egg */
+@keyframes parchment-stamp {
+  0%   { transform: scale(1.4) rotate(-8deg); opacity: 0; }
+  60%  { transform: scale(0.95) rotate(2deg); opacity: 1; }
+  80%  { transform: scale(1.02) rotate(-1deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.parchment-wax-seal {
+  animation: parchment-stamp 400ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* ============================================================
+   THEME: Void — Dieter Rams at 3am
+   ============================================================ */
+[data-theme="void"] {
+  --bg: #080808;
+  --surface: #111111;
+  --raised: #1a1a1a;
+  --card: #111111;
+  --sidebar: #0c0c0c;
+  --sidebar-active-bg: rgba(255,255,255,0.04);
+  --border: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.15);
+  --text-primary: #f2f2f2;
+  --text-secondary: rgba(242,242,242,0.4);
+  --text-tertiary: rgba(242,242,242,0.25);
+  --primary: #B22E21;
+  --primary-hover: #c43520;
+  --primary-soft: rgba(178,46,33,0.12);
+  --accent: #e8e8e8;
+  --accent-hover: #ffffff;
+  --accent-soft: rgba(242,242,242,0.08);
+  --on-primary: #f2f2f2;
+  --success: #2a5c3a;
+  --success-soft: rgba(42,92,58,0.2);
+  --warning: #5c4a00;
+  --warning-soft: rgba(92,74,0,0.2);
+  --danger: #cc3333;
+  --danger-soft: rgba(204,51,51,0.15);
+  --neutral-soft: rgba(242,242,242,0.05);
+  --radius-base: 4px;
+  --card-shadow: none;
+  --card-shadow-hover: 0 0 0 1px rgba(255,255,255,0.07);
+  --sidebar-shadow: inset -1px 0 0 rgba(255,255,255,0.05);
+  --page-bg: var(--bg);
+  --font-display: var(--font-syne), system-ui, sans-serif;
+  --font-body: var(--font-dm-serif-display), Georgia, serif;
+  --font-ui: var(--font-syne), system-ui, sans-serif;
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--raised);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+
+  --op-rec-strong-yes-bg: rgba(42,92,58,0.3);
+  --op-rec-strong-yes-fg: rgba(160,220,180,0.9);
+  --op-rec-yes-bg: rgba(42,92,58,0.15);
+  --op-rec-yes-fg: rgba(120,190,145,0.8);
+  --op-rec-unclear-bg: rgba(242,242,242,0.06);
+  --op-rec-unclear-fg: rgba(242,242,242,0.6);
+  --op-rec-no-bg: rgba(204,51,51,0.12);
+  --op-rec-no-fg: rgba(240,160,160,0.8);
+  --op-rec-strong-no-bg: rgba(204,51,51,0.25);
+  --op-rec-strong-no-fg: rgba(255,200,200,0.9);
+  --op-approve: rgba(42,92,58,0.6);
+  --op-approve-hover: rgba(50,110,70,0.75);
+  --op-approve-fg: rgba(160,220,180,0.95);
+  --op-reject: rgba(204,51,51,0.5);
+  --op-reject-hover: rgba(204,51,51,0.65);
+  --op-reject-fg: rgba(255,210,210,0.95);
+}
+
+[data-theme="void"] * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+[data-theme="void"] *::-webkit-scrollbar { width: 2px; height: 2px; }
+[data-theme="void"] *::-webkit-scrollbar-track { background: transparent; }
+[data-theme="void"] *::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 1px;
+}
+
+[data-theme="void"] :focus-visible {
+  outline: 1px solid rgba(242,242,242,0.3);
+  outline-offset: 2px;
+}
+
+[data-theme="void"] button:not(:disabled),
+[data-theme="void"] [role="button"]:not([aria-disabled="true"]) {
+  transition: background-color 200ms, border-color 200ms, color 200ms, box-shadow 200ms;
+}
+
+[data-theme="void"] .obs-app-name {
+  font-family: var(--font-syne), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: #f2f2f2;
+}
+
+[data-theme="void"] .obs-app-button:hover {
+  background: #161616 !important;
+  border-color: rgba(255,255,255,0.07) !important;
+}
+
+[data-theme="void"] .obs-app-button.obs-app-active {
+  background: #161616 !important;
+  border-left: 2px solid #ffffff !important;
+}
+
+[data-theme="void"] .obs-score-badge { display: none; }
+[data-theme="void"] .obs-score-bar { display: block; }
+
+/* Void scan line — plays once on page load */
+@keyframes void-scan {
+  0%   { top: 0; opacity: 1; }
+  100% { top: 100vh; opacity: 0; }
+}
+.void-scan-line {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255,255,255,0.02);
+  pointer-events: none;
+  z-index: 9999;
+  animation: void-scan 800ms linear forwards;
+}
+
+/* ============================================================
+   THEME: Ember — blue-light-free night working
+   ============================================================ */
+[data-theme="ember"] {
+  --bg: #1a1008;
+  --surface: #26190c;
+  --raised: #341f0d;
+  --card: #26190c;
+  --sidebar: #1f1409;
+  --sidebar-active-bg: rgba(232,132,10,0.1);
+  --border: rgba(255,180,80,0.08);
+  --border-strong: rgba(232,132,10,0.4);
+  --text-primary: #f5deb3;
+  --text-secondary: rgba(245,222,179,0.5);
+  --text-tertiary: rgba(245,222,179,0.3);
+  --primary: #e8840a;
+  --primary-hover: #d47508;
+  --primary-soft: rgba(232,132,10,0.15);
+  --accent: #e8840a;
+  --accent-hover: #d47508;
+  --accent-soft: rgba(232,132,10,0.15);
+  --on-primary: #1a1008;
+  --success: #4a7c20;
+  --success-soft: rgba(74,124,32,0.15);
+  --warning: #c87800;
+  --warning-soft: rgba(200,120,0,0.15);
+  --danger: #cc3333;
+  --danger-soft: rgba(204,51,51,0.15);
+  --neutral-soft: rgba(255,180,80,0.06);
+  --radius-base: 6px;
+  --card-shadow: 0 1px 3px rgba(232,132,10,0.08);
+  --card-shadow-hover: 0 2px 8px rgba(232,132,10,0.12);
+  --sidebar-shadow: inset -1px 0 0 rgba(255,180,80,0.08);
+  --page-bg: var(--bg);
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-ui: var(--font-space-grotesk), system-ui, sans-serif;
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--raised);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+
+  --op-rec-strong-yes-bg: rgba(74,124,32,0.2);
+  --op-rec-strong-yes-fg: rgba(180,220,120,0.9);
+  --op-rec-yes-bg: rgba(74,124,32,0.12);
+  --op-rec-yes-fg: rgba(160,200,100,0.8);
+  --op-rec-unclear-bg: rgba(232,132,10,0.12);
+  --op-rec-unclear-fg: rgba(232,132,10,0.9);
+  --op-rec-no-bg: rgba(204,51,51,0.12);
+  --op-rec-no-fg: rgba(240,160,140,0.8);
+  --op-rec-strong-no-bg: rgba(204,51,51,0.22);
+  --op-rec-strong-no-fg: rgba(255,200,185,0.9);
+  --op-approve: rgba(74,124,32,0.5);
+  --op-approve-hover: rgba(85,140,38,0.65);
+  --op-approve-fg: rgba(180,220,120,0.95);
+  --op-reject: rgba(204,51,51,0.45);
+  --op-reject-hover: rgba(204,51,51,0.6);
+  --op-reject-fg: rgba(255,210,200,0.95);
+}
+
+[data-theme="ember"] * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232,132,10,0.2) transparent;
+}
+[data-theme="ember"] *::-webkit-scrollbar { width: 3px; height: 3px; }
+[data-theme="ember"] *::-webkit-scrollbar-track { background: transparent; }
+[data-theme="ember"] *::-webkit-scrollbar-thumb {
+  background: rgba(232,132,10,0.2);
+  border-radius: 2px;
+}
+
+[data-theme="ember"] :focus-visible {
+  outline: 1px solid rgba(232,132,10,0.5);
+  outline-offset: 2px;
+}
+
+[data-theme="ember"] button:not(:disabled),
+[data-theme="ember"] [role="button"]:not([aria-disabled="true"]) {
+  transition: background-color 400ms ease-out, border-color 400ms ease-out, color 400ms ease-out, box-shadow 400ms ease-out;
+}
+
+[data-theme="ember"] .obs-app-name {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-weight: 300;
+  font-style: italic;
+  font-size: 1.125rem;
+  color: #f5deb3;
+}
+
+[data-theme="ember"] .obs-app-button:hover {
+  background: #2e1f10 !important;
+  border-color: rgba(255,180,80,0.15) !important;
+}
+
+[data-theme="ember"] .obs-app-button.obs-app-active {
+  background: #2e1f10 !important;
+  border-left: 2px solid #e8840a !important;
+}
+
+[data-theme="ember"] .obs-score-badge { display: none; }
+[data-theme="ember"] .obs-score-bar { display: block; }
+
+/* Rose confetti keyframes — used by rose theme approve button */
+@keyframes rose-confetti-burst {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--cx), var(--cy)) rotate(360deg); opacity: 0; }
+}
+
+/* Intelligence deep-link flash — when the operator agent jumps to a metric
+   tile, it briefly rings the tile so the answer is unmistakable. */
+@keyframes metric-flash {
+  from { box-shadow: 0 0 0 2px var(--accent); }
+  to   { box-shadow: 0 0 0 0 transparent; }
+}
+.metric-flash {
+  animation: metric-flash 2.4s ease-out;
 }

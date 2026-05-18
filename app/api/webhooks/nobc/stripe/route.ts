@@ -4,6 +4,7 @@ import { stripe } from '@/lib/stripe';
 import { db } from '@/lib/db';
 import { resend } from '@/lib/resend';
 import { rsvpConfirmedEmail } from '@/lib/email-templates';
+import { emitEvent } from '@/lib/emit-event';
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -54,6 +55,16 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Svix outbound: rsvp.confirmed
+      emitEvent({
+        workspaceId,
+        actorId: memberId ?? 'stripe',
+        action: 'rsvp.confirmed',
+        entityType: 'RSVP',
+        entityId: rsvpId,
+        metadata: { paymentPath: 'checkout' },
+      }).catch(err => console.error('[stripe-webhook] rsvp.confirmed emit failed:', err));
+
       if (process.env.RESEND_API_KEY && eventRecord) {
         const member = await db.member.findFirst({
           where: { id: memberId },
@@ -69,7 +80,7 @@ export async function POST(req: NextRequest) {
             rsvpId,
           );
           resend.emails.send({
-            from: 'NoBC <noreply@thenobadcompany.com>',
+            from: 'NoBC <team@thenobadcompany.com>',
             to: member.email,
             subject,
             html,
@@ -80,16 +91,16 @@ export async function POST(req: NextRequest) {
     }
 
     case 'payment_intent.amount_capturable_updated': {
-      // Card authorized — funds reserved, mark RSVP confirmed
+      // Card authorized — funds reserved, mark RSVP confirmed + paymentStatus AUTHORIZED
       const pi = event.data.object as Stripe.PaymentIntent;
       const { workspaceId, memberId } = pi.metadata as { workspaceId: string; memberId: string };
       const rsvp = await db.rSVP.findFirst({
         where: { stripePaymentIntentId: pi.id },
-        select: { id: true },
+        select: { id: true, eventId: true },
       });
       await db.rSVP.updateMany({
         where: { stripePaymentIntentId: pi.id },
-        data: { ticketStatus: 'confirmed', status: 'CONFIRMED' },
+        data: { ticketStatus: 'confirmed', status: 'CONFIRMED', paymentStatus: 'AUTHORIZED' },
       });
       if (rsvp && workspaceId) {
         await db.auditEvent.create({
@@ -101,12 +112,51 @@ export async function POST(req: NextRequest) {
             entityId: rsvp.id,
           },
         });
+
+        // Svix outbound: rsvp.confirmed (authorized = payment held, seat confirmed)
+        emitEvent({
+          workspaceId,
+          actorId: memberId ?? 'stripe',
+          action: 'rsvp.confirmed',
+          entityType: 'RSVP',
+          entityId: rsvp.id,
+          metadata: { paymentPath: 'authorize' },
+        }).catch(err => console.error('[stripe-webhook] rsvp.confirmed emit failed:', err));
+
+        // Send confirmation email
+        if (process.env.RESEND_API_KEY) {
+          const eventRecord = await db.event.findUnique({
+            where: { id: rsvp.eventId },
+            select: { title: true, slug: true, startAt: true, location: true },
+          });
+          const member = memberId
+            ? await db.member.findFirst({
+                where: { id: memberId },
+                select: { email: true, firstName: true, lastName: true },
+              })
+            : null;
+          if (eventRecord && member) {
+            const { resend } = await import('@/lib/resend');
+            const { rsvpConfirmedEmail } = await import('@/lib/email-templates');
+            const { subject, html } = rsvpConfirmedEmail(
+              `${member.firstName} ${member.lastName}`.trim(),
+              eventRecord.title,
+              eventRecord.startAt,
+              eventRecord.location,
+              eventRecord.slug,
+              rsvp.id,
+            );
+            resend.emails
+              .send({ from: 'NoBC <team@thenobadcompany.com>', to: member.email, subject, html })
+              .catch((err) => console.error('[stripe-webhook] confirmation email failed:', err));
+          }
+        }
       }
       break;
     }
 
     case 'payment_intent.succeeded': {
-      // Captured (charge.captured fires too, but this is cleaner)
+      // Captured — update paymentStatus and capturedAt
       const pi = event.data.object as Stripe.PaymentIntent;
       const { workspaceId, memberId } = pi.metadata as { workspaceId: string; memberId: string };
       const rsvp = await db.rSVP.findFirst({
@@ -115,7 +165,7 @@ export async function POST(req: NextRequest) {
       });
       await db.rSVP.updateMany({
         where: { stripePaymentIntentId: pi.id },
-        data: { ticketStatus: 'confirmed' },
+        data: { ticketStatus: 'confirmed', paymentStatus: 'CAPTURED', capturedAt: new Date() },
       });
       if (rsvp && workspaceId) {
         await db.auditEvent.create({
@@ -134,10 +184,27 @@ export async function POST(req: NextRequest) {
     case 'payment_intent.payment_failed':
     case 'payment_intent.canceled': {
       const pi = event.data.object as Stripe.PaymentIntent;
+      const { workspaceId: piWorkspaceId, memberId: piMemberId } = pi.metadata as {
+        workspaceId?: string; memberId?: string;
+      };
+      const failedRsvp = await db.rSVP.findFirst({
+        where: { stripePaymentIntentId: pi.id },
+        select: { id: true },
+      });
       await db.rSVP.updateMany({
         where: { stripePaymentIntentId: pi.id, ticketStatus: { in: ['held'] } },
-        data: { ticketStatus: 'payment_failed', status: 'DECLINED' },
+        data: { ticketStatus: 'payment_failed', status: 'DECLINED', paymentStatus: 'FAILED' },
       });
+      if (failedRsvp && piWorkspaceId) {
+        emitEvent({
+          workspaceId: piWorkspaceId,
+          actorId: piMemberId ?? 'stripe',
+          action: 'rsvp.cancelled',
+          entityType: 'RSVP',
+          entityId: failedRsvp.id,
+          metadata: { reason: event.type },
+        }).catch(err => console.error('[stripe-webhook] rsvp.cancelled emit failed:', err));
+      }
       break;
     }
   }

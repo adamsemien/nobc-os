@@ -14,6 +14,15 @@ model Workspace {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  // White-label / workspace settings
+  logoUrl           String?
+  primaryColor      String?
+  contactEmail      String?
+  tierCharterName   String  @default("Charter")
+  tierStandardName  String  @default("Standard")
+  tierWaitlistName  String  @default("Waitlist")
+  defaultTemplateId String?
+
   members         Member[]
   applications    Application[]
   events          Event[]
@@ -24,6 +33,11 @@ model Workspace {
   auditEvents     AuditEvent[]
   redList              RedList[]
   eventFlowTemplates   EventFlowTemplate[]
+  questionDefinitions  QuestionDefinition[]
+  applicationTemplates ApplicationTemplate[]
+  intelligenceInsights IntelligenceInsight[]
+  savedReports         SavedReport[]
+  agentConversations   AgentConversation[]
   svixAppId       String?
 }
 
@@ -112,12 +126,15 @@ model Application {
   archetype        String?
   archetypeScores  Json?
   personalizedCopy String?
+  templateId       String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  answers ApplicationAnswer[]
+  answers  ApplicationAnswer[]
+  template ApplicationTemplate? @relation(fields: [templateId], references: [id])
 
   @@index([workspaceId])
+  @@index([templateId])
 }
 
 model ApplicationAnswer {
@@ -247,6 +264,9 @@ model RSVP {
   checkedIn          Boolean    @default(false)
   checkedInAt        DateTime?
   stripePaymentIntentId String?
+  paymentStatus      String?
+  capturedAt         DateTime?
+  amountCents        Int?
   refundedAt         DateTime?
   refundAmountCents  Int?
   isComp             Boolean    @default(false)
@@ -342,19 +362,79 @@ model WaitlistEntry {
   @@index([eventId])
 }
 
+enum AuditActorType {
+  OPERATOR
+  AGENT
+  MEMBER
+  SYSTEM
+}
+
 model AuditEvent {
-  id          String    @id @default(cuid())
+  id          String         @id @default(cuid())
   workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id])
   actorId     String?
+  actorType   AuditActorType @default(OPERATOR)
   action      String
   entityType  String
   entityId    String
   metadata    Json?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime       @default(now())
 
   @@index([workspaceId])
   @@index([entityType, entityId])
+}
+
+/// A Cmd+K agent session. One per palette agent-mode entry (Phase 1 — no resumption).
+model AgentConversation {
+  id          String   @id @default(cuid())
+  workspaceId String
+  operatorId  String
+  createdAt   DateTime @default(now())
+  lastTurnAt  DateTime @default(now())
+  /// Auto-generated from the first user message, max 80 chars.
+  title       String?
+
+  turns     AgentTurn[]
+  workspace Workspace   @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([operatorId])
+}
+
+/// One step in an agent conversation: a user message, an assistant message,
+/// a tool call, or a tool result.
+model AgentTurn {
+  id                 String          @id @default(cuid())
+  conversationId     String
+  role               AgentTurnRole
+  /// User message or assistant text.
+  content            String?
+  toolName           String?
+  toolInput          Json?
+  toolOutput         Json?
+  status             AgentTurnStatus @default(COMPLETED)
+  confirmationPrompt String?
+  createdAt          DateTime        @default(now())
+
+  conversation AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+enum AgentTurnRole {
+  USER
+  ASSISTANT
+  TOOL_CALL
+  TOOL_RESULT
+}
+
+enum AgentTurnStatus {
+  PENDING
+  AWAITING_CONFIRMATION
+  COMPLETED
+  CANCELLED
+  FAILED
 }
 
 model RedList {
@@ -369,6 +449,57 @@ model RedList {
 
   @@index([workspaceId])
   @@index([email])
+}
+
+model QuestionDefinition {
+  id                  String   @id @default(cuid())
+  workspaceId         String
+  templateId          String
+  stableKey           String
+  label               String
+  type                String
+  section             String
+  order               Int
+  required            Boolean  @default(false)
+  isActive            Boolean  @default(true)
+  insightLabel        String
+  insightDescription  String
+  scoringDimension    String?
+  scoringWeight       Float    @default(0.5)
+  scoringLogic        String
+  archetypeSignals    String[]
+  sponsorRelevance    String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id])
+  template    ApplicationTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([workspaceId])
+  @@index([templateId])
+  @@index([stableKey])
+}
+
+model ApplicationTemplate {
+  id                    String   @id @default(cuid())
+  workspaceId           String
+  name                  String
+  description           String?
+  slug                  String
+  isActive              Boolean  @default(true)
+  isDefault             Boolean  @default(false)
+  scoringInstructions   String
+  archetypesEnabled     Boolean  @default(true)
+  memberWorthEnabled    Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  workspace    Workspace            @relation(fields: [workspaceId], references: [id])
+  questions    QuestionDefinition[]
+  applications Application[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
 }
 
 model EventFlowTemplate {
@@ -386,6 +517,35 @@ model EventFlowTemplate {
   customQuestions       Json      @default("[]")
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+
+  @@index([workspaceId])
+}
+
+model IntelligenceInsight {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  metricId     String
+  narrative    String
+  delta        Json?
+  generatedAt  DateTime  @default(now())
+  acknowledged Boolean   @default(false)
+
+  @@index([workspaceId])
+  @@index([metricId])
+}
+
+model SavedReport {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  name        String
+  question    String
+  metricIds   String[]
+  filters     Json
+  createdById String
+  createdAt   DateTime  @default(now())
+  lastRunAt   DateTime?
 
   @@index([workspaceId])
 }

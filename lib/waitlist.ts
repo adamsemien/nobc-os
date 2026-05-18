@@ -25,7 +25,7 @@ export async function promoteFromWaitlist(eventId: string): Promise<void> {
   if (process.env.RESEND_API_KEY) {
     const { subject, html } = waitlistPromotedEmail(entry.name, event.title, event.slug);
     await resend.emails.send({
-      from: 'NoBC <noreply@thenobadcompany.com>',
+      from: 'NoBC <team@thenobadcompany.com>',
       to: entry.email,
       subject,
       html,

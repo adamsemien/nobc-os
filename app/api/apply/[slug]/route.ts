@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { ApplySchema, answerQuestions } from '@/lib/apply-config';
 import { tagApplication } from '@/lib/ai/tag-application';
 import { attachEventRsvpAfterApply } from '@/lib/apply-event-rsvp';
+import { emitEvent } from '@/lib/emit-event';
 
 export async function POST(
   req: NextRequest,
@@ -128,6 +129,15 @@ export async function POST(
       console.error('[apply] tagApplication failed:', err);
     }),
   );
+
+  // Emit application.submitted — fire-and-forget, don't block response
+  emitEvent({
+    workspaceId: workspace.id,
+    action: 'application.submitted',
+    entityType: 'APPLICATION',
+    entityId: application.id,
+    metadata: { email, fullName },
+  }).catch(err => console.error('[apply] application.submitted emit failed:', err));
 
   const { userId } = await auth();
   if (userId && data.rsvpEventId) {

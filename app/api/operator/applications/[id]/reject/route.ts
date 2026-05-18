@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
+import { emitEvent } from '@/lib/emit-event';
 
 export async function POST(
   req: NextRequest,
@@ -32,34 +33,33 @@ export async function POST(
     /* optional body */
   }
 
-  const [updatedApp] = await db.$transaction([
-    db.application.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        reviewedAt: new Date(),
-        reviewedBy: userId,
-        rejectionReason: reason ?? null,
-        reviewNote,
-      },
-    }),
-    db.auditEvent.create({
-      data: {
-        workspaceId,
-        actorId: userId,
-        action: 'application.rejected',
-        entityType: 'APPLICATION',
-        entityId: id,
-      },
-    }),
-  ]);
+  const updatedApp = await db.application.update({
+    where: { id },
+    data: {
+      status: 'REJECTED',
+      reviewedAt: new Date(),
+      reviewedBy: userId,
+      rejectionReason: reason ?? null,
+      reviewNote,
+    },
+  });
+
+  // emitEvent writes AuditEvent + Svix
+  await emitEvent({
+    workspaceId,
+    actorId: userId,
+    action: 'application.rejected',
+    entityType: 'APPLICATION',
+    entityId: id,
+    metadata: { reason: reason ?? null },
+  });
 
   if (process.env.RESEND_API_KEY) {
     const { applicationRejectedEmail } = await import('@/lib/email-templates');
     const { resend } = await import('@/lib/resend');
     const { subject, html } = applicationRejectedEmail(app.fullName);
     resend.emails.send({
-      from: 'NoBC <noreply@thenobadcompany.com>',
+      from: 'NoBC <team@thenobadcompany.com>',
       to: app.email,
       subject,
       html,

@@ -5,6 +5,8 @@ import { requireWorkspaceId } from '@/lib/auth';
 import { z } from 'zod';
 import { EventAccessSchema } from '@/lib/event-access-schema';
 import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
+import { emitEvent } from '@/lib/emit-event';
+import { notifyProducer } from '@/lib/producer-webhook';
 
 const CustomQuestionSchema = z.object({
   id: z.string(),
@@ -157,6 +159,41 @@ export async function PATCH(
       });
     }
   });
+
+  // Emit Svix outbound events for publish/cancel transitions
+  if (statusChanged) {
+    if (rest.status === 'PUBLISHED') {
+      emitEvent({
+        workspaceId,
+        actorId: userId,
+        action: 'event.published',
+        entityType: 'EVENT',
+        entityId: id,
+        metadata: { previousStatus: event.status },
+      }).catch(err => console.error('[events] event.published emit failed:', err));
+    } else if (rest.status === 'CANCELLED') {
+      emitEvent({
+        workspaceId,
+        actorId: userId,
+        action: 'event.cancelled',
+        entityType: 'EVENT',
+        entityId: id,
+        metadata: { previousStatus: event.status },
+      }).catch(err => console.error('[events] event.cancelled emit failed:', err));
+    }
+  }
+
+  // Phase J: notify Producer of event lifecycle changes (fire-and-forget)
+  if (statusChanged && rest.status === 'PUBLISHED') {
+    notifyProducer('event.published', id, workspaceId)
+      .catch(err => console.error('[events] producer notify failed:', err));
+  } else if (statusChanged && rest.status === 'CANCELLED') {
+    notifyProducer('event.cancelled', id, workspaceId)
+      .catch(err => console.error('[events] producer notify failed:', err));
+  } else if (!statusChanged && event.status === 'PUBLISHED') {
+    notifyProducer('event.updated', id, workspaceId)
+      .catch(err => console.error('[events] producer notify failed:', err));
+  }
 
   return NextResponse.json({ ok: true });
 }

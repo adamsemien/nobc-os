@@ -5,6 +5,7 @@ import { getPublishedEventsWithConfirmedCounts } from '@/lib/events';
 import { getEventHeroDisplayUrl } from '@/lib/event-hero-url';
 import { MemberWorkspaceGate } from './_components/MemberWorkspaceGate';
 import MemberEventsExplorer, { type MemberEventsExplorerRow } from './_components/MemberEventsExplorer';
+import { LegalFooter } from '@/app/_components/LegalFooter';
 
 const applySlug = process.env.NEXT_PUBLIC_APPLY_SLUG?.trim();
 const applyHref = `/apply/${applySlug && applySlug.length > 0 ? applySlug : 'nobc'}`;
@@ -36,5 +37,10 @@ export default async function EventsPage() {
     })),
   );
 
-  return <MemberEventsExplorer events={rows} applyHref={applyHref} />;
+  return (
+    <>
+      <MemberEventsExplorer events={rows} applyHref={applyHref} />
+      <LegalFooter />
+    </>
+  );
 }

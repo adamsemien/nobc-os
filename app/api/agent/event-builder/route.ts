@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const today = new Date().toISOString().slice(0, 10);
 
   const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-6'),
+    model: anthropic('claude-sonnet-4-20250514'),
     schema: EventDraftSchema,
     prompt: `You are a creative director for No Bad Company, a premium curated member club. Today is ${today}.
 

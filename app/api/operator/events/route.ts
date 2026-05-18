@@ -5,6 +5,7 @@ import { requireWorkspaceId } from '@/lib/auth';
 import { z } from 'zod';
 import { EventAccessSchema, defaultEventAccess } from '@/lib/event-access-schema';
 import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
+import { notifyProducer } from '@/lib/producer-webhook';
 
 export async function GET() {
   const { userId } = await auth();
@@ -153,6 +154,12 @@ export async function POST(req: NextRequest) {
 
     return ev;
   });
+
+  // Phase J: an event created already PUBLISHED notifies Producer (fire-and-forget)
+  if (event.status === 'PUBLISHED') {
+    notifyProducer('event.published', event.id, workspaceId)
+      .catch(err => console.error('[events] producer notify failed:', err));
+  }
 
   return NextResponse.json({ event }, { status: 201 });
 }

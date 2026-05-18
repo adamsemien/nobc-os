@@ -112,6 +112,123 @@ const TEST_DATA: Partial<FormData> = {
   foodAccessibility: '',
 };
 
+const DEMO_SETS: Array<{
+  id: string;
+  name: string;
+  desc: string;
+  color: string;
+  data: Partial<FormData>;
+}> = [
+  {
+    id: 'maya',
+    name: 'Maya Okonkwo',
+    desc: 'charter candidate',
+    color: '#2D7A4F',
+    data: {
+      fullName: 'Maya Okonkwo',
+      email: 'maya.okonkwo@test.com',
+      phone: '512-555-0271',
+      city: 'Austin, TX',
+      neighborhood: 'East Austin',
+      fromOriginally: 'Lagos, Nigeria',
+      birthday: '1989-08-22',
+      links: '@mayaokonkwo · mayaokonkwo.com',
+      referrers: ['Chloe Chiang', 'Adam Semien', ''],
+      workingOn: "Running a cultural programming studio that produces site-specific experiences for brands who want to reach creative communities without being cringe about it. We just wrapped a three-month residency for a beverage brand inside a gallery space in East Austin — no logos on the wall, just programming that earned the room.",
+      obsessedWith: "The Nairobi art scene right now and what it means that the best contemporary African art is being bought by Africans. The secondary market implications alone could reshape everything. I've been in contact with two collectors there and it's unlike anything happening in New York.",
+      alwaysCalledAbout: "Who to invite to what. And whether a creative direction is actually good or just looks good on a deck. Those are different skills and most people confuse them.",
+      interestingPeople: "My mentor who ran the Serpentine Gallery for 12 years — she can read a room in 30 seconds and has never once compromised on quality. My best friend who is a session musician turned VC and is one of the most rigorous thinkers I know. My downstairs neighbor who makes the best egusi soup in Austin and has no idea.",
+      connectedPeople: "Introduced a James Beard-nominated chef to a real estate developer who wanted to do something interesting with a warehouse space. They talked twice, shook hands, and opened a restaurant. It has a three-month waitlist.",
+      loyalCommunity: "A rotating dinner series in Brooklyn I've been part of for six years. No name, no social media, 14 people, you eat whatever the host decides. It survived a pandemic and two people moving to different countries.",
+      detailsRight: "A record store in Tokyo called Jet Set Records in Shimokitazawa. The way they organize by feel rather than genre. You don't know what you're looking for until you find it.",
+      trustTaste: "Issey Miyake, still. The way he thought about the relationship between fabric and the body — utility and beauty as the same thing. I also ask Nobu Matsuhisa for restaurant recs if I'm ever in the same city.",
+      recommend: "A small ceramics studio in East Austin that doesn't have an Instagram. I have brought them six commissions personally this year.",
+      splurgeVsSave: "Splurge on anything that creates a memory or supports a maker. Save on everything a brand wants you to notice.",
+      karaokeS: "Killing Me Softly. Every time. No hesitation.",
+      coffeeTable: "Three art monographs and a piece of raw amber I bought at a market in Lagos.",
+      busyDuringDay: "Programming, production calls, and thinking through problems on long walks.",
+      sundayMorning: "Farmers market, then a long breakfast with people I actually want to talk to.",
+      socialLink: "Are.na — I have 40 channels and revisit all of them.",
+      everydayItem: "I was a competitive fencer in college. Épée. I was genuinely good.",
+      foodAccessibility: '',
+      agreedToTerms: true,
+      consentSms: false,
+    },
+  },
+  {
+    id: 'derek',
+    name: 'Derek Paulson',
+    desc: 'worth considering',
+    color: '#B86A00',
+    data: {
+      fullName: 'Derek Paulson',
+      email: 'derek.paulson@test.com',
+      phone: '512-555-0334',
+      city: 'Austin, TX',
+      neighborhood: 'South Austin',
+      fromOriginally: 'Memphis, TN',
+      birthday: '1986-11-03',
+      links: '@derekpaulson',
+      referrers: ['Adam Semien', '', ''],
+      workingOn: "Scaling my second restaurant and figuring out whether I want to open a third. The operations are finally solid. The question is whether I want to spend the next five years doing this again.",
+      obsessedWith: "Natural wine and why Austin still doesn't have a truly great bottle shop. Someone needs to do it right.",
+      alwaysCalledAbout: "Restaurant recommendations. And to settle arguments about music.",
+      interestingPeople: "My business partner who came from finance and approaches hospitality like an operator. Different instinct than me but it works. My sous chef who grew up in Oaxaca and has more knowledge of technique than anyone I've worked with.",
+      connectedPeople: "Connected a farmer I source from with a chef at another restaurant in town. They have a direct relationship now and both are better for it.",
+      loyalCommunity: "The Austin food community. I've been going to the same farmers market for six years and I know most of the vendors by name.",
+      detailsRight: "Odd Duck. The sourcing is real, the service knows what they're talking about, and they never make you feel like you need to deserve the experience.",
+      trustTaste: "My sommelier. If she's excited about a bottle I trust it completely.",
+      recommend: "A natural wine importer called Selection Massale. I've converted most of my industry friends.",
+      splurgeVsSave: "Splurge on ingredients and wine. Save on things nobody eats.",
+      karaokeS: "Don't Stop Believin'. Classic for a reason.",
+      coffeeTable: "A book on French bistro culture and a stack of menus from places I've eaten.",
+      busyDuringDay: "At the restaurant or on calls with suppliers.",
+      sundayMorning: "Farmers market, then family breakfast.",
+      socialLink: "Instagram — mostly for food and hospitality accounts.",
+      everydayItem: "I ran a half marathon once and hated every mile of it.",
+      foodAccessibility: '',
+      agreedToTerms: true,
+      consentSms: false,
+    },
+  },
+  {
+    id: 'tyler',
+    name: 'Tyler Brennan',
+    desc: 'hard pass',
+    color: '#B22E21',
+    data: {
+      fullName: 'Tyler Brennan',
+      email: 'tyler.brennan@test.com',
+      phone: '512-555-0198',
+      city: 'Austin, TX',
+      neighborhood: '',
+      fromOriginally: 'Austin, TX',
+      birthday: '1993-05-17',
+      links: 'instagram.com/tylerbrennan',
+      referrers: ['', '', ''],
+      workingOn: "Sales at a tech company. Also have a side hustle doing some consulting.",
+      obsessedWith: "The Joe Rogan podcast and the NBA.",
+      alwaysCalledAbout: "Advice and to hang out.",
+      interestingPeople: "My college roommate who works at Google. My dad who has been in real estate for 30 years.",
+      connectedPeople: "I introduced two friends at a party once and they ended up dating for a while.",
+      loyalCommunity: "My friend group I guess. We've known each other since high school.",
+      detailsRight: "Uchi is pretty good. The service is always solid.",
+      trustTaste: "My friend Jake has pretty good taste.",
+      recommend: "The Joe Rogan podcast. Everyone should listen to it.",
+      splurgeVsSave: "Splurge on going out. Save on random stuff.",
+      karaokeS: "Mr. Brightside.",
+      coffeeTable: "Some magazines and a candle.",
+      busyDuringDay: "Working and in meetings.",
+      sundayMorning: "Sleep in and watch sports.",
+      socialLink: "Twitter I guess.",
+      everydayItem: "I used to be pretty into CrossFit.",
+      foodAccessibility: '',
+      agreedToTerms: true,
+      consentSms: false,
+    },
+  },
+];
+
 const DEMO_DATA: FormData = {
   fullName: 'Jordan Mercer',
   email: 'jordan@example.com',
@@ -188,6 +305,7 @@ export default function MembershipForm() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [testDataLoaded, setTestDataLoaded] = useState(false);
   const [devHovered, setDevHovered] = useState(false);
+  const [showDevPicker, setShowDevPicker] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [bannerFading, setBannerFading] = useState(false);
 
@@ -197,7 +315,11 @@ export default function MembershipForm() {
 
   useEffect(() => {
     const stored = localStorage.getItem('nobc-apply-theme');
-    if (stored === 'night') setIsNight(true);
+    if (stored === 'night') { setIsNight(true); return; }
+    if (stored === 'day') return;
+    // No saved preference — default to night mode during late hours (11pm-4am).
+    const hour = new Date().getHours();
+    if (hour >= 23 || hour < 4) setIsNight(true);
   }, []);
 
   useEffect(() => {
@@ -285,7 +407,7 @@ export default function MembershipForm() {
   // Resume draft on mount
   useEffect(() => {
     const id = searchParams.get('id');
-    if (!id || isDemo) return;
+    if (!id || isDemo || isDev) return;
     (async () => {
       try {
         const res = await fetch(`/api/apply/membership/${id}`);
@@ -455,7 +577,7 @@ export default function MembershipForm() {
       if (!res.ok) throw new Error('Failed to save application.');
       const { id } = await res.json();
       setApplicationId(id as string);
-      const newUrl = isDemo ? `?id=${id}&demo=true` : `?id=${id}`;
+      const newUrl = isDemo ? `?id=${id}&demo=true` : isDev ? `?id=${id}&dev=true` : `?id=${id}`;
       window.history.replaceState(null, '', newUrl);
       advance(1);
     } catch (e: unknown) {
@@ -479,7 +601,7 @@ export default function MembershipForm() {
           const result = await res.json();
           id = result.id as string;
           setApplicationId(id);
-          const newUrl = isDemo ? `?id=${id}&demo=true` : `?id=${id}`;
+          const newUrl = isDemo ? `?id=${id}&demo=true` : isDev ? `?id=${id}&dev=true` : `?id=${id}`;
           window.history.replaceState(null, '', newUrl);
         }
       } else {
@@ -736,7 +858,7 @@ export default function MembershipForm() {
       <main style={{
         minHeight: 'calc(100vh - 56px)',
         color: theme.text,
-        padding: step === 0 || step === 7 ? '0' : '60px 24px 100px clamp(24px, 8vw, 120px)',
+        padding: step === 0 || step === 7 ? '0' : '60px 24px 100px 24px',
         transform: isTransitioning ? (transitionDirection === 'forward' ? 'translateY(-100%)' : 'translateY(100%)') : 'translateY(0)',
         opacity: isTransitioning ? 0 : 1,
         transition: 'transform 400ms ease, opacity 400ms ease',
@@ -745,9 +867,10 @@ export default function MembershipForm() {
         {/* SCREEN 0: Opening — cinematic headline, no chapter label */}
         {step === 0 && (
           <div style={{
-            padding: '48px 24px 100px clamp(24px, 8vw, 120px)',
-            maxWidth: 800,
+            padding: '48px 24px 100px 24px',
+            maxWidth: 560,
             width: '100%',
+            margin: '0 auto',
           }}>
             <h1 style={{
               fontFamily: displayFont,
@@ -816,7 +939,7 @@ export default function MembershipForm() {
 
         {/* SCREEN 1: Real Questions -> Who Are You */}
         {step === 1 && (
-          <div style={{ maxWidth: 800, width: '100%' }}>
+          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[1].label}</span>
             <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[1].heading}</h1>
 
@@ -840,7 +963,7 @@ export default function MembershipForm() {
 
         {/* SCREEN 2: Your World */}
         {step === 2 && (
-          <div style={{ maxWidth: 800, width: '100%' }}>
+          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[2].label}</span>
             <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[2].heading}</h1>
 
@@ -864,7 +987,7 @@ export default function MembershipForm() {
 
         {/* SCREEN 3: Taste */}
         {step === 3 && (
-          <div style={{ maxWidth: 800, width: '100%' }}>
+          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[3].label}</span>
             <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[3].heading}</h1>
 
@@ -892,7 +1015,7 @@ export default function MembershipForm() {
 
         {/* SCREEN 4: Rapid Fire */}
         {step === 4 && (
-          <div style={{ maxWidth: 800, width: '100%' }}>
+          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[4].label}</span>
             <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[4].heading}</h1>
             <p style={{ fontFamily: bodyFont, fontSize: 13, color: theme.muted, marginBottom: 40, marginTop: -24, letterSpacing: '0.02em' }}>Quick answers only.</p>
@@ -918,7 +1041,7 @@ export default function MembershipForm() {
 
         {/* SCREEN 5: Photos -> Show Up */}
         {step === 5 && (
-          <div style={{ maxWidth: 800, width: '100%' }}>
+          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[5].label}</span>
             <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[5].heading}</h1>
             <p style={{ fontFamily: bodyFont, fontSize: 13, color: theme.muted, marginBottom: 40, marginTop: -24, letterSpacing: '0.02em' }}>
@@ -975,7 +1098,7 @@ export default function MembershipForm() {
 
         {/* SCREEN 6: Legal -> Almost There */}
         {step === 6 && (
-          <div style={{ maxWidth: 800, width: '100%' }}>
+          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[6].label}</span>
             <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[6].heading}</h1>
             <p style={{ fontFamily: bodyFont, fontSize: 11, color: theme.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 24, marginTop: -24 }}>
@@ -1373,7 +1496,7 @@ export default function MembershipForm() {
         <>
           <button
             className="hidden sm:block"
-            onClick={fillTestData}
+            onClick={() => setShowDevPicker(v => !v)}
             onMouseEnter={() => setDevHovered(true)}
             onMouseLeave={() => setDevHovered(false)}
             style={{
@@ -1389,7 +1512,7 @@ export default function MembershipForm() {
           >
             fill test data
           </button>
-          {testDataLoaded && (
+          {testDataLoaded && !showDevPicker && (
             <div
               className="hidden sm:block"
               style={{
@@ -1400,6 +1523,57 @@ export default function MembershipForm() {
               letterSpacing: '0.06em', textTransform: 'uppercase',
             }}>
               test data loaded
+            </div>
+          )}
+          {showDevPicker && (
+            <div
+              className="hidden sm:block"
+              style={{
+                position: 'fixed', bottom: 50, left: 16, zIndex: 101,
+                background: theme.bg,
+                border: `1px solid ${theme.border}`,
+                borderRadius: 4,
+                padding: '8px 0',
+                minWidth: 240,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              }}
+            >
+              <p style={{
+                fontSize: 9, fontFamily: bodyFont, letterSpacing: '0.1em',
+                textTransform: 'uppercase', color: theme.muted,
+                padding: '0 12px 8px',
+                borderBottom: `1px solid ${theme.border}`,
+                marginBottom: 4,
+              }}>select applicant</p>
+              {DEMO_SETS.map(set => (
+                <button
+                  key={set.id}
+                  type="button"
+                  onClick={() => {
+                    setData(prev => ({ ...prev, ...set.data }));
+                    setTestDataLoaded(true);
+                    setShowDevPicker(false);
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '8px 12px',
+                    background: 'transparent', border: 'none',
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = theme.border; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                >
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: set.color, flexShrink: 0,
+                    display: 'inline-block',
+                  }} />
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block', fontSize: 11, fontFamily: bodyFont, color: theme.text, fontWeight: 500 }}>{set.name}</span>
+                    <span style={{ display: 'block', fontSize: 9, fontFamily: bodyFont, color: theme.muted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{set.desc}</span>
+                  </span>
+                </button>
+              ))}
             </div>
           )}
         </>

@@ -10,6 +10,7 @@ import {
   findOrCreateGuestMember,
   hasCapacity,
 } from '@/lib/event-access-submit';
+import { emitEvent } from '@/lib/emit-event';
 
 const BodySchema = z.object({
   guestEmail: z.string().email().optional(),
@@ -134,15 +135,13 @@ export async function POST(
     rsvpId = created.id;
   }
 
-  await db.auditEvent.create({
-    data: {
-      workspaceId,
-      actorId: userId ?? `guest:${body.guestEmail ?? 'unknown'}`,
-      action: 'rsvp.created',
-      entityType: 'RSVP',
-      entityId: rsvpId,
-      metadata: { ticketStatus, viewer, flow: resolved.flow },
-    },
+  await emitEvent({
+    workspaceId,
+    actorId: userId ?? `guest:${body.guestEmail ?? 'unknown'}`,
+    action: 'rsvp.created',
+    entityType: 'RSVP',
+    entityId: rsvpId,
+    metadata: { ticketStatus, viewer: String(viewer), flow: String(resolved.flow) },
   });
 
   return NextResponse.json({
