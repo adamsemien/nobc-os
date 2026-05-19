@@ -3,14 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
-import { Inbox, CalendarDays, ScrollText, Webhook, BarChart3 } from 'lucide-react';
+import { Inbox, CalendarDays, ScrollText, Webhook, BarChart3, Palette } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/operator/applications', label: 'Applications', match: '/operator/applications', Icon: Inbox },
   { href: '/operator/intelligence', label: 'Intelligence', match: '/operator/intelligence', Icon: BarChart3 },
   { href: '/operator/events', label: 'Events', match: '/operator/events', Icon: CalendarDays },
   { href: '/operator/audit', label: 'Audit', match: '/operator/audit', Icon: ScrollText },
-  { href: '/operator/settings/webhooks', label: 'Webhooks', match: '/operator/settings', Icon: Webhook },
+  { href: '/operator/settings/theme', label: 'Theme', match: '/operator/settings/theme', Icon: Palette },
+  { href: '/operator/settings/webhooks', label: 'Webhooks', match: '/operator/settings/webhooks', Icon: Webhook },
 ];
 
 export function OperatorNav() {
