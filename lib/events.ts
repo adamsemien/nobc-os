@@ -74,6 +74,21 @@ export async function getEventBySlug(workspaceId: string, slug: string) {
         },
         orderBy: { order: 'asc' },
       },
+      ticketTiers: {
+        where: { manuallyClosed: false },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          memberPriceCents: true,
+          nonMemberPriceCents: true,
+          quantity: true,
+          soldCount: true,
+          heldCount: true,
+          sortOrder: true,
+        },
+        orderBy: { sortOrder: 'asc' },
+      },
       _count: { select: { rsvps: true } },
     },
   });

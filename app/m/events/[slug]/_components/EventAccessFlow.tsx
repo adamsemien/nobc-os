@@ -11,7 +11,7 @@ import {
 } from '@stripe/react-stripe-js';
 import QRCode from 'qrcode';
 import { Loader2, CalendarPlus } from 'lucide-react';
-import type { EventDetailDTO, CustomQuestionDTO } from './EventDetail';
+import type { EventDetailDTO, CustomQuestionDTO, TicketTierDTO } from './EventDetail';
 import { formatGateCTA } from '@/lib/event-access';
 
 type Props = {
@@ -30,6 +30,7 @@ type Screen =
   | { kind: 'auth'; key: string }
   | { kind: 'guestInfo'; key: string }
   | { kind: 'fields'; key: string; questions: CustomQuestionDTO[] }
+  | { kind: 'tierSelect'; key: string; tiers: TicketTierDTO[] }
   | { kind: 'pay'; key: string }
   | { kind: 'submit'; key: string };
 
@@ -45,6 +46,7 @@ type FlowState = {
   guestName: string;
   guestEmail: string;
   answers: Record<string, string | boolean>;
+  tierId: string | null;
   clientSecret: string | null;
   rsvpId: string | null;
   amountCents: number;
@@ -89,7 +91,12 @@ function buildScreens(event: EventDetailDTO): Screen[] {
       } else {
         out.push({ kind: 'fields', key: 'fields', questions: visibleQuestions });
       }
-    } else if (step === 'pay') out.push({ kind: 'pay', key: 'pay' });
+    } else if (step === 'pay') {
+      if (event.tiers.length > 0) {
+        out.push({ kind: 'tierSelect', key: 'tierSelect', tiers: event.tiers });
+      }
+      out.push({ kind: 'pay', key: 'pay' });
+    }
     else if (step === 'submit') out.push({ kind: 'submit', key: 'submit' });
   }
   // Pay is terminal — drop a trailing confirm screen when payment is in the flow.
@@ -111,6 +118,7 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
       guestName: '',
       guestEmail: '',
       answers: {},
+      tierId: null,
       clientSecret: null,
       rsvpId: null,
       amountCents: 0,
@@ -156,6 +164,7 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
             guestEmail: state.guestEmail || undefined,
             guestName: state.guestName || undefined,
             customAnswers: state.answers,
+            tierId: state.tierId || undefined,
           }),
         });
         const data = (await res.json()) as {
@@ -163,8 +172,13 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
           rsvpId?: string;
           amountCents?: number;
           error?: string;
+          code?: string;
         };
         if (!res.ok || !data.clientSecret) {
+          if (data.code === 'membership_required') {
+            window.location.href = `/apply?return=${encodeURIComponent(`/m/events/${event.slug}`)}`;
+            return;
+          }
           throw new Error(data.error ?? 'Could not start payment');
         }
         setState((s) => ({
@@ -212,6 +226,7 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
           guestEmail: state.guestEmail || undefined,
           guestName: state.guestName || undefined,
           customAnswers: state.answers,
+          tierId: state.tierId || undefined,
         }),
       });
       const data = (await res.json()) as {
@@ -221,8 +236,15 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
         waitlisted?: boolean;
         position?: number;
         error?: string;
+        code?: string;
       };
-      if (!res.ok) throw new Error(data.error ?? 'Submission failed');
+      if (!res.ok) {
+        if (data.code === 'membership_required') {
+          window.location.href = `/apply?return=${encodeURIComponent(`/m/events/${event.slug}`)}`;
+          return;
+        }
+        throw new Error(data.error ?? 'Submission failed');
+      }
       setState((s) => ({ ...s, submitting: false }));
       setResult({
         ticketStatus: data.ticketStatus ?? 'confirmed',
@@ -326,6 +348,23 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
                       if (stepIdx === lastIdx) void submitFree();
                       else goNext();
                     }}
+                  />
+                )}
+
+                {screen?.kind === 'tierSelect' && (
+                  <TierSelectStep
+                    tiers={screen.tiers}
+                    isMember={event.viewer === 'member'}
+                    selectedTierId={state.tierId}
+                    onSelect={(id) => setState((s) => ({ ...s, tierId: id, errorMsg: null }))}
+                    onNext={() => {
+                      if (!state.tierId) {
+                        setState((s) => ({ ...s, errorMsg: 'Please select a ticket type.' }));
+                        return;
+                      }
+                      goNext();
+                    }}
+                    error={state.errorMsg}
                   />
                 )}
 
@@ -918,6 +957,75 @@ function DoneScreen({
         className={primaryBtnCls + ' mt-7'}
       >
         Done
+      </button>
+    </div>
+  );
+}
+
+function TierSelectStep({
+  tiers,
+  isMember,
+  selectedTierId,
+  onSelect,
+  onNext,
+  error,
+}: {
+  tiers: TicketTierDTO[];
+  isMember: boolean;
+  selectedTierId: string | null;
+  onSelect: (id: string) => void;
+  onNext: () => void;
+  error: string | null;
+}) {
+  const available = tiers.filter((t) => {
+    const price = isMember ? t.memberPriceCents : t.nonMemberPriceCents;
+    return price != null;
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        {available.map((tier) => {
+          const priceCents = isMember ? tier.memberPriceCents! : tier.nonMemberPriceCents!;
+          const remaining = tier.quantity - tier.soldCount - tier.heldCount;
+          const soldOut = remaining <= 0;
+          const isSelected = selectedTierId === tier.id;
+
+          return (
+            <button
+              key={tier.id}
+              type="button"
+              disabled={soldOut}
+              onClick={() => !soldOut && onSelect(tier.id)}
+              className={`w-full rounded-sm border px-4 py-3 text-left transition-colors disabled:opacity-50 font-[family-name:var(--font-dm-sans)] ${
+                isSelected
+                  ? 'border-[var(--nobc-red)] bg-[color-mix(in_oklab,var(--nobc-red)_6%,white)]'
+                  : 'border-[var(--apply-rule)] bg-white hover:border-[var(--nobc-red)]'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[14px] font-medium text-[var(--apply-ink)]">
+                  {tier.name}
+                </span>
+                <span className="shrink-0 text-[14px] font-medium text-[var(--apply-ink)]">
+                  {formatPrice(priceCents)}
+                </span>
+              </div>
+              {tier.description ? (
+                <p className="mt-1 text-[12px] text-[var(--apply-muted)]">{tier.description}</p>
+              ) : null}
+              {soldOut ? (
+                <p className="mt-1 text-[11px] uppercase tracking-widest text-[var(--apply-muted)]">
+                  Sold out
+                </p>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <ErrorText msg={error} />
+      <button type="button" onClick={onNext} className={primaryBtnCls}>
+        Continue →
       </button>
     </div>
   );

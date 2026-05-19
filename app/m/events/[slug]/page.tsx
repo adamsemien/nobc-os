@@ -118,6 +118,16 @@ export default async function EventDetailPage({
       ? { id: existingRsvp.id, ticketStatus: existingRsvp.ticketStatus }
       : null,
     customQuestions,
+    tiers: (event.ticketTiers ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      memberPriceCents: t.memberPriceCents,
+      nonMemberPriceCents: t.nonMemberPriceCents,
+      quantity: t.quantity,
+      soldCount: t.soldCount,
+      heldCount: t.heldCount,
+    })),
     plusOneRsvp: plusOneRsvp
       ? {
           id: plusOneRsvp.id,

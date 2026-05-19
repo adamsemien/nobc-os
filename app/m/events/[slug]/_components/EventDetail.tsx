@@ -8,6 +8,17 @@ import { TemplateEditorial } from './TemplateEditorial';
 import { TemplateSplit } from './TemplateSplit';
 import { TemplateMinimal } from './TemplateMinimal';
 
+export type TicketTierDTO = {
+  id: string;
+  name: string;
+  description: string | null;
+  memberPriceCents: number | null;
+  nonMemberPriceCents: number | null;
+  quantity: number;
+  soldCount: number;
+  heldCount: number;
+};
+
 export type CustomQuestionDTO = {
   id: string;
   type: 'text' | 'textarea' | 'select' | 'checkbox' | 'number' | 'date' | 'email' | 'phone';
@@ -43,6 +54,7 @@ export type EventDetailDTO = {
   memberQrCode: string | null;
   existingRsvp: { id: string; ticketStatus: string } | null;
   customQuestions: CustomQuestionDTO[];
+  tiers: TicketTierDTO[];
   plusOneRsvp: { id: string; guestName: string; guestEmail: string } | null;
   template: 'editorial' | 'split' | 'minimal';
   isOperator: boolean;
