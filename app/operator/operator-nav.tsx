@@ -3,15 +3,19 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
-import { Inbox, CalendarDays, ScrollText, Webhook, BarChart3, Palette } from 'lucide-react';
+import { Inbox, CalendarDays, ScrollText, BarChart3, Settings, ExternalLink } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/operator/applications', label: 'Applications', match: '/operator/applications', Icon: Inbox },
   { href: '/operator/intelligence', label: 'Intelligence', match: '/operator/intelligence', Icon: BarChart3 },
   { href: '/operator/events', label: 'Events', match: '/operator/events', Icon: CalendarDays },
   { href: '/operator/audit', label: 'Audit', match: '/operator/audit', Icon: ScrollText },
-  { href: '/operator/settings/theme', label: 'Theme', match: '/operator/settings/theme', Icon: Palette },
-  { href: '/operator/settings/webhooks', label: 'Webhooks', match: '/operator/settings/webhooks', Icon: Webhook },
+  { href: '/operator/settings', label: 'Settings', match: '/operator/settings', Icon: Settings },
+];
+
+const EXTERNAL_LINKS = [
+  { href: '/m/events', label: 'Preview Site' },
+  { href: '/apply', label: 'Apply Form' },
 ];
 
 export function OperatorNav() {
@@ -69,6 +73,24 @@ export function OperatorNav() {
             </Link>
           );
         })}
+
+        {/* Divider */}
+        <div className="my-1.5 mx-1 border-t" style={{ borderColor: 'var(--border)' }} />
+
+        {/* External utility links */}
+        {EXTERNAL_LINKS.map(({ href, label }) => (
+          <a
+            key={href}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative flex min-h-[36px] items-center gap-3 overflow-hidden rounded-[8px] px-3 font-[family-name:var(--font-dm-sans)] text-[12px] font-medium transition-colors duration-150 hover:bg-[var(--sidebar-active-bg)]"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <ExternalLink className="h-[15px] w-[15px] shrink-0" />
+            <span className="hidden md:inline">{label}</span>
+          </a>
+        ))}
       </nav>
 
       {/* Footer — avatar */}

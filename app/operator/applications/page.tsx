@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import {
   ApplicationsQueue,
@@ -115,6 +116,16 @@ export default async function OperatorApplicationsPage({
               {pendingCount}
             </span>
           </div>
+          <a
+            href="/apply?demo=true"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Preview form
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          </a>
         </header>
 
         <nav className="mb-6 flex flex-wrap gap-1 border-b border-border" aria-label="Filter applications">

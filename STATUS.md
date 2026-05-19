@@ -2,6 +2,23 @@
 
 _Last updated: 2026-05-19_
 
+## Operator nav + settings fixes ✅
+
+Branch: `feat/operator-nav-fixes`
+
+| Change | Status |
+|--------|--------|
+| Sidebar: Settings link → `/operator/settings` (replaces separate Theme + Webhooks items) | ✅ |
+| Sidebar: "Preview Site" + "Apply Form" external links (new-tab, below nav divider) | ✅ |
+| `/operator/settings` landing page → redirects to `/operator/settings/theme` | ✅ |
+| `/operator/settings/layout.tsx` — tab nav (Theme \| Webhooks) wrapping both settings pages | ✅ |
+| `/operator/applications` header — "Preview form →" link (opens `/apply?demo=true` new tab) | ✅ |
+| Application queue rows — "View →" hover link to `/operator/applications/[id]` | ✅ |
+
+`tsc --noEmit` clean. `next build` clean. CSS variables only, no hex literals added.
+
+---
+
 ## Active work — Items 6 + 7 (Events + RSVP)
 
 Branch: `feat/item-6-7-events-rsvp`

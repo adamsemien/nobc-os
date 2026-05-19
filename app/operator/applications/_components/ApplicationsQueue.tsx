@@ -491,6 +491,20 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                       onClick={e => e.stopPropagation()}
                     />
                   </div>
+                  <a
+                    href={`/operator/applications/${app.id}`}
+                    className="absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium opacity-0 transition-opacity group-hover:opacity-100"
+                    style={{
+                      color: 'var(--text-muted)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                    }}
+                    aria-label={`View ${app.fullName}`}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    View →
+                  </a>
                   <button
                     type="button"
                     onClick={() => {
