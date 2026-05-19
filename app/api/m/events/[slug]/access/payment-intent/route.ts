@@ -16,6 +16,7 @@ const BodySchema = z.object({
   guestEmail: z.string().email().optional(),
   guestName: z.string().min(1).optional(),
   customAnswers: z.record(z.string(), z.union([z.string(), z.boolean(), z.number(), z.null()])).optional(),
+  tierId: z.string().cuid().optional(),
 });
 
 export async function POST(
@@ -57,12 +58,36 @@ export async function POST(
       })
     : null;
 
+  // Membership gate: authenticated users without an approved Application cannot register.
+  if (userId && (!member || member.status !== 'APPROVED')) {
+    return NextResponse.json(
+      { error: 'Membership required to register for events.', code: 'membership_required' },
+      { status: 403 },
+    );
+  }
+
   const viewer = resolveViewer(member, userId);
   const ctx = await loadAccessContext(workspaceId, evt.id, viewer);
   if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const { resolved, event } = ctx;
-  const amountCents = priceForResolved(resolved);
+
+  // Tier-based pricing: if a tierId is provided, use the tier price.
+  let amountCents: number;
+  const resolvedTierId: string | undefined = body.tierId;
+  if (body.tierId) {
+    const tier = await db.ticketTier.findFirst({
+      where: { id: body.tierId, workspaceId, eventId: evt.id, manuallyClosed: false },
+      select: { memberPriceCents: true, nonMemberPriceCents: true },
+    });
+    if (!tier) return NextResponse.json({ error: 'Ticket tier not found' }, { status: 404 });
+    const price = resolved.kind === 'guest' ? tier.nonMemberPriceCents : tier.memberPriceCents;
+    if (price == null) return NextResponse.json({ error: 'Tier not available for this access level' }, { status: 403 });
+    amountCents = price;
+  } else {
+    amountCents = priceForResolved(resolved);
+  }
+
   if (amountCents <= 0) {
     return NextResponse.json({ error: 'This path is free — use submit endpoint.' }, { status: 400 });
   }
@@ -124,6 +149,7 @@ export async function POST(
         paymentStatus: 'AUTHORIZED',
         amountCents,
         ticketStatus: 'held',
+        tierId: resolvedTierId ?? null,
         customAnswers: body.customAnswers ?? undefined,
         guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
         guestName: resolved.kind === 'guest' ? body.guestName : null,
@@ -141,6 +167,7 @@ export async function POST(
         stripePaymentIntentId: pi.id,
         paymentStatus: 'AUTHORIZED',
         amountCents,
+        tierId: resolvedTierId ?? null,
         customAnswers: body.customAnswers ?? undefined,
         guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
         guestName: resolved.kind === 'guest' ? body.guestName : null,

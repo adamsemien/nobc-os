@@ -4,6 +4,7 @@ import { getOrCreateMemberFromClerk, type ClerkMemberRow } from '@/lib/clerk-mem
 
 export type RsvpSubmitBody = {
   eventId: string;
+  tierId?: string;
   customAnswers?: Record<string, string | boolean | number | null>;
 };
 
@@ -18,7 +19,7 @@ export async function submitMemberRsvp(
   | { ok: true; waitlisted: true; position: number }
   | { ok: false; status: number; error: string }
 > {
-  const { eventId, customAnswers } = body;
+  const { eventId, tierId, customAnswers } = body;
   if (!eventId) return { ok: false, status: 400, error: 'eventId required' };
 
   const event = await db.event.findFirst({
@@ -162,6 +163,7 @@ export async function submitMemberRsvp(
       memberId: member.id,
       status: rsvpStatus as 'CONFIRMED' | 'WAITLISTED',
       ticketStatus,
+      tierId: tierId ?? null,
       customAnswers: customAnswers ?? undefined,
     },
   });
