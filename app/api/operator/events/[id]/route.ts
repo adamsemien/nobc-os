@@ -7,6 +7,7 @@ import { EventAccessSchema } from '@/lib/event-access-schema';
 import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
 import { emitEvent } from '@/lib/emit-event';
 import { notifyProducer } from '@/lib/producer-webhook';
+import { sendTemplatedEmail, getPlatformBool } from '@/lib/email';
 
 const CustomQuestionSchema = z.object({
   id: z.string(),
@@ -195,5 +196,68 @@ export async function PATCH(
       .catch(err => console.error('[events] producer notify failed:', err));
   }
 
+  // Fan-out templated announcement to approved members on first publish.
+  if (statusChanged && rest.status === 'PUBLISHED') {
+    const shouldNotify = await getPlatformBool(workspaceId, 'event.notify_on_publish', true);
+    if (shouldNotify) {
+      void notifyMembersOfPublish(workspaceId, id, userId).catch(err =>
+        console.error('[events] member notify failed:', err),
+      );
+    }
+  }
+
   return NextResponse.json({ ok: true });
+}
+
+async function notifyMembersOfPublish(workspaceId: string, eventId: string, actorId: string) {
+  const [updated, members] = await Promise.all([
+    db.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, title: true, slug: true, startAt: true, location: true, description: true },
+    }),
+    db.member.findMany({
+      where: { workspaceId, status: 'APPROVED', email: { not: '' } },
+      select: { email: true, firstName: true, lastName: true },
+    }),
+  ]);
+  if (!updated || members.length === 0) return;
+
+  const dateFormatted = updated.startAt.toLocaleString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+  const eventUrl = `${siteUrl}/m/events/${updated.slug}`;
+
+  let sent = 0;
+  let skipped = 0;
+  for (const m of members) {
+    const result = await sendTemplatedEmail(workspaceId, 'event.published', m.email, {
+      member: { firstName: m.firstName, lastName: m.lastName },
+      event: {
+        title: updated.title,
+        dateFormatted,
+        location: updated.location ?? '',
+        description: updated.description ?? '',
+        url: eventUrl,
+      },
+      site: { url: siteUrl },
+    });
+    if (result.ok) sent++;
+    else skipped++;
+  }
+
+  await db.auditEvent.create({
+    data: {
+      workspaceId,
+      actorId,
+      action: 'event.notification_sent',
+      entityType: 'EVENT',
+      entityId: eventId,
+      metadata: { sent, skipped, recipientCount: members.length },
+    },
+  }).catch(() => {});
 }

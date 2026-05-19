@@ -6,6 +6,8 @@ export type RsvpSubmitBody = {
   eventId: string;
   tierId?: string;
   customAnswers?: Record<string, string | boolean | number | null>;
+  /** Operator UI-collected plus-one info — only persisted when event.plusOnesAllowed. */
+  plusOne?: { name?: string; instagram?: string };
 };
 
 type MemberRow = ClerkMemberRow;
@@ -19,7 +21,7 @@ export async function submitMemberRsvp(
   | { ok: true; waitlisted: true; position: number }
   | { ok: false; status: number; error: string }
 > {
-  const { eventId, tierId, customAnswers } = body;
+  const { eventId, tierId, customAnswers, plusOne } = body;
   if (!eventId) return { ok: false, status: 400, error: 'eventId required' };
 
   const event = await db.event.findFirst({
@@ -32,6 +34,7 @@ export async function submitMemberRsvp(
       capacity: true,
       priceInCents: true,
       nonMemberPriceInCents: true,
+      plusOnesAllowed: true,
     },
   });
   if (!event) return { ok: false, status: 404, error: 'Event not found' };
@@ -156,6 +159,7 @@ export async function submitMemberRsvp(
   const ticketStatus = event.approvalRequired ? 'pending_approval' : 'confirmed';
   const rsvpStatus = event.approvalRequired ? 'WAITLISTED' : 'CONFIRMED';
 
+  const acceptPlusOne = !!plusOne && event.plusOnesAllowed;
   const rsvp = await db.rSVP.create({
     data: {
       workspaceId,
@@ -165,6 +169,8 @@ export async function submitMemberRsvp(
       ticketStatus,
       tierId: tierId ?? null,
       customAnswers: customAnswers ?? undefined,
+      plusOneName: acceptPlusOne && plusOne?.name?.trim() ? plusOne.name.trim() : null,
+      plusOneInstagram: acceptPlusOne && plusOne?.instagram?.trim() ? plusOne.instagram.trim() : null,
     },
   });
 

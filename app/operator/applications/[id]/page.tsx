@@ -1,12 +1,35 @@
 import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { formatDateTime } from '@/lib/operator-application-display';
 import { Breadcrumbs } from '@/app/operator/_components/PageHeader';
+import { Avatar } from '@/app/operator/_components/Avatar';
 import {
   ApplicationDecisionBar,
   ConsentReadOnlyRow,
 } from './application-decision-bar';
+
+const URL_RE = /\bhttps?:\/\/[^\s)]+/i;
+const INSTAGRAM_RE = /(?:instagram\.com\/|^@)([A-Za-z0-9_.]{1,30})/i;
+
+function urlChip(answer: string): { label: string; href: string } | null {
+  const ig = INSTAGRAM_RE.exec(answer);
+  if (ig) {
+    const handle = ig[1];
+    return { label: `@${handle}`, href: `https://instagram.com/${handle}` };
+  }
+  const url = URL_RE.exec(answer);
+  if (url) {
+    try {
+      const u = new URL(url[0]);
+      return { label: u.hostname.replace(/^www\./, ''), href: u.toString() };
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
 
 type DetailPayload = {
   application: {
@@ -81,15 +104,18 @@ export default async function OperatorApplicationDetailPage({
 
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
           <section className="space-y-6">
-            <h1
-              className="text-3xl font-normal leading-tight sm:text-4xl"
-              style={{
-                fontFamily: 'var(--font-display)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              {app.fullName}
-            </h1>
+            <div className="flex items-center gap-4">
+              <Avatar name={app.fullName} email={app.email} size={64} />
+              <h1
+                className="text-3xl font-normal leading-tight sm:text-4xl"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {app.fullName}
+              </h1>
+            </div>
 
             <dl className="space-y-3 text-sm" style={{ color: 'var(--text-primary)' }}>
               <div>
@@ -176,19 +202,33 @@ export default async function OperatorApplicationDetailPage({
                 Application answers
               </h2>
               <div className="space-y-6">
-                {app.substantiveAnswers.map(row => (
-                  <div key={row.questionKey}>
-                    <p
-                      className="mb-1 text-xs font-semibold uppercase tracking-[0.18em]"
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
-                      {row.label}
-                    </p>
-                    <p className="whitespace-pre-wrap text-sm font-normal leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-                      {row.answer.trim() ? row.answer : '—'}
-                    </p>
-                  </div>
-                ))}
+                {app.substantiveAnswers.map(row => {
+                  const chip = urlChip(row.answer);
+                  return (
+                    <div key={row.questionKey}>
+                      <p
+                        className="mb-1 text-xs font-semibold uppercase tracking-[0.18em]"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {row.label}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm font-normal leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                        {row.answer.trim() ? row.answer : '—'}
+                      </p>
+                      {chip ? (
+                        <a
+                          href={chip.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-text-primary transition-colors hover:border-primary hover:text-primary"
+                        >
+                          {chip.label}
+                          <ExternalLink className="h-3 w-3" aria-hidden />
+                        </a>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

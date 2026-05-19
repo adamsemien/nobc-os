@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Camera, ListChecks, Download } from 'lucide-react';
+import { Camera, ListChecks, Download, UserPlus } from 'lucide-react';
 import { checkinDb, type CachedRsvp } from '@/lib/checkin-db';
 import { BrowserMultiFormatReader } from '@zxing/library';
+import { WalkinModal } from './WalkinModal';
 
 const CHECKIN_SECRET = process.env.NEXT_PUBLIC_CHECKIN_SECRET ?? '';
 
@@ -63,6 +64,7 @@ export function CheckInClient({
   const [loading, setLoading] = useState(true);
   const [scannerActive, setScannerActive] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [walkinOpen, setWalkinOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
 
@@ -302,6 +304,26 @@ export function CheckInClient({
             </button>
           )}
           <button
+            onClick={() => setWalkinOpen(true)}
+            aria-label="Add walk-in"
+            title="Add walk-in"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 48,
+              height: 48,
+              flexShrink: 0,
+              borderRadius: 10,
+              border: '1px solid #333',
+              background: '#161616',
+              color: '#f5f5f5',
+              cursor: 'pointer',
+            }}
+          >
+            <UserPlus size={18} />
+          </button>
+          <button
             onClick={() => setView(v => (v === 'scanner' ? 'list' : 'scanner'))}
             aria-label={view === 'scanner' ? 'Show guest list' : 'Open QR scanner'}
             style={{
@@ -539,6 +561,18 @@ export function CheckInClient({
           </div>
         )}
       </div>
+
+      <WalkinModal
+        open={walkinOpen}
+        onClose={() => setWalkinOpen(false)}
+        eventSlug={eventSlug}
+        workspaceSlug={workspaceSlug}
+        onSuccess={(memberName) => {
+          setScanResult({ name: memberName, status: 'success' });
+          setTimeout(() => setScanResult(null), 3000);
+          void fetchGuestList();
+        }}
+      />
     </div>
   );
 }

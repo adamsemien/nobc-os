@@ -33,6 +33,8 @@ export async function GET(
       guestName: true,
       guestEmail: true,
       plusOneOfMemberId: true,
+      plusOneName: true,
+      plusOneInstagram: true,
       member: {
         select: { firstName: true, lastName: true, email: true },
       },

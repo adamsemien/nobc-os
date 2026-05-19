@@ -6,6 +6,7 @@ import { ArrowLeft, Check, Clock, Loader2, Mail, MapPin, Phone, Search, X, XCirc
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { EmptyState } from '../../_components/EmptyState';
 import { useTheme } from '../../_components/ThemeToggle';
+import { Avatar } from '../../_components/Avatar';
 
 export type ApplicationsQueueItem = {
   id: string;
@@ -520,9 +521,12 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                     }`}
                     style={{ borderRadius: '8px', position: 'relative' }}
                   >
-                    <p className="obs-app-name truncate font-medium text-text-primary" style={headingFont}>
-                      {app.fullName}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <Avatar name={app.fullName} email={app.email} size={28} />
+                      <p className="obs-app-name truncate font-medium text-text-primary" style={headingFont}>
+                        {app.fullName}
+                      </p>
+                    </div>
                     <span
                       className="obs-score-badge"
                       aria-hidden="true"
@@ -554,7 +558,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
                       ) : null}
                       {worth ? (
                         <span className="inline-flex items-center gap-1 text-[11px]">
-                          <span className="font-semibold tabular-nums text-text-primary">{worth.total}/30</span>
+                          <span className="font-semibold tabular-nums text-text-primary">{Math.round((worth.total / 30) * 100)}</span>
                           <span className={`font-medium ${tier!.className}`}>· {tier!.label}</span>
                         </span>
                       ) : (!badge && !app.aiRecommendation ? (
@@ -922,8 +926,8 @@ function DetailPanel({
                   ))}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-sm text-text-secondary">{worth.total}/30</span>
-                  <span className={`text-sm font-semibold ${tier.className}`}>{tier.label}</span>
+                  <span className="text-sm tabular-nums text-text-secondary">{Math.round((worth.total / 30) * 100)}</span>
+                  <span className={`text-sm font-semibold ${tier.className}`}>· {tier.label}</span>
                 </div>
 
                 <div className="mt-3 space-y-1.5">

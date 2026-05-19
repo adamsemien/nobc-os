@@ -49,11 +49,46 @@ model Workspace {
   generatedAssets      GeneratedAsset[]
   svixAppId            String?
   watchList            WatchList[]
+  emailTemplates       EmailTemplate[]
+  platformSettings     PlatformSetting[]
 
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
   // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
   aiModel              String?
+}
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  key         String
+  name        String
+  description String?
+  subject     String
+  bodyHtml    String   @db.Text
+  bodyText    String   @db.Text
+  variables   Json
+  enabled     Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+}
+
+model PlatformSetting {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  key         String
+  value       String
+  type        String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
 }
 
 enum MemberStatus {
@@ -367,6 +402,13 @@ model RSVP {
   attendeeEmail         String?
   attendeePhone         String?
   attendeeCustomAnswers Json?
+
+  // Day-of reminder dedupe
+  reminderSentAt        DateTime?
+
+  // Plus-one capture (Task 10)
+  plusOneName           String?
+  plusOneInstagram      String?
 
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt

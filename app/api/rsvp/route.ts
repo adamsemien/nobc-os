@@ -10,12 +10,13 @@ export async function POST(req: NextRequest) {
   const workspaceId = await getMemberWorkspaceId(userId);
   if (!workspaceId) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
 
-  let body: { eventId: string; customAnswers?: Record<string, string | boolean | number | null> };
+  let body: {
+    eventId: string;
+    customAnswers?: Record<string, string | boolean | number | null>;
+    plusOne?: { name?: string; instagram?: string };
+  };
   try {
-    body = (await req.json()) as {
-      eventId: string;
-      customAnswers?: Record<string, string | boolean | number | null>;
-    };
+    body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
