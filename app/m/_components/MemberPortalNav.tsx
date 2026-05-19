@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const NAV_LINKS = [
-  { href: '/m/home', label: 'Home' },
+  { href: '/m', label: 'Home' },
   { href: '/m/events', label: 'Events' },
   { href: '/m/rsvps', label: 'My RSVPs' },
   { href: '/m/profile', label: 'Profile' },
-  { href: '/m/application', label: 'Application' },
+  { href: '/m/help', label: 'Help' },
 ];
 
 type MemberPortalNavProps = {
@@ -20,7 +20,8 @@ export default function MemberPortalNav({ firstName: _firstName }: MemberPortalN
 
   function isActive(href: string): boolean {
     if (href === '/m/events') return pathname.startsWith('/m/events');
-    return pathname === href;
+    if (href === '/m') return pathname === '/m' || pathname === '/m/home';
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   return (
@@ -32,7 +33,7 @@ export default function MemberPortalNav({ firstName: _firstName }: MemberPortalN
       >
         <div className="mx-auto max-w-4xl flex items-center justify-between px-5 py-4 sm:px-8">
           <Link
-            href="/m/home"
+            href="/m"
             className="text-[0.6rem] uppercase tracking-[0.2em] font-medium"
             style={{ color: 'var(--events-fg)' }}
           >
