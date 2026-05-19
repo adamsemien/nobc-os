@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Gift, Loader2, X, DollarSign, AlertTriangle, ArrowUpCircle } from 'lucide-react';
+import { Gift, Loader2, X, DollarSign, AlertTriangle, ArrowUpCircle, UserX, Ban } from 'lucide-react';
 import { EmptyState } from '../../../_components/EmptyState';
 
 type RsvpRow = {
@@ -44,6 +44,26 @@ function getAttendeeType(rsvp: RsvpRow): string {
 
 function isPending(rsvp: RsvpRow): boolean {
   return rsvp.ticketStatus === 'pending_approval' || rsvp.ticketStatus === 'held';
+}
+
+function TicketStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { bg: string; color: string; label: string }> = {
+    confirmed: { bg: 'var(--success-soft)', color: 'var(--success)', label: 'Confirmed' },
+    pending_approval: { bg: 'var(--warning-soft)', color: 'var(--warning)', label: 'Pending' },
+    held: { bg: 'var(--muted)', color: 'var(--text-secondary)', label: 'Waitlisted' },
+    rejected: { bg: 'var(--danger-soft)', color: 'var(--danger)', label: 'Rejected' },
+    refunded: { bg: 'var(--muted)', color: 'var(--text-muted)', label: 'Refunded' },
+    cancelled: { bg: 'var(--muted)', color: 'var(--text-muted)', label: 'Cancelled' },
+  };
+  const style = map[status] ?? { bg: 'var(--muted)', color: 'var(--text-muted)', label: status };
+  return (
+    <span
+      className="rounded px-2 py-0.5 text-xs font-medium"
+      style={{ background: style.bg, color: style.color, borderRadius: '5px' }}
+    >
+      {style.label}
+    </span>
+  );
 }
 
 function PaymentBadge({ status }: { status: string | null }) {
@@ -101,6 +121,8 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
   const [captureLoading, setCaptureLoading] = useState<Record<string, boolean>>({});
   const [bulkCaptureLoading, setBulkCaptureLoading] = useState(false);
   const [promoteLoading, setPromoteLoading] = useState<Record<string, boolean>>({});
+  const [rejectLoading, setRejectLoading] = useState<Record<string, boolean>>({});
+  const [cancelLoading, setCancelLoading] = useState<Record<string, boolean>>({});
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -191,6 +213,44 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
       }
     } finally {
       setPromoteLoading((p) => ({ ...p, [rsvpId]: false }));
+    }
+  }
+
+  async function handleReject(rsvpId: string) {
+    setRejectLoading((p) => ({ ...p, [rsvpId]: true }));
+    try {
+      const res = await fetch(`/api/operator/rsvps/${rsvpId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Reject failed');
+      } else {
+        router.refresh();
+      }
+    } finally {
+      setRejectLoading((p) => ({ ...p, [rsvpId]: false }));
+    }
+  }
+
+  async function handleCancel(rsvpId: string) {
+    setCancelLoading((p) => ({ ...p, [rsvpId]: true }));
+    try {
+      const res = await fetch(`/api/operator/rsvps/${rsvpId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Cancel failed');
+      } else {
+        router.refresh();
+      }
+    } finally {
+      setCancelLoading((p) => ({ ...p, [rsvpId]: false }));
     }
   }
 
@@ -312,6 +372,9 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
                   Type
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">
                   Payment
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">
@@ -341,6 +404,10 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
                       ? formatCents(priceInCents)
                       : '$0';
 
+                const rejectable = rsvp.ticketStatus === 'pending_approval';
+                const canCancel =
+                  rsvp.ticketStatus === 'confirmed' && !rsvp.stripePaymentIntentId;
+
                 return (
                   <tr
                     key={rsvp.id}
@@ -365,6 +432,9 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
                       ) : (
                         <span className="text-text-secondary">{getAttendeeType(rsvp)}</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <TicketStatusBadge status={rsvp.ticketStatus} />
                     </td>
                     <td className="px-4 py-3">
                       <PaymentBadge status={rsvp.stripePaymentIntentId ? rsvp.paymentStatus : 'FREE'} />
@@ -407,7 +477,47 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
                             ) : (
                               <ArrowUpCircle className="h-3 w-3" />
                             )}
-                            Promote
+                            Approve
+                          </button>
+                        )}
+                        {rejectable && (
+                          <button
+                            type="button"
+                            disabled={rejectLoading[rsvp.id]}
+                            onClick={() => handleReject(rsvp.id)}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors"
+                            style={{
+                              background: 'var(--danger-soft)',
+                              color: 'var(--danger)',
+                              borderRadius: '5px',
+                            }}
+                          >
+                            {rejectLoading[rsvp.id] ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <UserX className="h-3 w-3" />
+                            )}
+                            Reject
+                          </button>
+                        )}
+                        {canCancel && (
+                          <button
+                            type="button"
+                            disabled={cancelLoading[rsvp.id]}
+                            onClick={() => handleCancel(rsvp.id)}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors"
+                            style={{
+                              background: 'var(--muted)',
+                              color: 'var(--text-muted)',
+                              borderRadius: '5px',
+                            }}
+                          >
+                            {cancelLoading[rsvp.id] ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Ban className="h-3 w-3" />
+                            )}
+                            Cancel
                           </button>
                         )}
                         {isAuthorized && (

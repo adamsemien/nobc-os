@@ -2,6 +2,41 @@
 
 _Last updated: 2026-05-19_
 
+## V1 Items 8 + 9 — approval_required + Stripe authorize/capture ✅
+
+Branch: `feat/item-8-9-approval-stripe`
+
+### Item 8 — approval_required toggle
+
+| Area | Status |
+|------|--------|
+| `approvalRequired` field in Prisma schema | ✅ (pre-existing) |
+| RSVP creation sets `ticketStatus:'pending_approval'` when `approvalRequired=true` | ✅ (pre-existing) |
+| Per-event toggle via AccessGroupsCard flow builder (derives from `eventAccess`) | ✅ (pre-existing) |
+| `POST /api/operator/rsvps/[id]/approve` — confirm pending RSVP, capacity check, AuditEvent | ✅ (pre-existing) |
+| `POST /api/operator/rsvps/[id]/reject` — decline pending RSVP, AuditEvent | ✅ (pre-existing) |
+| **Approve button in EventAttendeesTab** (renamed from "Promote" → "Approve") | ✅ |
+| **Reject button in EventAttendeesTab** for `pending_approval` RSVPs | ✅ |
+| **TicketStatus column** in attendees table (Confirmed / Pending / Waitlisted / Rejected / Cancelled / Refunded) | ✅ |
+
+### Item 9 — Stripe authorize/capture
+
+| Area | Status |
+|------|--------|
+| PaymentIntent creation with `capture_method:'manual'` | ✅ (pre-existing) |
+| `POST /api/stripe/capture` — operator/cron capture | ✅ (pre-existing) |
+| `POST /api/stripe/refund` — full refund (cancels auth hold or issues Stripe refund) | ✅ (pre-existing) |
+| Capture + Refund buttons in EventAttendeesTab with payment status badges | ✅ (pre-existing) |
+| **`POST /api/operator/rsvps/[id]/cancel`** — releases AUTHORIZED hold via Stripe PI cancel; no-op for free RSVPs | ✅ |
+| **Cancel button in EventAttendeesTab** for confirmed free/comp RSVPs | ✅ |
+| Payment status column per attendee (AUTHORIZED / CAPTURED / REFUNDED / FREE) | ✅ (pre-existing) |
+| Nightly auto-capture cron (`/api/cron/capture-payments`) 24h before event | ✅ (pre-existing) |
+| AuditEvent on every transition (approve, reject, capture, refund, cancel) | ✅ |
+
+`tsc --noEmit` clean. `next build` clean. CSS variables only, no hex literals added.
+
+---
+
 ## Operator nav + settings fixes ✅
 
 Branch: `feat/operator-nav-fixes`
