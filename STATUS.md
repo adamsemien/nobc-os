@@ -2,7 +2,38 @@
 
 _Last updated: 2026-05-19_
 
-## Active work — Easter Eggs
+## Active work — Items 6 + 7 (Events + RSVP)
+
+Branch: `feat/item-6-7-events-rsvp`
+
+### Item 6 — Member event calendar ✅
+
+| Area | Status |
+|------|--------|
+| `/m/events` — upcoming events grid, access-mode badges, hero images | ✅ |
+| `/m/events/[slug]` — editorial / split / minimal templates | ✅ |
+| Server data layer (`getPublishedEventsWithConfirmedCounts`, `getEventBySlug`) | ✅ |
+| CSS tokens (`events-canvas`, `events-fg`, etc.) | ✅ |
+| `TicketTierDTO` + `tiers[]` on `EventDetailDTO` | ✅ |
+
+### Item 7 — RSVP system ✅
+
+| Area | Status |
+|------|--------|
+| `/api/rsvp` (open events, `submitMemberRsvp`, red-list, waitlist, email) | ✅ |
+| `/api/m/events/[slug]/access/payment-intent` — Stripe PI `capture_method:'manual'` | ✅ |
+| `/api/m/events/[slug]/access/submit` — free + approval RSVPs | ✅ |
+| `tierId` accepted in all three paths, validated, stored on RSVP row | ✅ |
+| Tier selector screen in `EventAccessFlow` for ticketed events with tiers | ✅ |
+| Tier price overrides event base price on payment-intent | ✅ |
+| Membership gate: authenticated non-members blocked (`membership_required`) | ✅ |
+| `approval_required` → `ticketStatus:'pending_approval'` | ✅ |
+| Capacity overflow → `WaitlistEntry` with position | ✅ |
+| `AuditEvent` on every RSVP creation | ✅ |
+
+`tsc --noEmit` clean. `next build` clean.
+
+## Previously completed — Easter Eggs
 
 Branch: `feat/easter-eggs`
 
