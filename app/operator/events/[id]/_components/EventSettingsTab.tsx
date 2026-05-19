@@ -14,6 +14,7 @@ import {
   fromApiQuestion,
   toApiQuestion,
 } from '@/lib/registration-fields';
+import { TierManager } from './TierManager';
 
 type EventFull = {
   id: string;
@@ -217,7 +218,8 @@ export function EventSettingsTab({ event }: Props) {
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <div className="space-y-8">
+      <form onSubmit={handleSave} className="space-y-6">
       {flash && (
         <div
           className={`rounded-md border border-border px-4 py-3 text-sm ${
@@ -494,7 +496,10 @@ export function EventSettingsTab({ event }: Props) {
         )}
       </div>
       {toast && <FlowToast message={toast} />}
-    </form>
+      </form>
+
+      <TierManager eventId={event.id} />
+    </div>
   );
 }
 

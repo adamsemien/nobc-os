@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceId } from '@/lib/auth';
 import {
-  deleteTicketTier,
+  closeTicketTier,
   updateTicketTier,
   TicketingError,
   ticketingErrorStatus,
@@ -41,7 +41,7 @@ export async function PATCH(
   }
 }
 
-/** DELETE /api/operator/ticket-tiers/[id] — delete a tier with no sales or holds. */
+/** DELETE /api/operator/ticket-tiers/[id] — soft-close a tier (manuallyClosed). */
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -53,8 +53,8 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    await deleteTicketTier(workspaceId, userId, id);
-    return NextResponse.json({ ok: true });
+    const tier = await closeTicketTier(workspaceId, userId, id);
+    return NextResponse.json({ tier });
   } catch (err) {
     if (err instanceof TicketingError) {
       return NextResponse.json({ error: err.message }, { status: ticketingErrorStatus(err.code) });

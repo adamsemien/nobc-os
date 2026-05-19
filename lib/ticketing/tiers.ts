@@ -214,32 +214,27 @@ export async function updateTicketTier(
   return tier;
 }
 
-/** Deletes a tier — only when nothing has been sold or held against it. */
-export async function deleteTicketTier(
-  workspaceId: string,
-  actorId: string,
-  tierId: string,
-): Promise<void> {
+/** Soft-closes a tier — sets manuallyClosed=true. Tier rows are never hard-
+ *  deleted, so sales history and the audit trail stay intact. */
+export async function closeTicketTier(workspaceId: string, actorId: string, tierId: string) {
   const existing = await db.ticketTier.findFirst({ where: { id: tierId, workspaceId } });
   if (!existing) throw new TicketingError('not_found', 'Ticket tier not found.');
 
-  if (existing.soldCount > 0 || existing.heldCount > 0) {
-    throw new TicketingError(
-      'has_sales',
-      'Cannot delete a tier that has sold or held tickets. Close it instead.',
-    );
-  }
-
-  await db.ticketTier.delete({ where: { id: tierId } });
+  const tier = await db.ticketTier.update({
+    where: { id: tierId },
+    data: { manuallyClosed: true },
+  });
 
   await emitEvent({
     workspaceId,
     actorId,
-    action: 'ticket_tier.deleted',
+    action: 'ticket_tier.closed',
     entityType: 'TICKET_TIER',
     entityId: tierId,
     metadata: { name: existing.name },
   });
+
+  return tier;
 }
 
 /** Rewrites sortOrder to match the given id order. Every id must belong to the

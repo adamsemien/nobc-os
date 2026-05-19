@@ -11,7 +11,7 @@ import { composeInsight } from '@/lib/intelligence/composer';
 import {
   createTicketTier,
   updateTicketTier,
-  deleteTicketTier,
+  closeTicketTier,
   listTicketTiers,
   reorderTicketTiers,
 } from '@/lib/ticketing/tiers';
@@ -524,12 +524,10 @@ function ticketingTools(): Record<string, ToolHandler> {
         );
       },
     },
-    'ticketing.tier.delete': {
-      description: 'Delete a ticket tier that has no sold or held tickets. Args: tierId.',
-      handler: async (workspaceId, args, userId) => {
-        await deleteTicketTier(workspaceId, userId, String(args.tierId));
-        return { ok: true };
-      },
+    'ticketing.tier.close': {
+      description: 'Close a ticket tier — soft delete, sets manuallyClosed. Args: tierId.',
+      handler: async (workspaceId, args, userId) =>
+        closeTicketTier(workspaceId, userId, String(args.tierId)),
     },
     'ticketing.tier.list': {
       description: 'List ticket tiers for an event or series. Args: eventId XOR seriesId.',
