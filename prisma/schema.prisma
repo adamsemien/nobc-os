@@ -23,14 +23,16 @@ model Workspace {
   tierWaitlistName  String  @default("Waitlist")
   defaultTemplateId String?
 
-  members         Member[]
-  applications    Application[]
-  events          Event[]
-  rsvps           RSVP[]
-  tickets         Ticket[]
-  payments        Payment[]
-  waitlistEntries WaitlistEntry[]
-  auditEvents     AuditEvent[]
+  members              Member[]
+  applications         Application[]
+  events               Event[]
+  eventSeries          EventSeries[]
+  rsvps                RSVP[]
+  orders               Order[]
+  tickets              Ticket[]
+  payments             Payment[]
+  waitlistEntries      WaitlistEntry[]
+  auditEvents          AuditEvent[]
   redList              RedList[]
   eventFlowTemplates   EventFlowTemplate[]
   questionDefinitions  QuestionDefinition[]
@@ -38,7 +40,14 @@ model Workspace {
   intelligenceInsights IntelligenceInsight[]
   savedReports         SavedReport[]
   agentConversations   AgentConversation[]
-  svixAppId       String?
+  ticketTiers          TicketTier[]
+  accessTokens         AccessToken[]
+  promoCodes           PromoCode[]
+  tags                 Tag[]
+  entityTags           EntityTag[]
+  sponsorBrandProfiles SponsorBrandProfile[]
+  generatedAssets      GeneratedAsset[]
+  svixAppId            String?
 }
 
 enum MemberStatus {
@@ -166,6 +175,32 @@ enum EventStatus {
   CANCELLED
 }
 
+enum EventVisibility {
+  public
+  members_only
+  unlisted
+}
+
+enum ServiceFeeMode {
+  absorb
+  pass_stripe_only
+  pass_stripe_plus_markup
+  flat_per_ticket
+}
+
+enum RefundPolicy {
+  none
+  window
+  credit
+}
+
+enum WaitlistPromotion {
+  none
+  same_tier_only
+  next_tier_current_price
+  next_tier_held_price
+}
+
 model Event {
   id               String          @id @default(cuid())
   workspaceId      String
@@ -193,6 +228,33 @@ model Event {
   runOfShow             String?         @db.Text
   template              String          @default("editorial")
   eventAccess           Json            @default("{\"member\":{\"enabled\":true,\"gate\":\"auto_confirm\",\"priceCents\":0},\"guest\":{\"enabled\":false,\"gate\":\"pay\",\"priceCents\":0},\"comp\":{\"enabled\":false,\"budgetCap\":null}}")
+
+  // Recurring — seriesId links to EventSeries
+  seriesId              String?
+  instanceNumber        Int?
+  recurrenceRule        String?
+  series                EventSeries?    @relation(fields: [seriesId], references: [id])
+
+  // Visibility & calendar
+  visibility            EventVisibility @default(public)
+  publishesAt           DateTime?
+  featured              Boolean         @default(false)
+
+  // Group buy
+  groupBuyEnabled                 Boolean @default(true)
+  requireAttendeeDetailsPerTicket Boolean @default(false)
+
+  // Service fees
+  serviceFeeMode       ServiceFeeMode @default(absorb)
+  serviceFeePercentBps Int?
+  serviceFeeFlatCents  Int?
+
+  // Refund policy default (tier can override)
+  defaultRefundPolicy  RefundPolicy   @default(window)
+
+  // Waitlist behavior
+  waitlistPromotion    WaitlistPromotion @default(same_tier_only)
+
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -200,9 +262,18 @@ model Event {
   rsvps           RSVP[]
   tickets         Ticket[]
   waitlistEntries WaitlistEntry[]
+  ticketTiers     TicketTier[]
+  orders          Order[]
+  accessTokens    AccessToken[]
+  promoCodes      PromoCode[]
+  ticketHolds     TicketHold[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
+  @@index([visibility])
+  @@index([featured])
+  @@index([publishesAt])
+  @@index([seriesId])
 }
 
 enum FieldType {
@@ -273,6 +344,21 @@ model RSVP {
   compType           String?
   guestEmail         String?
   guestName          String?
+
+  // Order / tier / token linkage
+  orderId            String?
+  order              Order?        @relation(fields: [orderId], references: [id])
+  tierId             String?
+  tier               TicketTier?   @relation(fields: [tierId], references: [id])
+  accessTokenId      String?
+  accessToken        AccessToken?  @relation(fields: [accessTokenId], references: [id])
+
+  // Per-attendee fields (group buy + requireAttendeeDetailsPerTicket)
+  attendeeName          String?
+  attendeeEmail         String?
+  attendeePhone         String?
+  attendeeCustomAnswers Json?
+
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
@@ -281,6 +367,8 @@ model RSVP {
   @@unique([workspaceId, eventId, memberId])
   @@index([workspaceId])
   @@index([eventId])
+  @@index([orderId])
+  @@index([tierId])
 }
 
 enum TicketStatus {
@@ -319,7 +407,9 @@ enum PaymentStatus {
   AUTHORIZED
   CAPTURED
   REFUNDED
+  PARTIALLY_REFUNDED
   FAILED
+  COMP
 }
 
 model Payment {
@@ -546,6 +636,379 @@ model SavedReport {
   createdById String
   createdAt   DateTime  @default(now())
   lastRunAt   DateTime?
+
+  @@index([workspaceId])
+}
+
+// ============================================================================
+// TICKETING V2 — EventSeries, TicketTier, Order, AccessToken, PromoCode
+// ============================================================================
+
+enum TierVisibility {
+  public
+  secret_link
+  members_only
+}
+
+enum TierTrigger {
+  previous_sold_out
+  date
+  manual
+}
+
+enum AccessTokenType {
+  secret_link
+  comp
+}
+
+enum DiscountType {
+  percent
+  flat
+  comp
+}
+
+enum TagEntityType {
+  member
+  event
+  series
+  order
+  application
+  rsvp
+}
+
+enum TagSource {
+  manual
+  tenur
+  activecampaign
+  beehiiv
+  system
+}
+
+model EventSeries {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  name        String
+  description String?
+  recurrenceRule String
+  startsAt    DateTime
+  endsAt      DateTime?
+  count       Int?
+
+  // Defaults inherited by instances on creation
+  defaultHeroImageAssetId String?
+  defaultDescription      String?
+  defaultAccessMode       EventAccessMode @default(OPEN)
+  defaultPlusOnesAllowed  Boolean         @default(false)
+  defaultRefundPolicy     RefundPolicy    @default(window)
+  brandColorHex           String?
+
+  active      Boolean @default(true)
+
+  events        Event[]
+  ticketTiers   TicketTier[]
+  promoCodes    PromoCode[]
+  orders        Order[]
+  seriesSponsors SeriesSponsor[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([active])
+}
+
+model SeriesSponsor {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  seriesId       String
+  sponsorBrandId String
+  tier           String?
+  startInstance  Int?
+  endInstance    Int?
+
+  series       EventSeries         @relation(fields: [seriesId], references: [id])
+  sponsorBrand SponsorBrandProfile @relation(fields: [sponsorBrandId], references: [id])
+
+  createdAt      DateTime @default(now())
+
+  @@unique([seriesId, sponsorBrandId])
+  @@index([workspaceId])
+}
+
+model TicketTier {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  // XOR: exactly one of eventId or seriesId must be set
+  eventId     String?
+  seriesId    String?
+  event       Event?       @relation(fields: [eventId], references: [id])
+  series      EventSeries? @relation(fields: [seriesId], references: [id])
+
+  name        String
+  description String?
+  imageUrl    String?
+  perksJson   Json?
+  sortOrder   Int      @default(0)
+
+  // Pricing — null = not purchasable by that audience
+  memberPriceCents    Int?
+  nonMemberPriceCents Int?
+
+  // Inventory
+  quantity  Int
+  soldCount Int @default(0)
+  heldCount Int @default(0)
+
+  // Availability
+  startsAt   DateTime?
+  endsAt     DateTime?
+  visibility TierVisibility @default(public)
+
+  // Auto-progression
+  autoOpenTrigger TierTrigger?
+  previousTierId  String?
+  previousTier    TicketTier?  @relation("TierProgression", fields: [previousTierId], references: [id])
+  nextTiers       TicketTier[] @relation("TierProgression")
+
+  // Order limits
+  minPerOrder Int @default(1)
+  maxPerOrder Int @default(10)
+
+  // Refund policy override (null = inherit from Event.defaultRefundPolicy)
+  refundPolicy      RefundPolicy?
+  refundWindowHours Int?
+
+  // Manual override
+  manuallyOpened Boolean @default(false)
+  manuallyClosed Boolean @default(false)
+
+  rsvps        RSVP[]
+  accessTokens AccessToken[]
+  promoCodes   PromoCode[]
+  ticketHolds  TicketHold[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId, eventId])
+  @@index([workspaceId, seriesId])
+  @@index([visibility])
+}
+
+model TicketHold {
+  id          String   @id @default(cuid())
+  workspaceId String
+  tierId      String
+  eventId     String?
+  quantity    Int
+  expiresAt   DateTime
+  orderId     String?
+
+  tier        TicketTier @relation(fields: [tierId], references: [id])
+  event       Event?     @relation(fields: [eventId], references: [id])
+
+  @@index([workspaceId])
+  @@index([tierId, expiresAt])
+  @@index([expiresAt])
+}
+
+model Order {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  // XOR: eventId for single-event orders, seriesId for season pass orders
+  eventId     String?
+  seriesId    String?
+  event       Event?       @relation(fields: [eventId], references: [id])
+  series      EventSeries? @relation(fields: [seriesId], references: [id])
+
+  buyerMemberId String?
+  buyerName     String
+  buyerEmail    String
+  buyerPhone    String?
+
+  subtotalCents      Int
+  serviceFeeCents    Int @default(0)
+  promoDiscountCents Int @default(0)
+  totalCents         Int
+
+  stripePaymentIntentId String?       @unique
+  paymentStatus         PaymentStatus @default(PENDING)
+
+  promoCodeId String?
+  promoCode   PromoCode? @relation(fields: [promoCodeId], references: [id])
+
+  rsvps       RSVP[]
+  redemptions PromoRedemption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId, eventId])
+  @@index([workspaceId, seriesId])
+  @@index([buyerMemberId])
+  @@index([paymentStatus])
+}
+
+model AccessToken {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  eventId     String?
+  tierId      String?
+
+  type      AccessTokenType
+  tokenHash String          @unique
+  maxUses   Int?
+  usedCount Int             @default(0)
+  expiresAt DateTime?
+
+  compAttendeeName  String?
+  compAttendeeEmail String?
+  createdByPersonId String?
+
+  event Event?      @relation(fields: [eventId], references: [id])
+  tier  TicketTier? @relation(fields: [tierId], references: [id])
+  rsvps RSVP[]
+
+  createdAt DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([eventId])
+  @@index([tierId])
+  @@index([type])
+}
+
+model PromoCode {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  // XOR: eventId or seriesId; tierId narrows further
+  eventId  String?
+  seriesId String?
+  tierId   String?
+
+  code          String
+  discountType  DiscountType
+  discountValue Int
+
+  maxUses            Int?
+  maxUsesPerCustomer Int?
+  validFrom          DateTime?
+  validUntil         DateTime?
+  usedCount          Int       @default(0)
+
+  event       Event?       @relation(fields: [eventId], references: [id])
+  series      EventSeries? @relation(fields: [seriesId], references: [id])
+  tier        TicketTier?  @relation(fields: [tierId], references: [id])
+  redemptions PromoRedemption[]
+  orders      Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, code])
+  @@unique([seriesId, code])
+  @@index([workspaceId])
+}
+
+model PromoRedemption {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  promoCodeId      String
+  orderId          String
+  amountSavedCents Int
+  redeemedAt       DateTime @default(now())
+
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id])
+  order     Order     @relation(fields: [orderId], references: [id])
+
+  @@index([workspaceId])
+  @@index([promoCodeId])
+  @@index([orderId])
+}
+
+model Tag {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  name           String // human-readable: "austin-local", "VIP"
+  slug           String // URL-safe normalized
+  category       String? // operator grouping: "source", "interest", "campaign"
+  color          String? // hex for UI
+  description    String?
+  externalSource TagSource @default(manual)
+  externalId     String? // ID in source system (Tenur tag, AC tag, Beehiiv segment)
+
+  entityTags EntityTag[]
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@unique([workspaceId, externalSource, externalId])
+  @@index([workspaceId])
+  @@index([externalSource])
+  @@index([category])
+}
+
+model EntityTag {
+  id          String        @id @default(cuid())
+  workspaceId String
+  tagId       String
+  entityType  TagEntityType
+  entityId    String
+  appliedBy   String? // userId, "system", or source name
+  appliedAt   DateTime      @default(now())
+
+  tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([tagId, entityType, entityId])
+  @@index([workspaceId, entityType, entityId])
+  @@index([tagId])
+}
+
+model SponsorBrandProfile {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  icp          String?
+  icpTags      String[]
+  category     String?
+  primaryColor String?
+  logoAssetId  String?
+
+  generatedAssets GeneratedAsset[]
+  seriesSponsors  SeriesSponsor[]
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+model GeneratedAsset {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  sponsorBrandId     String?
+  type               String // simple String for now; promote to enum later
+  pdfUrl             String
+  magicLinkUrl       String    @unique
+  generatedAt        DateTime  @default(now())
+  generatedBySession String?
+  expiresAt          DateTime?
+  payload            Json
+
+  sponsorBrand SponsorBrandProfile? @relation(fields: [sponsorBrandId], references: [id])
+  workspace    Workspace            @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
 }
