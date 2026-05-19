@@ -20,6 +20,12 @@ export async function POST(
   if (app.workspaceId !== workspaceId) {
     return Response.json({ error: 'Forbidden' }, { status: 403 });
   }
+  if (app.status === 'APPROVED') {
+    return Response.json({ error: 'Cannot reject an already-approved application' }, { status: 409 });
+  }
+  if (app.status === 'REJECTED') {
+    return Response.json({ error: 'Already rejected' }, { status: 409 });
+  }
 
   let reason: string | undefined;
   let reviewNote: string | null = null;

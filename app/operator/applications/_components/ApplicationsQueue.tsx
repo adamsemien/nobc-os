@@ -315,13 +315,18 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
   const bulkAction = useCallback(async (action: 'approve' | 'reject' | 'hold') => {
     setPendingBulkAction(action);
     const ids = Array.from(selectedIds);
-    await Promise.allSettled(
-      ids.map(id => fetch(`/api/operator/applications/${id}/${action}`, { method: 'POST', credentials: 'include' }))
+    const results = await Promise.allSettled(
+      ids.map(id => fetch(`/api/operator/applications/${id}/${action}`, { method: 'POST', credentials: 'include' }).then(r => ({ id, ok: r.ok })))
     );
-    setApplications(prev => prev.filter(a => !selectedIds.has(a.id)));
+    const succeeded = results.filter(r => r.status === 'fulfilled' && r.value.ok).map(r => (r as PromiseFulfilledResult<{ id: string; ok: boolean }>).value.id);
+    const failCount = ids.length - succeeded.length;
+    setApplications(prev => prev.filter(a => !succeeded.includes(a.id)));
     setSelectedIds(new Set());
     const label = action === 'approve' ? 'approved' : action === 'hold' ? 'moved to hold' : 'rejected';
-    setFlash({ type: 'success', message: `${ids.length} application${ids.length > 1 ? 's' : ''} ${label}.` });
+    const msg = failCount === 0
+      ? `${succeeded.length} application${succeeded.length !== 1 ? 's' : ''} ${label}.`
+      : `${succeeded.length} ${label}; ${failCount} failed (already processed or error).`;
+    setFlash({ type: failCount === 0 ? 'success' : 'error', message: msg });
     setPendingBulkAction(null);
     window.setTimeout(() => setFlash(null), 4000);
   }, [selectedIds]);
