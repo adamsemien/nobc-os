@@ -280,6 +280,12 @@ Roles live in Clerk Organization membership metadata. `lib/permissions.ts` expos
 
 ---
 
+## Session Discipline
+
+**STATUS.md rules:** max 50 lines. Contains only: current branch / last 5 commits / in flight / blocked / next task. Never duplicate CLAUDE.md. Rewrite lean at end of every session — never append.
+
+---
+
 ## Rules
 
 - All DB queries scoped to `workspaceId`
