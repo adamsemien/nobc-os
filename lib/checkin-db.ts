@@ -8,6 +8,8 @@ export interface CachedRsvp {
   email: string;
   memberQrCode: string | null;
   ticketStatus: string;
+  paymentStatus: string | null;
+  tierName: string | null;
   checkedIn: boolean;
   checkedInAt: string | null;
   isComp: boolean;

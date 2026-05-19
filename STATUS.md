@@ -2,6 +2,30 @@
 
 _Last updated: 2026-05-19_
 
+## V1 Item 12 — Offline-first QR check-in PWA ✅
+
+Branch: `feat/item-12-checkin-pwa`
+
+| Area | Status |
+|------|--------|
+| `/check-in/[slug]` — staff PWA, mobile-first dark UI | ✅ (pre-existing) |
+| QR scanner via `@zxing/library` + `BrowserMultiFormatReader` | ✅ (pre-existing) |
+| Dexie IndexedDB schema (`CachedRsvp` + `PendingCheckIn`) | ✅ (pre-existing) |
+| `GET /api/check-in/event` — guest list + event info, bearer token auth | ✅ (pre-existing) |
+| `POST /api/check-in/[rsvpId]` — idempotent check-in, AuditEvent, member stats | ✅ (pre-existing) |
+| Offline queue: optimistic Dexie update → sync on `window.online` | ✅ (pre-existing) |
+| Manual name/email search fallback | ✅ (pre-existing) |
+| Running checked-in / total count display | ✅ (pre-existing) |
+| **`public/sw.js`** — service worker: cache-first `/_next/static/`, network-first-with-fallback for check-in pages | ✅ |
+| **SW registration** in `CheckInClient` via `useEffect` | ✅ |
+| **PWA install prompt** — `beforeinstallprompt` handler + Download button in header | ✅ |
+| **`paymentStatus` + `tierName`** added to `CachedRsvp`, event API, and guest list display | ✅ |
+| **Scan result** shows name + tier + payment status (success and already-in cases) | ✅ |
+
+`tsc --noEmit` clean. `next build` clean. No hex literals added outside check-in component.
+
+---
+
 ## V1 Items 8 + 9 — approval_required + Stripe authorize/capture ✅
 
 Branch: `feat/item-8-9-approval-stripe`

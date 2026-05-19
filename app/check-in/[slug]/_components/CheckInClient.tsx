@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Camera, ListChecks } from 'lucide-react';
+import { Camera, ListChecks, Download } from 'lucide-react';
 import { checkinDb, type CachedRsvp } from '@/lib/checkin-db';
 import { BrowserMultiFormatReader } from '@zxing/library';
 
@@ -14,11 +14,36 @@ interface EventInfo {
   capacity: number | null;
 }
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+type ScanResult = {
+  name: string;
+  status: 'success' | 'already' | 'not_found' | 'error';
+  tierName?: string | null;
+  paymentStatus?: string | null;
+  ticketStatus?: string;
+};
+
 type View = 'list' | 'scanner';
 
 function formatTime(iso: string | null): string {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatPaymentStatus(ps: string | null | undefined): string {
+  if (!ps) return '';
+  const map: Record<string, string> = {
+    AUTHORIZED: 'Auth hold',
+    CAPTURED: 'Paid',
+    REFUNDED: 'Refunded',
+    COMP: 'Comp',
+    PENDING: 'Pending',
+  };
+  return map[ps] ?? ps;
 }
 
 export function CheckInClient({
@@ -34,11 +59,36 @@ export function CheckInClient({
   const [totalCount, setTotalCount] = useState(0);
   const [view, setView] = useState<View>('list');
   const [search, setSearch] = useState('');
-  const [scanResult, setScanResult] = useState<{ name: string; status: 'success' | 'already' | 'not_found' | 'error' } | null>(null);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [scannerActive, setScannerActive] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // Register service worker for offline asset caching
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {/* non-fatal */});
+    }
+  }, []);
+
+  // Capture the PWA install prompt so we can show our own button
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = useCallback(async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setInstallPrompt(null);
+  }, [installPrompt]);
 
   const fetchGuestList = useCallback(async () => {
     try {
@@ -89,7 +139,7 @@ export function CheckInClient({
       headers: { Authorization: `Bearer ${CHECKIN_SECRET}` },
     })
       .then(r => { if (r.ok) checkinDb.pending.update(rsvpId, { synced: true }); })
-      .catch(() => {/* stays pending, retry on reconnect */});
+      .catch(() => {/* stays pending, synced on reconnect */});
 
     return { ...rsvp, checkedIn: true, checkedInAt: now };
   }, []);
@@ -104,13 +154,25 @@ export function CheckInClient({
       return;
     }
     if (rsvp.checkedIn) {
-      setScanResult({ name: `${rsvp.firstName} ${rsvp.lastName}`, status: 'already' });
+      setScanResult({
+        name: `${rsvp.firstName} ${rsvp.lastName}`,
+        status: 'already',
+        tierName: rsvp.tierName,
+        paymentStatus: rsvp.paymentStatus,
+        ticketStatus: rsvp.ticketStatus,
+      });
       setTimeout(() => setScanResult(null), 3000);
       return;
     }
     const result = await performCheckIn(rsvp.id);
     if (result) {
-      setScanResult({ name: `${result.firstName} ${result.lastName}`, status: 'success' });
+      setScanResult({
+        name: `${result.firstName} ${result.lastName}`,
+        status: 'success',
+        tierName: result.tierName,
+        paymentStatus: result.paymentStatus,
+        ticketStatus: result.ticketStatus,
+      });
       setTimeout(() => setScanResult(null), 3000);
     }
   }, [scannerActive, performCheckIn]);
@@ -132,6 +194,7 @@ export function CheckInClient({
     };
   }, [view, handleQrScan]);
 
+  // Sync pending check-ins when connection returns
   useEffect(() => {
     const syncPending = async () => {
       const pending = await checkinDb.pending.where('synced').equals(0).toArray();
@@ -142,7 +205,7 @@ export function CheckInClient({
             headers: { Authorization: `Bearer ${CHECKIN_SECRET}` },
           });
           if (r.ok) await checkinDb.pending.update(p.rsvpId, { synced: true });
-        } catch { /* offline */ }
+        } catch { /* still offline */ }
       }
     };
     window.addEventListener('online', syncPending);
@@ -160,7 +223,7 @@ export function CheckInClient({
       })
     : rsvps;
 
-  // Checked-in first toggled off — keep stable order: not-checked-in first, then checked-in
+  // Unchecked-in guests first, then checked-in; both groups alpha by last name
   const orderedRsvps = [...filteredRsvps].sort((a, b) => {
     if (a.checkedIn !== b.checkedIn) return a.checkedIn ? 1 : -1;
     return a.lastName.localeCompare(b.lastName);
@@ -198,7 +261,7 @@ export function CheckInClient({
           zIndex: 10,
         }}
       >
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
             Staff Check-In
           </div>
@@ -215,25 +278,49 @@ export function CheckInClient({
             {loading && !event ? '…' : event?.title ?? 'Event not found'}
           </div>
         </div>
-        <button
-          onClick={() => setView(v => (v === 'scanner' ? 'list' : 'scanner'))}
-          aria-label={view === 'scanner' ? 'Show guest list' : 'Open QR scanner'}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 48,
-            height: 48,
-            flexShrink: 0,
-            borderRadius: 10,
-            border: '1px solid #333',
-            background: view === 'scanner' ? '#f5f5f5' : '#161616',
-            color: view === 'scanner' ? '#0a0a0a' : '#f5f5f5',
-            cursor: 'pointer',
-          }}
-        >
-          {view === 'scanner' ? <ListChecks size={22} /> : <Camera size={22} />}
-        </button>
+
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          {installPrompt && (
+            <button
+              onClick={handleInstall}
+              aria-label="Add to Home Screen"
+              title="Add to Home Screen"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                border: '1px solid #333',
+                background: '#161616',
+                color: '#888',
+                cursor: 'pointer',
+              }}
+            >
+              <Download size={18} />
+            </button>
+          )}
+          <button
+            onClick={() => setView(v => (v === 'scanner' ? 'list' : 'scanner'))}
+            aria-label={view === 'scanner' ? 'Show guest list' : 'Open QR scanner'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 48,
+              height: 48,
+              flexShrink: 0,
+              borderRadius: 10,
+              border: '1px solid #333',
+              background: view === 'scanner' ? '#f5f5f5' : '#161616',
+              color: view === 'scanner' ? '#0a0a0a' : '#f5f5f5',
+              cursor: 'pointer',
+            }}
+          >
+            {view === 'scanner' ? <ListChecks size={22} /> : <Camera size={22} />}
+          </button>
+        </div>
       </header>
 
       {/* Running count */}
@@ -266,6 +353,7 @@ export function CheckInClient({
               playsInline
               muted
             />
+            {/* Scan target overlay */}
             <div
               style={{
                 position: 'absolute',
@@ -293,14 +381,35 @@ export function CheckInClient({
                   borderRadius: 10,
                   padding: '14px 16px',
                   textAlign: 'center',
-                  fontWeight: 600,
-                  fontSize: 15,
                 }}
               >
-                {scanResult.status === 'success' && `✓ Checked in · ${scanResult.name}`}
-                {scanResult.status === 'already' && `Already in · ${scanResult.name}`}
-                {scanResult.status === 'not_found' && 'QR not on guest list'}
-                {scanResult.status === 'error' && 'Check-in failed — use search'}
+                {scanResult.status === 'success' && (
+                  <>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>✓ Checked in · {scanResult.name}</div>
+                    {scanResult.tierName && (
+                      <div style={{ fontSize: 13, marginTop: 4, opacity: 0.9 }}>{scanResult.tierName}</div>
+                    )}
+                    {scanResult.paymentStatus && (
+                      <div style={{ fontSize: 12, marginTop: 2, opacity: 0.75 }}>
+                        {formatPaymentStatus(scanResult.paymentStatus)}
+                      </div>
+                    )}
+                  </>
+                )}
+                {scanResult.status === 'already' && (
+                  <>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>Already in · {scanResult.name}</div>
+                    {scanResult.tierName && (
+                      <div style={{ fontSize: 13, marginTop: 4, opacity: 0.9 }}>{scanResult.tierName}</div>
+                    )}
+                  </>
+                )}
+                {scanResult.status === 'not_found' && (
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>QR not on guest list</div>
+                )}
+                {scanResult.status === 'error' && (
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>Check-in failed — use search</div>
+                )}
               </div>
             )}
           </div>
@@ -350,6 +459,22 @@ export function CheckInClient({
                       >
                         {rsvp.firstName} {rsvp.lastName}
                       </span>
+                      {rsvp.tierName && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            padding: '2px 7px',
+                            borderRadius: 5,
+                            background: '#1a2030',
+                            color: '#7090d0',
+                          }}
+                        >
+                          {rsvp.tierName}
+                        </span>
+                      )}
                       {rsvp.isComp && (
                         <span
                           style={{
@@ -373,7 +498,14 @@ export function CheckInClient({
                           ✓ Checked in{rsvp.checkedInAt ? ` · ${formatTime(rsvp.checkedInAt)}` : ''}
                         </span>
                       ) : (
-                        rsvp.email
+                        <span>
+                          {rsvp.email}
+                          {rsvp.paymentStatus && rsvp.paymentStatus !== 'COMP' && (
+                            <span style={{ color: '#555', marginLeft: 6 }}>
+                              · {formatPaymentStatus(rsvp.paymentStatus)}
+                            </span>
+                          )}
+                        </span>
                       )}
                     </div>
                   </div>

@@ -34,10 +34,12 @@ export async function GET(req: NextRequest) {
       id: true,
       memberId: true,
       ticketStatus: true,
+      paymentStatus: true,
       checkedIn: true,
       checkedInAt: true,
       isComp: true,
       compType: true,
+      tier: { select: { name: true } },
       member: {
         select: {
           firstName: true,
@@ -64,6 +66,8 @@ export async function GET(req: NextRequest) {
       email: r.member.email,
       memberQrCode: r.member.memberQrCode,
       ticketStatus: r.ticketStatus,
+      paymentStatus: r.paymentStatus ?? null,
+      tierName: r.tier?.name ?? null,
       checkedIn: r.checkedIn,
       checkedInAt: r.checkedInAt?.toISOString() ?? null,
       isComp: r.isComp,
