@@ -2,6 +2,30 @@
 
 _Last updated: 2026-05-19_
 
+## Apply form — 9-screen expansion ✅
+
+Branch: `feat/apply-form-v2`
+
+| Area | Status |
+|------|--------|
+| **FormData interface** — 23 new fields, 4 retired (`busyDuringDay`, `socialLink`, `connectedPeople`, `alwaysCalledAbout`) | ✅ |
+| **Screen 0 (The Basics)** — added `homeAddress`, `whatYouDo` (textarea, required), `howDidYouHear` | ✅ |
+| **Screen 1 (Personality & Perspective)** — updated obsessedWith label, removed alwaysCalledAbout, added `personYouAdmire` | ✅ |
+| **Screen 2 (Community Fit)** — reordered; added `howDoYouKnowGoodCompany` (required, first), `connectionOpportunity`, `whatKindOfPeopleFlowThrough`; moved `interestingPeople` to end | ✅ |
+| **Screen 3 (Taste)** — updated trustTaste + recommend labels; added 5 recommendation sub-fields in 2-col grid | ✅ |
+| **Screen 4 (Rapid Fire)** — removed `busyDuringDay`; replaced `socialLink` with `contentStopsScrolling`; added `idealSaturday`, `preferredWorkout`, `localAustinBrand`, `dreamBrandPartnership`, `shoppingCart`, `spendMoreThanMost`, `topPodcasts` | ✅ |
+| **Screen 5 (Tell Us About You)** — NEW screen: `whatPeopleComeToYouFor`, `heavilyInvestedIn`, `genuineExpertIn` (all required) | ✅ |
+| **Screens 6/7/8** — Photos, Legal, Reveal renumbered from 5/6/7 | ✅ |
+| **Progress bar** — updated from `/7` to `/8` | ✅ |
+| **Answer keys** — updated to `personality.*`, `community.*`, `about.*` prefixes; backward-compat for resume drafts | ✅ |
+| **Demo autofill** — DEMO_DATA, TEST_DATA, all 3 DEMO_SETS updated with new fields | ✅ |
+| **Legal waiver** — untouched | ✅ |
+| **FroggerGame** — untouched | ✅ |
+
+`tsc --noEmit` clean. `next build` clean. No hex literals added.
+
+---
+
 ## V1 Item 12 — Offline-first QR check-in PWA ✅
 
 Branch: `feat/item-12-checkin-pwa`

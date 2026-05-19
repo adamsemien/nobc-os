@@ -39,26 +39,45 @@ interface FormData {
   phone: string;
   city: string;
   neighborhood: string;
+  homeAddress: string;
   fromOriginally: string;
   birthday: string;
   links: string;
   referrers: [string, string, string];
+  whatYouDo: string;
+  howDidYouHear: string;
   workingOn: string;
   obsessedWith: string;
-  alwaysCalledAbout: string;
-  interestingPeople: string;
-  connectedPeople: string;
+  personYouAdmire: string;
+  howDoYouKnowGoodCompany: string;
+  connectionOpportunity: string;
   loyalCommunity: string;
+  whatKindOfPeopleFlowThrough: string;
+  interestingPeople: string;
   detailsRight: string;
   trustTaste: string;
   recommend: string;
   splurgeVsSave: string;
+  recommendTravel: string;
+  recommendFoodDrink: string;
+  recommendWellnessFitness: string;
+  recommendFashion: string;
+  recommendHomeDesign: string;
   karaokeS: string;
   coffeeTable: string;
-  busyDuringDay: string;
+  idealSaturday: string;
   sundayMorning: string;
-  socialLink: string;
+  contentStopsScrolling: string;
   everydayItem: string;
+  preferredWorkout: string;
+  localAustinBrand: string;
+  dreamBrandPartnership: string;
+  shoppingCart: string;
+  spendMoreThanMost: string;
+  topPodcasts: string;
+  whatPeopleComeToYouFor: string;
+  heavilyInvestedIn: string;
+  genuineExpertIn: string;
   photoUrls: string[];
   foodAccessibility: string;
   agreedToTerms: boolean;
@@ -73,13 +92,20 @@ interface SubmitResult {
 }
 
 const EMPTY_FORM: FormData = {
-  fullName: '', email: '', phone: '', city: '', neighborhood: '', fromOriginally: '',
-  birthday: '', links: '', referrers: ['', '', ''],
-  workingOn: '', obsessedWith: '', alwaysCalledAbout: '',
-  interestingPeople: '', connectedPeople: '', loyalCommunity: '',
+  fullName: '', email: '', phone: '', city: '', neighborhood: '', homeAddress: '',
+  fromOriginally: '', birthday: '', links: '', referrers: ['', '', ''],
+  whatYouDo: '', howDidYouHear: '',
+  workingOn: '', obsessedWith: '', personYouAdmire: '',
+  howDoYouKnowGoodCompany: '', connectionOpportunity: '', loyalCommunity: '',
+  whatKindOfPeopleFlowThrough: '', interestingPeople: '',
   detailsRight: '', trustTaste: '', recommend: '', splurgeVsSave: '',
-  karaokeS: '', coffeeTable: '', busyDuringDay: '', sundayMorning: '',
-  socialLink: '', everydayItem: '',
+  recommendTravel: '', recommendFoodDrink: '', recommendWellnessFitness: '',
+  recommendFashion: '', recommendHomeDesign: '',
+  karaokeS: '', coffeeTable: '', idealSaturday: '', sundayMorning: '',
+  contentStopsScrolling: '', everydayItem: '',
+  preferredWorkout: '', localAustinBrand: '', dreamBrandPartnership: '',
+  shoppingCart: '', spendMoreThanMost: '', topPodcasts: '',
+  whatPeopleComeToYouFor: '', heavilyInvestedIn: '', genuineExpertIn: '',
   photoUrls: [], foodAccessibility: '', agreedToTerms: false, consentSms: false,
 };
 
@@ -89,26 +115,45 @@ const TEST_DATA: Partial<FormData> = {
   phone: '512-555-0192',
   city: 'Austin, TX',
   neighborhood: 'East Austin',
+  homeAddress: '2541 East 6th Street, Austin, TX 78702',
   fromOriginally: 'Chicago',
   birthday: '1990-04-12',
   links: '@jordanvoss · https://jordanvoss.co · https://linkedin.com/in/jordanvoss',
   referrers: ['Chloe Chiang', 'Adam Semien', ''],
+  whatYouDo: 'Building a platform that connects independent restaurateurs with local farmers directly. We cut out three middlemen and the margins are finally making sense.',
+  howDidYouHear: 'Through mutual friends in the food community',
   workingOn: 'Building a platform that connects independent restaurateurs with local farmers directly. We cut out three middlemen and the margins are finally making sense.',
   obsessedWith: "The way Tokyo convenience stores have turned functional retail into a genuine cultural experience. I've been thinking about it for six months.",
-  alwaysCalledAbout: 'Introductions. And whether a business idea actually has legs. Sometimes both in the same call.',
-  interestingPeople: "My friend Dara runs a foundation in Lagos and somehow also DJs underground parties in Brooklyn twice a year. My neighbor Ray is 74, was a session musician in the 70s, and knows more about fermentation than anyone I've met.",
-  connectedPeople: "Introduced a ceramicist I know to a restaurant opening in the Eastside that needed a custom dish program. They're still working together two years later.",
+  personYouAdmire: "My friend Dara who runs a foundation in Lagos and somehow also DJs underground parties in Brooklyn twice a year. The way she holds multiple identities with total ease is something I study.",
+  howDoYouKnowGoodCompany: "When the conversation gets inconveniently interesting. When someone says something true and the table just goes quiet for a second.",
+  connectionOpportunity: "Introduced a ceramicist I know to a restaurant opening in the Eastside that needed a custom dish program. They're still working together two years later.",
   loyalCommunity: "A small dinner series I've been part of since 2019. It has no name, no Instagram, just twelve people who rotate hosting. It survived the pandemic and I think that says everything.",
+  whatKindOfPeopleFlowThrough: "Farmers, chefs, the occasional architect or designer who works on hospitality spaces. People who understand that the supply chain is part of the story.",
+  interestingPeople: "My friend Dara runs a foundation in Lagos and somehow also DJs underground parties in Brooklyn twice a year. My neighbor Ray is 74, was a session musician in the 70s, and knows more about fermentation than anyone I've met.",
   detailsRight: 'Barley Swine. The spacing between tables, the way servers describe the food, the fact that the check never feels like an interruption.',
   trustTaste: 'My friend Mei. If she recommends something I stop asking questions and just go.',
   recommend: 'Sourdough starter culture from a bakery in Portland called Seastar. I have personally convinced eleven people to order it.',
   splurgeVsSave: "Splurge on restaurants and travel. Save on everything that doesn't create a memory.",
+  recommendTravel: 'Tokyo — the convenience stores alone are worth the flight',
+  recommendFoodDrink: 'Barley Swine — always Barley Swine',
+  recommendWellnessFitness: 'Daily walks, occasional yoga when I\'m disciplined about it',
+  recommendFashion: 'Margaret Howell and vintage Filson',
+  recommendHomeDesign: 'Anything Tadao Ando would approve of',
   karaokeS: 'Africa by Toto. Every time.',
   coffeeTable: "Monocle issue from 2019, a rock from Marfa, and a book on Tadao Ando I've never actually opened.",
-  busyDuringDay: 'Building, mostly. A lot of calls with people who are also building.',
+  idealSaturday: 'Farmers market at 7, two hours of reading, a long lunch with people I want to think with, nothing scheduled after 4pm.',
   sundayMorning: 'Farmers market, then two hours of reading with the phone in another room.',
-  socialLink: 'Are.na',
+  contentStopsScrolling: 'Are.na boards. Architecture and urbanism long reads. The occasional deep-dive video essay on fermentation or material culture.',
   everydayItem: 'I was a competitive fencer in college. Épée. I was not very good.',
+  preferredWorkout: 'Cycling and occasional yoga',
+  localAustinBrand: 'JuiceLand — underrated actually',
+  dreamBrandPartnership: 'Muji. The philosophy aligns — everything we make should have a reason.',
+  shoppingCart: 'Sourdough starter culture from Seastar in Portland, a Japanese carbon steel knife, and the new Monocle issue',
+  spendMoreThanMost: "Restaurants and travel. Save on everything that doesn't create a memory.",
+  topPodcasts: '99% Invisible, Gastropod, and How I Built This for the commute',
+  whatPeopleComeToYouFor: 'Introductions. And whether a business idea actually has legs. Sometimes both in the same call.',
+  heavilyInvestedIn: "The platform — we're finally profitable on the direct sourcing model and I'm putting everything back in.",
+  genuineExpertIn: "Agricultural supply chains and the last-mile problem in local food. And probably Tokyo convenience store culture at this point.",
   foodAccessibility: '',
 };
 
@@ -130,26 +175,45 @@ const DEMO_SETS: Array<{
       phone: '512-555-0271',
       city: 'Austin, TX',
       neighborhood: 'East Austin',
+      homeAddress: '1840 East 7th Street, Austin, TX 78702',
       fromOriginally: 'Lagos, Nigeria',
       birthday: '1989-08-22',
       links: '@mayaokonkwo · mayaokonkwo.com',
       referrers: ['Chloe Chiang', 'Adam Semien', ''],
+      whatYouDo: "Cultural programmer and experience designer — I run a studio that produces site-specific programming for brands trying to reach creative communities without losing the room. Before that, gallery management and event production in London and Lagos.",
+      howDidYouHear: 'Through Chloe Chiang',
       workingOn: "Running a cultural programming studio that produces site-specific experiences for brands who want to reach creative communities without being cringe about it. We just wrapped a three-month residency for a beverage brand inside a gallery space in East Austin — no logos on the wall, just programming that earned the room.",
       obsessedWith: "The Nairobi art scene right now and what it means that the best contemporary African art is being bought by Africans. The secondary market implications alone could reshape everything. I've been in contact with two collectors there and it's unlike anything happening in New York.",
-      alwaysCalledAbout: "Who to invite to what. And whether a creative direction is actually good or just looks good on a deck. Those are different skills and most people confuse them.",
-      interestingPeople: "My mentor who ran the Serpentine Gallery for 12 years — she can read a room in 30 seconds and has never once compromised on quality. My best friend who is a session musician turned VC and is one of the most rigorous thinkers I know. My downstairs neighbor who makes the best egusi soup in Austin and has no idea.",
-      connectedPeople: "Introduced a James Beard-nominated chef to a real estate developer who wanted to do something interesting with a warehouse space. They talked twice, shook hands, and opened a restaurant. It has a three-month waitlist.",
+      personYouAdmire: "Rirkrit Tiravanija. The way he turned hospitality and shared meals into his primary artistic medium — the idea that gathering people is itself a form of art. I think about it constantly when designing experiences.",
+      howDoYouKnowGoodCompany: "When people stop performing and start thinking out loud. When you leave feeling smarter and more curious than when you arrived. When someone says something true at the table and the room just goes still for a second.",
+      connectionOpportunity: "Introduced a James Beard-nominated chef to a real estate developer who wanted to do something interesting with a warehouse space. They talked twice, shook hands, and opened a restaurant. It has a three-month waitlist.",
       loyalCommunity: "A rotating dinner series in Brooklyn I've been part of for six years. No name, no social media, 14 people, you eat whatever the host decides. It survived a pandemic and two people moving to different countries.",
+      whatKindOfPeopleFlowThrough: "Collectors, curators, independent chefs, creative directors who have crossed over into building real things. People who move between worlds — who can hold a conversation at a gallery opening and at a farmer's market and neither feels forced.",
+      interestingPeople: "My mentor who ran the Serpentine Gallery for 12 years — she can read a room in 30 seconds and has never once compromised on quality. My best friend who is a session musician turned VC and is one of the most rigorous thinkers I know.",
       detailsRight: "A record store in Tokyo called Jet Set Records in Shimokitazawa. The way they organize by feel rather than genre. You don't know what you're looking for until you find it.",
       trustTaste: "Issey Miyake, still. The way he thought about the relationship between fabric and the body — utility and beauty as the same thing. I also ask Nobu Matsuhisa for restaurant recs if I'm ever in the same city.",
       recommend: "A small ceramics studio in East Austin that doesn't have an Instagram. I have brought them six commissions personally this year.",
       splurgeVsSave: "Splurge on anything that creates a memory or supports a maker. Save on everything a brand wants you to notice.",
+      recommendTravel: 'Shimokitazawa — skip the hotels, rent a house',
+      recommendFoodDrink: 'Nairobi Chai House in Westlands',
+      recommendWellnessFitness: 'Hot power yoga at Black Swan in East Austin',
+      recommendFashion: 'Lemaire and local vintage before anything else',
+      recommendHomeDesign: 'Mjölk in Toronto — ships to the US',
       karaokeS: "Killing Me Softly. Every time. No hesitation.",
       coffeeTable: "Three art monographs and a piece of raw amber I bought at a market in Lagos.",
-      busyDuringDay: "Programming, production calls, and thinking through problems on long walks.",
+      idealSaturday: "Farmers market at 9, long breakfast with two or three people I want to think with, a museum or gallery in the afternoon with no agenda, a dinner I helped cook somewhere I actually want to be.",
       sundayMorning: "Farmers market, then a long breakfast with people I actually want to talk to.",
-      socialLink: "Are.na — I have 40 channels and revisit all of them.",
+      contentStopsScrolling: "Long-form essays on Are.na, independent video essays on YouTube about craft and process — ceramics, architecture, winemaking. The kind of content that makes you feel like you watched a documentary, not a reel.",
       everydayItem: "I was a competitive fencer in college. Épée. I was genuinely good.",
+      preferredWorkout: 'Hot yoga, long walks, occasional boxing',
+      localAustinBrand: "Antonelli's Cheese Shop",
+      dreamBrandPartnership: "Issey Miyake or Aesop — I'd want to design an experience around the philosophy of the brand, not a campaign. Something that lives in a space for three months.",
+      shoppingCart: "A Muji floor lamp, a Yixing teapot I found on a ceramics deep-dive, and a book on Pritzker-winning architects I haven't ordered yet",
+      spendMoreThanMost: "Travel and dining — I'd rather eat one extraordinary meal than three mediocre ones. And on art, when something moves me.",
+      topPodcasts: "99% Invisible, The Long View with Brian Koppelman, and Monocle 24's The Urbanist",
+      whatPeopleComeToYouFor: "Who to invite and why. I've become a kind of connector-in-residence for a certain kind of creative in Austin — people call me when they're trying to fill a room, launch something, or figure out who they should meet. Also for honest reads on whether a creative direction is actually good versus just well-executed.",
+      heavilyInvestedIn: "Building a cultural programming toolkit that I can license to other cities. The Austin model works — I want to see what it looks like in Detroit, Portland, Lagos. I've been putting 15-hour days into the framework for six months.",
+      genuineExpertIn: "Experience design for creative communities. How to build programming that earns its audience instead of buying it. And the West African contemporary art market — specifically the secondary market dynamics post-2020.",
       foodAccessibility: '',
       agreedToTerms: true,
       consentSms: false,
@@ -166,26 +230,45 @@ const DEMO_SETS: Array<{
       phone: '512-555-0334',
       city: 'Austin, TX',
       neighborhood: 'South Austin',
+      homeAddress: '2201 South 1st Street, Austin, TX 78704',
       fromOriginally: 'Memphis, TN',
       birthday: '1986-11-03',
       links: '@derekpaulson',
       referrers: ['Adam Semien', '', ''],
+      whatYouDo: "Chef and restaurateur. I own two restaurants in Austin — both focused on seasonal local sourcing with direct farmer relationships. Also doing some consulting for hospitality groups trying to do sourcing better.",
+      howDidYouHear: 'Adam Semien invited me',
       workingOn: "Scaling my second restaurant and figuring out whether I want to open a third. The operations are finally solid. The question is whether I want to spend the next five years doing this again.",
       obsessedWith: "Natural wine and why Austin still doesn't have a truly great bottle shop. Someone needs to do it right.",
-      alwaysCalledAbout: "Restaurant recommendations. And to settle arguments about music.",
-      interestingPeople: "My business partner who came from finance and approaches hospitality like an operator. Different instinct than me but it works. My sous chef who grew up in Oaxaca and has more knowledge of technique than anyone I've worked with.",
-      connectedPeople: "Connected a farmer I source from with a chef at another restaurant in town. They have a direct relationship now and both are better for it.",
+      personYouAdmire: "Alice Waters. Not because of the obvious reasons — because she had a vision in 1971 that was genuinely 30 years ahead of the conversation and she never compromised on it. She built the infrastructure to support the idea, not just the idea itself.",
+      howDoYouKnowGoodCompany: "When there's substance in the room. Good company means you're learning something, laughing about something real, or building something together — not just being seen somewhere.",
+      connectionOpportunity: "Connected a farmer I source from with a chef at another restaurant in town. They have a direct relationship now and both are better for it. That kind of quiet introduction matters more than it looks.",
       loyalCommunity: "The Austin food community. I've been going to the same farmers market for six years and I know most of the vendors by name.",
+      whatKindOfPeopleFlowThrough: "Chefs, farmers, winemakers, the occasional sommelier. Some architects and designers. People who make things with their hands and think seriously about what they put into the world.",
+      interestingPeople: "My business partner who came from finance and approaches hospitality like an operator. Different instinct than me but it works. My sous chef who grew up in Oaxaca and has more knowledge of technique than anyone I've worked with.",
       detailsRight: "Odd Duck. The sourcing is real, the service knows what they're talking about, and they never make you feel like you need to deserve the experience.",
       trustTaste: "My sommelier. If she's excited about a bottle I trust it completely.",
       recommend: "A natural wine importer called Selection Massale. I've converted most of my industry friends.",
       splurgeVsSave: "Splurge on ingredients and wine. Save on things nobody eats.",
+      recommendTravel: 'Copenhagen — specifically for the restaurant scene and the food culture',
+      recommendFoodDrink: 'Contigo for patio dining, Barley Swine for the serious meal',
+      recommendWellnessFitness: 'Running — nothing complicated',
+      recommendFashion: 'Engineered Garments — the workwear line',
+      recommendHomeDesign: "Whatever's at the Laguna Gloria gift shop",
       karaokeS: "Don't Stop Believin'. Classic for a reason.",
       coffeeTable: "A book on French bistro culture and a stack of menus from places I've eaten.",
-      busyDuringDay: "At the restaurant or on calls with suppliers.",
+      idealSaturday: "Farmers market at 7am, service at the restaurant for brunch, afternoon off to cook something I've been thinking about, dinner with my family.",
       sundayMorning: "Farmers market, then family breakfast.",
-      socialLink: "Instagram — mostly for food and hospitality accounts.",
+      contentStopsScrolling: "Long food videos — actual technique, actual kitchens. Not content, craft. And the occasional deep read on fermentation science or the economics of independent restaurants.",
       everydayItem: "I ran a half marathon once and hated every mile of it.",
+      preferredWorkout: 'Running, 5am before service',
+      localAustinBrand: 'Barley Swine — they set the standard here',
+      dreamBrandPartnership: "Lodge Cast Iron. Simple, honest, made in Tennessee. I'd want to design a collection of seasonal recipes and give them away, not sell them.",
+      shoppingCart: "New carbon steel pans, a fermentation crock, and a book on French charcuterie I keep starting and not finishing",
+      spendMoreThanMost: "Ingredients. Quality protein, heritage grains, good fats. Most people save on what they eat — I can't do that.",
+      topPodcasts: 'The Dave Chang Show, The Restaurant Guys, and occasionally Gastropod when I have two hours',
+      whatPeopleComeToYouFor: "Restaurant recommendations — always. But also honest feedback on whether a hospitality idea will actually work. The question I ask every time is: can you survive Tuesday?",
+      heavilyInvestedIn: "Figuring out whether I want to open a third restaurant. The emotional and financial calculus of that decision has been occupying more of my mind than I want to admit.",
+      genuineExpertIn: "Seasonal sourcing at scale — how to build the supplier relationships, negotiate the pricing, and design a menu around what actually comes in. Most people can do one of those things. I can do all three at the same time.",
       foodAccessibility: '',
       agreedToTerms: true,
       consentSms: false,
@@ -202,26 +285,45 @@ const DEMO_SETS: Array<{
       phone: '512-555-0198',
       city: 'Austin, TX',
       neighborhood: '',
+      homeAddress: '4512 Lamar Boulevard, Austin, TX 78756',
       fromOriginally: 'Austin, TX',
       birthday: '1993-05-17',
       links: 'instagram.com/tylerbrennan',
       referrers: ['', '', ''],
+      whatYouDo: "Sales at a tech company. Also doing some consulting on the side when I have time.",
+      howDidYouHear: 'Saw it online somewhere',
       workingOn: "Sales at a tech company. Also have a side hustle doing some consulting.",
       obsessedWith: "The Joe Rogan podcast and the NBA.",
-      alwaysCalledAbout: "Advice and to hang out.",
-      interestingPeople: "My college roommate who works at Google. My dad who has been in real estate for 30 years.",
-      connectedPeople: "I introduced two friends at a party once and they ended up dating for a while.",
+      personYouAdmire: "Elon Musk. He built multiple companies and changed entire industries.",
+      howDoYouKnowGoodCompany: "When people are fun and not taking themselves too seriously. Good vibes basically.",
+      connectionOpportunity: "Introduced two friends at a party once. I think they dated for a while.",
       loyalCommunity: "My friend group I guess. We've known each other since high school.",
+      whatKindOfPeopleFlowThrough: "Tech people, sales people, some startup guys. Normal Austin people I guess.",
+      interestingPeople: "My college roommate who works at Google. My dad who has been in real estate for 30 years.",
       detailsRight: "Uchi is pretty good. The service is always solid.",
       trustTaste: "My friend Jake has pretty good taste.",
       recommend: "The Joe Rogan podcast. Everyone should listen to it.",
       splurgeVsSave: "Splurge on going out. Save on random stuff.",
+      recommendTravel: 'Nashville — good nightlife',
+      recommendFoodDrink: 'Uchi is the obvious answer',
+      recommendWellnessFitness: 'CrossFit or the gym',
+      recommendFashion: 'Nothing specific',
+      recommendHomeDesign: "Whatever looks good on Instagram",
       karaokeS: "Mr. Brightside.",
       coffeeTable: "Some magazines and a candle.",
-      busyDuringDay: "Working and in meetings.",
+      idealSaturday: "Sleep in, brunch somewhere, watch the game, go out at night.",
       sundayMorning: "Sleep in and watch sports.",
-      socialLink: "Twitter I guess.",
+      contentStopsScrolling: "Highlight reels, podcasts, anything NBA. Instagram mostly.",
       everydayItem: "I used to be pretty into CrossFit.",
+      preferredWorkout: 'Used to do CrossFit, now just the gym',
+      localAustinBrand: "I don't really know local brands",
+      dreamBrandPartnership: 'Nike or something big like that',
+      shoppingCart: "Nothing specific, just random stuff",
+      spendMoreThanMost: "Going out and concerts",
+      topPodcasts: 'Joe Rogan and Call Her Daddy',
+      whatPeopleComeToYouFor: "Hanging out and advice about tech jobs. Sometimes they want restaurant recs.",
+      heavilyInvestedIn: "Working on my career and trying to figure out the next move. Maybe doing my own thing eventually.",
+      genuineExpertIn: "Sales, honestly. I'm pretty good at it. And knowing Austin nightlife.",
       foodAccessibility: '',
       agreedToTerms: true,
       consentSms: false,
@@ -235,26 +337,45 @@ const DEMO_DATA: FormData = {
   phone: '5125550142',
   city: 'Austin, TX',
   neighborhood: 'Travis Heights',
+  homeAddress: '1834 South Lamar Blvd, Austin, TX 78704',
   fromOriginally: 'Chicago',
   birthday: '1991-03-14',
   links: 'instagram.com/jordanmercer · jordanmercer.co',
   referrers: ['Chloe Chiang', 'Adam Semien', ''],
+  whatYouDo: 'Building a hospitality tech platform for independent venues — connecting operators with tools they actually need. Before that, event production and community building in Austin for five years.',
+  howDidYouHear: 'Through Chloe Chiang',
   workingOn: 'Building a hospitality tech platform for independent venues',
   obsessedWith: 'The intersection of food culture and community organizing',
-  alwaysCalledAbout: 'Who to hire, where to eat, and whether the vibe is right',
-  interestingPeople: 'My mentor who runs three Michelin restaurants and my friend who left Goldman to open a natural wine bar',
-  connectedPeople: 'Introduced two founders at a dinner I hosted — they started a company six months later',
+  personYouAdmire: "Virgil Abloh — not just for the aesthetic, but for how he moved between worlds without losing credibility in any of them. He proved you could be a serious designer and a collaborator and a community builder simultaneously.",
+  howDoYouKnowGoodCompany: "When the conversation keeps going after the reason you came is over. When you leave thinking differently than when you arrived.",
+  connectionOpportunity: "Introduced two founders at a dinner I hosted — they started a company six months later. The introduction was entirely a hunch. Still proud of it.",
   loyalCommunity: 'The Austin food community — been going to the same farmers market for four years',
+  whatKindOfPeopleFlowThrough: "Operators, chefs, creative directors, builders. People who are making something real rather than positioning for something.",
+  interestingPeople: 'My mentor who runs three Michelin restaurants and my friend who left Goldman to open a natural wine bar',
   detailsRight: 'Uchi Austin — the lighting, the pacing, the way they handle dietary needs without making it weird',
-  trustTaste: 'My friend Sasha — she has never recommended anything I didn\'t love',
+  trustTaste: "My friend Sasha — she has never recommended anything I didn't love",
   recommend: 'The podcast 99% Invisible — I have converted at least 20 people',
   splurgeVsSave: 'Splurge on experiences and ingredients, save on things nobody sees',
+  recommendTravel: 'Mexico City — always',
+  recommendFoodDrink: 'Suerte for the corn, Odd Duck for the sourcing',
+  recommendWellnessFitness: 'Orange Theory followed by walking everywhere',
+  recommendFashion: 'Aritzia for the basics, vintage for everything interesting',
+  recommendHomeDesign: "Crate & Barrel for bones, thrift stores for character",
   karaokeS: 'Jealous by Beyoncé, no hesitation',
   coffeeTable: 'A Noma coffee table book and a deck of Oblique Strategies cards',
-  busyDuringDay: 'Building and in meetings',
+  idealSaturday: "Farmers market at 9, no agenda until noon, then a long lunch somewhere I've been wanting to try, afternoon walking, dinner I cooked myself.",
   sundayMorning: 'Farmers market then a long breakfast with no agenda',
-  socialLink: 'Are.na — I go back to old channels constantly',
+  contentStopsScrolling: "99% Invisible episodes, Are.na boards on architecture and identity, long essays on food culture. Anything that makes me feel like I learned something instead of just consuming something.",
   everydayItem: 'I competed in junior fencing nationals',
+  preferredWorkout: 'Orange Theory, three times a week',
+  localAustinBrand: "Antonelli's Cheese Shop — the standard for what a local food business can be",
+  dreamBrandPartnership: "Patagonia — I'd want to co-design a program around independent venue sustainability, not a product.",
+  shoppingCart: "A Le Creuset Dutch oven, a pair of Clarks desert boots in brown, and a book on cocktail history I've been meaning to read for eight months",
+  spendMoreThanMost: "Experiences and ingredients. If it creates a memory or goes into something I'm making, I spend without much thought.",
+  topPodcasts: "99% Invisible, The Long View with Brian Koppelman, and Conan O'Brien Needs a Friend for the commute",
+  whatPeopleComeToYouFor: "Introductions and reads on whether a concept has legs. I've developed a reputation as someone who can tell you in ten minutes whether an idea will work or whether it's a funded wish.",
+  heavilyInvestedIn: "The platform — two years in, and the product is finally doing what I've been describing to investors for 18 months. Also: learning how to manage a team without losing the thing that made the work good.",
+  genuineExpertIn: "Independent venue operations — the economics, the programming, the community dynamics. And the hospitality-to-tech translation problem, which is harder than most people realize.",
   photoUrls: [],
   foodAccessibility: '',
   agreedToTerms: true,
@@ -262,22 +383,24 @@ const DEMO_DATA: FormData = {
 };
 
 const SCREEN_CONFIG = [
-  { label: '', heading: '' }, // Screen 0: cinematic, no label
-  { label: 'REAL QUESTIONS', heading: 'Who Are You' },
-  { label: 'YOUR WORLD', heading: 'Your World' },
-  { label: 'TASTE', heading: 'Taste' },
-  { label: 'RAPID FIRE', heading: 'Rapid Fire' },
-  { label: 'PHOTOS', heading: 'Show Up' },
-  { label: 'LEGAL', heading: 'Almost There' },
+  { label: '', heading: '' },
+  { label: 'YOUR WORLD', heading: 'Personality & Perspective' },
+  { label: 'YOUR WORLD', heading: 'Community Fit' },
+  { label: 'YOUR TASTE', heading: 'Taste' },
+  { label: 'YOUR ENERGY', heading: 'Rapid Fire' },
+  { label: 'TELL US ABOUT YOU', heading: 'Tell Us About You' },
+  { label: 'YOUR PRESENCE', heading: 'Photos' },
+  { label: 'THE FINE PRINT', heading: 'Almost There' },
   { label: 'YOUR ARCHETYPE', heading: '' },
 ];
 
 function stepFromAnswers(answers: Record<string, string>): number {
-  if (answers['photos.foodAccessibility'] !== undefined || answers['photos.urls'] !== undefined) return 6;
+  if (answers['photos.foodAccessibility'] !== undefined || answers['photos.urls'] !== undefined) return 7;
+  if (answers['about.whatPeopleComeToYouFor'] !== undefined) return 6;
   if (answers['rapid.karaokeS'] !== undefined) return 5;
   if (answers['taste.detailsRight'] !== undefined) return 4;
-  if (answers['world.interestingPeople'] !== undefined) return 3;
-  if (answers['real.workingOn'] !== undefined) return 2;
+  if (answers['community.howDoYouKnowGoodCompany'] !== undefined || answers['world.interestingPeople'] !== undefined) return 3;
+  if (answers['personality.workingOn'] !== undefined || answers['real.workingOn'] !== undefined) return 2;
   if (answers['basics.city'] !== undefined) return 1;
   return 0;
 }
@@ -317,7 +440,6 @@ export default function MembershipForm() {
     const stored = localStorage.getItem('nobc-apply-theme');
     if (stored === 'night') { setIsNight(true); return; }
     if (stored === 'day') return;
-    // No saved preference — default to night mode during late hours (11pm-4am).
     const hour = new Date().getHours();
     if (hour >= 23 || hour < 4) setIsNight(true);
   }, []);
@@ -325,8 +447,6 @@ export default function MembershipForm() {
   useEffect(() => {
     localStorage.setItem('nobc-apply-theme', isNight ? 'night' : 'day');
   }, [isNight]);
-
-  // -- Styles --
 
   const labelStyle: React.CSSProperties = {
     fontFamily: bodyFont,
@@ -388,7 +508,6 @@ export default function MembershipForm() {
 
   const fieldGroup: React.CSSProperties = { marginBottom: 40 };
 
-  // -- Frogger cheat code --
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') { setShowFrogger(false); return; }
@@ -404,7 +523,6 @@ export default function MembershipForm() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Resume draft on mount
   useEffect(() => {
     const id = searchParams.get('id');
     if (!id || isDemo || isDev) return;
@@ -422,26 +540,45 @@ export default function MembershipForm() {
           phone: application.phone ?? '',
           city: ans['basics.city'] ?? '',
           neighborhood: ans['basics.neighborhood'] ?? '',
+          homeAddress: ans['basics.homeAddress'] ?? '',
           fromOriginally: ans['basics.fromOriginally'] ?? '',
           birthday: ans['basics.birthday'] ?? '',
           links: ans['basics.links'] ?? '',
           referrers: JSON.parse(ans['basics.referrers'] ?? '["","",""]'),
-          workingOn: ans['real.workingOn'] ?? '',
-          obsessedWith: ans['real.obsessedWith'] ?? '',
-          alwaysCalledAbout: ans['real.alwaysCalledAbout'] ?? '',
-          interestingPeople: ans['world.interestingPeople'] ?? '',
-          connectedPeople: ans['world.connectedPeople'] ?? '',
-          loyalCommunity: ans['world.loyalCommunity'] ?? '',
+          whatYouDo: ans['basics.whatYouDo'] ?? '',
+          howDidYouHear: ans['basics.howDidYouHear'] ?? '',
+          workingOn: ans['personality.workingOn'] ?? ans['real.workingOn'] ?? '',
+          obsessedWith: ans['personality.obsessedWith'] ?? ans['real.obsessedWith'] ?? '',
+          personYouAdmire: ans['personality.personYouAdmire'] ?? '',
+          howDoYouKnowGoodCompany: ans['community.howDoYouKnowGoodCompany'] ?? '',
+          connectionOpportunity: ans['community.connectionOpportunity'] ?? ans['world.connectedPeople'] ?? '',
+          loyalCommunity: ans['community.loyalCommunity'] ?? ans['world.loyalCommunity'] ?? '',
+          whatKindOfPeopleFlowThrough: ans['community.whatKindOfPeopleFlowThrough'] ?? '',
+          interestingPeople: ans['community.interestingPeople'] ?? ans['world.interestingPeople'] ?? '',
           detailsRight: ans['taste.detailsRight'] ?? '',
           trustTaste: ans['taste.trustTaste'] ?? '',
           recommend: ans['taste.recommend'] ?? '',
           splurgeVsSave: ans['taste.splurgeVsSave'] ?? '',
+          recommendTravel: ans['taste.recommendTravel'] ?? '',
+          recommendFoodDrink: ans['taste.recommendFoodDrink'] ?? '',
+          recommendWellnessFitness: ans['taste.recommendWellnessFitness'] ?? '',
+          recommendFashion: ans['taste.recommendFashion'] ?? '',
+          recommendHomeDesign: ans['taste.recommendHomeDesign'] ?? '',
           karaokeS: ans['rapid.karaokeS'] ?? '',
           coffeeTable: ans['rapid.coffeeTable'] ?? '',
-          busyDuringDay: ans['rapid.busyDuringDay'] ?? '',
+          idealSaturday: ans['rapid.idealSaturday'] ?? '',
           sundayMorning: ans['rapid.sundayMorning'] ?? '',
-          socialLink: ans['rapid.socialLink'] ?? '',
+          contentStopsScrolling: ans['rapid.contentStopsScrolling'] ?? ans['rapid.socialLink'] ?? '',
           everydayItem: ans['rapid.everydayItem'] ?? '',
+          preferredWorkout: ans['rapid.preferredWorkout'] ?? '',
+          localAustinBrand: ans['rapid.localAustinBrand'] ?? '',
+          dreamBrandPartnership: ans['rapid.dreamBrandPartnership'] ?? '',
+          shoppingCart: ans['rapid.shoppingCart'] ?? '',
+          spendMoreThanMost: ans['rapid.spendMoreThanMost'] ?? '',
+          topPodcasts: ans['rapid.topPodcasts'] ?? '',
+          whatPeopleComeToYouFor: ans['about.whatPeopleComeToYouFor'] ?? ans['real.alwaysCalledAbout'] ?? '',
+          heavilyInvestedIn: ans['about.heavilyInvestedIn'] ?? '',
+          genuineExpertIn: ans['about.genuineExpertIn'] ?? '',
           foodAccessibility: ans['photos.foodAccessibility'] ?? '',
           photoUrls: JSON.parse(ans['photos.urls'] ?? '[]'),
         }));
@@ -504,26 +641,45 @@ export default function MembershipForm() {
     const answers: Record<string, string> = {
       'basics.city': data.city,
       'basics.neighborhood': data.neighborhood,
+      'basics.homeAddress': data.homeAddress,
       'basics.fromOriginally': data.fromOriginally,
       'basics.birthday': data.birthday,
       'basics.links': data.links,
       'basics.referrers': JSON.stringify(data.referrers),
-      'real.workingOn': data.workingOn,
-      'real.obsessedWith': data.obsessedWith,
-      'real.alwaysCalledAbout': data.alwaysCalledAbout,
-      'world.interestingPeople': data.interestingPeople,
-      'world.connectedPeople': data.connectedPeople,
-      'world.loyalCommunity': data.loyalCommunity,
+      'basics.whatYouDo': data.whatYouDo,
+      'basics.howDidYouHear': data.howDidYouHear,
+      'personality.workingOn': data.workingOn,
+      'personality.obsessedWith': data.obsessedWith,
+      'personality.personYouAdmire': data.personYouAdmire,
+      'community.howDoYouKnowGoodCompany': data.howDoYouKnowGoodCompany,
+      'community.connectionOpportunity': data.connectionOpportunity,
+      'community.loyalCommunity': data.loyalCommunity,
+      'community.whatKindOfPeopleFlowThrough': data.whatKindOfPeopleFlowThrough,
+      'community.interestingPeople': data.interestingPeople,
       'taste.detailsRight': data.detailsRight,
       'taste.trustTaste': data.trustTaste,
       'taste.recommend': data.recommend,
       'taste.splurgeVsSave': data.splurgeVsSave,
+      'taste.recommendTravel': data.recommendTravel,
+      'taste.recommendFoodDrink': data.recommendFoodDrink,
+      'taste.recommendWellnessFitness': data.recommendWellnessFitness,
+      'taste.recommendFashion': data.recommendFashion,
+      'taste.recommendHomeDesign': data.recommendHomeDesign,
       'rapid.karaokeS': data.karaokeS,
       'rapid.coffeeTable': data.coffeeTable,
-      'rapid.busyDuringDay': data.busyDuringDay,
+      'rapid.idealSaturday': data.idealSaturday,
       'rapid.sundayMorning': data.sundayMorning,
-      'rapid.socialLink': data.socialLink,
+      'rapid.contentStopsScrolling': data.contentStopsScrolling,
       'rapid.everydayItem': data.everydayItem,
+      'rapid.preferredWorkout': data.preferredWorkout,
+      'rapid.localAustinBrand': data.localAustinBrand,
+      'rapid.dreamBrandPartnership': data.dreamBrandPartnership,
+      'rapid.shoppingCart': data.shoppingCart,
+      'rapid.spendMoreThanMost': data.spendMoreThanMost,
+      'rapid.topPodcasts': data.topPodcasts,
+      'about.whatPeopleComeToYouFor': data.whatPeopleComeToYouFor,
+      'about.heavilyInvestedIn': data.heavilyInvestedIn,
+      'about.genuineExpertIn': data.genuineExpertIn,
       'photos.foodAccessibility': data.foodAccessibility,
     };
     try {
@@ -556,6 +712,10 @@ export default function MembershipForm() {
       setError('Please fill in your full name and email.');
       return;
     }
+    if (!isDemo && !data.whatYouDo.trim()) {
+      setError('Please tell us what you do.');
+      return;
+    }
     setError('');
     setIsLoading(true);
     try {
@@ -567,10 +727,13 @@ export default function MembershipForm() {
           answers: {
             'basics.city': data.city,
             'basics.neighborhood': data.neighborhood,
+            'basics.homeAddress': data.homeAddress,
             'basics.fromOriginally': data.fromOriginally,
             'basics.birthday': data.birthday,
             'basics.links': data.links,
             'basics.referrers': JSON.stringify(data.referrers),
+            'basics.whatYouDo': data.whatYouDo,
+            'basics.howDidYouHear': data.howDidYouHear,
           },
         }),
       });
@@ -646,7 +809,7 @@ export default function MembershipForm() {
       const result = await submitRes.json();
       setSubmitResult(result);
       setData(prev => ({ ...prev, photoUrls: uploadedUrls }));
-      setStep(7);
+      setStep(8);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
@@ -661,30 +824,25 @@ export default function MembershipForm() {
     canvas.width = 1080; canvas.height = 1080;
     const ctx = canvas.getContext('2d')!;
 
-    // Background — near black
     ctx.fillStyle = '#0d0d0f';
     ctx.fillRect(0, 0, 1080, 1080);
 
-    // Top — "THE NO BAD COMPANY" small, centered, white, wide tracking
     ctx.fillStyle = '#ffffff';
     ctx.font = '500 18px Helvetica Neue, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.letterSpacing = '0.2em';
     ctx.fillText('THE NO BAD COMPANY', 540, 120);
 
-    // Center — archetype name huge
     ctx.fillStyle = '#ffffff';
     ctx.font = 'italic 140px Georgia, serif';
     ctx.textAlign = 'center';
     ctx.fillText(submitResult.archetype, 540, 520);
 
-    // Below — one-liner, smaller, gray
     const oneLiner = ARCHETYPES[submitResult.archetype as ArchetypeName]?.oneLiner ?? '';
     ctx.font = '32px Helvetica Neue, Arial, sans-serif';
     ctx.fillStyle = '#9e9a9a';
     ctx.fillText(oneLiner, 540, 600);
 
-    // Bottom — top 2 tags in primary color
     const topTags = (submitResult.tags ?? []).slice(0, 2);
     if (topTags.length > 0) {
       ctx.fillStyle = '#B22E21';
@@ -692,13 +850,11 @@ export default function MembershipForm() {
       ctx.fillText(topTags.join('  ·  ').toUpperCase(), 540, 900);
     }
 
-    // Bottom right — URL tiny
     ctx.fillStyle = '#666666';
     ctx.font = '16px Helvetica Neue, Arial, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText('nobc-os.vercel.app/apply', 1040, 1040);
 
-    // Download with applicant name
     const safeName = data.fullName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'member';
     const link = document.createElement('a');
     link.download = `my-archetype-${safeName}.png`;
@@ -779,7 +935,7 @@ export default function MembershipForm() {
       <div style={{ background: theme.bg, minHeight: '100vh', fontFamily: bodyFont, color: theme.text, transition: 'background 300ms ease, color 300ms ease' }}>
 
       {/* DEMO badge */}
-      {isDemo && step < 7 && (
+      {isDemo && step < 8 && (
         <div style={{
           position: 'fixed',
           top: 14,
@@ -799,10 +955,10 @@ export default function MembershipForm() {
         </div>
       )}
 
-      {/* Progress bar — 2px sharp line at top */}
-      {step < 7 && (
+      {/* Progress bar */}
+      {step < 8 && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 60, height: 2, background: theme.border }}>
-          <div style={{ height: '100%', width: `${((step + 1) / 7) * 100}%`, background: theme.accent, transition: 'width 0.4s ease', borderRadius: 0 }} />
+          <div style={{ height: '100%', width: `${((step + 1) / 8) * 100}%`, background: theme.accent, transition: 'width 0.4s ease', borderRadius: 0 }} />
         </div>
       )}
 
@@ -824,7 +980,7 @@ export default function MembershipForm() {
         </div>
       )}
 
-      {/* Header — sticky, solid bg, no bleed-through */}
+      {/* Header */}
       <nav style={{
         position: 'sticky', top: 0, left: 0, right: 0, zIndex: 50,
         height: 56, padding: '0 24px',
@@ -858,13 +1014,13 @@ export default function MembershipForm() {
       <main style={{
         minHeight: 'calc(100vh - 56px)',
         color: theme.text,
-        padding: step === 0 || step === 7 ? '0' : '60px 24px 100px 24px',
+        padding: step === 0 || step === 8 ? '0' : '60px 24px 100px 24px',
         transform: isTransitioning ? (transitionDirection === 'forward' ? 'translateY(-100%)' : 'translateY(100%)') : 'translateY(0)',
         opacity: isTransitioning ? 0 : 1,
         transition: 'transform 400ms ease, opacity 400ms ease',
       }}>
 
-        {/* SCREEN 0: Opening — cinematic headline, no chapter label */}
+        {/* SCREEN 0: The Basics */}
         {step === 0 && (
           <div style={{
             padding: '48px 24px 100px 24px',
@@ -910,6 +1066,10 @@ export default function MembershipForm() {
               </div>
             </div>
             <div style={fieldGroup}>
+              <label style={labelStyle}>HOME ADDRESS</label>
+              <input style={getInputStyle('homeAddress')} onFocus={() => setFocusedField('homeAddress')} onBlur={() => setFocusedField(null)} type="text" value={data.homeAddress} onChange={e => set('homeAddress', e.target.value)} />
+            </div>
+            <div style={fieldGroup}>
               <label style={labelStyle}>WHERE ARE YOU FROM ORIGINALLY</label>
               <input style={getInputStyle('from')} onFocus={() => setFocusedField('from')} onBlur={() => setFocusedField(null)} type="text" value={data.fromOriginally} onChange={e => set('fromOriginally', e.target.value)} />
             </div>
@@ -931,13 +1091,21 @@ export default function MembershipForm() {
                 <input style={getInputStyle('ref2')} onFocus={() => setFocusedField('ref2')} onBlur={() => setFocusedField(null)} type="text" value={data.referrers[2]} onChange={e => set('referrers', [data.referrers[0], data.referrers[1], e.target.value])} />
               )}
             </div>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>TELL US ABOUT WHAT YOU DO — YOUR ROLE, INDUSTRY, COMPANY, CREATIVE PURSUITS, PASSION PROJECTS. WHAT KEEPS YOU BUSY?</label>
+              <textarea style={getTextareaStyle('whatYouDo')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('whatYouDo')} onBlur={() => setFocusedField(null)} rows={1} value={data.whatYouDo} onChange={e => set('whatYouDo', e.target.value)} />
+            </div>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>HOW DID YOU HEAR ABOUT NOBC?</label>
+              <input style={getInputStyle('howDidYouHear')} onFocus={() => setFocusedField('howDidYouHear')} onBlur={() => setFocusedField(null)} type="text" value={data.howDidYouHear} onChange={e => set('howDidYouHear', e.target.value)} />
+            </div>
 
             {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
             {navBlock(handleBasicsNext)}
           </div>
         )}
 
-        {/* SCREEN 1: Real Questions -> Who Are You */}
+        {/* SCREEN 1: Personality & Perspective */}
         {step === 1 && (
           <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[1].label}</span>
@@ -948,40 +1116,65 @@ export default function MembershipForm() {
               <textarea style={getTextareaStyle('workingOn')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('workingOn')} onBlur={() => setFocusedField(null)} rows={1} value={data.workingOn} onChange={e => set('workingOn', e.target.value)} />
             </div>
             <div style={fieldGroup}>
-              <label style={labelStyle}>WHAT ARE YOU COMPLETELY OBSESSED WITH LATELY</label>
+              <label style={labelStyle}>WHAT&apos;S SOMETHING YOU&apos;VE BECOME OBSESSIVE ABOUT LATELY</label>
               <textarea style={getTextareaStyle('obsessedWith')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('obsessedWith')} onBlur={() => setFocusedField(null)} rows={1} value={data.obsessedWith} onChange={e => set('obsessedWith', e.target.value)} />
             </div>
             <div style={fieldGroup}>
-              <label style={labelStyle}>WHAT DO PEOPLE ALWAYS CALL YOU ABOUT</label>
-              <textarea style={getTextareaStyle('calledAbout')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('calledAbout')} onBlur={() => setFocusedField(null)} rows={1} value={data.alwaysCalledAbout} onChange={e => set('alwaysCalledAbout', e.target.value)} />
+              <label style={labelStyle}>THINK OF SOMEONE YOU ADMIRE — DOESN&apos;T HAVE TO BE SOMEONE YOU KNOW PERSONALLY. WHO ARE THEY, AND WHAT INSPIRES YOU ABOUT THEM?</label>
+              <textarea style={getTextareaStyle('personYouAdmire')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('personYouAdmire')} onBlur={() => setFocusedField(null)} rows={1} value={data.personYouAdmire} onChange={e => set('personYouAdmire', e.target.value)} />
             </div>
 
             {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-            {navBlock(() => patchAndAdvance({ 'real.workingOn': data.workingOn, 'real.obsessedWith': data.obsessedWith, 'real.alwaysCalledAbout': data.alwaysCalledAbout }, 2))}
+            {navBlock(() => patchAndAdvance({
+              'personality.workingOn': data.workingOn,
+              'personality.obsessedWith': data.obsessedWith,
+              'personality.personYouAdmire': data.personYouAdmire,
+            }, 2))}
           </div>
         )}
 
-        {/* SCREEN 2: Your World */}
+        {/* SCREEN 2: Community Fit */}
         {step === 2 && (
           <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[2].label}</span>
             <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[2].heading}</h1>
 
             <div style={fieldGroup}>
-              <label style={labelStyle}>WHO ARE THE MOST INTERESTING PEOPLE IN YOUR LIFE RIGHT NOW</label>
-              <textarea style={getTextareaStyle('interesting')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('interesting')} onBlur={() => setFocusedField(null)} rows={1} value={data.interestingPeople} onChange={e => set('interestingPeople', e.target.value)} />
+              <label style={labelStyle}>HOW DO YOU KNOW WHEN YOU&apos;RE IN GOOD COMPANY?</label>
+              <textarea style={getTextareaStyle('howDoYouKnowGoodCompany')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('howDoYouKnowGoodCompany')} onBlur={() => setFocusedField(null)} rows={1} value={data.howDoYouKnowGoodCompany} onChange={e => set('howDoYouKnowGoodCompany', e.target.value)} />
             </div>
             <div style={fieldGroup}>
-              <label style={labelStyle}>TELL US ABOUT A TIME YOU CONNECTED TWO PEOPLE WHO NEEDED TO MEET</label>
-              <textarea style={getTextareaStyle('connected')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('connected')} onBlur={() => setFocusedField(null)} rows={1} value={data.connectedPeople} onChange={e => set('connectedPeople', e.target.value)} />
+              <label style={labelStyle}>TELL US ABOUT A CONNECTION, INTRODUCTION, OR OPPORTUNITY YOU HELPED CREATE FOR SOMEONE ELSE.</label>
+              <textarea style={getTextareaStyle('connectionOpportunity')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('connectionOpportunity')} onBlur={() => setFocusedField(null)} rows={1} value={data.connectionOpportunity} onChange={e => set('connectionOpportunity', e.target.value)} />
             </div>
             <div style={fieldGroup}>
               <label style={labelStyle}>WHAT GROUP OR COMMUNITY HAVE YOU STAYED LOYAL TO, AND WHY</label>
               <textarea style={getTextareaStyle('loyal')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('loyal')} onBlur={() => setFocusedField(null)} rows={1} value={data.loyalCommunity} onChange={e => set('loyalCommunity', e.target.value)} />
             </div>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>WHAT KIND OF PEOPLE, IDEAS, OR OPPORTUNITIES TEND TO FLOW THROUGH YOUR WORLD?</label>
+              <textarea style={getTextareaStyle('whatKindOfPeopleFlowThrough')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('whatKindOfPeopleFlowThrough')} onBlur={() => setFocusedField(null)} rows={1} value={data.whatKindOfPeopleFlowThrough} onChange={e => set('whatKindOfPeopleFlowThrough', e.target.value)} />
+            </div>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>WHO ARE THE MOST INTERESTING PEOPLE IN YOUR LIFE RIGHT NOW</label>
+              <textarea style={getTextareaStyle('interesting')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('interesting')} onBlur={() => setFocusedField(null)} rows={1} value={data.interestingPeople} onChange={e => set('interestingPeople', e.target.value)} />
+            </div>
 
             {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-            {navBlock(() => patchAndAdvance({ 'world.interestingPeople': data.interestingPeople, 'world.connectedPeople': data.connectedPeople, 'world.loyalCommunity': data.loyalCommunity }, 3))}
+            {navBlock(() => {
+              if (!isDemo && !data.howDoYouKnowGoodCompany.trim()) {
+                setError('Please answer how you know when you\'re in good company.');
+                return;
+              }
+              setError('');
+              patchAndAdvance({
+                'community.howDoYouKnowGoodCompany': data.howDoYouKnowGoodCompany,
+                'community.connectionOpportunity': data.connectionOpportunity,
+                'community.loyalCommunity': data.loyalCommunity,
+                'community.whatKindOfPeopleFlowThrough': data.whatKindOfPeopleFlowThrough,
+                'community.interestingPeople': data.interestingPeople,
+              }, 3);
+            })}
           </div>
         )}
 
@@ -996,11 +1189,11 @@ export default function MembershipForm() {
               <textarea style={getTextareaStyle('details')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('details')} onBlur={() => setFocusedField(null)} rows={1} value={data.detailsRight} onChange={e => set('detailsRight', e.target.value)} />
             </div>
             <div style={fieldGroup}>
-              <label style={labelStyle}>WHOSE TASTE DO YOU TRUST AUTOMATICALLY</label>
-              <input style={getInputStyle('trust')} onFocus={() => setFocusedField('trust')} onBlur={() => setFocusedField(null)} type="text" value={data.trustTaste} onChange={e => set('trustTaste', e.target.value)} />
+              <label style={labelStyle}>WHOSE TASTE, RECOMMENDATIONS, OR PERSPECTIVE DO YOU TRUST ALMOST AUTOMATICALLY? COULD BE A FRIEND, CELEBRITY, CREATOR, ATHLETE, OR SOMEONE IN YOUR LIFE.</label>
+              <textarea style={getTextareaStyle('trust')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('trust')} onBlur={() => setFocusedField(null)} rows={1} value={data.trustTaste} onChange={e => set('trustTaste', e.target.value)} />
             </div>
             <div style={fieldGroup}>
-              <label style={labelStyle}>WHAT DO YOU RECOMMEND LIKE YOU&apos;RE GETTING PAID FOR IT</label>
+              <label style={labelStyle}>WHAT&apos;S THE LAST THING YOU CONVINCED A FRIEND TO BUY — AND WHAT DO YOU RECOMMEND TO EVERYONE LIKE YOU&apos;RE GETTING PAID FOR IT?</label>
               <textarea style={getTextareaStyle('recommend')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('recommend')} onBlur={() => setFocusedField(null)} rows={1} value={data.recommend} onChange={e => set('recommend', e.target.value)} />
             </div>
             <div style={fieldGroup}>
@@ -1008,8 +1201,36 @@ export default function MembershipForm() {
               <textarea style={getTextareaStyle('splurge')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('splurge')} onBlur={() => setFocusedField(null)} rows={1} value={data.splurgeVsSave} onChange={e => set('splurgeVsSave', e.target.value)} />
             </div>
 
+            <div style={fieldGroup}>
+              <label style={{ ...labelStyle, marginBottom: 16 }}>WHERE DO YOU TURN FOR RECOMMENDATIONS?</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 24px' }}>
+                {([
+                  { label: 'Travel', key: 'recommendTravel' as const },
+                  { label: 'Food & Drink', key: 'recommendFoodDrink' as const },
+                  { label: 'Wellness & Fitness', key: 'recommendWellnessFitness' as const },
+                  { label: 'Fashion', key: 'recommendFashion' as const },
+                  { label: 'Home & Design', key: 'recommendHomeDesign' as const },
+                ] as const).map(({ label, key }) => (
+                  <div key={key} style={fieldGroup}>
+                    <label style={{ ...labelStyle, fontSize: 10 }}>{label.toUpperCase()}</label>
+                    <input style={getInputStyle(key)} onFocus={() => setFocusedField(key)} onBlur={() => setFocusedField(null)} type="text" placeholder={label} value={data[key]} onChange={e => set(key, e.target.value)} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-            {navBlock(() => patchAndAdvance({ 'taste.detailsRight': data.detailsRight, 'taste.trustTaste': data.trustTaste, 'taste.recommend': data.recommend, 'taste.splurgeVsSave': data.splurgeVsSave }, 4))}
+            {navBlock(() => patchAndAdvance({
+              'taste.detailsRight': data.detailsRight,
+              'taste.trustTaste': data.trustTaste,
+              'taste.recommend': data.recommend,
+              'taste.splurgeVsSave': data.splurgeVsSave,
+              'taste.recommendTravel': data.recommendTravel,
+              'taste.recommendFoodDrink': data.recommendFoodDrink,
+              'taste.recommendWellnessFitness': data.recommendWellnessFitness,
+              'taste.recommendFashion': data.recommendFashion,
+              'taste.recommendHomeDesign': data.recommendHomeDesign,
+            }, 4))}
           </div>
         )}
 
@@ -1023,11 +1244,17 @@ export default function MembershipForm() {
             {([
               { label: 'KARAOKE SONG', key: 'karaokeS' as const },
               { label: "WHAT'S ON YOUR COFFEE TABLE", key: 'coffeeTable' as const },
-              { label: 'WHAT KEEPS YOU BUSY DURING THE DAY', key: 'busyDuringDay' as const },
-              { label: 'SUNDAY MORNING', key: 'sundayMorning' as const },
-              { label: 'YOUR INSTAGRAM, TIKTOK, OR YOUTUBE', key: 'socialLink' as const },
+              { label: "WHAT'S YOUR IDEAL SATURDAY?", key: 'idealSaturday' as const },
+              { label: 'SUNDAY MORNING — WHAT DOES IT LOOK LIKE?', key: 'sundayMorning' as const },
+              { label: 'WHAT KIND OF CONTENT STOPS YOU SCROLLING, AND WHERE IS IT LIVING?', key: 'contentStopsScrolling' as const },
               { label: "SOMETHING YOU USE EVERY DAY THAT MOST PEOPLE DON'T KNOW ABOUT", key: 'everydayItem' as const },
-            ]).map(({ label, key }) => (
+              { label: 'PREFERRED WORKOUT, IF ANY?', key: 'preferredWorkout' as const },
+              { label: 'A LOCAL AUSTIN BRAND YOU LOVE TO REP?', key: 'localAustinBrand' as const },
+              { label: 'DREAM BRAND PARTNERSHIP — WHO WOULD YOU WANT, AND WHY?', key: 'dreamBrandPartnership' as const },
+              { label: "WHAT'S CURRENTLY IN YOUR SHOPPING CART OR ON YOUR WISH LIST?", key: 'shoppingCart' as const },
+              { label: 'WHAT DO YOU SPEND MORE MONEY ON THAN MOST PEOPLE?', key: 'spendMoreThanMost' as const },
+              { label: 'WHAT ARE THE TOP 2-3 PODCASTS YOU LISTEN TO THE MOST?', key: 'topPodcasts' as const },
+            ] as const).map(({ label, key }) => (
               <div key={key} style={fieldGroup}>
                 <label style={labelStyle}>{label}</label>
                 <input style={getInputStyle(key)} onFocus={() => setFocusedField(key)} onBlur={() => setFocusedField(null)} type="text" value={data[key]} onChange={e => set(key, e.target.value)} />
@@ -1035,15 +1262,63 @@ export default function MembershipForm() {
             ))}
 
             {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-            {navBlock(() => patchAndAdvance({ 'rapid.karaokeS': data.karaokeS, 'rapid.coffeeTable': data.coffeeTable, 'rapid.busyDuringDay': data.busyDuringDay, 'rapid.sundayMorning': data.sundayMorning, 'rapid.socialLink': data.socialLink, 'rapid.everydayItem': data.everydayItem }, 5))}
+            {navBlock(() => patchAndAdvance({
+              'rapid.karaokeS': data.karaokeS,
+              'rapid.coffeeTable': data.coffeeTable,
+              'rapid.idealSaturday': data.idealSaturday,
+              'rapid.sundayMorning': data.sundayMorning,
+              'rapid.contentStopsScrolling': data.contentStopsScrolling,
+              'rapid.everydayItem': data.everydayItem,
+              'rapid.preferredWorkout': data.preferredWorkout,
+              'rapid.localAustinBrand': data.localAustinBrand,
+              'rapid.dreamBrandPartnership': data.dreamBrandPartnership,
+              'rapid.shoppingCart': data.shoppingCart,
+              'rapid.spendMoreThanMost': data.spendMoreThanMost,
+              'rapid.topPodcasts': data.topPodcasts,
+            }, 5))}
           </div>
         )}
 
-        {/* SCREEN 5: Photos -> Show Up */}
+        {/* SCREEN 5: Tell Us About You */}
         {step === 5 && (
           <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>{SCREEN_CONFIG[5].label}</span>
             <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[5].heading}</h1>
+
+            <div style={fieldGroup}>
+              <label style={labelStyle}>WHAT DO PEOPLE CONSISTENTLY COME TO YOU FOR? COULD BE ADVICE, INTRODUCTIONS, RECOMMENDATIONS, TASTE, STRATEGY, OPPORTUNITIES, EXPERIENCES, PERSPECTIVE, OR SOMETHING ELSE ENTIRELY.</label>
+              <textarea style={getTextareaStyle('whatPeopleComeToYouFor')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('whatPeopleComeToYouFor')} onBlur={() => setFocusedField(null)} rows={1} value={data.whatPeopleComeToYouFor} onChange={e => set('whatPeopleComeToYouFor', e.target.value)} />
+            </div>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>WHAT HAVE YOU INVESTED HEAVILY IN RECENTLY — TIME, MONEY, ENERGY, OR ATTENTION?</label>
+              <textarea style={getTextareaStyle('heavilyInvestedIn')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('heavilyInvestedIn')} onBlur={() => setFocusedField(null)} rows={1} value={data.heavilyInvestedIn} onChange={e => set('heavilyInvestedIn', e.target.value)} />
+            </div>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>WHAT DO YOU CONSIDER YOURSELF A GENUINE EXPERT IN — PROFESSIONALLY OR OTHERWISE?</label>
+              <textarea style={getTextareaStyle('genuineExpertIn')} ref={el => { if (el) autoResizeTextarea(el); }} onInput={e => autoResizeTextarea(e.currentTarget)} onFocus={() => setFocusedField('genuineExpertIn')} onBlur={() => setFocusedField(null)} rows={1} value={data.genuineExpertIn} onChange={e => set('genuineExpertIn', e.target.value)} />
+            </div>
+
+            {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
+            {navBlock(() => {
+              if (!isDemo && (!data.whatPeopleComeToYouFor.trim() || !data.heavilyInvestedIn.trim() || !data.genuineExpertIn.trim())) {
+                setError('Please answer all three questions.');
+                return;
+              }
+              setError('');
+              patchAndAdvance({
+                'about.whatPeopleComeToYouFor': data.whatPeopleComeToYouFor,
+                'about.heavilyInvestedIn': data.heavilyInvestedIn,
+                'about.genuineExpertIn': data.genuineExpertIn,
+              }, 6);
+            })}
+          </div>
+        )}
+
+        {/* SCREEN 6: Photos */}
+        {step === 6 && (
+          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
+            <span style={chapterLabelStyle}>{SCREEN_CONFIG[6].label}</span>
+            <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[6].heading}</h1>
             <p style={{ fontFamily: bodyFont, fontSize: 13, color: theme.muted, marginBottom: 40, marginTop: -24, letterSpacing: '0.02em' }}>
               Candid over headshot. We want to see you in the wild.
             </p>
@@ -1091,16 +1366,16 @@ export default function MembershipForm() {
             {navBlock(() => {
               if (!isDemo && photoFiles.length === 0) { setError('Please add at least one photo.'); return; }
               setError('');
-              patchAndAdvance({ 'photos.foodAccessibility': data.foodAccessibility }, 6);
+              patchAndAdvance({ 'photos.foodAccessibility': data.foodAccessibility }, 7);
             })}
           </div>
         )}
 
-        {/* SCREEN 6: Legal -> Almost There */}
-        {step === 6 && (
+        {/* SCREEN 7: Legal */}
+        {step === 7 && (
           <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
-            <span style={chapterLabelStyle}>{SCREEN_CONFIG[6].label}</span>
-            <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[6].heading}</h1>
+            <span style={chapterLabelStyle}>{SCREEN_CONFIG[7].label}</span>
+            <h1 style={sectionHeadingStyle}>{SCREEN_CONFIG[7].heading}</h1>
             <p style={{ fontFamily: bodyFont, fontSize: 11, color: theme.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 24, marginTop: -24 }}>
               This waiver is a draft for attorney review.
             </p>
@@ -1150,8 +1425,8 @@ export default function MembershipForm() {
           </div>
         )}
 
-        {/* SCREEN 7: Reveal — Cinematic Archetype Experience */}
-        {step === 7 && submitResult && Object.keys(submitResult.archetypeScores ?? {}).length > 0 && (
+        {/* SCREEN 8: Reveal */}
+        {step === 8 && submitResult && Object.keys(submitResult.archetypeScores ?? {}).length > 0 && (
           <div style={{
             minHeight: '100vh',
             background: 'var(--bg-reveal)',
@@ -1471,7 +1746,7 @@ export default function MembershipForm() {
           </div>
         )}
 
-        {step === 7 && submitResult && Object.keys(submitResult.archetypeScores ?? {}).length === 0 && (
+        {step === 8 && submitResult && Object.keys(submitResult.archetypeScores ?? {}).length === 0 && (
           <div style={{ textAlign: 'center', paddingTop: 80, minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
             <h1 style={{ fontFamily: bodyFont, fontSize: 28, fontWeight: 500, color: theme.text, marginBottom: 16 }}>
               Your answers are in.
@@ -1482,7 +1757,7 @@ export default function MembershipForm() {
           </div>
         )}
 
-        {step === 7 && !submitResult && (
+        {step === 8 && !submitResult && (
           <div style={{ textAlign: 'center', paddingTop: 80, minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
             <p style={{ fontFamily: bodyFont, fontSize: 16, color: theme.muted }}>Reading your application...</p>
           </div>
