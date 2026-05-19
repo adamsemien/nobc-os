@@ -3,11 +3,31 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { emitEvent } from '@/lib/emit-event';
-import { MemberStatus } from '@prisma/client';
+import { MemberStatus, TagEntityType } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { mcpMetrics, runMetric } from '@/lib/intelligence';
 import type { MetricFilters } from '@/lib/intelligence';
 import { composeInsight } from '@/lib/intelligence/composer';
+import {
+  createTicketTier,
+  updateTicketTier,
+  deleteTicketTier,
+  listTicketTiers,
+  reorderTicketTiers,
+} from '@/lib/ticketing/tiers';
+import {
+  CreateTierSchema,
+  UpdateTierSchema,
+  toCreateTierInput,
+  toUpdateTierInput,
+} from '@/lib/ticketing/tier-schema';
+import { createEventSeries, updateEventSeries, listEventSeries, generateInstances } from '@/lib/series';
+import {
+  CreateSeriesSchema,
+  UpdateSeriesSchema,
+  toCreateSeriesInput,
+  toUpdateSeriesInput,
+} from '@/lib/series-schema';
 
 // Lightweight MCP-style tool dispatcher for the NoBC OS operator agent.
 // Exposes a fixed set of read + critical write tools over a simple JSON-RPC-like interface.
@@ -461,6 +481,245 @@ function intelligenceTools(): Record<string, ToolHandler> {
   return out;
 }
 
+function parseEntityType(value: unknown): TagEntityType {
+  const v = String(value);
+  if ((Object.values(TagEntityType) as string[]).includes(v)) return v as TagEntityType;
+  throw new Error(
+    `Invalid entityType "${v}" — expected one of ${Object.values(TagEntityType).join(', ')}`,
+  );
+}
+
+/** Ticketing V2 + series + tag tool surface. Real handlers wrap the shared
+ *  logic layers (lib/ticketing/tiers, lib/series) and direct tag queries;
+ *  order / promo-write / comp / access-token tools are stubs until the Stripe
+ *  payment integration lands. */
+function ticketingTools(): Record<string, ToolHandler> {
+  const slugify = (v: string) =>
+    v
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'tag';
+
+  const stub = (tool: string, message: string): ToolHandler => ({
+    description: `[not implemented] ${message}`,
+    handler: async () => ({ status: 'not_implemented', tool, message }),
+  });
+
+  return {
+    'ticketing.tier.create': {
+      description:
+        'Create a ticket tier. Args: eventId XOR seriesId, name, quantity, optional memberPriceCents / nonMemberPriceCents, visibility, startsAt / endsAt, minPerOrder / maxPerOrder, refundPolicy.',
+      handler: async (workspaceId, args, userId) =>
+        createTicketTier(workspaceId, userId, toCreateTierInput(CreateTierSchema.parse(args))),
+    },
+    'ticketing.tier.update': {
+      description: 'Update a ticket tier. Args: tierId, plus any tier fields to change.',
+      handler: async (workspaceId, args, userId) => {
+        const { tierId, ...rest } = args;
+        return updateTicketTier(
+          workspaceId,
+          userId,
+          String(tierId),
+          toUpdateTierInput(UpdateTierSchema.parse(rest)),
+        );
+      },
+    },
+    'ticketing.tier.delete': {
+      description: 'Delete a ticket tier that has no sold or held tickets. Args: tierId.',
+      handler: async (workspaceId, args, userId) => {
+        await deleteTicketTier(workspaceId, userId, String(args.tierId));
+        return { ok: true };
+      },
+    },
+    'ticketing.tier.list': {
+      description: 'List ticket tiers for an event or series. Args: eventId XOR seriesId.',
+      handler: async (workspaceId, args) =>
+        listTicketTiers(workspaceId, {
+          eventId: args.eventId ? String(args.eventId) : undefined,
+          seriesId: args.seriesId ? String(args.seriesId) : undefined,
+        }),
+    },
+    'ticketing.tier.reorder': {
+      description: 'Reorder ticket tiers. Args: tierIds — string[] in the desired order.',
+      handler: async (workspaceId, args, userId) =>
+        reorderTicketTiers(workspaceId, userId, (args.tierIds as string[]) ?? []),
+    },
+
+    'series.create': {
+      description:
+        'Create a recurring event series. Args: name, recurrenceRule (RRULE string), startsAt, count or endsAt, optional defaults.',
+      handler: async (workspaceId, args, userId) =>
+        createEventSeries(workspaceId, userId, toCreateSeriesInput(CreateSeriesSchema.parse(args))),
+    },
+    'series.update': {
+      description: 'Update an event series. Args: seriesId, plus any series fields to change.',
+      handler: async (workspaceId, args, userId) => {
+        const { seriesId, ...rest } = args;
+        return updateEventSeries(
+          workspaceId,
+          userId,
+          String(seriesId),
+          toUpdateSeriesInput(UpdateSeriesSchema.parse(rest)),
+        );
+      },
+    },
+    'series.list': {
+      description: 'List every event series in the workspace.',
+      handler: async (workspaceId) => listEventSeries(workspaceId),
+    },
+    'series.generate_instances': {
+      description: 'Expand a series RRULE into draft Event instances. Args: seriesId.',
+      handler: async (workspaceId, args, userId) =>
+        generateInstances(workspaceId, userId, String(args.seriesId)),
+    },
+    'series.cancel': {
+      description: 'Cancel a series — deactivates it (active=false). Args: seriesId.',
+      handler: async (workspaceId, args, userId) =>
+        updateEventSeries(workspaceId, userId, String(args.seriesId), { active: false }),
+    },
+
+    'tag.create': {
+      description: 'Create a tag. Args: name, optional slug, category, color, description.',
+      handler: async (workspaceId, args) => {
+        const name = String(args.name ?? '').trim();
+        if (!name) throw new Error('tag.create requires a name');
+        return db.tag.create({
+          data: {
+            workspaceId,
+            name,
+            slug: slugify(String(args.slug ?? name)),
+            category: args.category ? String(args.category) : null,
+            color: args.color ? String(args.color) : null,
+            description: args.description ? String(args.description) : null,
+          },
+        });
+      },
+    },
+    'tag.list': {
+      description: 'List tags in the workspace. Optional arg: category.',
+      handler: async (workspaceId, args) =>
+        db.tag.findMany({
+          where: { workspaceId, ...(args.category ? { category: String(args.category) } : {}) },
+          orderBy: { name: 'asc' },
+        }),
+    },
+    'tag.apply': {
+      description:
+        'Apply a tag to an entity. Args: tagId, entityType (member|event|series|order|application|rsvp), entityId, optional appliedBy.',
+      handler: async (workspaceId, args, userId) => {
+        const entityType = parseEntityType(args.entityType);
+        const tagId = String(args.tagId);
+        const tag = await db.tag.findFirst({
+          where: { id: tagId, workspaceId },
+          select: { id: true },
+        });
+        if (!tag) throw new Error('Tag not found in this workspace');
+        const entityId = String(args.entityId);
+        const appliedBy = args.appliedBy ? String(args.appliedBy) : userId;
+        return db.entityTag.upsert({
+          where: { tagId_entityType_entityId: { tagId, entityType, entityId } },
+          create: { workspaceId, tagId, entityType, entityId, appliedBy },
+          update: { appliedBy },
+        });
+      },
+    },
+    'tag.remove': {
+      description: 'Remove a tag from an entity. Args: tagId, entityType, entityId.',
+      handler: async (workspaceId, args) => {
+        const entityType = parseEntityType(args.entityType);
+        const res = await db.entityTag.deleteMany({
+          where: {
+            workspaceId,
+            tagId: String(args.tagId),
+            entityType,
+            entityId: String(args.entityId),
+          },
+        });
+        return { removed: res.count };
+      },
+    },
+    'tag.bulk_apply': {
+      description:
+        'Apply one tag to many entities. Args: tagId, entityType, entityIds (string[]), optional appliedBy.',
+      handler: async (workspaceId, args, userId) => {
+        const entityType = parseEntityType(args.entityType);
+        const tagId = String(args.tagId);
+        const tag = await db.tag.findFirst({
+          where: { id: tagId, workspaceId },
+          select: { id: true },
+        });
+        if (!tag) throw new Error('Tag not found in this workspace');
+        const entityIds = (args.entityIds as string[]) ?? [];
+        const appliedBy = args.appliedBy ? String(args.appliedBy) : userId;
+        const res = await db.entityTag.createMany({
+          data: entityIds.map((entityId) => ({ workspaceId, tagId, entityType, entityId, appliedBy })),
+          skipDuplicates: true,
+        });
+        return { applied: res.count };
+      },
+    },
+
+    'ticketing.order.list': {
+      description: 'List orders. Optional args: eventId, seriesId, limit (max 100).',
+      handler: async (workspaceId, args) =>
+        db.order.findMany({
+          where: {
+            workspaceId,
+            ...(args.eventId ? { eventId: String(args.eventId) } : {}),
+            ...(args.seriesId ? { seriesId: String(args.seriesId) } : {}),
+          },
+          orderBy: { createdAt: 'desc' },
+          take: Math.min(Number(args.limit ?? 50), 100),
+        }),
+    },
+    'ticketing.order.get': {
+      description: 'Get one order with its RSVPs and redemptions. Args: orderId.',
+      handler: async (workspaceId, args) =>
+        db.order.findFirst({
+          where: { id: String(args.orderId), workspaceId },
+          include: { rsvps: true, redemptions: true },
+        }),
+    },
+    'ticketing.promo.list': {
+      description: 'List promo codes. Optional args: eventId, seriesId.',
+      handler: async (workspaceId, args) =>
+        db.promoCode.findMany({
+          where: {
+            workspaceId,
+            ...(args.eventId ? { eventId: String(args.eventId) } : {}),
+            ...(args.seriesId ? { seriesId: String(args.seriesId) } : {}),
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+    },
+
+    'ticketing.order.create': stub(
+      'ticketing.order.create',
+      'Order creation ships with the Stripe payment integration.',
+    ),
+    'ticketing.promo.create': stub(
+      'ticketing.promo.create',
+      'Promo-code management is not built yet.',
+    ),
+    'ticketing.promo.redeem': stub(
+      'ticketing.promo.redeem',
+      'Promo redemption ships with the Stripe payment integration.',
+    ),
+    'ticketing.access_token.generate': stub(
+      'ticketing.access_token.generate',
+      'Access-token generation is not built yet.',
+    ),
+    'ticketing.access_token.revoke': stub(
+      'ticketing.access_token.revoke',
+      'Access-token revocation is not built yet.',
+    ),
+    'ticketing.comp.issue': stub(
+      'ticketing.comp.issue',
+      'Comp issuance via the ticketing surface is not built yet.',
+    ),
+  };
+}
+
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -475,7 +734,10 @@ export async function POST(req: NextRequest) {
   }
 
   const { tool, args = {} } = body;
-  const allTools = { ...TOOLS, ...intelligenceTools() } as Record<string, ToolHandler>;
+  const allTools = { ...TOOLS, ...intelligenceTools(), ...ticketingTools() } as Record<
+    string,
+    ToolHandler
+  >;
   const handler = allTools[tool];
   if (!handler) {
     return NextResponse.json(
@@ -495,7 +757,10 @@ export async function POST(req: NextRequest) {
 
 // Expose tool manifest — static tools plus auto-registered intelligence.* tools
 export async function GET() {
-  const all = { ...TOOLS, ...intelligenceTools() } as Record<string, ToolHandler>;
+  const all = { ...TOOLS, ...intelligenceTools(), ...ticketingTools() } as Record<
+    string,
+    ToolHandler
+  >;
   const tools = Object.entries(all).map(([name, t]) => ({ name, description: t.description }));
   return NextResponse.json({ tools });
 }
