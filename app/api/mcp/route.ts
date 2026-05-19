@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { emitEvent } from '@/lib/emit-event';
-import { MemberStatus, TagEntityType } from '@prisma/client';
+import { EventAccessMode, MemberStatus, Prisma, TagEntityType } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { mcpMetrics, runMetric } from '@/lib/intelligence';
 import type { MetricFilters } from '@/lib/intelligence';
@@ -59,10 +59,14 @@ const TOOLS = {
   get_member: {
     description: 'Get a single member by ID or email',
     handler: async (workspaceId: string, args: Record<string, unknown>) => {
-      const where = args.email
-        ? { workspaceId_email: { workspaceId, email: String(args.email) } }
-        : { id: String(args.id) };
-      return db.member.findUnique({ where });
+      // Both branches are workspace-scoped. The id branch uses findFirst
+      // because findUnique cannot take a non-unique extra filter.
+      if (args.email) {
+        return db.member.findUnique({
+          where: { workspaceId_email: { workspaceId, email: String(args.email) } },
+        });
+      }
+      return db.member.findFirst({ where: { id: String(args.id), workspaceId } });
     },
   },
   list_events: {
@@ -121,14 +125,26 @@ const TOOLS = {
   // Write tools
   add_to_red_list: {
     description: 'Add an email to the workspace red list',
-    handler: async (workspaceId: string, args: Record<string, unknown>) => {
-      return db.redList.create({
+    handler: async (workspaceId: string, args: Record<string, unknown>, userId: string) => {
+      const entry = await db.redList.create({
         data: {
           workspaceId,
           email: String(args.email),
           reason: args.reason ? String(args.reason) : undefined,
         },
       });
+
+      await emitEvent({
+        workspaceId,
+        actorId: userId,
+        actorType: 'AGENT',
+        action: 'redlist.added',
+        entityType: 'RED_LIST',
+        entityId: entry.id,
+        metadata: { email: entry.email, via: 'mcp' },
+      });
+
+      return entry;
     },
   },
 
@@ -198,6 +214,7 @@ const TOOLS = {
       await emitEvent({
         workspaceId,
         actorId: userId,
+        actorType: 'AGENT',
         action: 'application.approved',
         entityType: 'APPLICATION',
         entityId: id,
@@ -208,6 +225,7 @@ const TOOLS = {
         await emitEvent({
           workspaceId,
           actorId: userId,
+          actorType: 'AGENT',
           action: 'member.created',
           entityType: 'MEMBER',
           entityId: member.id,
@@ -243,6 +261,7 @@ const TOOLS = {
       await emitEvent({
         workspaceId,
         actorId: userId,
+        actorType: 'AGENT',
         action: 'application.rejected',
         entityType: 'APPLICATION',
         entityId: id,
@@ -277,6 +296,7 @@ const TOOLS = {
       await emitEvent({
         workspaceId,
         actorId: userId,
+        actorType: 'AGENT',
         action: 'event.created',
         entityType: 'EVENT',
         entityId: event.id,
@@ -299,6 +319,7 @@ const TOOLS = {
       await emitEvent({
         workspaceId,
         actorId: userId,
+        actorType: 'AGENT',
         action: 'event.published',
         entityType: 'EVENT',
         entityId: eventId,
@@ -321,10 +342,52 @@ const TOOLS = {
       await emitEvent({
         workspaceId,
         actorId: userId,
+        actorType: 'AGENT',
         action: 'event.cancelled',
         entityType: 'EVENT',
         entityId: eventId,
         metadata: { previousStatus: existing.status, via: 'mcp' },
+      });
+
+      return updated;
+    },
+  },
+
+  update_event: {
+    description:
+      'Update a DRAFT event. Args: id (required) plus any of title, description, ' +
+      'startDatetime, endDatetime, venue, capacity, accessMode, approvalRequired, ' +
+      'plusOnesAllowed. Only DRAFT events can be edited.',
+    handler: async (workspaceId: string, args: Record<string, unknown>, userId: string) => {
+      const id = String(args.id);
+      const existing = await db.event.findFirst({ where: { id, workspaceId } });
+      if (!existing) throw new Error('Event not found or not in this workspace');
+      if (existing.status !== 'DRAFT') {
+        throw new Error(`Only DRAFT events can be updated (current status: ${existing.status})`);
+      }
+
+      // Partial update — only fields explicitly passed are touched.
+      const data: Prisma.EventUpdateInput = {};
+      if (args.title !== undefined) data.title = String(args.title);
+      if (args.description !== undefined) data.description = String(args.description);
+      if (args.startDatetime !== undefined) data.startAt = new Date(String(args.startDatetime));
+      if (args.endDatetime !== undefined) data.endAt = new Date(String(args.endDatetime));
+      if (args.venue !== undefined) data.location = String(args.venue);
+      if (args.capacity !== undefined) data.capacity = Number(args.capacity);
+      if (args.accessMode !== undefined) data.accessMode = String(args.accessMode) as EventAccessMode;
+      if (args.approvalRequired !== undefined) data.approvalRequired = Boolean(args.approvalRequired);
+      if (args.plusOnesAllowed !== undefined) data.plusOnesAllowed = Boolean(args.plusOnesAllowed);
+
+      const updated = await db.event.update({ where: { id }, data });
+
+      await emitEvent({
+        workspaceId,
+        actorId: userId,
+        actorType: 'AGENT',
+        action: 'event.updated',
+        entityType: 'EVENT',
+        entityId: id,
+        metadata: { fields: Object.keys(data).join(','), via: 'mcp' },
       });
 
       return updated;
@@ -365,6 +428,7 @@ const TOOLS = {
         await emitEvent({
           workspaceId,
           actorId: userId,
+          actorType: 'AGENT',
           action: 'member.created',
           entityType: 'MEMBER',
           entityId: member.id,
@@ -403,6 +467,7 @@ const TOOLS = {
       await emitEvent({
         workspaceId,
         actorId: userId,
+        actorType: 'AGENT',
         action: 'rsvp.created',
         entityType: 'RSVP',
         entityId: rsvp.id,
@@ -435,6 +500,7 @@ const TOOLS = {
       await emitEvent({
         workspaceId,
         actorId: userId,
+        actorType: 'AGENT',
         action: 'rsvp.confirmed',
         entityType: 'RSVP',
         entityId: rsvpId,
@@ -578,10 +644,10 @@ function ticketingTools(): Record<string, ToolHandler> {
 
     'tag.create': {
       description: 'Create a tag. Args: name, optional slug, category, color, description.',
-      handler: async (workspaceId, args) => {
+      handler: async (workspaceId, args, userId) => {
         const name = String(args.name ?? '').trim();
         if (!name) throw new Error('tag.create requires a name');
-        return db.tag.create({
+        const tag = await db.tag.create({
           data: {
             workspaceId,
             name,
@@ -591,6 +657,16 @@ function ticketingTools(): Record<string, ToolHandler> {
             description: args.description ? String(args.description) : null,
           },
         });
+        await emitEvent({
+          workspaceId,
+          actorId: userId,
+          actorType: 'AGENT',
+          action: 'tag.created',
+          entityType: 'TAG',
+          entityId: tag.id,
+          metadata: { name: tag.name, via: 'mcp' },
+        });
+        return tag;
       },
     },
     'tag.list': {
@@ -614,25 +690,43 @@ function ticketingTools(): Record<string, ToolHandler> {
         if (!tag) throw new Error('Tag not found in this workspace');
         const entityId = String(args.entityId);
         const appliedBy = args.appliedBy ? String(args.appliedBy) : userId;
-        return db.entityTag.upsert({
+        const result = await db.entityTag.upsert({
           where: { tagId_entityType_entityId: { tagId, entityType, entityId } },
           create: { workspaceId, tagId, entityType, entityId, appliedBy },
           update: { appliedBy },
         });
+        await emitEvent({
+          workspaceId,
+          actorId: userId,
+          actorType: 'AGENT',
+          action: 'tag.applied',
+          entityType,
+          entityId,
+          metadata: { tagId, via: 'mcp' },
+        });
+        return result;
       },
     },
     'tag.remove': {
       description: 'Remove a tag from an entity. Args: tagId, entityType, entityId.',
-      handler: async (workspaceId, args) => {
+      handler: async (workspaceId, args, userId) => {
         const entityType = parseEntityType(args.entityType);
+        const tagId = String(args.tagId);
+        const entityId = String(args.entityId);
         const res = await db.entityTag.deleteMany({
-          where: {
-            workspaceId,
-            tagId: String(args.tagId),
-            entityType,
-            entityId: String(args.entityId),
-          },
+          where: { workspaceId, tagId, entityType, entityId },
         });
+        if (res.count > 0) {
+          await emitEvent({
+            workspaceId,
+            actorId: userId,
+            actorType: 'AGENT',
+            action: 'tag.removed',
+            entityType,
+            entityId,
+            metadata: { tagId, via: 'mcp' },
+          });
+        }
         return { removed: res.count };
       },
     },
@@ -652,6 +746,15 @@ function ticketingTools(): Record<string, ToolHandler> {
         const res = await db.entityTag.createMany({
           data: entityIds.map((entityId) => ({ workspaceId, tagId, entityType, entityId, appliedBy })),
           skipDuplicates: true,
+        });
+        await emitEvent({
+          workspaceId,
+          actorId: userId,
+          actorType: 'AGENT',
+          action: 'tag.bulk_applied',
+          entityType: 'TAG',
+          entityId: tagId,
+          metadata: { applied: res.count, entityType, via: 'mcp' },
         });
         return { applied: res.count };
       },
@@ -722,8 +825,6 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const workspaceId = await requireWorkspaceId(userId);
-
   let body: ToolCall;
   try {
     body = (await req.json()) as ToolCall;
@@ -745,6 +846,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const workspaceId = await requireWorkspaceId(userId);
     const result = await handler.handler(workspaceId, args, userId);
     return NextResponse.json({ result });
   } catch (err) {
@@ -755,6 +857,9 @@ export async function POST(req: NextRequest) {
 
 // Expose tool manifest — static tools plus auto-registered intelligence.* tools
 export async function GET() {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const all = { ...TOOLS, ...intelligenceTools(), ...ticketingTools() } as Record<
     string,
     ToolHandler
