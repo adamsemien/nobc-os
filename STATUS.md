@@ -5,50 +5,57 @@ _Last updated: 2026-05-19_
 ## Current branch: `main`
 
 ## Last 5 commits
-- `feat(operator)` nav overhaul, dashboard, settings landing, members, check-in hub
-- `feat(operator)` route-level loading skeletons + Producer UI reference
-- `fix(operator)` semantic tokens + theme-aware fonts in operator UI
-- `fix(mcp)` security + audit hardening on MCP tool surface
-- `feat(operator)` AgentPanel — Cmd+Shift+A AI agent chat panel
+- `feat(events)` hero images, live RSVP list, member event redesign
+- `feat(help)` operator + member help systems with tooltips
+- `feat(member)` complete member portal — home, rsvps, profile
+- `feat(dev)` AI persona runner + 50-batch seed
+- `feat(workflows)` event workflow gates + editable tier names
 
-## In flight (uncommitted)
-Communications stack + live-feel polish. All TS clean, three migrations pending:
-- `prisma/migrations/20260519100000_workspace_ai_model` — Workspace.aiModel
-- `prisma/migrations/20260519110000_communications` — EmailTemplate + PlatformSetting
-- `prisma/migrations/20260519120000_rsvp_reminder_plus_one` — RSVP.reminderSentAt, plusOneName, plusOneInstagram
-
-Apply with: `npx prisma migrate deploy` (or `migrate dev` locally).
+## In flight
+Nothing. All five blocks shipped. `tsc --noEmit` clean.
+Migration `20260519230000_workflow_gates_and_tier_names` applied to Postgres.
 
 ## What shipped this session
-- Sidebar: Dashboard / Applications (pending badge) / Events / Check-in / Members / Lists / Intelligence / Activity / Settings (footer).
-- Dashboard at /operator: 4 stat cards, Action Required, upcoming events w/ capacity + Room buttons, recent Activity feed.
-- The Room (event night dashboard) — vibe line, confetti, chime, VIP marker, last-arrival spotlight, capacity gauge.
-- Check-in Hub at /operator/check-in.
-- Members route + member detail with archetype, score (0–100), VIP marker.
-- Application form builder — /operator/settings/application.
-- AI Model switcher — /operator/settings/model, persists to Workspace.aiModel.
-- Communications — /operator/settings/communications: EmailTemplate + PlatformSetting CRUD, default templates seeded.
-- `lib/email.ts` `sendTemplatedEmail()` — all future sends go through here.
-- Event publish → fan-out to APPROVED members via `event.published` template (gated by `event.notify_on_publish`).
-- Day-of reminder cron at `/api/cron/event-reminders` + vercel.json schedule (15:00 UTC).
-- Walk-in registration on the check-in PWA (UserPlus button) → /api/check-in/walkin.
-- Plus-one capture: RSVP fields (`plusOneName`, `plusOneInstagram`), wired through `submitMemberRsvp` and surfaced in operator RSVP queries.
-- Scoring display: 0–100 + tier (Charter / Standard / Waitlist) via `lib/score-display.ts` + `<ScoreBadge>`.
-- Avatar primitive: pravatar fallback by email hash, used in dashboard, members, applications queue + detail.
-- Application detail: avatar header + IG / portfolio chips parsed from answers.
-- Event detail: persistent action bar (Check In / The Room / Publish / Cancel / Edit) + breadcrumbs.
-- Breadcrumbs on applications + members + settings detail pages.
-- Audit → Activity rename (label only; URL kept at `/operator/audit`).
-- Favicon at `app/icon.svg` + `app/apple-icon.svg`.
-- Seed expansion: 30 members, 20 pending applications (5 borderline), Late Night past event 100% checked in, Residency with 8 live check-ins in the last 2 hours so The Room shows real data.
+
+**Block A — Workflows + tiers**
+- `EventWorkflow` model + `Workspace.tierNames` JSON. Six templates (open, members_only, apply_or_pay, paid_only, referral_required, invitation_code). `lib/workflows/{types,templates,render,engine}.ts`.
+- Event create UI: Workflow section in step 3 with template cards, per-template config, live "in plain English" gate summary.
+- `/operator/settings/tiers` — Resident / Member / Considering, fully editable. `ScoreBadge` + ApplicationsQueue read configured names.
+- Seed sets workflow per event (Residency: open, House Dinner: apply_or_pay $150, Founder's Circle + Members Preview: members_only, Late Night: open).
+
+**Block B — AI persona runner**
+- `/api/dev/persona/generate` — claude-sonnet-4-6 produces a Persona JSON, optional scenario input.
+- `/api/dev/persona/run` — SSE streams apply / auto_approve / rsvp / pay / checkin through real platform logic. Stripe live-mode refused.
+- `/api/dev/persona/seed-batch` — 50 personas spread across 6 months, statuses distributed 25p / 10h / 10a / 5r.
+- DevToolbar gains an "AI QA Runner" section with scenario input, step checkboxes, live SSE log, view-persona link, and a "Seed 50 personas (AI)" button.
+
+**Block C — Member portal**
+- `/m` (new) — vanity member card (archetype, member-since, member no.), upcoming events with per-member RSVP status chips, recent RSVPs preview, footer quick links.
+- Root `/` routes by role (signed-out → /apply, approved member → /m, otherwise → /operator).
+- `/m/(portal)/home` becomes a server redirect to `/m`. MemberPortalNav rewired (Home → /m, Help → /m/help).
+- `/m/help` reads PlatformSetting `help.member.faq` with a built-in default.
+
+**Block D — Help system**
+- `<HelpPanel>` slide-over (right side, 480px) opened by floating ? button or `?` key. 8 sections (quickstart / applications / events / workflows / check-in / lists / intelligence / shortcuts).
+- `<OnboardingTour>` 5-step modal on empty operator workspaces, localStorage-dismissed.
+- `<HelpTip>` (?) tooltip primitive wired into the Workflow template picker, Approval-required toggle, email-template Enabled toggle, Lists description.
+- Settings → Communications gets a Member FAQ editor; saves to `help.member.faq` via `/api/operator/settings/help-faq`.
+
+**Block E — Events polish**
+- Operator Attendees tab gets `<LiveRsvpFeed>` — polls every 30s, highlights new arrivals, archetype-aware.
+- `/api/operator/events/[id]/rsvps?limit&order` returns enriched rows (archetype joined via Application).
+- `/m/events/[slug]` renders a "How to attend" card listing every workflow path with its `renderPathSummary` line under the existing template.
+- Hero image system (`heroImageAssetId`, `HeroImageUpload`, `getEventHeroDisplayUrl`) confirmed working from prior session.
 
 ## Blocked
-- Item 11 (Apple/Google Wallet passes) — PassNinja account pending.
-- Item 17 (MCP server) — toolset incomplete.
-- Member-side event detail redesign (Task 9) and hero-image upload UI (Task 6) deferred.
+- Apple/Google Wallet passes — PassNinja account pending.
+- MCP server toolset incomplete.
+- Custom workflows (mix-and-match steps) — V2.
 
-## Next session should start with
-Apply the three pending migrations, then deploy. Smoke test:
-1. Settings → Communications loads and shows 6 templates + 4 settings.
-2. Publish an event → check audit log for `event.notification_sent`.
-3. Check-in PWA → Add walk-in → verify member + RSVP created + audit row.
+## Next session
+Smoke test in production:
+1. Workflow picker on a new event — confirm EventWorkflow row created.
+2. `/operator/settings/tiers` — rename, verify ApplicationsQueue + ScoreBadge update.
+3. DevToolbar — "Generate & Run" with scenario "founder from NYC" hits all steps cleanly.
+4. `/m` — vanity card renders, footer links work.
+5. ? key opens HelpPanel; ? icon (bottom-left) opens it too.
