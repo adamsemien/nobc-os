@@ -48,6 +48,7 @@ model Workspace {
   sponsorBrandProfiles SponsorBrandProfile[]
   generatedAssets      GeneratedAsset[]
   svixAppId            String?
+  watchList            WatchList[]
 }
 
 enum MemberStatus {
@@ -539,6 +540,31 @@ model RedList {
 
   @@index([workspaceId])
   @@index([email])
+}
+
+enum WatchListType {
+  PURPLE
+  BLOCKED
+}
+
+model WatchList {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
+  type        WatchListType
+  matchEmail  String?
+  matchPhone  String?
+  matchInstagram String?
+  note        String?
+  createdBy   String?
+  createdAt   DateTime      @default(now())
+  deletedAt   DateTime?
+
+  @@index([workspaceId])
+  @@index([workspaceId, type])
+  @@index([matchEmail])
+  @@index([matchPhone])
+  @@index([matchInstagram])
 }
 
 model QuestionDefinition {

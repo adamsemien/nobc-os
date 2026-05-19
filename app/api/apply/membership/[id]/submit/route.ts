@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { render } from '@react-email/render';
 import { db } from '@/lib/db';
+import { resend } from '@/lib/resend';
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { scoreApplication } from '@/lib/scoring';
+import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
+import WelcomeEmail from '@/emails/WelcomeEmail';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,6 +16,101 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     include: { answers: true },
   });
   if (!application) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  // ── 1. Duplicate check ────────────────────────────────────────────────
+  const isDuplicate = await checkDuplicate(
+    application.workspaceId,
+    application.email,
+    application.phone,
+    application.id,
+  );
+  if (isDuplicate) {
+    await db.auditEvent.create({
+      data: {
+        workspaceId: application.workspaceId,
+        actorType: 'SYSTEM',
+        action: 'application.duplicate_blocked',
+        entityType: 'Application',
+        entityId: application.id,
+      },
+    });
+    return NextResponse.json({ error: 'duplicate_application' }, { status: 409 });
+  }
+
+  // ── 2 + 3. WatchList check ────────────────────────────────────────────
+  const watchMatch = await checkWatchList(
+    application.workspaceId,
+    application.email,
+    application.phone,
+    null, // Instagram not yet captured as an explicit form field
+  );
+
+  if (watchMatch?.type === 'BLOCKED') {
+    await db.application.update({ where: { id }, data: { status: 'REJECTED' } });
+    await db.auditEvent.create({
+      data: {
+        workspaceId: application.workspaceId,
+        actorType: 'SYSTEM',
+        action: 'application.blocked',
+        entityType: 'Application',
+        entityId: application.id,
+        metadata: { watchListEntryId: watchMatch.entryId },
+      },
+    });
+    return NextResponse.json({ blocked: true });
+  }
+
+  if (watchMatch?.type === 'PURPLE') {
+    const now = new Date();
+    const nameParts = application.fullName.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const member = await db.member.upsert({
+      where: { workspaceId_email: { workspaceId: application.workspaceId, email: application.email } },
+      update: { status: 'APPROVED', approved: true, approvedAt: now },
+      create: {
+        workspaceId: application.workspaceId,
+        clerkUserId: `app_${application.id}`,
+        email: application.email,
+        firstName,
+        lastName,
+        phone: application.phone ?? undefined,
+        status: 'APPROVED',
+        approved: true,
+        approvedAt: now,
+      },
+    });
+
+    await db.application.update({
+      where: { id },
+      data: { status: 'APPROVED', reviewedAt: now, reviewedBy: 'system', memberId: member.id },
+    });
+
+    try {
+      const html = await render(WelcomeEmail({ name: application.fullName, archetype: undefined }));
+      await resend.emails.send({
+        from: 'The No Bad Company <team@thenobadcompany.com>',
+        to: application.email,
+        subject: "you're in. welcome to no bad company.",
+        html,
+      });
+    } catch (e) {
+      console.error('Purple list welcome email failed', e);
+    }
+
+    await db.auditEvent.create({
+      data: {
+        workspaceId: application.workspaceId,
+        actorType: 'SYSTEM',
+        action: 'application.purple_list_approved',
+        entityType: 'Application',
+        entityId: application.id,
+        metadata: { watchListEntryId: watchMatch.entryId },
+      },
+    });
+    // Fall through to AI scoring so the archetype is computed even for auto-approvals.
+  }
 
   // Question-agnostic AI scoring — driven by the template's QuestionDefinitions.
   const result = await scoreApplication(id);

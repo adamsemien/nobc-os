@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const SETTINGS_TABS = [
   { href: '/operator/settings/theme', label: 'Theme' },
   { href: '/operator/settings/webhooks', label: 'Webhooks' },
+  { href: '/operator/settings/lists', label: 'Lists' },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
