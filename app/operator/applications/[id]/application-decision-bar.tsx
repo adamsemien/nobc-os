@@ -68,20 +68,20 @@ export function ApplicationDecisionBar({
       <div
         className="fixed inset-x-0 bottom-0 z-20 border-t px-4 py-4 sm:px-6"
         style={{
-          borderColor: 'var(--nobc-hairline)',
-          background: 'var(--nobc-ivory)',
+          borderColor: 'var(--border)',
+          background: 'var(--bg)',
           paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
         }}
       >
         <div className="mx-auto max-w-6xl">
           {status === 'APPROVED' && (
-            <p className="text-center text-sm" style={{ color: 'var(--nobc-ink)' }}>
+            <p className="text-center text-sm" style={{ color: 'var(--text-primary)' }}>
               Approved
               {reviewedLabel ? ` on ${reviewedLabel}` : ''}.
             </p>
           )}
           {status === 'REJECTED' && (
-            <p className="text-center text-sm" style={{ color: 'var(--nobc-ink)' }}>
+            <p className="text-center text-sm" style={{ color: 'var(--text-primary)' }}>
               Rejected
               {reviewedLabel ? ` on ${reviewedLabel}` : ''}.
             </p>
@@ -95,21 +95,21 @@ export function ApplicationDecisionBar({
     <div
       className="fixed inset-x-0 bottom-0 z-20 border-t px-4 py-4 sm:px-6"
       style={{
-        borderColor: 'var(--nobc-hairline)',
-        background: 'var(--nobc-ivory)',
-        boxShadow: '0 -8px 24px var(--nobc-hairline)',
+        borderColor: 'var(--border)',
+        background: 'var(--bg)',
+        boxShadow: '0 -8px 24px var(--border)',
         paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
       }}
     >
       <div className="mx-auto max-w-6xl space-y-3">
         {error ? (
-          <p className="text-center text-sm" style={{ color: 'var(--nobc-red)' }}>
+          <p className="text-center text-sm" style={{ color: 'var(--primary)' }}>
             {error}
           </p>
         ) : null}
         {rejectOpen ? (
           <div className="space-y-2">
-            <label className="block text-xs tracking-wide" style={{ color: 'var(--nobc-dark)' }}>
+            <label className="block text-xs tracking-wide" style={{ color: 'var(--text-secondary)' }}>
               Optional note (shown internally)
               <textarea
                 value={reason}
@@ -118,9 +118,9 @@ export function ApplicationDecisionBar({
                 className="mt-1 w-full resize-y border px-3 py-2 text-sm outline-none focus:ring-2"
                 style={{
                   borderRadius: '4px',
-                  borderColor: 'var(--nobc-hairline)',
-                  color: 'var(--nobc-ink)',
-                  background: 'var(--nobc-ivory)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)',
+                  background: 'var(--bg)',
                   fontFamily: 'inherit',
                 }}
               />
@@ -133,7 +133,7 @@ export function ApplicationDecisionBar({
             onClick={approve}
             disabled={busy !== null}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 px-5 text-base font-medium text-white disabled:opacity-60 sm:min-w-[10rem] sm:w-auto"
-            style={{ borderRadius: '4px', background: 'var(--nobc-red)' }}
+            style={{ borderRadius: '4px', background: 'var(--primary)' }}
           >
             {busy === 'approve' ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null}
             Approve
@@ -151,8 +151,8 @@ export function ApplicationDecisionBar({
                 borderRadius: '4px',
                 borderWidth: '1px',
                 borderStyle: 'solid',
-                borderColor: 'var(--nobc-ink)',
-                color: 'var(--nobc-ink)',
+                borderColor: 'var(--text-primary)',
+                color: 'var(--text-primary)',
                 background: 'transparent',
               }}
             >
@@ -172,8 +172,8 @@ export function ApplicationDecisionBar({
                   borderRadius: '4px',
                   borderWidth: '1px',
                   borderStyle: 'solid',
-                  borderColor: 'var(--nobc-hairline)',
-                  color: 'var(--nobc-dark)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-secondary)',
                 }}
               >
                 Cancel
@@ -183,7 +183,7 @@ export function ApplicationDecisionBar({
                 onClick={reject}
                 disabled={busy !== null}
                 className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 px-4 text-sm font-medium text-white disabled:opacity-60"
-                style={{ borderRadius: '4px', background: 'var(--nobc-ink)' }}
+                style={{ borderRadius: '4px', background: 'var(--text-primary)' }}
               >
                 {busy === 'reject' ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null}
                 Confirm reject
@@ -203,14 +203,14 @@ export function ConsentReadOnlyRow({ label, checked }: { label: string; checked:
         className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center border"
         style={{
           borderRadius: '4px',
-          borderColor: 'var(--nobc-hairline)',
-          color: checked ? 'var(--nobc-red)' : 'var(--nobc-dark)',
+          borderColor: 'var(--border)',
+          color: checked ? 'var(--primary)' : 'var(--text-secondary)',
         }}
         aria-hidden
       >
         {checked ? <Check className="h-4 w-4" strokeWidth={2.5} /> : null}
       </span>
-      <span className="text-sm leading-relaxed" style={{ color: 'var(--nobc-ink)' }}>
+      <span className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
         {label}
       </span>
     </li>

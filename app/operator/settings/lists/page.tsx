@@ -122,7 +122,7 @@ export default function ListsPage() {
       <div className="mx-auto max-w-4xl">
         <h1
           className="mb-1 text-3xl font-normal"
-          style={{ fontFamily: "'PP Editorial New', Georgia, serif", color: 'var(--text-primary)' }}
+          style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
         >
           Lists
         </h1>

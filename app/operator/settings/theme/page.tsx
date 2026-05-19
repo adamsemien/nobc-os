@@ -28,7 +28,7 @@ export default function ThemePage() {
         <h1
           className="mb-1 text-3xl font-normal"
           style={{
-            fontFamily: "'PP Editorial New', Georgia, serif",
+            fontFamily: 'var(--font-display)',
             color: 'var(--text-primary)',
           }}
         >

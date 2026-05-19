@@ -46,9 +46,9 @@ export default async function OperatorApplicationDetailPage({
 
   if (res.status === 404) {
     return (
-      <div className="px-4 py-16 text-center text-sm" style={{ color: 'var(--nobc-dark)' }}>
+      <div className="px-4 py-16 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
         Application not found.{' '}
-        <Link href="/operator/applications" className="underline" style={{ color: 'var(--nobc-red)' }}>
+        <Link href="/operator/applications" className="underline" style={{ color: 'var(--primary)' }}>
           Back to list
         </Link>
       </div>
@@ -57,7 +57,7 @@ export default async function OperatorApplicationDetailPage({
 
   if (!res.ok) {
     return (
-      <div className="px-4 py-16 text-center text-sm" style={{ color: 'var(--nobc-red)' }}>
+      <div className="px-4 py-16 text-center text-sm" style={{ color: 'var(--primary)' }}>
         Could not load this application.
       </div>
     );
@@ -74,7 +74,7 @@ export default async function OperatorApplicationDetailPage({
         <Link
           href="/operator/applications"
           className="mb-6 inline-block text-sm underline-offset-4 hover:underline"
-          style={{ color: 'var(--nobc-red)' }}
+          style={{ color: 'var(--primary)' }}
         >
           ← All applications
         </Link>
@@ -84,14 +84,14 @@ export default async function OperatorApplicationDetailPage({
             <h1
               className="text-3xl font-normal leading-tight sm:text-4xl"
               style={{
-                fontFamily: "'PP Editorial New', Georgia, serif",
-                color: 'var(--nobc-ink)',
+                fontFamily: 'var(--font-display)',
+                color: 'var(--text-primary)',
               }}
             >
               {app.fullName}
             </h1>
 
-            <dl className="space-y-3 text-sm" style={{ color: 'var(--nobc-ink)' }}>
+            <dl className="space-y-3 text-sm" style={{ color: 'var(--text-primary)' }}>
               <div>
                 <dt className="sr-only">Email</dt>
                 <dd>
@@ -112,14 +112,14 @@ export default async function OperatorApplicationDetailPage({
               ) : null}
               {app.city ? (
                 <div>
-                  <dt className="text-xs uppercase tracking-wider" style={{ color: 'var(--nobc-dark)' }}>
+                  <dt className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                     City
                   </dt>
                   <dd className="mt-0.5">{app.city}</dd>
                 </div>
               ) : null}
               <div>
-                <dt className="text-xs uppercase tracking-wider" style={{ color: 'var(--nobc-dark)' }}>
+                <dt className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                   Applied
                 </dt>
                 <dd className="mt-0.5">{formatDateTime(app.createdAt)}</dd>
@@ -130,11 +130,11 @@ export default async function OperatorApplicationDetailPage({
               <div>
                 <h2
                   className="mb-2 text-xs font-semibold uppercase tracking-[0.2em]"
-                  style={{ color: 'var(--nobc-dark)' }}
+                  style={{ color: 'var(--text-secondary)' }}
                 >
                   Referrers
                 </h2>
-                <ul className="list-inside list-disc space-y-1 text-sm" style={{ color: 'var(--nobc-ink)' }}>
+                <ul className="list-inside list-disc space-y-1 text-sm" style={{ color: 'var(--text-primary)' }}>
                   {app.referrers.map((line, i) => (
                     <li key={`${line}-${i}`}>{line}</li>
                   ))}
@@ -151,15 +151,15 @@ export default async function OperatorApplicationDetailPage({
             </div>
 
             {app.status === 'APPROVED' && reviewedDate ? (
-              <p className="text-sm" style={{ color: 'var(--nobc-dark)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                 Approved on {reviewedDate}
               </p>
             ) : null}
             {app.status === 'REJECTED' ? (
-              <div className="text-sm" style={{ color: 'var(--nobc-dark)' }}>
+              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                 {reviewedDate ? <p>Rejected on {reviewedDate}.</p> : <p>Rejected.</p>}
                 {app.rejectionReason ? (
-                  <p className="mt-2 leading-relaxed" style={{ color: 'var(--nobc-ink)' }}>
+                  <p className="mt-2 leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                     {app.rejectionReason}
                   </p>
                 ) : null}
@@ -171,7 +171,7 @@ export default async function OperatorApplicationDetailPage({
             <div>
               <h2
                 className="mb-4 text-xs font-semibold uppercase tracking-[0.25em]"
-                style={{ color: 'var(--nobc-dark)' }}
+                style={{ color: 'var(--text-secondary)' }}
               >
                 Application answers
               </h2>
@@ -180,11 +180,11 @@ export default async function OperatorApplicationDetailPage({
                   <div key={row.questionKey}>
                     <p
                       className="mb-1 text-xs font-semibold uppercase tracking-[0.18em]"
-                      style={{ color: 'var(--nobc-dark)' }}
+                      style={{ color: 'var(--text-secondary)' }}
                     >
                       {row.label}
                     </p>
-                    <p className="whitespace-pre-wrap text-sm font-normal leading-relaxed" style={{ color: 'var(--nobc-ink)' }}>
+                    <p className="whitespace-pre-wrap text-sm font-normal leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                       {row.answer.trim() ? row.answer : '—'}
                     </p>
                   </div>
@@ -195,11 +195,11 @@ export default async function OperatorApplicationDetailPage({
             <div>
               <h2
                 className="mb-3 text-xs font-semibold uppercase tracking-[0.25em]"
-                style={{ color: 'var(--nobc-dark)' }}
+                style={{ color: 'var(--text-secondary)' }}
               >
                 Consents
               </h2>
-              <ul className="divide-y" style={{ borderColor: 'var(--nobc-hairline)' }}>
+              <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
                 <ConsentReadOnlyRow label={labelForModelField('consentEmail')} checked={app.consentEmail} />
                 <ConsentReadOnlyRow label={labelForModelField('consentSms')} checked={app.consentSms} />
                 {app.consentAnswers.map(row => (

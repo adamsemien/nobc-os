@@ -25,7 +25,7 @@ export function CopyInviteLinkButton({ slug }: Props) {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--apply-rule)] bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-[var(--nobc-red)] hover:text-[var(--nobc-red)]"
+      className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-primary hover:text-primary"
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       {copied ? 'Copied!' : 'Copy Invite Link'}

@@ -354,7 +354,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
   }, []); // no deps — uses refs
 
   const headingFont: CSSProperties = {
-    fontFamily: "'PP Editorial New', Georgia, serif",
+    fontFamily: 'var(--font-display)',
   };
 
   if (applications.length === 0) {

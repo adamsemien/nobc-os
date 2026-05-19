@@ -58,7 +58,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
       <span className="text-[0.65rem] font-medium uppercase tracking-widest text-text-muted">{label}</span>
       <span
         className="text-3xl font-light text-text-primary"
-        style={{ fontFamily: "'PP Editorial New', Georgia, serif" }}
+        style={{ fontFamily: 'var(--font-display)' }}
       >
         {value}
       </span>
@@ -101,7 +101,7 @@ export function EventOverviewTab({ event, heroImageUrl }: Props) {
         >
           <span
             className="text-lg text-text-tertiary"
-            style={{ fontFamily: "'PP Editorial New', Georgia, serif", letterSpacing: '0.2em' }}
+            style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.2em' }}
           >
             NO BAD COMPANY
           </span>

@@ -65,6 +65,13 @@ export default async function AuditPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
+              {events.length === 0 && (
+                <tr className="bg-surface-elevated">
+                  <td colSpan={4} className="px-4 py-16 text-center text-sm text-text-muted">
+                    No audit events yet. Operator and agent actions will appear here.
+                  </td>
+                </tr>
+              )}
               {events.map(e => (
                 <tr key={e.id} className="bg-surface-elevated hover:bg-muted transition-colors">
                   <td className="px-4 py-3 text-text-muted whitespace-nowrap">
