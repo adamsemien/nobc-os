@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
+import type { Persona, PersonaStep } from '@/lib/dev/persona-types';
 
 const ALLOWED_IDS = (process.env.NEXT_PUBLIC_DEV_USER_IDS ?? '')
   .split(',')
@@ -71,6 +72,25 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
   const [seededAt, setSeededAt] = useState<string | null>(null);
   const [seededEvents, setSeededEvents] = useState<SeededEvent[]>([]);
 
+  // AI QA Runner state
+  const [scenario, setScenario] = useState('');
+  const [selectedSteps, setSelectedSteps] = useState<Record<PersonaStep, boolean>>({
+    apply: true,
+    auto_approve: true,
+    rsvp: true,
+    pay: false,
+    checkin: true,
+  });
+  const [persona, setPersona] = useState<Persona | null>(null);
+  const [runLog, setRunLog] = useState<string[]>([]);
+  const [running, setRunning] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [resultApplicationId, setResultApplicationId] = useState<string | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const stripeLive =
+    typeof process !== 'undefined' &&
+    (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '').startsWith('pk_live_');
+
   const isAllowed = isLoaded && !!user && ALLOWED_IDS.includes(user.id);
 
   useEffect(() => {
@@ -136,6 +156,105 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
       setStatus({ type: 'error', msg: err instanceof Error ? err.message : 'Unknown error' });
     } finally {
       setSeeding(false);
+    }
+  }
+
+  function appendLog(line: string) {
+    setRunLog((prev) => {
+      const next = [...prev, line];
+      requestAnimationFrame(() => {
+        if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+      });
+      return next;
+    });
+  }
+
+  async function handleGenerateAndRun() {
+    setRunning(true);
+    setRunLog([]);
+    setPersona(null);
+    setResultApplicationId(null);
+    appendLog('⏳ Generating persona…');
+    try {
+      const gen = await fetch('/api/dev/persona/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ scenario: scenario.trim() || undefined }),
+      });
+      if (!gen.ok) throw new Error(await gen.text());
+      const { persona: p } = (await gen.json()) as { persona: Persona };
+      setPersona(p);
+      appendLog(`✓ Persona: ${p.fullName} — ${p.archetype_lean}`);
+
+      const steps: PersonaStep[] = (Object.entries(selectedSteps) as Array<[PersonaStep, boolean]>)
+        .filter(([, on]) => on)
+        .map(([s]) => s);
+      if (!steps.length) {
+        appendLog('No steps selected — done.');
+        return;
+      }
+
+      appendLog(`▶ Running steps: ${steps.join(', ')}`);
+      const res = await fetch('/api/dev/persona/run', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ persona: p, steps }),
+      });
+      if (!res.ok || !res.body) throw new Error(`Run failed (${res.status})`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n\n');
+        buf = lines.pop() ?? '';
+        for (const block of lines) {
+          if (!block.startsWith('data:')) continue;
+          const json = block.slice(5).trim();
+          if (!json) continue;
+          try {
+            const ev = JSON.parse(json) as {
+              type: string;
+              step?: string;
+              message?: string;
+              data?: any;
+            };
+            if (ev.type === 'step.start') appendLog(`→ ${ev.step}`);
+            else if (ev.type === 'step.progress') appendLog(`   ${ev.message}`);
+            else if (ev.type === 'step.complete') appendLog(`✓ ${ev.step}`);
+            else if (ev.type === 'step.error') appendLog(`✗ ${ev.step}: ${ev.message}`);
+            else if (ev.type === 'run.complete') {
+              appendLog('— done.');
+              if (ev.data?.applicationId) setResultApplicationId(ev.data.applicationId);
+            } else if (ev.type === 'run.error') appendLog(`✗ ${ev.message}`);
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      appendLog(`✗ ${e.message ?? 'Failed'}`);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function handleSeed50() {
+    if (!window.confirm('Generate 50 AI personas as applications? This will use Claude credits.')) return;
+    setBatchRunning(true);
+    setRunLog((prev) => [...prev, '🌱 Seeding 50 personas — this may take ~3-5 minutes.']);
+    try {
+      const res = await fetch('/api/dev/persona/seed-batch', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Batch failed');
+      appendLog(
+        `✓ Created ${data.created} (${data.statusDistribution.pending}p · ${data.statusDistribution.hold}h · ${data.statusDistribution.approved}a · ${data.statusDistribution.rejected}r) in ${Math.round(data.totalMs / 1000)}s`,
+      );
+    } catch (e: any) {
+      appendLog(`✗ ${e.message}`);
+    } finally {
+      setBatchRunning(false);
     }
   }
 
@@ -289,6 +408,110 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
               >
                 {status.type === 'success' ? '✓ ' : '✗ '}{status.msg}
               </div>
+            )}
+          </div>
+
+          {/* AI QA Runner */}
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid #2d2438' }}>
+            <div style={{ color: '#5a4d6a', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+              AI QA Runner
+            </div>
+            <textarea
+              value={scenario}
+              onChange={(e) => setScenario(e.target.value)}
+              placeholder="Scenario (optional) — e.g. founder who just moved from NYC"
+              rows={2}
+              style={{
+                width: '100%',
+                background: '#231d2e',
+                border: '1px solid #3d3050',
+                borderRadius: 6,
+                color: '#e8e4f0',
+                fontSize: 11,
+                padding: '6px 8px',
+                fontFamily: 'monospace',
+                resize: 'vertical',
+                marginBottom: 8,
+              }}
+            />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+              {(['apply', 'auto_approve', 'rsvp', 'pay', 'checkin'] as PersonaStep[]).map((s) => {
+                const checked = selectedSteps[s];
+                const disabled = s === 'pay' && stripeLive;
+                return (
+                  <label
+                    key={s}
+                    title={disabled ? 'Switch Stripe to Test Mode' : undefined}
+                    style={{
+                      ...S.chip,
+                      background: checked ? '#3a2540' : '#231d2e',
+                      borderColor: checked ? '#B22E21' : '#3d3050',
+                      color: disabled ? '#5a4d6a' : '#c4b8d4',
+                      opacity: disabled ? 0.5 : 1,
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked && !disabled}
+                      disabled={disabled}
+                      onChange={(e) => setSelectedSteps((prev) => ({ ...prev, [s]: e.target.checked }))}
+                      style={{ marginRight: 4 }}
+                    />
+                    {s}
+                  </label>
+                );
+              })}
+            </div>
+            {stripeLive && (
+              <div style={{ color: '#f87171', fontSize: 9, marginBottom: 6 }}>
+                Stripe Live Mode detected — Pay step is disabled.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              <button onClick={handleGenerateAndRun} disabled={running || batchRunning} style={S.btn}>
+                {running ? '⏳' : '▶'} Generate & Run
+              </button>
+              <button onClick={handleSeed50} disabled={running || batchRunning} style={{ ...S.btn, background: '#2a1820', borderColor: '#5a3530', color: '#e8c4b4' }}>
+                {batchRunning ? '⏳' : '🌱'} Seed 50 personas (AI)
+              </button>
+            </div>
+            {persona && (
+              <div style={{ background: '#231d2e', border: '1px solid #3d3050', borderRadius: 6, padding: '6px 8px', marginBottom: 8, fontSize: 10 }}>
+                <div style={{ color: '#e8e4f0', fontWeight: 700 }}>{persona.fullName}</div>
+                <div style={{ color: '#c4b8d4' }}>
+                  {persona.archetype_lean} · {persona.neighborhood}
+                </div>
+              </div>
+            )}
+            {runLog.length > 0 && (
+              <div
+                ref={logRef}
+                style={{
+                  maxHeight: 160,
+                  overflowY: 'auto',
+                  background: '#0f0c14',
+                  border: '1px solid #2d2438',
+                  borderRadius: 6,
+                  padding: 6,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  color: '#c4b8d4',
+                  lineHeight: 1.4,
+                }}
+              >
+                {runLog.map((line, i) => (
+                  <div key={i}>{line}</div>
+                ))}
+              </div>
+            )}
+            {resultApplicationId && (
+              <a
+                href={`/operator/applications/${resultApplicationId}`}
+                style={{ ...S.chip, marginTop: 8, display: 'inline-block', background: '#2a1820', borderColor: '#5a2530', color: '#e8b4aa' }}
+              >
+                View persona →
+              </a>
             )}
           </div>
 
