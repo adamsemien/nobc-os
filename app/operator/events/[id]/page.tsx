@@ -9,6 +9,7 @@ import { EventCheckinTab } from './_components/EventCheckinTab';
 import { EventSettingsTab } from './_components/EventSettingsTab';
 import { CopyInviteLinkButton } from './_components/CopyInviteLinkButton';
 import { EventActionBar } from './_components/EventActionBar';
+import { LiveRsvpFeed } from './_components/LiveRsvpFeed';
 import { Breadcrumbs } from '@/app/operator/_components/PageHeader';
 import { getEventHeroDisplayUrl } from '@/lib/event-hero-url';
 
@@ -220,11 +221,19 @@ export default async function OperatorEventDetailPage({
         {/* Tab content */}
         {tab === 'overview' && <EventOverviewTab event={event} heroImageUrl={heroImageUrl} />}
         {tab === 'attendees' && (
-          <EventAttendeesTab
-            rsvps={rsvps}
-            eventId={id}
-            priceInCents={event.priceInCents}
-          />
+          <>
+            <div className="mb-6">
+              <LiveRsvpFeed
+                eventId={id}
+                enabled={event.status === 'PUBLISHED' && new Date(event.startAt).getTime() > Date.now()}
+              />
+            </div>
+            <EventAttendeesTab
+              rsvps={rsvps}
+              eventId={id}
+              priceInCents={event.priceInCents}
+            />
+          </>
         )}
         {tab === 'applications' && (
           <EventApplicationsTab applications={applications} eventId={id} />

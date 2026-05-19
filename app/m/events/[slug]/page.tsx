@@ -12,6 +12,12 @@ import {
 } from '@/lib/event-access';
 import { MemberWorkspaceGate } from '../_components/MemberWorkspaceGate';
 import { EventDetail, type EventDetailDTO } from './_components/EventDetail';
+import type { WorkflowPath } from '@/lib/workflows/types';
+
+function parseWorkflowPaths(value: unknown): WorkflowPath[] {
+  if (!Array.isArray(value)) return [];
+  return value as WorkflowPath[];
+}
 
 export default async function EventDetailPage({
   params,
@@ -33,13 +39,19 @@ export default async function EventDetailPage({
 
   const heroImageUrl = getEventHeroDisplayUrl(event.heroImageAssetId);
 
-  const [member, capacityUsedCount] = await Promise.all([
+  const [member, capacityUsedCount, workflow] = await Promise.all([
     db.member.findFirst({
       where: { workspaceId, clerkUserId: userId },
       select: { id: true, approved: true, status: true, memberQrCode: true },
     }),
     getCapacityUsedRsvpCount(event.id, workspaceId),
+    db.eventWorkflow.findUnique({
+      where: { eventId: event.id },
+      select: { paths: true },
+    }),
   ]);
+
+  const workflowPaths = parseWorkflowPaths(workflow?.paths);
 
   const existingRsvp = member
     ? await db.rSVP.findFirst({
@@ -141,6 +153,7 @@ export default async function EventDetailPage({
     // Member pages are org-gated, so any viewer who isn't an approved member
     // is an operator previewing the page.
     isOperator: viewer !== 'member',
+    workflowPaths,
   };
 
   return <EventDetail event={dto} />;

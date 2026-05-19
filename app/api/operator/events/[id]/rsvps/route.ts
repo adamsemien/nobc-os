@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { userId } = await auth();
@@ -13,6 +13,11 @@ export async function GET(
   const workspaceId = await requireWorkspaceId(userId);
   const { id } = await params;
 
+  const url = new URL(req.url);
+  const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get('limit') ?? '0', 10) || 0));
+  const order = url.searchParams.get('order') === 'desc' ? 'desc' : 'asc';
+
+  // Joining application by email lets us surface archetype for live-feed UI.
   const rsvps = await db.rSVP.findMany({
     where: { workspaceId, eventId: id },
     select: {
@@ -39,8 +44,26 @@ export async function GET(
         select: { firstName: true, lastName: true, email: true },
       },
     },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { createdAt: order },
+    ...(limit > 0 ? { take: limit } : {}),
   });
 
-  return NextResponse.json({ rsvps });
+  // Optional archetype enrichment (cheap email-keyed lookup).
+  const emails = Array.from(
+    new Set(rsvps.map((r) => r.member?.email ?? r.guestEmail).filter((e): e is string => !!e)),
+  );
+  const applications = emails.length
+    ? await db.application.findMany({
+        where: { workspaceId, email: { in: emails } },
+        select: { email: true, archetype: true },
+      })
+    : [];
+  const archetypeByEmail = new Map(applications.map((a) => [a.email.toLowerCase(), a.archetype]));
+
+  const enriched = rsvps.map((r) => {
+    const email = (r.member?.email ?? r.guestEmail ?? '').toLowerCase();
+    return { ...r, archetype: archetypeByEmail.get(email) ?? null };
+  });
+
+  return NextResponse.json({ rsvps: enriched });
 }

@@ -4,9 +4,11 @@ import { useState } from 'react';
 import type { EventAccess } from '@/lib/event-access-schema';
 import type { ResolvedAccess, ViewerKind, StepId } from '@/lib/event-access';
 import { resolveAccessForViewer, buildSteps } from '@/lib/event-access';
+import type { WorkflowPath } from '@/lib/workflows/types';
 import { TemplateEditorial } from './TemplateEditorial';
 import { TemplateSplit } from './TemplateSplit';
 import { TemplateMinimal } from './TemplateMinimal';
+import { WorkflowPathsCard } from './WorkflowPathsCard';
 
 export type TicketTierDTO = {
   id: string;
@@ -58,6 +60,7 @@ export type EventDetailDTO = {
   plusOneRsvp: { id: string; guestName: string; guestEmail: string } | null;
   template: 'editorial' | 'split' | 'minimal';
   isOperator: boolean;
+  workflowPaths?: WorkflowPath[];
 };
 
 type PreviewViewer = 'guest' | 'member';
@@ -77,9 +80,25 @@ function deriveForViewer(event: EventDetailDTO, viewer: PreviewViewer): EventDet
 }
 
 function renderTemplate(event: EventDetailDTO) {
-  if (event.template === 'split') return <TemplateSplit event={event} />;
-  if (event.template === 'minimal') return <TemplateMinimal event={event} />;
-  return <TemplateEditorial event={event} />;
+  const tpl =
+    event.template === 'split' ? (
+      <TemplateSplit event={event} />
+    ) : event.template === 'minimal' ? (
+      <TemplateMinimal event={event} />
+    ) : (
+      <TemplateEditorial event={event} />
+    );
+
+  if (!event.workflowPaths || event.workflowPaths.length === 0) return tpl;
+
+  return (
+    <>
+      {tpl}
+      <div className="mx-auto max-w-4xl px-5 sm:px-8 pb-10">
+        <WorkflowPathsCard paths={event.workflowPaths} />
+      </div>
+    </>
+  );
 }
 
 export function EventDetail({ event }: { event: EventDetailDTO }) {
