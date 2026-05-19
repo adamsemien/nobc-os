@@ -13,7 +13,7 @@ Branch: `feat/ticketing-v2-ui`
 | EventSeries CRUD API (`/api/operator/series`) | ✅ |
 | MCP tools — `ticketing.*` / `series.*` / `tag.*` | ✅ |
 | **Phase 3 — Tier manager UI in event builder** | ✅ |
-| **Phase 4 — Series tab on events page** | in progress |
+| **Phase 4 — Series tab on events page** | ✅ |
 
 ### Phase 3 — Tier manager UI
 
@@ -27,6 +27,23 @@ soft-closes ticket tiers for the event.
   `AuditEvent` (`ticket_tier.closed`) is written. (`TicketTier` has no `active`
   column; `manuallyClosed` is the soft-disable flag.)
 - Drag-reorder via `@dnd-kit/sortable`, optimistic updates with revert-on-error.
+
+### Phase 4 — Series tab
+
+`/operator/events` now has **Events** and **Series** tabs (`EventsPageTabs`) —
+Series is a tab beside the event list, not a separate route.
+
+- `SeriesPanel` lists EventSeries with the RRULE shown as human-readable text
+  (`rrule.toText()`), an instance count, and an active toggle.
+- Create-series form: name, description, RRULE (with a live human-readable
+  preview as you type), first occurrence, max instances.
+- Expanding a series lazy-loads and lists its generated Event instances
+  (title, scheduled date, status); a Generate action expands the RRULE.
+- Wired to `/api/operator/series` (GET/POST/PATCH, `/[id]` GET added for the
+  instance list, `/[id]/generate` POST).
+
+Both UI phases complete on `feat/ticketing-v2-ui`. `tsc --noEmit` and
+`next build` both clean.
 
 ## Database
 

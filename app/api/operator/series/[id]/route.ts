@@ -1,8 +1,32 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceId } from '@/lib/auth';
+import { db } from '@/lib/db';
 import { deleteEventSeries, updateEventSeries, SeriesError, seriesErrorStatus } from '@/lib/series';
 import { UpdateSeriesSchema, toUpdateSeriesInput } from '@/lib/series-schema';
+
+/** GET /api/operator/series/[id] — one series with its generated Event instances. */
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const workspaceId = await requireWorkspaceId(userId);
+  const { id } = await params;
+
+  const series = await db.eventSeries.findFirst({ where: { id, workspaceId } });
+  if (!series) return NextResponse.json({ error: 'Series not found' }, { status: 404 });
+
+  const instances = await db.event.findMany({
+    where: { workspaceId, seriesId: id },
+    orderBy: { startAt: 'asc' },
+    select: { id: true, slug: true, title: true, startAt: true, status: true, instanceNumber: true },
+  });
+
+  return NextResponse.json({ series, instances });
+}
 
 /** PATCH /api/operator/series/[id] — update a series. */
 export async function PATCH(

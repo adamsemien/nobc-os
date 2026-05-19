@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
-import { EmptyState } from '../_components/EmptyState';
-import { EventsTable } from './_components/EventsTable';
+import { EventsPageTabs, type EventRow, type SeriesRow } from './_components/EventsPageTabs';
 
 export default async function OperatorEventsPage() {
-  const res = await operatorServerFetch('/api/operator/events');
+  const [eventsRes, seriesRes] = await Promise.all([
+    operatorServerFetch('/api/operator/events'),
+    operatorServerFetch('/api/operator/series'),
+  ]);
 
-  if (!res.ok) {
+  if (!eventsRes.ok) {
     return (
       <div className="px-4 py-16 text-center text-sm text-text-secondary">
         Unable to load events.
@@ -14,19 +16,10 @@ export default async function OperatorEventsPage() {
     );
   }
 
-  const { events } = (await res.json()) as { events: Array<{
-    id: string;
-    slug: string;
-    title: string;
-    startAt: string;
-    location: string | null;
-    status: string;
-    accessMode: string;
-    capacity: number | null;
-    priceInCents: number | null;
-    capacityUsed: number;
-    revenueCents: number;
-  }> };
+  const { events } = (await eventsRes.json()) as { events: EventRow[] };
+  const series: SeriesRow[] = seriesRes.ok
+    ? ((await seriesRes.json()) as { series: SeriesRow[] }).series
+    : [];
 
   return (
     <div className="px-6 pb-16 pt-8 lg:px-10">
@@ -43,15 +36,7 @@ export default async function OperatorEventsPage() {
           </Link>
         </div>
 
-        {events.length === 0 ? (
-          <EmptyState
-            icon="event"
-            title="Nothing here yet."
-            action={{ label: 'Create your first event →', href: '/operator/events/new' }}
-          />
-        ) : (
-          <EventsTable events={events} />
-        )}
+        <EventsPageTabs events={events} series={series} />
       </div>
     </div>
   );
