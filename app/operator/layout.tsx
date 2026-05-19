@@ -9,6 +9,8 @@ import { MyspaceEasterEgg } from './_components/MyspaceEasterEgg';
 import { CommandPaletteProvider } from '@/components/command-palette/CommandPaletteProvider';
 import { CommandKPill } from '@/components/command-palette/CommandKPill';
 import { DevToolbar } from './_components/DevToolbar';
+import { HelpPanel } from './_components/HelpPanel';
+import { OnboardingTour } from './_components/OnboardingTour';
 
 export default async function OperatorLayout({
   children,
@@ -19,7 +21,8 @@ export default async function OperatorLayout({
   const workspaceId = (await getMemberWorkspaceId(userId)) ?? '';
 
   // Events feed the Cmd+K palette — workspace-scoped, soonest first.
-  const [eventsRaw, pendingApplicationCount] = await Promise.all([
+  // Member count feeds the onboarding-tour empty-state check.
+  const [eventsRaw, pendingApplicationCount, memberCount] = await Promise.all([
     workspaceId
       ? db.event.findMany({
           where: { workspaceId },
@@ -29,6 +32,9 @@ export default async function OperatorLayout({
       : Promise.resolve([]),
     workspaceId
       ? db.application.count({ where: { workspaceId, status: 'PENDING' } })
+      : Promise.resolve(0),
+    workspaceId
+      ? db.member.count({ where: { workspaceId, status: 'APPROVED' } })
       : Promise.resolve(0),
   ]);
   const events = eventsRaw.map((e) => ({
@@ -52,6 +58,8 @@ export default async function OperatorLayout({
         <AimEasterEgg />
         <MyspaceEasterEgg />
         <CommandKPill />
+        <HelpPanel />
+        <OnboardingTour hasEvents={eventsRaw.length > 0} hasMembers={memberCount > 0} />
         <DevToolbar workspaceId={workspaceId} />
       </div>
     </CommandPaletteProvider>

@@ -1,7 +1,34 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, Eye } from 'lucide-react';
+import { ChevronDown, Eye, HelpCircle } from 'lucide-react';
+
+function HelpTipInline({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex items-center">
+      <button
+        type="button"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="text-text-muted"
+        aria-label="More info"
+      >
+        <HelpCircle className="h-3.5 w-3.5" />
+      </button>
+      {open ? (
+        <span
+          role="tooltip"
+          className="absolute left-1/2 top-full z-10 mt-1.5 w-56 -translate-x-1/2 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs leading-snug text-text-primary shadow-md"
+        >
+          {children}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 export type TemplateRow = {
   id: string;
@@ -156,6 +183,10 @@ function TemplateCard({ initial }: { initial: TemplateRow }) {
               className="h-4 w-4 rounded border-border accent-primary"
             />
             <span className="text-text-primary">Enabled</span>
+            <HelpTipInline>
+              When off, this template never sends — the platform skips it and writes an
+              email.skipped row to the audit log.
+            </HelpTipInline>
           </label>
 
           <Field label="Subject">

@@ -127,7 +127,8 @@ export default function ListsPage() {
           Lists
         </h1>
         <p className="mb-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Purple List auto-approves matching applicants. Blocked List auto-rejects them.
+          Purple flags VIPs and auto-approves matching applicants. Blocked flags people who should
+          never be approved — matching applications are auto-rejected at submit.
         </p>
 
         {/* Tabs */}

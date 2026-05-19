@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { PageHeader } from '../../_components/PageHeader';
 import { CommunicationsEditor, type TemplateRow, type SettingRow } from './_components/CommunicationsEditor';
+import { MemberFaqEditor } from './_components/MemberFaqEditor';
 
 export default async function CommunicationsPage() {
   const { userId } = await auth();
@@ -29,6 +30,9 @@ export default async function CommunicationsPage() {
           ]}
         />
         <CommunicationsEditor initialTemplates={templates} initialSettings={settings} />
+        <div className="mt-10">
+          <MemberFaqEditor />
+        </div>
       </div>
     </div>
   );

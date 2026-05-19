@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplateConfig, buildPathsFromTemplate } from '@/lib/workflows/templates';
 import { renderWorkflowSummary } from '@/lib/workflows/render';
 import type { WorkflowTemplateKey } from '@/lib/workflows/types';
+import { HelpTip } from '../../../_components/Tooltip';
 
 export type WorkflowSelection = {
   templateKey: WorkflowTemplateKey;
@@ -41,8 +42,12 @@ export function WorkflowSection({
   return (
     <div className={`space-y-5 ${chrome}`}>
       <div>
-        <h3 className="mb-1 text-[15px] font-semibold tracking-tight text-text-primary">
+        <h3 className="mb-1 flex items-center gap-1.5 text-[15px] font-semibold tracking-tight text-text-primary">
           Workflow
+          <HelpTip>
+            Open lets anyone RSVP. Members Only restricts to approved members. Apply or Pay
+            gives non-members two routes — apply for free or pay to skip the line.
+          </HelpTip>
         </h3>
         <p className="text-[13px] text-text-secondary">
           Pick how people get into this event. Custom workflows are coming soon.
@@ -131,7 +136,10 @@ function ConfigEditor({
               onChange={(c) => onChange({ amountCents: c })}
             />
           </Field>
-          <Field label="Approval required">
+          <Field
+            label="Approval required"
+            tip="When on, every application waits for an operator to approve or reject before becoming an RSVP. Off means anyone who applies is auto-confirmed."
+          >
             <Toggle
               checked={config.requiresApproval ?? true}
               onChange={(v) => onChange({ requiresApproval: v })}
@@ -183,11 +191,20 @@ function ConfigEditor({
   }
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  tip,
+  children,
+}: {
+  label: string;
+  tip?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-medium uppercase tracking-widest text-text-secondary">
+      <label className="mb-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-widest text-text-secondary">
         {label}
+        {tip ? <HelpTip>{tip}</HelpTip> : null}
       </label>
       {children}
     </div>
