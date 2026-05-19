@@ -49,6 +49,11 @@ model Workspace {
   generatedAssets      GeneratedAsset[]
   svixAppId            String?
   watchList            WatchList[]
+
+  // Operator-selected Claude model for AI features.
+  // Display preference + server fallback. CLAUDE.md still locks the application-scoring
+  // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
+  aiModel              String?
 }
 
 enum MemberStatus {

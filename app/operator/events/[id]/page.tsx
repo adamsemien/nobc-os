@@ -8,6 +8,8 @@ import { EventApplicationsTab } from './_components/EventApplicationsTab';
 import { EventCheckinTab } from './_components/EventCheckinTab';
 import { EventSettingsTab } from './_components/EventSettingsTab';
 import { CopyInviteLinkButton } from './_components/CopyInviteLinkButton';
+import { EventActionBar } from './_components/EventActionBar';
+import { Breadcrumbs } from '@/app/operator/_components/PageHeader';
 import { getEventHeroDisplayUrl } from '@/lib/event-hero-url';
 
 const PRODUCER_URL = process.env.NEXT_PUBLIC_PRODUCER_URL ?? null;
@@ -162,15 +164,15 @@ export default async function OperatorEventDetailPage({
   return (
     <div className="px-6 pb-20 pt-8 lg:px-10">
       <div className="mx-auto w-full max-w-[1280px]">
-        {/* Header */}
-        <div className="mb-2 flex items-center justify-between gap-4">
-          <Link
-            href="/operator/events"
-            className="text-sm text-primary underline-offset-4 hover:underline"
-          >
-            ← All events
-          </Link>
-        </div>
+        <Breadcrumbs
+          items={[
+            { href: '/operator/events', label: 'Events' },
+            { label: event.title },
+          ]}
+        />
+
+        {/* Persistent action bar — visible without scrolling */}
+        <EventActionBar eventId={id} slug={event.slug} status={event.status} />
 
         <h1
           className="mb-1 text-3xl font-normal text-text-primary"
@@ -189,7 +191,7 @@ export default async function OperatorEventDetailPage({
           </span>
         </p>
 
-        {/* Action bar */}
+        {/* Secondary actions */}
         <div className="mb-8 flex flex-wrap items-center gap-2">
           <CopyInviteLinkButton slug={event.slug} />
           <a
@@ -208,12 +210,6 @@ export default async function OperatorEventDetailPage({
           >
             Open in Producer →
           </a>
-          <Link
-            href={`/operator/events/${id}/room`}
-            className="inline-flex items-center gap-1.5 rounded-sm border border-primary bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:opacity-90"
-          >
-            The Room →
-          </Link>
         </div>
 
         {/* Tab nav */}

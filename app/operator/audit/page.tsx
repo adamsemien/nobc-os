@@ -48,10 +48,15 @@ export default async function AuditPage({
     <div className="px-6 pb-16 pt-8 lg:px-10">
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-[24px] font-semibold tracking-tight text-text-primary font-[family-name:var(--font-dm-sans)]">
-            Audit Log
-          </h1>
-          <span className="text-sm text-text-muted">{total.toLocaleString()} events</span>
+          <div>
+            <h1 className="text-[24px] font-semibold tracking-tight text-text-primary font-[family-name:var(--font-dm-sans)]">
+              Activity
+            </h1>
+            <p className="mt-1 text-sm text-text-secondary">
+              Everything that happened — operator decisions, member RSVPs, agent actions.
+            </p>
+          </div>
+          <span className="text-sm text-text-muted tabular-nums">{total.toLocaleString()} events</span>
         </div>
 
         <div className="overflow-hidden rounded-lg border border-border">

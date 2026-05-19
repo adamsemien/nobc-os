@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { formatDateTime } from '@/lib/operator-application-display';
+import { Breadcrumbs } from '@/app/operator/_components/PageHeader';
 import {
   ApplicationDecisionBar,
   ConsentReadOnlyRow,
@@ -71,13 +72,12 @@ export default async function OperatorApplicationDetailPage({
   return (
     <div className="px-4 pb-52 pt-8 sm:px-6">
       <div className="mx-auto max-w-6xl">
-        <Link
-          href="/operator/applications"
-          className="mb-6 inline-block text-sm underline-offset-4 hover:underline"
-          style={{ color: 'var(--primary)' }}
-        >
-          ← All applications
-        </Link>
+        <Breadcrumbs
+          items={[
+            { href: '/operator/applications', label: 'Applications' },
+            { label: app.fullName },
+          ]}
+        />
 
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
           <section className="space-y-6">
