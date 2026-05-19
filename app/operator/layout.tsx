@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { OperatorNav } from './operator-nav';
-import { AiChatPanel } from './_components/AiChatPanel';
+import { AgentPanel } from './_components/AgentPanel';
 import { ObsidianIdleEgg } from './_components/ObsidianIdleEgg';
 import { AimEasterEgg } from './_components/AimEasterEgg';
 import { MyspaceEasterEgg } from './_components/MyspaceEasterEgg';
@@ -42,7 +42,8 @@ export default async function OperatorLayout({
       >
         <OperatorNav />
         <main className="flex min-h-screen min-w-0 flex-1 flex-col">{children}</main>
-        <AiChatPanel />
+        {/* Cmd+K is owned by CommandPaletteProvider — AgentPanel binds Cmd+Shift+A. */}
+        <AgentPanel />
         <ObsidianIdleEgg />
         <AimEasterEgg />
         <MyspaceEasterEgg />
