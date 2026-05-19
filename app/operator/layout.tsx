@@ -8,6 +8,7 @@ import { AimEasterEgg } from './_components/AimEasterEgg';
 import { MyspaceEasterEgg } from './_components/MyspaceEasterEgg';
 import { CommandPaletteProvider } from '@/components/command-palette/CommandPaletteProvider';
 import { CommandKPill } from '@/components/command-palette/CommandKPill';
+import { DevToolbar } from './_components/DevToolbar';
 
 export default async function OperatorLayout({
   children,
@@ -46,6 +47,7 @@ export default async function OperatorLayout({
         <AimEasterEgg />
         <MyspaceEasterEgg />
         <CommandKPill />
+        <DevToolbar workspaceId={workspaceId} />
       </div>
     </CommandPaletteProvider>
   );
