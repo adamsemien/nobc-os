@@ -1364,3 +1364,699 @@ button:not(:disabled):active,
 .metric-flash {
   animation: metric-flash 2.4s ease-out;
 }
+
+/* ── Y2K: custom property for rainbow hue animation (top-level, @property required) ── */
+@property --y2k-hue {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
+/* ── Y2K: keyframes ── */
+@keyframes y2k-hue-spin {
+  from { --y2k-hue: 0; }
+  to   { --y2k-hue: 360; }
+}
+@keyframes y2k-sparkle {
+  0%, 100% { transform: scale(1);    opacity: 1;   }
+  50%       { transform: scale(1.05); opacity: 0.8; }
+}
+@keyframes y2k-marquee {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(-100%); }
+}
+
+/* ============================================================
+   THEME: Y2K — beta 0.99
+   Xanga + LiveJournal + AIM, circa 1998–2002.
+   Hot pink, beveled chrome, Comic Sans, royal blue links.
+   Hex literals are permitted ONLY in this theme block.
+   ============================================================ */
+[data-theme="y2k"] {
+  /* Layout / surface */
+  --bg: #FFE0F0;
+  --surface: #FFFFFF;
+  --raised: #FFF0F8;
+  --card: #FFFFFF;
+  --sidebar: #FFD6EC;
+  --sidebar-active-bg: rgba(255, 20, 147, 0.1);
+  --border: #FF1493;
+  --border-strong: #FF1493;
+
+  /* Typography */
+  --text-primary: #1A1A1A;
+  --text-secondary: #663399;
+  --text-tertiary: #999999;
+
+  /* Brand */
+  --primary: #0066CC;
+  --primary-hover: #3399FF;
+  --primary-soft: rgba(0, 102, 204, 0.12);
+  --accent: #FF1493;
+  --accent-hover: #FF69B4;
+  --accent-soft: rgba(255, 20, 147, 0.1);
+  --on-primary: #FFFFFF;
+
+  /* Status */
+  --success: #00CC00;
+  --success-soft: rgba(0, 204, 0, 0.15);
+  --warning: #FFCC00;
+  --warning-soft: rgba(255, 204, 0, 0.15);
+  --danger: #CC0000;
+  --danger-soft: rgba(204, 0, 0, 0.12);
+  --neutral-soft: rgba(102, 51, 153, 0.08);
+
+  /* Shape + shadow */
+  --radius-base: 4px;
+  --card-shadow: 4px 4px 0 #FF1493;
+  --card-shadow-hover: 6px 6px 0 #FF1493;
+  --sidebar-shadow: inset -1px 0 0 #FF1493;
+  --page-bg: repeating-linear-gradient(
+    45deg,
+    rgba(255, 20, 147, 0.03) 0px,
+    rgba(255, 20, 147, 0.03) 1px,
+    transparent 1px,
+    transparent 8px
+  ), #FFE0F0;
+
+  /* Fonts — all system fonts, no loading required */
+  --font-display: "Lucida Handwriting", "Brush Script MT", "Comic Sans MS", cursive;
+  --font-body: "Comic Sans MS", "Trebuchet MS", Tahoma, sans-serif;
+  --font-ui: "Comic Sans MS", "Trebuchet MS", Tahoma, sans-serif;
+  --font-mono: "Courier New", monospace;
+
+  /* Legacy operator aliases */
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--surface);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+
+  /* Operator AI recommendation + action badges */
+  --op-rec-strong-yes-bg: rgba(0, 160, 0, 0.18);
+  --op-rec-strong-yes-fg: #005500;
+  --op-rec-yes-bg: rgba(0, 204, 0, 0.1);
+  --op-rec-yes-fg: #006600;
+  --op-rec-unclear-bg: rgba(255, 204, 0, 0.18);
+  --op-rec-unclear-fg: #886600;
+  --op-rec-no-bg: rgba(204, 0, 0, 0.1);
+  --op-rec-no-fg: #880000;
+  --op-rec-strong-no-bg: rgba(204, 0, 0, 0.22);
+  --op-rec-strong-no-fg: #660000;
+  --op-approve: #009900;
+  --op-approve-hover: #007700;
+  --op-approve-fg: #FFFFFF;
+  --op-reject: rgba(204, 0, 0, 0.15);
+  --op-reject-hover: rgba(204, 0, 0, 0.25);
+  --op-reject-fg: #880000;
+}
+
+/* Card border */
+[data-theme="y2k"] .op-card {
+  border: 2px solid #FF1493;
+}
+
+/* Headings — 1px offset hot-pink text-shadow */
+[data-theme="y2k"] h1,
+[data-theme="y2k"] h2 {
+  text-shadow: 1px 1px 0 #FF1493;
+}
+
+/* Links — always underlined; royal blue / purple visited / pink hover */
+[data-theme="y2k"] a {
+  color: #0000EE;
+  text-decoration: underline;
+}
+[data-theme="y2k"] a:visited {
+  color: #551A8B;
+}
+[data-theme="y2k"] a:hover {
+  color: #FF1493;
+}
+
+/* Beveled buttons — Windows 98 chrome.
+   Border directions: top/left highlight, bottom/right shadow.
+   Active press inverts the bevel and shifts 2px. */
+[data-theme="y2k"] button:not(:disabled),
+[data-theme="y2k"] [role="button"]:not([aria-disabled="true"]) {
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: rgba(255,255,255,0.85) rgba(0,0,0,0.4) rgba(0,0,0,0.4) rgba(255,255,255,0.85) !important;
+  box-shadow:
+    inset  1px  1px 0 rgba(255,255,255,0.6),
+    inset -1px -1px 0 rgba(0,0,0,0.15),
+    4px 4px 0 rgba(255, 20, 147, 0.25) !important;
+  font-family: "Comic Sans MS", "Trebuchet MS", Tahoma, sans-serif !important;
+  border-radius: 2px !important;
+  transition: none !important;
+}
+[data-theme="y2k"] button:not(:disabled):active,
+[data-theme="y2k"] [role="button"]:not([aria-disabled="true"]):active {
+  border-color: rgba(0,0,0,0.4) rgba(255,255,255,0.85) rgba(255,255,255,0.85) rgba(0,0,0,0.4) !important;
+  box-shadow:
+    inset -1px -1px 0 rgba(255,255,255,0.6),
+    inset  1px  1px 0 rgba(0,0,0,0.15) !important;
+  transform: translate(2px, 2px) !important;
+}
+
+/* Disable the shimmer sweep in y2k — rainbow outline takes its place */
+[data-theme="y2k"] .btn-shimmer::after {
+  display: none;
+}
+
+/* Rainbow conic-gradient border on .btn-shimmer (primary action buttons).
+   Uses @property --y2k-hue to interpolate hsl() smoothly across 360°.
+   Gated by prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="y2k"] .btn-shimmer {
+    outline: 3px solid hsl(var(--y2k-hue), 100%, 50%);
+    outline-offset: 3px;
+    animation: y2k-hue-spin 8s linear infinite;
+  }
+}
+
+/* Application list card — score badge hidden, bar shown */
+[data-theme="y2k"] .obs-score-badge { display: none; }
+[data-theme="y2k"] .obs-score-bar   { display: block; }
+
+/* Application list card — active selection: pink left border */
+[data-theme="y2k"] .obs-app-button.obs-app-active {
+  background: #FFF0F8 !important;
+  border-left: 3px solid #FF1493 !important;
+}
+
+/* Selected / active states — lime green glow at ~30% opacity */
+[data-theme="y2k"] [aria-current="true"],
+[data-theme="y2k"] [aria-selected="true"] {
+  box-shadow: 0 0 0 3px rgba(0, 255, 0, 0.3) !important;
+}
+
+/* Alternating table rows — pale pink / white */
+[data-theme="y2k"] table tr:nth-child(even) { background-color: #FFE0F0; }
+[data-theme="y2k"] table tr:nth-child(odd)  { background-color: #FFFFFF; }
+
+/* y2k-sparkle — opt-in "NEW!" badge pulse; apply class to activate */
+[data-theme="y2k"] .y2k-sparkle {
+  animation: y2k-sparkle 1.5s ease-in-out infinite;
+}
+
+/* y2k-marquee — opt-in CSS-only horizontal scroll; apply class to activate */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="y2k"] .y2k-marquee {
+    display: inline-block;
+    white-space: nowrap;
+    animation: y2k-marquee 20s linear infinite;
+  }
+}
+
+/* ============================================================
+   THEME: AIM — You've Got Mail
+   AOL Instant Messenger, circa 2001–2003.
+   Windows 98 chrome, buddy list panels, Tahoma, AOL gold.
+   Hex literals permitted only in this theme block.
+   ============================================================ */
+
+/* ── AIM: keyframes ── */
+@keyframes aim-blink-status {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+@keyframes aim-titlebar-shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+[data-theme="aim"] {
+  /* Layout / surface — classic Windows grey */
+  --bg: #D4D0C8;
+  --surface: #ECE9D8;
+  --raised: #FFFFFF;
+  --card: #FFFFFF;
+  --sidebar: #D4D0C8;
+  --sidebar-active-bg: rgba(0, 36, 106, 0.12);
+  --border: #808080;
+  --border-strong: #404040;
+
+  /* Typography */
+  --text-primary: #000000;
+  --text-secondary: #0A246A;
+  --text-tertiary: #666666;
+
+  /* Brand — AOL gold + Windows deep blue */
+  --primary: #0A246A;
+  --primary-hover: #1A3A9A;
+  --primary-soft: rgba(10, 36, 106, 0.12);
+  --accent: #FFB900;
+  --accent-hover: #FFA500;
+  --accent-soft: rgba(255, 185, 0, 0.15);
+  --on-primary: #FFFFFF;
+
+  /* Status */
+  --success: #00AA00;
+  --success-soft: rgba(0, 170, 0, 0.15);
+  --warning: #FFB900;
+  --warning-soft: rgba(255, 185, 0, 0.15);
+  --danger: #CC0000;
+  --danger-soft: rgba(204, 0, 0, 0.12);
+  --neutral-soft: rgba(0, 0, 0, 0.08);
+
+  /* Shape + shadow — Win98 inset bevel */
+  --radius-base: 2px;
+  --card-shadow:
+    inset  1px  1px 0 #FFFFFF,
+    inset -1px -1px 0 #808080,
+    inset  2px  2px 0 #D4D0C8,
+    inset -2px -2px 0 #404040;
+  --card-shadow-hover: var(--card-shadow);
+  --sidebar-shadow: inset -1px 0 0 #808080;
+  --page-bg: #D4D0C8;
+
+  /* Fonts — Tahoma / system-ui, the AIM font */
+  --font-display: Tahoma, "MS Sans Serif", system-ui, sans-serif;
+  --font-body: Tahoma, "MS Sans Serif", system-ui, sans-serif;
+  --font-ui: Tahoma, "MS Sans Serif", system-ui, sans-serif;
+  --font-mono: "Courier New", monospace;
+
+  /* Legacy operator aliases */
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--surface);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+
+  /* Operator AI recommendation badges */
+  --op-rec-strong-yes-bg: rgba(0, 140, 0, 0.18);
+  --op-rec-strong-yes-fg: #004400;
+  --op-rec-yes-bg: rgba(0, 170, 0, 0.12);
+  --op-rec-yes-fg: #005500;
+  --op-rec-unclear-bg: rgba(255, 185, 0, 0.18);
+  --op-rec-unclear-fg: #664400;
+  --op-rec-no-bg: rgba(204, 0, 0, 0.1);
+  --op-rec-no-fg: #880000;
+  --op-rec-strong-no-bg: rgba(204, 0, 0, 0.22);
+  --op-rec-strong-no-fg: #660000;
+  --op-approve: #006600;
+  --op-approve-hover: #004400;
+  --op-approve-fg: #FFFFFF;
+  --op-reject: rgba(204, 0, 0, 0.15);
+  --op-reject-hover: rgba(204, 0, 0, 0.25);
+  --op-reject-fg: #880000;
+}
+
+/* Cards — raised bevel panel (Win98 raised element) */
+[data-theme="aim"] .op-card {
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: #FFFFFF #808080 #808080 #FFFFFF !important;
+  box-shadow:
+    inset  1px  1px 0 #D4D0C8,
+    inset -1px -1px 0 #404040 !important;
+  border-radius: 0 !important;
+}
+
+/* Title bar — Win98 deep blue gradient */
+[data-theme="aim"] h1,
+[data-theme="aim"] h2 {
+  background: linear-gradient(to right, #0A246A, #A6CAF0);
+  color: #FFFFFF !important;
+  padding: 3px 6px;
+  font-size: 12px !important;
+  font-weight: bold;
+  letter-spacing: 0;
+  text-shadow: none !important;
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+/* Beveled buttons — Win98 raised chrome */
+[data-theme="aim"] button:not(:disabled),
+[data-theme="aim"] [role="button"]:not([aria-disabled="true"]) {
+  background: #D4D0C8 !important;
+  font-family: Tahoma, system-ui, sans-serif !important;
+  font-size: 11px !important;
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: #FFFFFF #808080 #808080 #FFFFFF !important;
+  box-shadow:
+    inset  1px  1px 0 #E8E4DC,
+    inset -1px -1px 0 #606060 !important;
+  border-radius: 0 !important;
+  padding: 3px 8px !important;
+  transition: none !important;
+  color: #000000 !important;
+}
+[data-theme="aim"] button:not(:disabled):active,
+[data-theme="aim"] [role="button"]:not([aria-disabled="true"]):active {
+  border-color: #808080 #FFFFFF #FFFFFF #808080 !important;
+  box-shadow:
+    inset  1px  1px 0 #606060,
+    inset -1px -1px 0 #E8E4DC !important;
+  transform: translate(1px, 1px) !important;
+}
+
+/* Buddy list inner panel — white inset */
+[data-theme="aim"] .aim-buddy-panel {
+  background: #FFFFFF;
+  border: 2px solid;
+  border-color: #808080 #FFFFFF #FFFFFF #808080;
+  box-shadow: inset 1px 1px 0 #404040;
+  padding: 4px;
+  font-size: 12px;
+  font-family: Tahoma, system-ui, sans-serif;
+}
+
+/* Online dot — approved members. Applied to any .member-approved element */
+[data-theme="aim"] .member-approved::before,
+[data-theme="aim"] [data-member-status="approved"]::before {
+  content: '●';
+  color: #00AA00;
+  font-size: 10px;
+  margin-right: 4px;
+  display: inline-block;
+  animation: aim-blink-status 2s ease-in-out infinite;
+}
+
+/* Links */
+[data-theme="aim"] a { color: #0A246A; text-decoration: underline; }
+[data-theme="aim"] a:visited { color: #551A8B; }
+[data-theme="aim"] a:hover { color: #FFB900; }
+
+/* Table rows — buddy list style */
+[data-theme="aim"] table tr:nth-child(even) { background-color: #F0EEE8; }
+[data-theme="aim"] table tr:nth-child(odd)  { background-color: #FFFFFF; }
+
+/* Sidebar — grey panel feel */
+[data-theme="aim"] nav, [data-theme="aim"] aside {
+  background: #D4D0C8;
+  border-right: 2px solid;
+  border-color: #FFFFFF #808080 #808080 #FFFFFF;
+}
+
+/* Away message banner */
+.aim-away-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: linear-gradient(to right, #0A246A, #A6CAF0);
+  color: #FFFFFF;
+  font-family: Tahoma, system-ui, sans-serif;
+  font-size: 12px;
+  border-bottom: 2px solid #404040;
+}
+.aim-away-icon { font-size: 14px; }
+.aim-away-text { flex: 1; }
+.aim-away-close {
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,0.4) !important;
+  color: #FFFFFF !important;
+  font-size: 10px !important;
+  padding: 1px 4px !important;
+  cursor: pointer;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.aim-away-close:hover { background: rgba(255,255,255,0.2) !important; }
+
+/* Running man + sound toggle corner widget */
+.aim-corner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+.aim-running-man {
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #0A246A;
+  margin: 0;
+  text-align: left;
+  white-space: pre;
+  user-select: none;
+}
+.aim-sound-toggle {
+  font-size: 14px;
+  background: #D4D0C8 !important;
+  border: 2px solid !important;
+  border-color: #FFFFFF #808080 #808080 #FFFFFF !important;
+  border-radius: 0 !important;
+  padding: 2px 4px !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
+/* ============================================================
+   THEME: MySpace — Top 8
+   Custom profiles, glitter text, auto-play, 2005–2008.
+   Hex literals permitted only in this theme block.
+   ============================================================ */
+
+/* ── MySpace: keyframes ── */
+@keyframes ms-glitter {
+  0%   { color: #FF69B4; text-shadow: 0 0 8px #FF69B4, 0 0 16px #FF69B4; }
+  25%  { color: #00BFFF; text-shadow: 0 0 8px #00BFFF, 0 0 16px #00BFFF; }
+  50%  { color: #FFD700; text-shadow: 0 0 8px #FFD700, 0 0 16px #FFD700; }
+  75%  { color: #FF4500; text-shadow: 0 0 8px #FF4500, 0 0 16px #FF4500; }
+  100% { color: #FF69B4; text-shadow: 0 0 8px #FF69B4, 0 0 16px #FF69B4; }
+}
+@keyframes ms-blinkie-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(1.05); }
+}
+@keyframes ms-bg-drift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 60px 60px; }
+}
+
+[data-theme="myspace"] {
+  /* Layout — deep dark purple/black */
+  --bg: #0D0010;
+  --surface: #1A0020;
+  --raised: #220030;
+  --card: #1A0020;
+  --sidebar: #120018;
+  --sidebar-active-bg: rgba(255, 105, 180, 0.15);
+  --border: #FF69B4;
+  --border-strong: #00BFFF;
+
+  /* Typography */
+  --text-primary: #FFFFFF;
+  --text-secondary: #FF69B4;
+  --text-tertiary: #00BFFF;
+
+  /* Brand — hot pink + electric blue */
+  --primary: #FF69B4;
+  --primary-hover: #FF1493;
+  --primary-soft: rgba(255, 105, 180, 0.15);
+  --accent: #00BFFF;
+  --accent-hover: #0099CC;
+  --accent-soft: rgba(0, 191, 255, 0.15);
+  --on-primary: #FFFFFF;
+
+  /* Status */
+  --success: #00FF7F;
+  --success-soft: rgba(0, 255, 127, 0.15);
+  --warning: #FFD700;
+  --warning-soft: rgba(255, 215, 0, 0.15);
+  --danger: #FF4500;
+  --danger-soft: rgba(255, 69, 0, 0.15);
+  --neutral-soft: rgba(255, 105, 180, 0.08);
+
+  /* Shape + shadow — profile box glow */
+  --radius-base: 4px;
+  --card-shadow: 0 0 12px rgba(255, 105, 180, 0.4), inset 0 0 8px rgba(0, 191, 255, 0.1);
+  --card-shadow-hover: 0 0 20px rgba(255, 105, 180, 0.7), inset 0 0 12px rgba(0, 191, 255, 0.2);
+  --sidebar-shadow: inset -1px 0 0 #FF69B4;
+
+  /* CSS-only repeating diamond pattern (no images) */
+  --page-bg: repeating-conic-gradient(
+    rgba(255, 105, 180, 0.04) 0deg 90deg,
+    rgba(0, 191, 255, 0.03) 90deg 180deg
+  ) 0 0 / 30px 30px,
+  linear-gradient(135deg, #0D0010 0%, #150022 50%, #0D0010 100%);
+
+  /* Fonts — Comic Sans, truly */
+  --font-display: "Comic Sans MS", "Comic Sans", cursive;
+  --font-body: "Comic Sans MS", "Comic Sans", cursive;
+  --font-ui: "Comic Sans MS", "Comic Sans", cursive;
+  --font-mono: "Courier New", monospace;
+
+  /* Legacy aliases */
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--surface);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+
+  /* Recommendation badges */
+  --op-rec-strong-yes-bg: rgba(0, 255, 127, 0.18);
+  --op-rec-strong-yes-fg: #00FF7F;
+  --op-rec-yes-bg: rgba(0, 255, 127, 0.1);
+  --op-rec-yes-fg: #00CC66;
+  --op-rec-unclear-bg: rgba(255, 215, 0, 0.18);
+  --op-rec-unclear-fg: #FFD700;
+  --op-rec-no-bg: rgba(255, 69, 0, 0.1);
+  --op-rec-no-fg: #FF4500;
+  --op-rec-strong-no-bg: rgba(255, 69, 0, 0.22);
+  --op-rec-strong-no-fg: #FF2200;
+  --op-approve: #00FF7F;
+  --op-approve-hover: #00CC66;
+  --op-approve-fg: #000000;
+  --op-reject: rgba(255, 69, 0, 0.15);
+  --op-reject-hover: rgba(255, 69, 0, 0.25);
+  --op-reject-fg: #FF4500;
+}
+
+/* Animated background drift */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="myspace"] body,
+  [data-theme="myspace"] .operator-scope {
+    animation: ms-bg-drift 8s linear infinite;
+  }
+}
+
+/* Cards — profile box style */
+[data-theme="myspace"] .op-card {
+  border: 2px solid #FF69B4 !important;
+  box-shadow: 0 0 12px rgba(255, 105, 180, 0.4), inset 0 0 6px rgba(0, 191, 255, 0.08) !important;
+  background: rgba(26, 0, 32, 0.9) !important;
+}
+
+/* Glitter headings */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="myspace"] h1,
+  [data-theme="myspace"] h2 {
+    animation: ms-glitter 3s ease-in-out infinite;
+    font-family: "Comic Sans MS", cursive !important;
+    font-weight: bold;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="myspace"] h1,
+  [data-theme="myspace"] h2 {
+    color: #FF69B4;
+    text-shadow: 0 0 8px #FF69B4;
+    font-family: "Comic Sans MS", cursive !important;
+    font-weight: bold;
+  }
+}
+
+/* Links */
+[data-theme="myspace"] a { color: #00BFFF; text-decoration: underline; }
+[data-theme="myspace"] a:visited { color: #9932CC; }
+[data-theme="myspace"] a:hover { color: #FF69B4; }
+
+/* Buttons — MySpace red "Edit Profile" style */
+[data-theme="myspace"] button:not(:disabled),
+[data-theme="myspace"] [role="button"]:not([aria-disabled="true"]) {
+  background: #CC0033 !important;
+  color: #FFFFFF !important;
+  font-family: "Comic Sans MS", cursive !important;
+  font-size: 12px !important;
+  border: 1px solid #FF69B4 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 0 6px rgba(255, 105, 180, 0.3) !important;
+  transition: none !important;
+}
+[data-theme="myspace"] button:not(:disabled):hover,
+[data-theme="myspace"] [role="button"]:not([aria-disabled="true"]):hover {
+  background: #990022 !important;
+  box-shadow: 0 0 10px rgba(255, 105, 180, 0.6) !important;
+}
+
+/* Top 8 — first 8 members in any list get a faint gold crown */
+[data-theme="myspace"] .member-row:nth-child(-n+8)::before,
+[data-theme="myspace"] .op-member-row:nth-child(-n+8)::before,
+[data-theme="myspace"] tbody tr:nth-child(-n+8) td:first-child::before {
+  content: '👑';
+  font-size: 10px;
+  margin-right: 4px;
+  opacity: 0.55;
+  display: inline;
+}
+
+/* Table rows */
+[data-theme="myspace"] table tr:nth-child(even) { background-color: rgba(255, 105, 180, 0.06); }
+[data-theme="myspace"] table tr:nth-child(odd)  { background-color: transparent; }
+
+/* Now playing banner */
+.ms-now-playing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 16px;
+  background: linear-gradient(to right, #1A0020, #0D0033);
+  border-bottom: 1px solid #FF69B4;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 12px;
+  color: #FF69B4;
+}
+.ms-now-playing-text { flex: 1; }
+.ms-now-playing-close {
+  background: transparent !important;
+  border: 1px solid #FF69B4 !important;
+  color: #FF69B4 !important;
+  font-size: 10px !important;
+  padding: 1px 5px !important;
+  cursor: pointer;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+.ms-now-playing-close:hover { background: rgba(255,105,180,0.15) !important; }
+
+/* Bottom bar: blinkies + view counter */
+.ms-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 16px;
+  background: linear-gradient(to right, #0D0010, #1A0020, #0D0010);
+  border-top: 1px solid #FF69B4;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 11px;
+}
+.ms-blinkies {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ms-blinkie {
+    padding: 2px 6px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    font-size: 10px;
+    animation: ms-blinkie-pulse 1.5s ease-in-out infinite;
+    cursor: default;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms-blinkie {
+    padding: 2px 6px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    font-size: 10px;
+  }
+}
+.ms-blinkie:nth-child(1) { color: #FF69B4; animation-delay: 0s; }
+.ms-blinkie:nth-child(2) { color: #00BFFF; animation-delay: 0.25s; }
+.ms-blinkie:nth-child(3) { color: #FFD700; animation-delay: 0.5s; }
+.ms-blinkie:nth-child(4) { color: #9932CC; animation-delay: 0.75s; }
+.ms-blinkie:nth-child(5) { color: #00FF7F; animation-delay: 1.0s; }
+.ms-blinkie:nth-child(6) { color: #FF69B4; animation-delay: 1.25s; }
+.ms-view-counter { color: #00BFFF; font-size: 11px; white-space: nowrap; }

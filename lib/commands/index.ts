@@ -9,6 +9,9 @@ import './theme/switch-rose';
 import './theme/switch-parchment';
 import './theme/switch-void';
 import './theme/switch-ember';
+import './theme/switch-y2k';
+import './theme/switch-aim';
+import './theme/switch-myspace';
 
 import './navigation/go-to-applications';
 import './navigation/go-to-intelligence';

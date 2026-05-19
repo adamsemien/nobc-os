@@ -2,9 +2,52 @@
 
 _Last updated: 2026-05-19_
 
-## Active work — Ticketing V2
+## Active work — Easter Eggs
 
-Branch: `feat/ticketing-v2-ui`
+Branch: `feat/easter-eggs`
+
+| Theme | Trigger | Status |
+|-------|---------|--------|
+| Y2K — beta 0.99 | Cmd+K → `y2k` | ✅ |
+| AIM — You've Got Mail | Cmd+K → `aim` | ✅ |
+| MySpace — Top 8 | Cmd+K → `myspace` | ✅ |
+
+### AIM theme
+
+`[data-theme="aim"]` — AOL Instant Messenger circa 2001–2003.
+
+- Windows 98 grey background (`#D4D0C8`), raised/inset bevel on all panels and buttons
+- Title bars: deep blue → sky blue gradient (`#0A246A → #A6CAF0`) with white text
+- Accent: AOL gold (`#FFB900`)
+- Font: Tahoma / system-ui
+- Beveled buttons with Win98 border-color inset trick; active press shifts 1px
+- Running man ASCII art (bottom-right corner widget)
+- Away message banner (fixed top, dismissable): "Adam is away: building NoBC OS brb"
+- Sound toggle button (decorative 🔊/🔇)
+- Green online dot on `.member-approved` / `[data-member-status="approved"]` elements
+- Door creak on activate — synthesized via Web Audio API, no file imports; three oscillators (rumble sawtooth + sine squeak + modulator)
+- Toggle off: type `aim` again or switch to another theme
+
+### MySpace theme
+
+`[data-theme="myspace"]` — MySpace circa 2005–2008.
+
+- Deep black/purple background (`#0D0010`) with CSS-only repeating-conic diamond pattern
+- Hot pink (`#FF69B4`) + electric blue (`#00BFFF`) accents; Comic Sans everywhere
+- Glitter heading effect: `ms-glitter` keyframe cycles h1/h2 through pink → blue → gold → orange
+- Profile box cards: pink border + inner glow box-shadow
+- Buttons: MySpace red (`#CC0033`) with pink border glow
+- Top 8: first 8 rows in any member list get a faint 👑 via CSS `:nth-child(-n+8)` pseudo-element
+- "Currently listening to:" banner (fixed top, dismissable): Fall Out Boy — Sugar We're Goin Down
+- Blinkies row (fixed bottom): 6 animated badges in rotating colors with staggered `animation-delay`
+- Profile view counter: `1,337+` (random offset seeded on theme activation)
+- Toggle off: type `myspace` again or switch to another theme
+
+Both themes: `tsc --noEmit` clean, `next build` clean.
+
+## Previously completed — Ticketing V2
+
+Branch: `feat/ticketing-v2-ui` (merged to main)
 
 | Area | Status |
 |------|--------|
@@ -15,35 +58,12 @@ Branch: `feat/ticketing-v2-ui`
 | **Phase 3 — Tier manager UI in event builder** | ✅ |
 | **Phase 4 — Series tab on events page** | ✅ |
 
-### Phase 3 — Tier manager UI
+## Previously completed — V1 Item 4 audit fixes
 
-`TierManager` is mounted in the event Settings tab (`/operator/events/[id]`, Settings),
-below the event form. It lists, creates, inline-edits, drag-reorders, and
-soft-closes ticket tiers for the event.
+Branch: `feat/item-4-fixes` (merged to main)
 
-- Wired to `/api/operator/ticket-tiers` (GET/POST + `/[id]` PATCH/DELETE + `/reorder`).
-- Pricing uses both `memberPriceCents` and `nonMemberPriceCents` (entered as dollars).
-- Delete is a **soft close** — `manuallyClosed=true`, never a hard delete; an
-  `AuditEvent` (`ticket_tier.closed`) is written. (`TicketTier` has no `active`
-  column; `manuallyClosed` is the soft-disable flag.)
-- Drag-reorder via `@dnd-kit/sortable`, optimistic updates with revert-on-error.
-
-### Phase 4 — Series tab
-
-`/operator/events` now has **Events** and **Series** tabs (`EventsPageTabs`) —
-Series is a tab beside the event list, not a separate route.
-
-- `SeriesPanel` lists EventSeries with the RRULE shown as human-readable text
-  (`rrule.toText()`), an instance count, and an active toggle.
-- Create-series form: name, description, RRULE (with a live human-readable
-  preview as you type), first occurrence, max instances.
-- Expanding a series lazy-loads and lists its generated Event instances
-  (title, scheduled date, status); a Generate action expands the RRULE.
-- Wired to `/api/operator/series` (GET/POST/PATCH, `/[id]` GET added for the
-  instance list, `/[id]/generate` POST).
-
-Both UI phases complete on `feat/ticketing-v2-ui`. `tsc --noEmit` and
-`next build` both clean.
+- Reject route: 409 guard prevents rejecting already-APPROVED apps (blocks orphaned Member row)
+- Bulk action: per-item failures surfaced; only succeeded rows removed from queue
 
 ## Database
 

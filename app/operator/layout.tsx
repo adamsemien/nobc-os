@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { OperatorNav } from './operator-nav';
 import { AiChatPanel } from './_components/AiChatPanel';
 import { ObsidianIdleEgg } from './_components/ObsidianIdleEgg';
+import { AimEasterEgg } from './_components/AimEasterEgg';
+import { MyspaceEasterEgg } from './_components/MyspaceEasterEgg';
 import { CommandPaletteProvider } from '@/components/command-palette/CommandPaletteProvider';
 import { CommandKPill } from '@/components/command-palette/CommandKPill';
 
@@ -41,6 +43,8 @@ export default async function OperatorLayout({
         <main className="flex min-h-screen min-w-0 flex-1 flex-col">{children}</main>
         <AiChatPanel />
         <ObsidianIdleEgg />
+        <AimEasterEgg />
+        <MyspaceEasterEgg />
         <CommandKPill />
       </div>
     </CommandPaletteProvider>
