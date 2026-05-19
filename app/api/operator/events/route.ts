@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { EventAccessSchema, defaultEventAccess } from '@/lib/event-access-schema';
 import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
 import { notifyProducer } from '@/lib/producer-webhook';
+import { buildPathsFromTemplate } from '@/lib/workflows/templates';
+import type { WorkflowTemplateKey } from '@/lib/workflows/types';
 
 export async function GET() {
   const { userId } = await auth();
@@ -75,6 +77,27 @@ const CreateSchema = z.object({
   status: z.enum(['DRAFT', 'PUBLISHED']).default('DRAFT'),
   customQuestions: z.array(CustomQuestionInput).optional(),
   eventAccess: EventAccessSchema.optional(),
+  workflow: z
+    .object({
+      templateKey: z.enum([
+        'open',
+        'members_only',
+        'apply_or_pay',
+        'paid_only',
+        'referral_required',
+        'invitation_code',
+      ]),
+      config: z
+        .object({
+          amountCents: z.number().int().nonnegative().optional(),
+          requiresApproval: z.boolean().optional(),
+          minReferrals: z.number().int().positive().optional(),
+          codes: z.array(z.string()).optional(),
+          minTier: z.enum(['top', 'mid', 'low']).optional(),
+        })
+        .default({}),
+    })
+    .optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -89,7 +112,7 @@ export async function POST(req: NextRequest) {
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
 
-  const { customQuestions, eventAccess: eventAccessInput, ...data } = parsed.data;
+  const { customQuestions, eventAccess: eventAccessInput, workflow, ...data } = parsed.data;
 
   const slugTaken = await db.event.findUnique({
     where: { workspaceId_slug: { workspaceId, slug: data.slug } },
@@ -139,6 +162,21 @@ export async function POST(req: NextRequest) {
           showToGuest: q.showToGuest,
           whenInFlow: q.whenInFlow,
         })),
+      });
+    }
+
+    if (workflow) {
+      const paths = buildPathsFromTemplate(
+        workflow.templateKey as WorkflowTemplateKey,
+        workflow.config,
+      );
+      await tx.eventWorkflow.create({
+        data: {
+          workspaceId,
+          eventId: ev.id,
+          templateKey: workflow.templateKey,
+          paths: paths as object,
+        },
       });
     }
 

@@ -51,11 +51,16 @@ model Workspace {
   watchList            WatchList[]
   emailTemplates       EmailTemplate[]
   platformSettings     PlatformSetting[]
+  eventWorkflows       EventWorkflow[]
 
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
   // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
   aiModel              String?
+
+  // Editable tier labels for the 0-100 score. null = use defaults (Resident/Member/Considering).
+  // Shape: { top: string, mid: string, low: string }.
+  tierNames            Json?
 }
 
 model EmailTemplate {
@@ -311,6 +316,7 @@ model Event {
   accessTokens    AccessToken[]
   promoCodes      PromoCode[]
   ticketHolds     TicketHold[]
+  workflow        EventWorkflow?
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -318,6 +324,22 @@ model Event {
   @@index([featured])
   @@index([publishesAt])
   @@index([seriesId])
+}
+
+/// Flexible workflow gating for an event. Replaces the rigid accessMode enum.
+/// `paths` is a WorkflowPath[] (see lib/workflows/types.ts). null templateKey = custom.
+model EventWorkflow {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  eventId     String   @unique
+  event       Event     @relation(fields: [eventId], references: [id])
+  templateKey String?
+  paths       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, eventId])
 }
 
 enum FieldType {

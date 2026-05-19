@@ -7,6 +7,7 @@ import {
   Webhook,
   Activity,
   Mail,
+  Trophy,
 } from 'lucide-react';
 import { PageHeader } from '../_components/PageHeader';
 
@@ -29,6 +30,12 @@ const CARDS: Card[] = [
     title: 'Communications',
     description: 'Email templates, cadences, and auto-notifications.',
     Icon: Mail,
+  },
+  {
+    href: '/operator/settings/tiers',
+    title: 'Member Tiers',
+    description: 'Rename Resident / Member / Considering to fit your brand.',
+    Icon: Trophy,
   },
   {
     href: '/operator/settings/model',

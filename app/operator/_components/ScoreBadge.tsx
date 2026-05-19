@@ -1,15 +1,18 @@
-import { toScoreDisplay } from '@/lib/score-display';
+import { toScoreDisplay, type TierNames } from '@/lib/score-display';
 
 export function ScoreBadge({
   value,
   size = 'md',
   showTier = true,
+  tierNames,
 }: {
   value: number | null | undefined;
   size?: 'sm' | 'md' | 'lg';
   showTier?: boolean;
+  /** Optional override — falls back to defaults (Resident/Member/Considering). */
+  tierNames?: TierNames;
 }) {
-  const display = toScoreDisplay(value);
+  const display = toScoreDisplay(value, tierNames);
   if (!display) {
     return (
       <span className="text-sm tabular-nums" style={{ color: 'var(--text-tertiary, var(--text-muted))' }}>

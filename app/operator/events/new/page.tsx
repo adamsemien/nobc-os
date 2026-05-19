@@ -8,6 +8,11 @@ import { Check, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { HeroImageUpload } from './_components/HeroImageUpload';
 import { AccessGroupsCard } from './_components/AccessGroupsCard';
 import { TemplatePicker, type TemplateKey } from './_components/TemplatePicker';
+import {
+  WorkflowSection,
+  DEFAULT_WORKFLOW_SELECTION,
+  type WorkflowSelection,
+} from './_components/WorkflowSection';
 import { defaultEventAccess, type EventAccess } from '@/lib/event-access-schema';
 import { newGate } from '@/lib/event-gates';
 import { type AccessQuestion, toApiQuestion, coerceFieldType } from '@/lib/registration-fields';
@@ -161,6 +166,7 @@ export default function NewEventPage() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [slugEdited, setSlugEdited] = useState(false);
   const [access, setAccess] = useState<EventAccess>(() => defaultEventAccess());
+  const [workflow, setWorkflow] = useState<WorkflowSelection>(DEFAULT_WORKFLOW_SELECTION);
   const [questions, setQuestions] = useState<AccessQuestion[]>([]);
   const [template, setTemplate] = useState<TemplateKey>('editorial');
 
@@ -355,6 +361,7 @@ export default function NewEventPage() {
         template,
         status,
         eventAccess: access,
+        workflow,
         ...(appliedTemplate && { plusOnesAllowed: appliedTemplate.plusOnesAllowed, showCapacity: appliedTemplate.showCapacity }),
         ...(questions.length > 0 && { customQuestions: questions.map(toApiQuestion) }),
       };
@@ -535,6 +542,10 @@ export default function NewEventPage() {
                 )}
               </div>
             )}
+
+            <div className="mb-8 rounded-[10px] border border-border bg-card p-5">
+              <WorkflowSection value={workflow} onChange={setWorkflow} />
+            </div>
 
             <AccessGroupsCard value={access} onChange={setAccess} questions={questions} onQuestionsChange={setQuestions} eventTitle={form.title} />
           </section>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowLeft, Check, Clock, Loader2, Mail, MapPin, Phone, Search, X, XCircle } from 'lucide-react';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
+import { DEFAULT_TIER_NAMES, type TierNames } from '@/lib/score-display';
 import { EmptyState } from '../../_components/EmptyState';
 import { useTheme } from '../../_components/ThemeToggle';
 import { Avatar } from '../../_components/Avatar';
@@ -162,9 +163,13 @@ function orderedAnswerEntries(answers: Record<string, string>): [string, string]
 
 type Props = {
   applications: ApplicationsQueueItem[];
+  tierNames?: TierNames;
 };
 
-export function ApplicationsQueue({ applications: initialApplications }: Props) {
+export function ApplicationsQueue({
+  applications: initialApplications,
+  tierNames = DEFAULT_TIER_NAMES,
+}: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialApplications[0]?.id ?? null,
@@ -473,7 +478,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
               const refs = getReferrers(app);
               const isChecked = selectedIds.has(app.id);
               const worth = app.archetypeScores ? memberWorthScores(app.archetypeScores) : null;
-              const tier = worth ? memberTier(worth.total) : null;
+              const tier = worth ? memberTier(worth.total, tierNames) : null;
               return (
                 <li key={app.id} className="group relative">
                   <div className={`absolute left-2 top-2 z-10 transition-opacity ${isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -603,6 +608,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
               onReject={() => postAction(selected.id, 'reject')}
               onWaitlist={() => postAction(selected.id, 'waitlist')}
               onHold={() => postAction(selected.id, 'hold')}
+              tierNames={tierNames}
             />
           ) : null}
         </div>
@@ -645,6 +651,7 @@ export function ApplicationsQueue({ applications: initialApplications }: Props) 
               onReject={() => postAction(selected.id, 'reject')}
               onWaitlist={() => postAction(selected.id, 'waitlist')}
               onHold={() => postAction(selected.id, 'hold')}
+              tierNames={tierNames}
             />
           </div>
         </div>
@@ -662,10 +669,13 @@ function memberWorthScores(scores: Record<string, number>): { influence: number;
   return { influence, contribution, activation, total };
 }
 
-function memberTier(total: number): { label: string; className: string } {
-  if (total >= 22) return { label: 'Charter', className: 'text-success' };
-  if (total >= 16) return { label: 'Standard', className: 'text-text-secondary' };
-  return { label: 'Waitlist', className: 'text-danger' };
+function memberTier(
+  total: number,
+  names: TierNames = DEFAULT_TIER_NAMES,
+): { label: string; className: string } {
+  if (total >= 22) return { label: names.top, className: 'text-success' };
+  if (total >= 16) return { label: names.mid, className: 'text-text-secondary' };
+  return { label: names.low, className: 'text-danger' };
 }
 
 function DetailPanel({
@@ -678,6 +688,7 @@ function DetailPanel({
   onReject,
   onWaitlist,
   onHold,
+  tierNames = DEFAULT_TIER_NAMES,
 }: {
   app: ApplicationsQueueItem;
   headingFont: CSSProperties;
@@ -688,6 +699,7 @@ function DetailPanel({
   onReject: () => void;
   onWaitlist: () => void;
   onHold: () => void;
+  tierNames?: TierNames;
 }) {
   const { theme } = useTheme();
   const approveBtnRef = useRef<HTMLButtonElement>(null);
@@ -910,7 +922,7 @@ function DetailPanel({
 
           {app.archetypeScores && (() => {
             const worth = memberWorthScores(app.archetypeScores!);
-            const tier = memberTier(worth.total);
+            const tier = memberTier(worth.total, tierNames);
             return (
               <>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center">

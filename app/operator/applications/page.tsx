@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
+import { auth } from '@clerk/nextjs/server';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
+import { requireWorkspaceId } from '@/lib/auth';
+import { getWorkspaceTierNames } from '@/lib/workspace-tier-names';
 import {
   ApplicationsQueue,
   type ApplicationsQueueItem,
@@ -104,6 +107,11 @@ export default async function OperatorApplicationsPage({
   const { applications, pendingCount, counts } = data;
   const queueItems = applications.map(toQueueItem);
 
+  const { userId } = await auth();
+  const tierNames = userId
+    ? await getWorkspaceTierNames(await requireWorkspaceId(userId))
+    : undefined;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col">
@@ -169,7 +177,7 @@ export default async function OperatorApplicationsPage({
           </p>
         ) : null}
 
-        <ApplicationsQueue key={tab} applications={queueItems} />
+        <ApplicationsQueue key={tab} applications={queueItems} tierNames={tierNames} />
       </div>
     </div>
   );

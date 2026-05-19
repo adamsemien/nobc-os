@@ -440,6 +440,32 @@ export async function POST() {
   });
   const eventBySlug = Object.fromEntries(events.map((e) => [e.slug, e]));
 
+  // ── 3b. EventWorkflow records ─────────────────────────────────────────────
+  const WORKFLOW_SEEDS: Array<{
+    slug: string;
+    templateKey: 'open' | 'members_only' | 'apply_or_pay' | 'paid_only' | 'referral_required' | 'invitation_code';
+    config: Record<string, unknown>;
+  }> = [
+    { slug: '__demo-residency-summer', templateKey: 'open', config: {} },
+    { slug: '__demo-house-dinner-4', templateKey: 'apply_or_pay', config: { amountCents: 15000, requiresApproval: true } },
+    { slug: '__demo-founders-circle-aug', templateKey: 'members_only', config: { minTier: 'low' } },
+    { slug: '__demo-late-night-july', templateKey: 'open', config: {} },
+    { slug: '__demo-members-preview', templateKey: 'members_only', config: { minTier: 'low' } },
+  ];
+  {
+    const { buildPathsFromTemplate } = await import('@/lib/workflows/templates');
+    for (const w of WORKFLOW_SEEDS) {
+      const ev = eventBySlug[w.slug];
+      if (!ev) continue;
+      const paths = buildPathsFromTemplate(w.templateKey, w.config as any);
+      await db.eventWorkflow.upsert({
+        where: { eventId: ev.id },
+        update: { templateKey: w.templateKey, paths: paths as object },
+        create: { workspaceId, eventId: ev.id, templateKey: w.templateKey, paths: paths as object },
+      });
+    }
+  }
+
   // ── 4. EventCustomQuestions for Founder's Circle ─────────────────────────
   const foundersEvent = eventBySlug['__demo-founders-circle-aug'];
   if (foundersEvent) {
