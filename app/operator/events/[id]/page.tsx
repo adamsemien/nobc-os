@@ -208,6 +208,12 @@ export default async function OperatorEventDetailPage({
           >
             Open in Producer →
           </a>
+          <Link
+            href={`/operator/events/${id}/room`}
+            className="inline-flex items-center gap-1.5 rounded-sm border border-primary bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:opacity-90"
+          >
+            The Room →
+          </Link>
         </div>
 
         {/* Tab nav */}

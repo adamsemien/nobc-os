@@ -229,6 +229,7 @@ function SortableGateCard({
 
         {/* Edit toggle */}
         <button type="button" onClick={onToggleEdit}
+          aria-label={isEditing ? 'Finish editing gate' : 'Edit gate'}
           className={`rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-widest transition-colors ${chrome} ${isEditing ? 'bg-raised text-[var(--nobc-red)]' : 'text-[var(--apply-muted)] hover:text-[var(--apply-ink)]'}`}>
           {isEditing ? 'done' : 'edit'}
         </button>
@@ -268,8 +269,8 @@ function GateEditor({
     <div className="flex flex-col gap-3">
       {/* Label */}
       <div>
-        <label className={labelCls}>Label</label>
-        <input type="text" value={gate.label} onChange={(e) => onUpdate({ label: e.target.value })} className={inputCls} />
+        <label htmlFor={`gate-label-${gate.id}`} className={labelCls}>Label</label>
+        <input id={`gate-label-${gate.id}`} type="text" value={gate.label} onChange={(e) => onUpdate({ label: e.target.value })} className={inputCls} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -329,8 +330,8 @@ function GateEditor({
       {gate.type === 'custom_question' && (
         <>
           <div>
-            <label className={labelCls}>Question text</label>
-            <input type="text" placeholder="e.g. Are you 21 or older?"
+            <label htmlFor={`gate-question-${gate.id}`} className={labelCls}>Question text</label>
+            <input id={`gate-question-${gate.id}`} type="text" placeholder="e.g. Are you 21 or older?"
               value={gate.question ?? ''}
               onChange={(e) => onUpdate({ question: e.target.value })}
               className={inputCls}
@@ -369,7 +370,7 @@ function GatePickerModal({ onSelect, onClose }: { onSelect: (type: GateType) => 
           <p className={`text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] ${chrome}`}>
             Choose gate type
           </p>
-          <button type="button" onClick={onClose} className="text-[var(--apply-muted)] hover:text-[var(--apply-ink)]">
+          <button type="button" onClick={onClose} aria-label="Close" className="text-[var(--apply-muted)] hover:text-[var(--apply-ink)]">
             <X className="h-4 w-4" />
           </button>
         </div>

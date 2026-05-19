@@ -62,7 +62,15 @@ export function DrillDownPanel({
 
   return (
     <div className="fixed inset-0 z-[80]" role="dialog" aria-label={`${metricName} detail`}>
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
+      <div
+        className="absolute inset-0"
+        style={{ background: 'rgba(0,0,0,0.4)' }}
+        role="button"
+        tabIndex={0}
+        aria-label="Close panel"
+        onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClose(); }}
+      />
       <aside
         className="absolute right-0 top-0 flex h-full w-full max-w-[480px] flex-col"
         style={{ background: 'var(--card)', borderLeft: '1px solid var(--border)' }}

@@ -162,7 +162,7 @@ STRIPE_PUBLISHABLE_KEY
 STRIPE_WEBHOOK_SECRET
 
 # Webhooks
-SVIX_SECRET                           — Svix webhook signing
+SVIX_API_KEY                          — Svix webhook signing (lib/svix.ts)
 PRODUCER_WEBHOOK_URL                  — Phase J outbound to Producer
 PRODUCER_WEBHOOK_SECRET               — HMAC secret shared with Producer
 
