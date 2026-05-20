@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
     }
     const persona = JSON.parse(match[0]) as Persona;
     return NextResponse.json({ persona });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message ?? 'AI generation failed' }, { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'AI generation failed';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

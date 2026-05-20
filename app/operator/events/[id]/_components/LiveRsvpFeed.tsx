@@ -32,7 +32,7 @@ export function LiveRsvpFeed({ eventId, enabled = true }: { eventId: string; ena
           cache: 'no-store',
         });
         if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { rsvps: any[] };
+        const data = (await res.json()) as { rsvps: FeedItem[] };
         const next = (data.rsvps ?? []).map((r) => ({
           id: r.id,
           createdAt: r.createdAt,

@@ -41,9 +41,9 @@ function parseFaq(json: string | null | undefined): Faq[] {
   try {
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed)) return DEFAULT_FAQ;
-    const cleaned = parsed
-      .filter((p: any) => typeof p?.question === 'string' && typeof p?.answer === 'string')
-      .map((p: any) => ({ question: String(p.question), answer: String(p.answer) }));
+    const cleaned = (parsed as Array<Record<string, unknown>>)
+      .filter((p) => typeof p?.question === 'string' && typeof p?.answer === 'string')
+      .map((p) => ({ question: String(p.question), answer: String(p.answer) }));
     return cleaned.length ? cleaned : DEFAULT_FAQ;
   } catch {
     return DEFAULT_FAQ;

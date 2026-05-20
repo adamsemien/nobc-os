@@ -341,7 +341,7 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
               type: string;
               step?: string;
               message?: string;
-              data?: any;
+              data?: { applicationId?: string } & Record<string, unknown>;
             };
             if (ev.type === 'step.start') appendLog(`→ ${ev.step}`);
             else if (ev.type === 'step.progress') appendLog(`   ${ev.message}`);
@@ -354,8 +354,9 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
           } catch {}
         }
       }
-    } catch (e: any) {
-      appendLog(`✗ ${e.message ?? 'Failed'}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed';
+      appendLog(`✗ ${msg}`);
     } finally {
       setRunning(false);
     }
@@ -372,8 +373,9 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
       appendLog(
         `✓ Created ${data.created} (${data.statusDistribution.pending}p · ${data.statusDistribution.hold}h · ${data.statusDistribution.approved}a · ${data.statusDistribution.rejected}r) in ${Math.round(data.totalMs / 1000)}s`,
       );
-    } catch (e: any) {
-      appendLog(`✗ ${e.message}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Batch failed';
+      appendLog(`✗ ${msg}`);
     } finally {
       setBatchRunning(false);
     }

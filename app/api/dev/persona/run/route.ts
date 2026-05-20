@@ -51,14 +51,16 @@ export async function POST(req: NextRequest) {
             else if (step === 'pay') await runPay(ctx, send);
             else if (step === 'checkin') await runCheckin(workspaceId, ctx, send);
             send({ type: 'step.complete', step });
-          } catch (e: any) {
-            send({ type: 'step.error', step, message: e.message ?? 'Step failed' });
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : 'Step failed';
+            send({ type: 'step.error', step, message: msg });
             break;
           }
         }
         send({ type: 'run.complete', data: ctx });
-      } catch (e: any) {
-        send({ type: 'run.error', message: e.message ?? 'Run failed' });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Run failed';
+        send({ type: 'run.error', message: msg });
       } finally {
         controller.close();
       }
@@ -126,8 +128,9 @@ async function runApply(
       message: `Scored: ${score100} / 100 — ${result.archetype} — ${result.aiRecommendation}`,
       data: { archetype: result.archetype, recommendation: result.aiRecommendation, tags: result.tags },
     });
-  } catch (e: any) {
-    send({ type: 'step.progress', message: `AI scoring skipped: ${e.message}` });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    send({ type: 'step.progress', message: `AI scoring skipped: ${msg}` });
   }
 
   ctx.applicationId = application.id;
@@ -224,6 +227,9 @@ async function runPay(
   if (!ctx.rsvpId) throw new Error('No RSVP — run rsvp first.');
 
   const Stripe = (await import('stripe')).default;
+  // Stripe's apiVersion is a literal-union type that lags behind the live API;
+  // pinning to a version newer than the SDK's published union requires a cast.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stripe = new Stripe(key, { apiVersion: '2025-09-30.clover' as any });
 
   send({ type: 'step.progress', message: 'Creating test PaymentIntent…' });

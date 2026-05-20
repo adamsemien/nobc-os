@@ -457,7 +457,10 @@ export async function POST() {
     for (const w of WORKFLOW_SEEDS) {
       const ev = eventBySlug[w.slug];
       if (!ev) continue;
-      const paths = buildPathsFromTemplate(w.templateKey, w.config as any);
+      const paths = buildPathsFromTemplate(
+        w.templateKey,
+        w.config as import('@/lib/workflows/templates').WorkflowTemplateConfig,
+      );
       await db.eventWorkflow.upsert({
         where: { eventId: ev.id },
         update: { templateKey: w.templateKey, paths: paths as object },

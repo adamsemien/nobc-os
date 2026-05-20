@@ -149,7 +149,7 @@ export function NotificationCenter() {
               </li>
             ) : items.length === 0 ? (
               <li className="px-3 py-6 text-center text-sm text-text-muted">
-                You're all caught up.
+                You&apos;re all caught up.
               </li>
             ) : (
               items.map((n) => {
