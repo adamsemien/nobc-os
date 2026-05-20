@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { requireWorkspaceId } from '@/lib/auth';
 import { getWorkspaceTierNames } from '@/lib/workspace-tier-names';
+import { PageHeader } from '@/components/ui';
 import {
   ApplicationsQueue,
   type ApplicationsQueueItem,
@@ -115,26 +116,29 @@ export default async function OperatorApplicationsPage({
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col">
-        <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[24px] font-semibold tracking-tight text-text-primary font-[family-name:var(--font-dm-sans)]">
+        <PageHeader
+          title={
+            <span className="flex items-center gap-3">
               Applications
-            </h1>
-            <span className="rounded-full bg-primary px-2.5 py-0.5 text-sm font-medium tabular-nums text-primary-foreground">
-              {pendingCount}
+              <span className="rounded-full bg-primary px-2.5 py-0.5 text-sm font-medium tabular-nums text-primary-foreground">
+                {pendingCount}
+              </span>
             </span>
-          </div>
-          <a
-            href="/apply?demo=true"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            Preview form
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-          </a>
-        </header>
+          }
+          subtitle="Review, score, and decide. Pending first."
+          action={
+            <a
+              href="/apply?demo=true"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Preview form
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            </a>
+          }
+        />
 
         <nav className="mb-6 flex flex-wrap gap-1 border-b border-border" aria-label="Filter applications">
           {TABS.map(({ label, value }) => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageHeader } from '@/components/ui';
 
 export default function WebhooksPage() {
   const [token, setToken] = useState<string | null>(null);
@@ -36,15 +37,14 @@ export default function WebhooksPage() {
   return (
     <div className="px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-4xl">
-        <h1
-          className="mb-2 text-3xl font-normal text-text-primary"
-          style={{ fontFamily: 'var(--font-display)' }}
-        >
-          Webhooks
-        </h1>
-        <p className="mb-8 text-sm text-text-muted">
-          Subscribe to NoBC OS events and deliver them to your own endpoints.
-        </p>
+        <PageHeader
+          title="Webhooks"
+          subtitle="Subscribe to NoBC OS events and deliver them to your own endpoints."
+          crumbs={[
+            { href: '/operator/settings', label: 'Settings' },
+            { label: 'Webhooks' },
+          ]}
+        />
 
         {error && (
           <div className="rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm text-danger">

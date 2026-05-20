@@ -3,6 +3,17 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import Link from 'next/link';
+import {
+  PageHeader,
+  DataTableShell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableBody,
+  DataTableRow,
+  DataTableCell,
+  EmptyState,
+} from '@/components/ui';
+import { Activity } from 'lucide-react';
 
 const PAGE_SIZE = 50;
 
@@ -47,71 +58,82 @@ export default async function AuditPage({
   return (
     <div className="px-6 pb-16 pt-8 lg:px-10">
       <div className="mx-auto w-full max-w-[1280px]">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-[24px] font-semibold tracking-tight text-text-primary font-[family-name:var(--font-dm-sans)]">
-              Activity
-            </h1>
-            <p className="mt-1 text-sm text-text-secondary">
-              Everything that happened — operator decisions, member RSVPs, agent actions.
-            </p>
-          </div>
-          <span className="text-sm text-text-muted tabular-nums">{total.toLocaleString()} events</span>
-        </div>
+        <PageHeader
+          title="Activity"
+          subtitle="Everything that happened — operator decisions, member RSVPs, agent actions."
+          action={
+            <span className="text-sm text-text-muted tabular-nums">
+              {total.toLocaleString()} events
+            </span>
+          }
+        />
 
-        <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">Time</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">Action</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">Entity</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted">Actor</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {events.length === 0 && (
-                <tr className="bg-surface-elevated">
-                  <td colSpan={4} className="px-4 py-16 text-center text-sm text-text-muted">
-                    No audit events yet. Operator and agent actions will appear here.
-                  </td>
-                </tr>
-              )}
-              {events.map(e => (
-                <tr key={e.id} className="bg-surface-elevated hover:bg-muted transition-colors">
-                  <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+        {events.length === 0 ? (
+          <EmptyState
+            icon={Activity}
+            title="No activity yet"
+            subtitle="Operator and agent actions will appear here as they happen."
+          />
+        ) : (
+          <DataTableShell>
+            <DataTableHead>
+              <DataTableHeader>Time</DataTableHeader>
+              <DataTableHeader>Action</DataTableHeader>
+              <DataTableHeader>Entity</DataTableHeader>
+              <DataTableHeader>Actor</DataTableHeader>
+            </DataTableHead>
+            <DataTableBody>
+              {events.map((e) => (
+                <DataTableRow key={e.id}>
+                  <DataTableCell tone="tertiary" className="whitespace-nowrap">
                     {new Date(e.createdAt).toLocaleString('en-US', {
-                      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
                     })}
-                  </td>
-                  <td className="px-4 py-3 font-medium" style={{ color: actionColor(e.action) }}>
-                    {formatAction(e.action)}
-                  </td>
-                  <td className="px-4 py-3 text-text-secondary">
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{e.entityType}</span>
-                    {' '}
-                    <span className="font-mono text-xs text-text-muted">{e.entityId.slice(-8)}</span>
-                  </td>
-                  <td className="px-4 py-3 text-text-muted font-mono text-xs">
+                  </DataTableCell>
+                  <DataTableCell className="font-medium">
+                    <span style={{ color: actionColor(e.action) }}>
+                      {formatAction(e.action)}
+                    </span>
+                  </DataTableCell>
+                  <DataTableCell tone="secondary">
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                      {e.entityType}
+                    </span>{' '}
+                    <span className="font-mono text-xs text-text-muted">
+                      {e.entityId.slice(-8)}
+                    </span>
+                  </DataTableCell>
+                  <DataTableCell tone="tertiary" className="font-mono text-xs">
                     {e.actorId ? e.actorId.slice(-12) : '—'}
-                  </td>
-                </tr>
+                  </DataTableCell>
+                </DataTableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </DataTableBody>
+          </DataTableShell>
+        )}
 
         {totalPages > 1 && (
           <div className="mt-6 flex items-center justify-between text-sm text-text-muted">
-            <span>Page {page} of {totalPages}</span>
+            <span>
+              Page {page} of {totalPages}
+            </span>
             <div className="flex gap-3">
               {page > 1 && (
-                <Link href={`/operator/audit?page=${page - 1}`} className="text-primary hover:underline">
+                <Link
+                  href={`/operator/audit?page=${page - 1}`}
+                  className="text-primary hover:underline"
+                >
                   ← Prev
                 </Link>
               )}
               {page < totalPages && (
-                <Link href={`/operator/audit?page=${page + 1}`} className="text-primary hover:underline">
+                <Link
+                  href={`/operator/audit?page=${page + 1}`}
+                  className="text-primary hover:underline"
+                >
                   Next →
                 </Link>
               )}

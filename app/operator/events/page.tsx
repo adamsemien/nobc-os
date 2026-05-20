@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
-import { EventsPageTabs, type EventRow, type SeriesRow } from './_components/EventsPageTabs';
+import { PageHeader } from '@/components/ui';
+import {
+  EventsPageTabs,
+  type EventRow,
+  type SeriesRow,
+} from './_components/EventsPageTabs';
 
 export default async function OperatorEventsPage() {
   const [eventsRes, seriesRes] = await Promise.all([
@@ -24,17 +29,18 @@ export default async function OperatorEventsPage() {
   return (
     <div className="px-6 pb-16 pt-8 lg:px-10">
       <div className="mx-auto w-full max-w-[1400px]">
-        <div className="mb-8 flex items-center justify-between gap-4">
-          <h1 className="text-[24px] font-semibold tracking-tight text-text-primary font-[family-name:var(--font-dm-sans)]">
-            Events
-          </h1>
-          <Link
-            href="/operator/events/new"
-            className="btn-shimmer inline-flex items-center rounded-[8px] bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover"
-          >
-            + New Event
-          </Link>
-        </div>
+        <PageHeader
+          title="Events"
+          subtitle="Upcoming, past, and recurring series."
+          action={
+            <Link
+              href="/operator/events/new"
+              className="btn-shimmer inline-flex items-center rounded-[8px] bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover"
+            >
+              + New Event
+            </Link>
+          }
+        />
 
         <EventsPageTabs events={events} series={series} />
       </div>

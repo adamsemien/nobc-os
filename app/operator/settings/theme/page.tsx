@@ -3,6 +3,7 @@
 import { Check } from 'lucide-react';
 import { useTheme } from '../../_components/ThemeToggle';
 import { THEMES, type ThemeId } from '@/lib/theme';
+import { PageHeader } from '@/components/ui';
 
 const SHORT_LABELS: Record<ThemeId, string> = {
   nobc:     'Light',
@@ -25,18 +26,14 @@ export default function ThemePage() {
   return (
     <div className="px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-4xl">
-        <h1
-          className="mb-1 text-3xl font-normal"
-          style={{
-            fontFamily: 'var(--font-display)',
-            color: 'var(--text-primary)',
-          }}
-        >
-          Appearance
-        </h1>
-        <p className="mb-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Choose a theme. Changes apply immediately.
-        </p>
+        <PageHeader
+          title="Appearance"
+          subtitle="Choose a theme. Changes apply immediately."
+          crumbs={[
+            { href: '/operator/settings', label: 'Settings' },
+            { label: 'Appearance' },
+          ]}
+        />
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {THEMES.map((t) => {

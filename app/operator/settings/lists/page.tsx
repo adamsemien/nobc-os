@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
+import { PageHeader } from '@/components/ui';
 
 type ListType = 'PURPLE' | 'BLOCKED';
 
@@ -129,16 +130,14 @@ export default function ListsPage() {
   return (
     <div className="px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-4xl">
-        <h1
-          className="mb-1 text-3xl font-normal"
-          style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
-        >
-          Lists
-        </h1>
-        <p className="mb-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Purple flags VIPs and auto-approves matching applicants. Blocked flags people who should
-          never be approved — matching applications are auto-rejected at submit.
-        </p>
+        <PageHeader
+          title="Lists"
+          subtitle="Purple flags VIPs and auto-approves matching applicants. Blocked auto-rejects on submit."
+          crumbs={[
+            { href: '/operator/settings', label: 'Settings' },
+            { label: 'Lists' },
+          ]}
+        />
 
         {/* Tabs */}
         <div className="mb-6 flex gap-1 rounded-lg p-1" style={{ background: 'var(--raised)' }}>
