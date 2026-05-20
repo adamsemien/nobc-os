@@ -525,6 +525,8 @@ function AuthStep() {
   );
 }
 
+const GUEST_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 function GuestInfoStep({
   name,
   email,
@@ -538,10 +540,22 @@ function GuestInfoStep({
   onChange: (n: string, e: string) => void;
   onNext: () => void;
 }) {
+  const [touched, setTouched] = useState({ name: false, email: false });
+  const nameErr = touched.name && !name.trim() ? 'Please add your name.' : '';
+  const emailErr =
+    touched.email && !email.trim()
+      ? 'Please add your email.'
+      : touched.email && !GUEST_EMAIL_RE.test(email.trim())
+        ? 'Enter a valid email address.'
+        : '';
+  const canContinue = name.trim().length > 0 && GUEST_EMAIL_RE.test(email.trim());
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        setTouched({ name: true, email: true });
+        if (!canContinue) return;
         onNext();
       }}
       className="space-y-5"
@@ -552,25 +566,39 @@ function GuestInfoStep({
           type="text"
           autoFocus
           required
+          maxLength={100}
           value={name}
           onChange={(e) => onChange(e.target.value, email)}
+          onBlur={() => setTouched((t) => ({ ...t, name: true }))}
           placeholder="First and last name"
           className={inputCls}
         />
+        {nameErr ? (
+          <p role="alert" className="mt-1 text-xs text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+            {nameErr}
+          </p>
+        ) : null}
       </div>
       <div>
         <FieldLabel>Email</FieldLabel>
         <input
           type="email"
           required
+          maxLength={254}
           value={email}
           onChange={(e) => onChange(name, e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, email: true }))}
           placeholder="you@email.com"
           className={inputCls}
         />
+        {emailErr ? (
+          <p role="alert" className="mt-1 text-xs text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+            {emailErr}
+          </p>
+        ) : null}
       </div>
       <ErrorText msg={error} />
-      <button type="submit" className={primaryBtnCls}>
+      <button type="submit" disabled={!canContinue} className={primaryBtnCls}>
         Continue →
       </button>
     </form>

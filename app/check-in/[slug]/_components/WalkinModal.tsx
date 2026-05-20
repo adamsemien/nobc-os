@@ -5,6 +5,11 @@ import { X } from 'lucide-react';
 
 const CHECKIN_SECRET = process.env.NEXT_PUBLIC_CHECKIN_SECRET ?? '';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_RE = /^[\d\s\-().+ ]{10,}$/;
+
+type FieldErrors = { name?: string; email?: string; phone?: string };
+
 export function WalkinModal({
   open,
   onClose,
@@ -25,13 +30,26 @@ export function WalkinModal({
   const [plusOneName, setPlusOneName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   if (!open) return null;
 
+  function validate(): FieldErrors {
+    const fe: FieldErrors = {};
+    if (!name.trim()) fe.name = 'Required';
+    else if (name.trim().length > 100) fe.name = 'Max 100 characters';
+    if (!email.trim()) fe.email = 'Required';
+    else if (!EMAIL_RE.test(email.trim())) fe.email = 'Enter a valid email';
+    if (phone.trim() && !PHONE_RE.test(phone.trim())) fe.phone = 'Enter a valid phone';
+    return fe;
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) {
-      setError('Name and email are required');
+    const fe = validate();
+    setFieldErrors(fe);
+    if (Object.keys(fe).length > 0) {
+      setError(null);
       return;
     }
     setSubmitting(true);
@@ -121,32 +139,38 @@ export function WalkinModal({
           </button>
         </div>
 
-        <FormRow label="Name *">
+        <FormRow label="Name *" error={fieldErrors.name}>
           <input
             type="text"
             value={name}
+            maxLength={100}
             onChange={(e) => setName(e.target.value)}
+            onBlur={() => setFieldErrors(validate())}
             autoComplete="name"
             autoFocus
             style={inputStyle}
           />
         </FormRow>
 
-        <FormRow label="Email *">
+        <FormRow label="Email *" error={fieldErrors.email}>
           <input
             type="email"
             value={email}
+            maxLength={254}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => setFieldErrors(validate())}
             autoComplete="email"
             style={inputStyle}
           />
         </FormRow>
 
-        <FormRow label="Phone (optional)">
+        <FormRow label="Phone (optional)" error={fieldErrors.phone}>
           <input
             type="tel"
             value={phone}
+            maxLength={30}
             onChange={(e) => setPhone(e.target.value)}
+            onBlur={() => setFieldErrors(validate())}
             autoComplete="tel"
             style={inputStyle}
           />
@@ -179,7 +203,7 @@ export function WalkinModal({
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !name.trim() || !email.trim()}
           style={{
             marginTop: 4,
             height: 48,
@@ -190,7 +214,7 @@ export function WalkinModal({
             fontSize: 16,
             fontWeight: 600,
             cursor: submitting ? 'wait' : 'pointer',
-            opacity: submitting ? 0.6 : 1,
+            opacity: submitting || !name.trim() || !email.trim() ? 0.6 : 1,
           }}
         >
           {submitting ? 'Adding…' : 'Add & check in'}
@@ -200,13 +224,26 @@ export function WalkinModal({
   );
 }
 
-function FormRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FormRow({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#888' }}>
         {label}
       </span>
       {children}
+      {error ? (
+        <span role="alert" style={{ fontSize: 12, color: '#ff8a80' }}>
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }

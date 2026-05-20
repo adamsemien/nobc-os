@@ -46,6 +46,10 @@ export default function ListsPage() {
   const [addNote, setAddNote] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; phone?: string }>({});
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const PHONE_RE = /^[\d\s\-().+ ]{10,}$/;
 
   // Removal
   const [removing, setRemoving] = useState<string | null>(null);
@@ -66,6 +70,11 @@ export default function ListsPage() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setAddError('');
+    const fe: { email?: string; phone?: string } = {};
+    if (addEmail.trim() && !EMAIL_RE.test(addEmail.trim())) fe.email = 'Enter a valid email';
+    if (addPhone.trim() && !PHONE_RE.test(addPhone.trim())) fe.phone = 'Enter a valid phone';
+    setFieldErrors(fe);
+    if (Object.keys(fe).length > 0) return;
     if (!addEmail && !addPhone && !addInstagram) {
       setAddError('Enter at least one match criterion.');
       return;
@@ -170,11 +179,16 @@ export default function ListsPage() {
               <input
                 type="email"
                 value={addEmail}
-                onChange={e => setAddEmail(e.target.value)}
+                maxLength={254}
+                onChange={e => { setAddEmail(e.target.value); if (fieldErrors.email) setFieldErrors(f => ({ ...f, email: undefined })); }}
+                onBlur={() => setFieldErrors(f => ({ ...f, email: addEmail.trim() && !EMAIL_RE.test(addEmail.trim()) ? 'Enter a valid email' : undefined }))}
                 placeholder="name@example.com"
                 className={inputClass()}
-                style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text-primary)' }}
+                style={{ borderColor: fieldErrors.email ? 'var(--danger)' : 'var(--border)', background: 'var(--bg)', color: 'var(--text-primary)' }}
               />
+              {fieldErrors.email && (
+                <p role="alert" className="mt-1 text-xs" style={{ color: 'var(--danger)' }}>{fieldErrors.email}</p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs" style={{ color: 'var(--text-tertiary)' }}>
@@ -183,11 +197,16 @@ export default function ListsPage() {
               <input
                 type="tel"
                 value={addPhone}
-                onChange={e => setAddPhone(e.target.value)}
+                maxLength={30}
+                onChange={e => { setAddPhone(e.target.value); if (fieldErrors.phone) setFieldErrors(f => ({ ...f, phone: undefined })); }}
+                onBlur={() => setFieldErrors(f => ({ ...f, phone: addPhone.trim() && !PHONE_RE.test(addPhone.trim()) ? 'Enter a valid phone' : undefined }))}
                 placeholder="+1 555 000 0000"
                 className={inputClass()}
-                style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text-primary)' }}
+                style={{ borderColor: fieldErrors.phone ? 'var(--danger)' : 'var(--border)', background: 'var(--bg)', color: 'var(--text-primary)' }}
               />
+              {fieldErrors.phone && (
+                <p role="alert" className="mt-1 text-xs" style={{ color: 'var(--danger)' }}>{fieldErrors.phone}</p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs" style={{ color: 'var(--text-tertiary)' }}>

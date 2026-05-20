@@ -66,6 +66,10 @@ const inputClass =
   'w-full rounded border px-3 py-2.5 text-sm focus:outline-none transition-colors';
 const labelClass = 'text-[0.65rem] uppercase tracking-[0.15em] mb-1.5 block';
 
+const PHONE_RE = /^[\d\s\-().+ ]{10,}$/;
+
+type FieldErrors = { firstName?: string; lastName?: string; phone?: string };
+
 export default function ProfileForm({ member, application }: ProfileFormProps) {
   const [firstName, setFirstName] = useState(member.firstName ?? '');
   const [lastName, setLastName] = useState(member.lastName ?? '');
@@ -73,9 +77,23 @@ export default function ProfileForm({ member, application }: ProfileFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  function validate(): FieldErrors {
+    const fe: FieldErrors = {};
+    if (!firstName.trim()) fe.firstName = 'Required';
+    else if (firstName.length > 100) fe.firstName = 'Max 100 characters';
+    if (!lastName.trim()) fe.lastName = 'Required';
+    else if (lastName.length > 100) fe.lastName = 'Max 100 characters';
+    if (phone.trim() && !PHONE_RE.test(phone.trim())) fe.phone = 'Enter a valid phone';
+    return fe;
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const fe = validate();
+    setFieldErrors(fe);
+    if (Object.keys(fe).length > 0) return;
     setSaving(true);
     setError('');
     setSaved(false);
@@ -88,8 +106,12 @@ export default function ProfileForm({ member, application }: ProfileFormProps) {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        setError(data?.error ? JSON.stringify(data.error) : 'Something went wrong.');
+        const data = await res.json().catch(() => ({}));
+        const msg =
+          typeof data?.error === 'string'
+            ? data.error
+            : 'We could not save those changes. Please try again.';
+        setError(msg);
         return;
       }
 
@@ -151,10 +173,11 @@ export default function ProfileForm({ member, application }: ProfileFormProps) {
           <input
             type="text"
             value={firstName}
+            maxLength={100}
             onChange={(e) => setFirstName(e.target.value)}
             className={inputClass}
             style={{
-              borderColor: 'var(--events-line-soft)',
+              borderColor: fieldErrors.firstName ? 'var(--danger)' : 'var(--events-line-soft)',
               background: 'var(--events-canvas-raised)',
               color: 'var(--events-fg)',
             }}
@@ -162,9 +185,17 @@ export default function ProfileForm({ member, application }: ProfileFormProps) {
               (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--events-warm-accent)';
             }}
             onBlur={(e) => {
-              (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--events-line-soft)';
+              setFieldErrors(validate());
+              (e.currentTarget as HTMLInputElement).style.borderColor = fieldErrors.firstName
+                ? 'var(--danger)'
+                : 'var(--events-line-soft)';
             }}
           />
+          {fieldErrors.firstName && (
+            <p className="mt-1 text-xs" style={{ color: 'var(--danger)' }} role="alert">
+              {fieldErrors.firstName}
+            </p>
+          )}
         </div>
 
         <div>
@@ -174,10 +205,11 @@ export default function ProfileForm({ member, application }: ProfileFormProps) {
           <input
             type="text"
             value={lastName}
+            maxLength={100}
             onChange={(e) => setLastName(e.target.value)}
             className={inputClass}
             style={{
-              borderColor: 'var(--events-line-soft)',
+              borderColor: fieldErrors.lastName ? 'var(--danger)' : 'var(--events-line-soft)',
               background: 'var(--events-canvas-raised)',
               color: 'var(--events-fg)',
             }}
@@ -185,9 +217,17 @@ export default function ProfileForm({ member, application }: ProfileFormProps) {
               (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--events-warm-accent)';
             }}
             onBlur={(e) => {
-              (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--events-line-soft)';
+              setFieldErrors(validate());
+              (e.currentTarget as HTMLInputElement).style.borderColor = fieldErrors.lastName
+                ? 'var(--danger)'
+                : 'var(--events-line-soft)';
             }}
           />
+          {fieldErrors.lastName && (
+            <p className="mt-1 text-xs" style={{ color: 'var(--danger)' }} role="alert">
+              {fieldErrors.lastName}
+            </p>
+          )}
         </div>
 
         <div>
@@ -197,11 +237,12 @@ export default function ProfileForm({ member, application }: ProfileFormProps) {
           <input
             type="tel"
             value={phone}
+            maxLength={30}
             onChange={(e) => setPhone(e.target.value)}
             className={inputClass}
             placeholder="Optional"
             style={{
-              borderColor: 'var(--events-line-soft)',
+              borderColor: fieldErrors.phone ? 'var(--danger)' : 'var(--events-line-soft)',
               background: 'var(--events-canvas-raised)',
               color: 'var(--events-fg)',
             }}
@@ -209,9 +250,17 @@ export default function ProfileForm({ member, application }: ProfileFormProps) {
               (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--events-warm-accent)';
             }}
             onBlur={(e) => {
-              (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--events-line-soft)';
+              setFieldErrors(validate());
+              (e.currentTarget as HTMLInputElement).style.borderColor = fieldErrors.phone
+                ? 'var(--danger)'
+                : 'var(--events-line-soft)';
             }}
           />
+          {fieldErrors.phone && (
+            <p className="mt-1 text-xs" style={{ color: 'var(--danger)' }} role="alert">
+              {fieldErrors.phone}
+            </p>
+          )}
         </div>
 
         {/* Application read-only fields */}

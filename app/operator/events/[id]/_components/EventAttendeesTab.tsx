@@ -721,14 +721,22 @@ function CompDrawer({
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
-  const canSubmit = firstName.trim() && lastName.trim() && email.trim() && !submitting;
+  const COMP_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const emailValid = COMP_EMAIL_RE.test(email.trim());
+  const canSubmit =
+    firstName.trim() && lastName.trim() && email.trim() && emailValid && !submitting;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      if (email.trim() && !emailValid) setEmailError('Enter a valid email');
+      return;
+    }
     setSubmitting(true);
     setError(null);
+    setEmailError(null);
     try {
       const res = await fetch(`/api/operator/events/${eventId}/comp`, {
         method: 'POST',
@@ -811,9 +819,25 @@ function CompDrawer({
               type="email"
               className={fieldCls}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              maxLength={254}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError(null);
+              }}
+              onBlur={() =>
+                setEmailError(
+                  email.trim() && !COMP_EMAIL_RE.test(email.trim())
+                    ? 'Enter a valid email'
+                    : null,
+                )
+              }
               required
             />
+            {emailError && (
+              <span role="alert" className="text-xs" style={{ color: 'var(--danger)' }}>
+                {emailError}
+              </span>
+            )}
           </label>
 
           <label className="flex flex-col gap-1.5">
