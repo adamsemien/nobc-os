@@ -8,6 +8,7 @@ import { DEFAULT_TIER_NAMES, type TierNames } from '@/lib/score-display';
 import { EmptyState } from '../../_components/EmptyState';
 import { useTheme } from '../../_components/ThemeToggle';
 import { Avatar } from '../../_components/Avatar';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { WaxSealStamp } from './WaxSealStamp';
 
 export type ApplicationsQueueItem = {
@@ -183,6 +184,7 @@ export function ApplicationsQueue({
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'score' | 'alpha'>('newest');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingBulkAction, setPendingBulkAction] = useState<string | null>(null);
+  const [confirmBulk, setConfirmBulk] = useState<'reject' | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [voidInverted, setVoidInverted] = useState(false);
 
@@ -322,20 +324,34 @@ export function ApplicationsQueue({
   const bulkAction = useCallback(async (action: 'approve' | 'reject' | 'hold') => {
     setPendingBulkAction(action);
     const ids = Array.from(selectedIds);
-    const results = await Promise.allSettled(
-      ids.map(id => fetch(`/api/operator/applications/${id}/${action}`, { method: 'POST', credentials: 'include' }).then(r => ({ id, ok: r.ok })))
-    );
-    const succeeded = results.filter(r => r.status === 'fulfilled' && r.value.ok).map(r => (r as PromiseFulfilledResult<{ id: string; ok: boolean }>).value.id);
-    const failCount = ids.length - succeeded.length;
-    setApplications(prev => prev.filter(a => !succeeded.includes(a.id)));
-    setSelectedIds(new Set());
-    const label = action === 'approve' ? 'approved' : action === 'hold' ? 'moved to hold' : 'rejected';
-    const msg = failCount === 0
-      ? `${succeeded.length} application${succeeded.length !== 1 ? 's' : ''} ${label}.`
-      : `${succeeded.length} ${label}; ${failCount} failed (already processed or error).`;
-    setFlash({ type: failCount === 0 ? 'success' : 'error', message: msg });
-    setPendingBulkAction(null);
-    window.setTimeout(() => setFlash(null), 4000);
+    try {
+      const res = await fetch('/api/operator/applications/bulk', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, action }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        succeeded?: number;
+        failed?: number;
+        failures?: { id: string }[];
+      };
+      const succeededIds = ids.filter(id => !(data.failures ?? []).some(f => f.id === id));
+      const failCount = data.failed ?? Math.max(0, ids.length - (data.succeeded ?? 0));
+      setApplications(prev => prev.filter(a => !succeededIds.includes(a.id)));
+      setSelectedIds(new Set());
+      const label = action === 'approve' ? 'approved' : action === 'hold' ? 'moved to hold' : 'rejected';
+      const msg = failCount === 0
+        ? `${succeededIds.length} application${succeededIds.length !== 1 ? 's' : ''} ${label}.`
+        : `${succeededIds.length} ${label}; ${failCount} failed (already processed or error).`;
+      setFlash({ type: failCount === 0 ? 'success' : 'error', message: msg });
+    } catch {
+      setFlash({ type: 'error', message: 'Network error. Try again.' });
+    } finally {
+      setPendingBulkAction(null);
+      window.setTimeout(() => setFlash(null), 4000);
+    }
   }, [selectedIds]);
 
   useEffect(() => {
@@ -430,7 +446,7 @@ export function ApplicationsQueue({
                   Approve
                 </button>
                 <button
-                  onClick={() => bulkAction('reject')}
+                  onClick={() => setConfirmBulk('reject')}
                   disabled={!!pendingBulkAction}
                   className="rounded px-2 py-1 text-xs font-medium text-danger hover:bg-muted disabled:opacity-50"
                 >
@@ -614,6 +630,21 @@ export function ApplicationsQueue({
           ) : null}
         </div>
       </div>
+
+      {confirmBulk === 'reject' ? (
+        <ConfirmModal
+          title={`Reject ${selectedIds.size} application${selectedIds.size === 1 ? '' : 's'}?`}
+          subtitle="This sends a rejection email and cannot be undone."
+          confirmLabel="Reject all"
+          confirmTone="danger"
+          busy={pendingBulkAction === 'reject'}
+          onCancel={() => setConfirmBulk(null)}
+          onConfirm={async () => {
+            setConfirmBulk(null);
+            await bulkAction('reject');
+          }}
+        />
+      ) : null}
 
       {sheetOpen && selected ? (
         <div
