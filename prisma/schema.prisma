@@ -54,6 +54,7 @@ model Workspace {
   eventWorkflows       EventWorkflow[]
   operatorComments     OperatorComment[]
   operatorNotifications OperatorNotification[]
+  qaMissions           QAMission[]
 
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
@@ -1152,4 +1153,32 @@ model OperatorNotification {
 
   @@index([recipientId, readAt])
   @@index([workspaceId, createdAt])
+}
+
+// Gamified QA testing missions. AI generates a scenario + steps; operator runs
+// it in the live platform; checkpoint hits + bug reports + completion accrue
+// score. Mission state is honor-system + URL detection on the client.
+model QAMission {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  operatorId     String
+  operatorName   String
+  scenario       String
+  missionType    String    // 'speed_run' | 'discovery' | 'workflow' | 'stress_test' | 'bug_hunt'
+  difficulty     String    // 'easy' | 'medium' | 'hard'
+  targetSteps    Json      // Array of { id, instruction, checkpoint, points }
+  completedSteps Json      @default("[]")
+  score          Int       @default(0)
+  bugsFound      Json      @default("[]")
+  feedback       String?
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  durationMs     Int?
+  status         String    @default("active") // 'active' | 'completed' | 'abandoned'
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, operatorId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, score])
 }

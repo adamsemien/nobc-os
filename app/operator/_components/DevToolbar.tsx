@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import type { Persona, PersonaStep } from '@/lib/dev/persona-types';
+import type {
+  ActiveMission,
+  MissionDifficulty,
+} from '@/lib/dev/qa-types';
+import { QAMissionPanel } from './QAMissionPanel';
 
 const ALLOWED_IDS = (process.env.NEXT_PUBLIC_DEV_USER_IDS ?? '')
   .split(',')
@@ -87,6 +92,28 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
   const [batchRunning, setBatchRunning] = useState(false);
   const [resultApplicationId, setResultApplicationId] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+
+  // QA Game Mode state
+  const [mission, setMission] = useState<ActiveMission | null>(null);
+  const [missionLoading, setMissionLoading] = useState(false);
+  const [missionError, setMissionError] = useState<string | null>(null);
+  const [difficulty, setDifficulty] = useState<MissionDifficulty>('medium');
+  const [leaderboard, setLeaderboard] = useState<
+    Array<{ id: string; operatorName: string; score: number; missionType: string; difficulty: string }>
+  >([]);
+  const [recent, setRecent] = useState<
+    Array<{ id: string; missionType: string; difficulty: string; score: number; status: string; completedAt: string | null }>
+  >([]);
+  const [completionSummary, setCompletionSummary] = useState<{
+    score: number;
+    durationMs: number;
+    timeBonus: number;
+    completionBonus: number;
+    bugsFound: number;
+    stepsCompleted: number;
+    stepsTotal: number;
+  } | null>(null);
+
   const stripeLive =
     typeof process !== 'undefined' &&
     (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '').startsWith('pk_live_');
@@ -127,6 +154,92 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isAllowed, toggle]);
+
+  // Rehydrate active mission on mount + load leaderboard / recent.
+  useEffect(() => {
+    if (!isAllowed) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/dev/qa/active');
+        if (res.ok) {
+          const data = (await res.json()) as { mission: ActiveMission | null };
+          if (!cancelled && data.mission) setMission(data.mission);
+        }
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAllowed]);
+
+  const refreshBoards = useCallback(async () => {
+    try {
+      const [lbRes, recRes] = await Promise.all([
+        fetch('/api/dev/qa/leaderboard'),
+        fetch('/api/dev/qa/recent'),
+      ]);
+      if (lbRes.ok) {
+        const d = await lbRes.json();
+        setLeaderboard(d.leaderboard ?? []);
+      }
+      if (recRes.ok) {
+        const d = await recRes.json();
+        setRecent(d.recent ?? []);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!isAllowed || !open) return;
+    refreshBoards();
+  }, [isAllowed, open, refreshBoards]);
+
+  async function handleStartMission() {
+    setMissionLoading(true);
+    setMissionError(null);
+    setCompletionSummary(null);
+    try {
+      const res = await fetch('/api/dev/qa/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ difficulty }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMissionError(data?.error ?? 'Could not generate mission.');
+        return;
+      }
+      setMission(data.mission as ActiveMission);
+    } catch (e) {
+      setMissionError(e instanceof Error ? e.message : 'Network error.');
+    } finally {
+      setMissionLoading(false);
+    }
+  }
+
+  function handleMissionComplete(summary: {
+    score: number;
+    durationMs: number;
+    timeBonus: number;
+    completionBonus: number;
+    bugsFound: number;
+    stepsCompleted: number;
+    stepsTotal: number;
+  }) {
+    setCompletionSummary(summary);
+    setMission(null);
+    refreshBoards();
+  }
+
+  function handleMissionAbandon() {
+    setMission(null);
+    refreshBoards();
+  }
+
+  function handleMissionUpdate(next: ActiveMission) {
+    setMission(next);
+  }
 
   if (!isLoaded || !isAllowed) return null;
 
@@ -298,6 +411,16 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
 
   return (
     <>
+      {/* Mission panel — floats bottom-left whenever a mission is active */}
+      {mission && (
+        <QAMissionPanel
+          mission={mission}
+          onUpdate={handleMissionUpdate}
+          onComplete={handleMissionComplete}
+          onAbandon={handleMissionAbandon}
+        />
+      )}
+
       {/* Floating pill — always visible, hidden when panel is open */}
       <button
         onClick={toggle}
@@ -512,6 +635,137 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
               >
                 View persona →
               </a>
+            )}
+          </div>
+
+          {/* QA Game Mode */}
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid #2d2438' }}>
+            <div style={{ color: '#5a4d6a', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+              🎮 QA Game Mode
+            </div>
+            {mission ? (
+              <div style={{ color: '#c4b8d4', fontSize: 11 }}>
+                Mission in progress · {mission.score}pt · panel docked bottom-left
+              </div>
+            ) : (
+              <>
+                {/* Difficulty selector */}
+                <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                  {(['easy', 'medium', 'hard'] as const).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setDifficulty(d)}
+                      style={{
+                        ...S.chip,
+                        flex: 1,
+                        textAlign: 'center',
+                        background: difficulty === d ? '#3a2540' : '#231d2e',
+                        borderColor: difficulty === d ? '#B22E21' : '#3d3050',
+                        color: difficulty === d ? '#e8e4f0' : '#c4b8d4',
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={handleStartMission}
+                  disabled={missionLoading}
+                  style={{ ...S.btn, width: '100%', textAlign: 'center', fontWeight: 700 }}
+                >
+                  {missionLoading ? '⏳ Generating…' : 'Start Mission →'}
+                </button>
+                {missionError && (
+                  <div style={{ color: '#f87171', fontSize: 10, marginTop: 6 }}>
+                    ✗ {missionError}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Completion summary (post-mission) */}
+            {completionSummary && !mission && (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: 8,
+                  borderRadius: 6,
+                  border: '1px solid #4ade80',
+                  background: '#0f1a14',
+                  color: '#c4d8c0',
+                  fontSize: 10,
+                  lineHeight: 1.5,
+                }}
+              >
+                <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                  ✓ Mission complete · {completionSummary.score}pt
+                </div>
+                <div>
+                  {completionSummary.stepsCompleted}/{completionSummary.stepsTotal} steps ·{' '}
+                  {Math.round(completionSummary.durationMs / 1000)}s · {completionSummary.bugsFound} bug
+                  {completionSummary.bugsFound === 1 ? '' : 's'}
+                </div>
+                {completionSummary.timeBonus > 0 && (
+                  <div style={{ color: '#fbbf24' }}>
+                    +{completionSummary.timeBonus}pt time bonus
+                  </div>
+                )}
+                {completionSummary.completionBonus > 0 && (
+                  <div style={{ color: '#fbbf24' }}>
+                    +{completionSummary.completionBonus}pt full clear
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Leaderboard (weekly) */}
+            {leaderboard.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ color: '#5a4d6a', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  This week · top 5
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10 }}>
+                  {leaderboard.map((row, i) => (
+                    <div
+                      key={row.id}
+                      style={{
+                        display: 'flex',
+                        gap: 6,
+                        color: i === 0 ? '#fbbf24' : '#c4b8d4',
+                      }}
+                    >
+                      <span style={{ width: 14 }}>{['🥇', '🥈', '🥉'][i] ?? `${i + 1}.`}</span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {row.operatorName}
+                      </span>
+                      <span style={{ color: '#5a4d6a' }}>{row.missionType.replace('_', ' ')}</span>
+                      <span style={{ fontWeight: 700 }}>{row.score}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent missions */}
+            {recent.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ color: '#5a4d6a', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Recent
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10 }}>
+                  {recent.map((row) => (
+                    <div key={row.id} style={{ display: 'flex', gap: 6, color: '#c4b8d4' }}>
+                      <span style={{ color: row.status === 'completed' ? '#4ade80' : '#5a4d6a' }}>
+                        {row.status === 'completed' ? '✓' : '×'}
+                      </span>
+                      <span style={{ flex: 1 }}>{row.missionType.replace('_', ' ')}</span>
+                      <span style={{ color: '#5a4d6a' }}>{row.difficulty}</span>
+                      <span style={{ fontWeight: 700 }}>{row.score}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
