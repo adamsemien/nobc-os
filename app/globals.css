@@ -2149,3 +2149,27 @@ button:not(:disabled):active,
 [data-theme="myspace"] {
   --on-primary: #1A0020;
 }
+
+/* ============================================================
+   Editorial entrance — operator home dashboard
+   Subtle fade + 8px rise, staggered across the major sections.
+   Honors prefers-reduced-motion.
+   ============================================================ */
+@keyframes editorial-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .editorial-fade-in {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: editorial-fade-in 500ms ease-out forwards;
+  }
+  .editorial-stagger-1 { animation-delay:   0ms; }
+  .editorial-stagger-2 { animation-delay:  80ms; }
+  .editorial-stagger-3 { animation-delay: 160ms; }
+  .editorial-stagger-4 { animation-delay: 240ms; }
+  .editorial-stagger-5 { animation-delay: 320ms; }
+}
+

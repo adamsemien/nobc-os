@@ -11,7 +11,7 @@
 | **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | 7-theme system polish + V1.5 customization features |
+| **Next** | Roll the editorial dashboard treatment outward — apply the same hairline + display-numeral language to `/operator/applications` and `/operator/events` index pages |
 
 ## Scope
 
@@ -28,16 +28,23 @@ Feature-specific operator UIs (applications review, event editor, RSVP manager, 
 ## Files in play
 
 ```
-app/operator/layout.tsx                         ← shell + nav
-app/operator/page.tsx                           ← dashboard home / activity feed
-app/operator/members/page.tsx                   ← directory
-app/operator/members/[id]/page.tsx              ← member detail
-app/operator/audit/page.tsx                     ← audit log viewer
-app/operator/settings/                          ← workspace settings (entire directory)
-app/operator/_help/                             ← in-app help / onboarding (entire directory)
-lib/theme.ts                                    ← active theme resolution (7-theme system + per-workspace override)
-lib/permissions.ts                              ← role → action matrix used by every operator API route
-lib/audit.ts                                    ← AuditEvent write + query helpers (single module)
+app/operator/layout.tsx                                  ← shell + nav
+app/operator/page.tsx                                    ← editorial dashboard home (masthead → numerals → tonight → journal → marginalia)
+app/operator/members/page.tsx                            ← directory
+app/operator/members/[id]/page.tsx                       ← member detail
+app/operator/audit/page.tsx                              ← audit log viewer
+app/operator/settings/                                   ← workspace settings (entire directory)
+app/operator/_help/                                      ← in-app help / onboarding (entire directory)
+app/operator/_components/dashboard/StatColumn.tsx        ← oversized display-font numeral with eyebrow + soft CTA
+app/operator/_components/dashboard/SectionHeader.tsx     ← editorial section eyebrow (or display-font heading) with optional action slot
+app/operator/_components/dashboard/CapacityBar.tsx       ← 1px hairline capacity indicator for events
+app/operator/_components/dashboard/ActivityRow.tsx       ← single audit-row with colored leading rule
+app/operator/_components/dashboard/TonightPanel.tsx      ← "Tonight" feature block: today's events + waiting-on-you list
+app/operator/_components/dashboard/format.ts             ← shared date/action formatters used across the dashboard components
+lib/theme.ts                                             ← active theme resolution (10-theme system + per-workspace override)
+lib/permissions.ts                                       ← role → action matrix used by every operator API route
+lib/audit.ts                                             ← AuditEvent write + query helpers (single module)
+app/globals.css                                          ← `.editorial-fade-in` + `.editorial-stagger-{1..5}` entrance keyframes (honor prefers-reduced-motion)
 ```
 
 ## Inputs
@@ -62,6 +69,17 @@ lib/audit.ts                                    ← AuditEvent write + query hel
 - **Tag** + **EntityTag**: member/application tagging surface used in the directory
 - **AccessToken**: operator API tokens (when present)
 - Indexes: (workspaceId, createdAt DESC), (resourceType, resourceId)
+
+## Dashboard home — editorial language
+
+The operator home (`app/operator/page.tsx`) is a luxury-magazine read of the workspace, not a fintech panel. The visual contract:
+
+- **Five sections, top → bottom:** masthead (date + display-font headline + thin rule) → four-column numerals (giant `var(--font-display)` numbers separated by vertical hairlines) → "Tonight" (the only urgent moment) → "What's coming" + "Lately" two-column journal → marginalia (birthdays + on-this-day) under a single top hairline.
+- **One accent moment.** `var(--primary)` only flips a body element when something demands action — the Pending Applications numeral when count > 0, and `The Room →` as the only filled `--primary` button on the page (lives inside Tonight). Everything else stays in text-primary/secondary/tertiary.
+- **Hairlines, not cards.** Surfaces are separated by 1px `var(--border)` rules instead of bordered card backgrounds. Capacity is a 1px line, not a rounded pill.
+- **Display font for numerals + section titles.** All large numerals and event titles use `var(--font-display)` directly so per-theme pairings (Obsidian → Cormorant, Parchment → Fraunces, Rose → Playfair, etc.) inherit automatically. Never hardcode `"PP Editorial New"` or any other family name in components.
+- **Staggered entrance.** Each major section uses `.editorial-fade-in .editorial-stagger-{n}`; cascade is 80ms per step, gated behind `prefers-reduced-motion: no-preference`.
+- **Reusable dashboard components live under `app/operator/_components/dashboard/`** — extracting from `page.tsx` (rather than building inline JSX) is the default when adding a new editorial surface in this stage.
 
 ## Rules — DO NOT VIOLATE
 
