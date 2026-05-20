@@ -98,6 +98,98 @@ function isValidMission(m: unknown): m is GeneratedMission {
   return true;
 }
 
+/** Snapshot of what actually exists in the workspace so missions can reference real data. */
+async function buildWorkspaceSnapshot(workspaceId: string): Promise<string> {
+  const [
+    workspace,
+    memberCount,
+    pendingAppCount,
+    sampleMembers,
+    sampleApps,
+    sampleEvents,
+    sampleWatch,
+    sampleEventFlows,
+  ] = await Promise.all([
+    db.workspace.findUnique({ where: { id: workspaceId }, select: { name: true, slug: true } }),
+    db.member.count({ where: { workspaceId, status: { not: 'GUEST' } } }),
+    db.application.count({ where: { workspaceId, status: 'PENDING' } }),
+    db.member.findMany({
+      where: { workspaceId, status: { not: 'GUEST' } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, firstName: true, lastName: true },
+    }),
+    db.application.findMany({
+      where: { workspaceId, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, fullName: true, email: true, archetype: true, aiScore: true },
+    }),
+    db.event.findMany({
+      where: { workspaceId },
+      orderBy: { startAt: 'desc' },
+      take: 5,
+      select: { id: true, title: true, slug: true, accessMode: true, status: true },
+    }),
+    db.watchList.findMany({
+      where: { workspaceId, deletedAt: null },
+      take: 5,
+      select: { type: true, matchEmail: true },
+    }),
+    db.eventWorkflow.findMany({
+      where: { workspaceId },
+      take: 5,
+      select: { templateKey: true },
+    }),
+  ]);
+
+  const lines: string[] = [];
+  lines.push(`Workspace: ${workspace?.name ?? '(unknown)'} (slug: ${workspace?.slug ?? '?'})`);
+  lines.push(`Member count: ${memberCount} · Pending applications: ${pendingAppCount}`);
+  if (sampleMembers.length > 0) {
+    lines.push(
+      `Sample members: ${sampleMembers
+        .map((m) => `${m.firstName} ${m.lastName} (id ${m.id.slice(-6)})`)
+        .join(', ')}`,
+    );
+  } else {
+    lines.push('Sample members: (none — workspace has no approved members yet)');
+  }
+  if (sampleApps.length > 0) {
+    lines.push(
+      `Pending applications: ${sampleApps
+        .map(
+          (a) =>
+            `${a.fullName ?? a.email} [${a.archetype ?? 'no-archetype'}, score ${a.aiScore ?? '—'}] (id ${a.id.slice(-6)})`,
+        )
+        .join('; ')}`,
+    );
+  } else {
+    lines.push('Pending applications: (queue empty)');
+  }
+  if (sampleEvents.length > 0) {
+    lines.push(
+      `Recent events: ${sampleEvents
+        .map((e) => `"${e.title}" (slug=${e.slug}, accessMode=${e.accessMode}, status=${e.status})`)
+        .join('; ')}`,
+    );
+  } else {
+    lines.push('Recent events: (none)');
+  }
+  if (sampleWatch.length > 0) {
+    lines.push(
+      `Watch list samples: ${sampleWatch
+        .map((w) => `${w.type}:${w.matchEmail ?? '(no email)'}`)
+        .join(', ')}`,
+    );
+  }
+  if (sampleEventFlows.length > 0) {
+    const templates = Array.from(new Set(sampleEventFlows.map((f) => f.templateKey)));
+    lines.push(`Workflow templates in use: ${templates.join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId || !ALLOWED.includes(userId)) {
@@ -110,6 +202,8 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as { difficulty?: Difficulty };
     if (body.difficulty && VALID_DIFFICULTY.has(body.difficulty)) difficulty = body.difficulty;
   } catch {}
+
+  const snapshot = await buildWorkspaceSnapshot(workspaceId);
 
   // Abandon any other active missions for this operator before starting fresh.
   await db.qAMission.updateMany({
@@ -131,7 +225,12 @@ export async function POST(req: NextRequest) {
       const { text } = await generateText({
         model: anthropic('claude-sonnet-4-6'),
         system: SYSTEM_PROMPT,
-        prompt: `Difficulty: ${difficulty}. Generate one mission now.`,
+        prompt: `Current state of this workspace:
+${snapshot}
+
+When it sharpens a mission, reference the real data above by name (e.g. "Approve [name]'s pending application", "Open the event titled X"). For exploratory or general-purpose missions, generic instructions are fine. If a section above is empty (e.g. zero pending applications), do NOT invent missions that require it — pick objectives the operator can actually run today.
+
+Difficulty: ${difficulty}. Generate one mission now.`,
         maxOutputTokens: 1200,
         temperature: 0.9,
       });
