@@ -1,7 +1,18 @@
 'use client';
 
-import { useCallback, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { useCallback, useState } from 'react';
+import {
+  Avatar,
+  DataTableShell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableBody,
+  DataTableRow,
+  DataTableCell,
+} from '@/components/ui';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { ScoreBadge } from '../../_components/ScoreBadge';
 
 export type MembersBulkMember = {
   id: string;
@@ -26,16 +37,16 @@ const ACTION_LABEL: Record<Action, string> = {
   tag: 'Tag',
 };
 
-export function MembersBulkActions({
-  members,
-  children,
-}: {
-  members: MembersBulkMember[];
-  children: (
-    selected: Set<string>,
-    toggle: (id: string) => void,
-  ) => ReactNode;
-}) {
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+export function MembersBulkActions({ members }: { members: MembersBulkMember[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Action | null>(null);
   const [confirm, setConfirm] = useState<Action | null>(null);
@@ -105,9 +116,7 @@ export function MembersBulkActions({
       ) : null}
 
       {count > 0 ? (
-        <div
-          className="sticky top-2 z-20 mb-3 flex items-center gap-3 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm shadow-sm"
-        >
+        <div className="sticky top-2 z-20 mb-3 flex items-center gap-3 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm shadow-sm">
           <span className="text-text-secondary">
             {count} of {allCount} selected
           </span>
@@ -157,7 +166,79 @@ export function MembersBulkActions({
         </div>
       ) : null}
 
-      {children(selected, toggle)}
+      <DataTableShell>
+        <DataTableHead>
+          <DataTableHeader className="w-8" />
+          <DataTableHeader>Member</DataTableHeader>
+          <DataTableHeader>Archetype</DataTableHeader>
+          <DataTableHeader>Score</DataTableHeader>
+          <DataTableHeader align="right">Events</DataTableHeader>
+          <DataTableHeader>Last seen</DataTableHeader>
+          <DataTableHeader>Joined</DataTableHeader>
+        </DataTableHead>
+        <DataTableBody>
+          {members.map((m) => (
+            <DataTableRow key={m.id}>
+              <DataTableCell>
+                <input
+                  type="checkbox"
+                  checked={selected.has(m.id)}
+                  onChange={() => toggle(m.id)}
+                  aria-label={`Select ${m.fullName}`}
+                  className="h-4 w-4 cursor-pointer rounded border-border accent-primary"
+                />
+              </DataTableCell>
+              <DataTableCell>
+                <Link
+                  href={`/operator/members/${m.id}`}
+                  className="flex items-center gap-3"
+                >
+                  <Avatar name={m.fullName} email={m.email} size={32} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-text-primary">
+                      <span className="truncate font-medium">{m.fullName}</span>
+                      {m.isVip ? (
+                        <span
+                          title="Purple list"
+                          style={{ color: 'var(--accent, #C7A7DE)' }}
+                        >
+                          ✦
+                        </span>
+                      ) : null}
+                      {m.isBlocked ? (
+                        <span
+                          title="Blocked"
+                          className="rounded bg-danger-soft px-1 text-[9px] font-semibold uppercase text-danger"
+                        >
+                          blocked
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="truncate text-xs text-text-muted">
+                      {m.email}
+                    </div>
+                  </div>
+                </Link>
+              </DataTableCell>
+              <DataTableCell tone="secondary">
+                {m.archetype ? (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
+                    {m.archetype}
+                  </span>
+                ) : (
+                  <span className="text-text-muted">—</span>
+                )}
+              </DataTableCell>
+              <DataTableCell>
+                <ScoreBadge value={m.aiScore} size="sm" />
+              </DataTableCell>
+              <DataTableCell align="right">{m.totalEventsAttended}</DataTableCell>
+              <DataTableCell tone="tertiary">{fmtDate(m.lastAttendedDate)}</DataTableCell>
+              <DataTableCell tone="tertiary">{fmtDate(m.createdAt)}</DataTableCell>
+            </DataTableRow>
+          ))}
+        </DataTableBody>
+      </DataTableShell>
 
       {confirm ? (
         <ConfirmModal
