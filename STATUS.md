@@ -5,43 +5,36 @@ _Last updated: 2026-05-19_
 ## Current branch: `main`
 
 ## Last 5 commits
+- `fix(validation)` zod schemas, length caps, phone normalization, inline client validation
+- `docs(status)` refresh after 5-block session
 - `feat(events)` hero images, live RSVP list, member event redesign
 - `feat(help)` operator + member help systems with tooltips
 - `feat(member)` complete member portal — home, rsvps, profile
-- `feat(dev)` AI persona runner + 50-batch seed
-- `feat(workflows)` event workflow gates + editable tier names
 
 ## In flight
-Validation hardening + bug audit. Uncommitted. `tsc --noEmit` clean.
+Theme + help + delight pass. Uncommitted. `tsc --noEmit` clean.
 
 ## What shipped this session (uncommitted)
 
-**Validation hardening**
-- `lib/validation.ts` — strict email regex (rejects multi-@, missing TLD, whitespace), phone regex + `normalizePhone()`, `answersMap` for application drafts.
-- `POST /api/apply/membership` — zod-validated (was unvalidated). Length-capped, phone-normalized on write.
-- `PATCH /api/apply/membership/[id]` — zod-validated, gated to `status === PENDING`, validates id shape.
-- `GET /api/apply/membership/[id]` — only PENDING drafts, internal AI fields stripped from response.
-- Client inline validation + error display added to: WalkinModal (name/email/phone), ProfileForm (firstName/lastName/phone), EventAccessFlow GuestInfoStep (name/email), Comp drawer (email), Lists add form (email/phone). Submit buttons now disabled until form is valid.
+**Theme contrast audit** — all 10 themes (`nobc`, `midnight`, `obsidian`, `rose`, `parchment`, `void`, `ember`, `y2k`, `aim`, `myspace`) now hit WCAG 2.1 AA (4.5:1) on body/secondary/tertiary text, button text on primary, and all status chip pairs. Override block appended to `app/globals.css` — 110/110 verified pairs pass.
 
-**Phase 3 spot check**
-- Sampled operator routes: workspace scoping correct (either `findFirst({id,workspaceId})` or `findUnique` + explicit workspaceId check).
-- Public apply-draft endpoints were the main gap; now closed.
+**Help content rewrite**
+- `app/operator/_help/content.ts` — 8 sections rewritten in NoBC voice (direct, lowercase casual, members not users, "the way we think about it" anchors).
+- `app/m/(portal)/help/page.tsx` — DEFAULT_FAQ sharpened (6 entries). PlatformSetting `help.member.faq` integration already existed.
 
-## Queued, awaiting prioritization
-Three large task messages arrived mid-session:
-1. **Delight pass** — MySpace theme readability, wax seal stamp animation, Velvet Rope theme, typewriter on Room vibe line.
-2. **Theme audit + help rewrite** — full WCAG audit of all themes, NoBC-voice rewrite of operator + member help, Member Constellation viz, birthday wall, throwback widget, Clerk appearance config.
-3. **5-block session** — design system primitives migration, OperatorComment + Notifications schema + UI, Cmd+K command palette, bulk actions on applications/members, single-source-of-truth counts API.
+**Delight pass**
+- `MemberConstellation` (SVG, no lib) at top of `/operator/intelligence`. Dots sized by aiScore, colored by archetype CSS vars, position hashed from member.id, parallax on mouse, lines between cosine-similar (>0.7) archetype profiles, hover tooltip, click → member detail.
+- Dashboard widgets below Action Required: **Birthdays this week** (queries `ApplicationAnswer` for `basics.birthday`) and **On this day** (AuditEvent at 30/90/365 days ago). Both hide on empty data.
+- `WaxSealStamp` component + `lib/sounds/wax-stamp.ts` — layered 80Hz sine thump + bandpass-filtered noise burst (~150ms), fires on mount with the existing parchment seal animation.
 
-These overlap (themes appear in 1 & 2, help content in 2, dashboard widgets in 2, design primitives in 3). Needs direction before starting.
+**Clerk appearance** — `lib/clerk-appearance.ts` passes a config matching NoBC tokens (cream bg, red primary, PP Editorial italic headings, Neue Haas body, 10px cards, 6px buttons). Wired into `<ClerkProvider>` in `app/layout.tsx`.
+
+## Known gaps
+- Birthday wall is wired but no `birthday` field on `Member` — depends on `basics.birthday` answer surviving on Application. Will surface for members whose application carried the answer.
 
 ## Blocked
 - Apple/Google Wallet passes — PassNinja account pending.
 - MCP server toolset incomplete.
-- Custom workflows (mix-and-match steps) — V2.
 
 ## Next session
-Pick from the queue above, then smoke test in production:
-1. Try POSTing `/api/apply/membership` with `email: "foo@@bar"` → expect 422.
-2. Submit walk-in with malformed phone → expect inline "Enter a valid phone" before submit.
-3. PATCH a non-PENDING application id → expect 403.
+Commit, smoke-test in dev (each theme + constellation + birthday/throwback widgets + Clerk sign-in styling), then deploy.

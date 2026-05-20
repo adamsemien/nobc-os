@@ -8,6 +8,8 @@ import {
   ScanLine,
   ArrowRight,
   Sparkles,
+  Cake,
+  History,
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
@@ -63,6 +65,95 @@ function actionColor(action: string): string {
   return 'var(--text-secondary)';
 }
 
+/** Returns true if YYYY-MM-DD birthday falls within the next 7 days from today (month/day only). */
+function birthdayWithinWeek(birthday: string, today: Date): { days: number; weekday: string } | null {
+  const m = birthday.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const bMonth = parseInt(m[2], 10) - 1;
+  const bDay = parseInt(m[3], 10);
+  if (isNaN(bMonth) || isNaN(bDay)) return null;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + i);
+    if (d.getMonth() === bMonth && d.getDate() === bDay) {
+      return { days: i, weekday: d.toLocaleDateString('en-US', { weekday: 'short' }) };
+    }
+  }
+  return null;
+}
+
+type Birthday = { memberId: string; name: string; days: number; weekday: string; label: string };
+
+async function loadBirthdaysThisWeek(workspaceId: string): Promise<Birthday[]> {
+  const apps = await db.application.findMany({
+    where: { workspaceId, status: 'APPROVED', memberId: { not: null } },
+    select: {
+      memberId: true,
+      fullName: true,
+      answers: {
+        where: { questionKey: 'basics.birthday' },
+        select: { answer: true },
+      },
+    },
+  });
+  const today = new Date();
+  const out: Birthday[] = [];
+  const seen = new Set<string>();
+  for (const a of apps) {
+    if (!a.memberId || seen.has(a.memberId)) continue;
+    const raw = a.answers[0]?.answer;
+    if (!raw) continue;
+    const hit = birthdayWithinWeek(raw, today);
+    if (!hit) continue;
+    seen.add(a.memberId);
+    const label = hit.days === 0 ? 'today' : hit.days === 1 ? 'tomorrow' : hit.weekday;
+    out.push({ memberId: a.memberId, name: a.fullName, days: hit.days, weekday: hit.weekday, label });
+  }
+  out.sort((a, b) => a.days - b.days);
+  return out;
+}
+
+type Throwback = { period: string; action: string; entityType: string; entityId: string; createdAt: Date };
+
+async function loadThrowbacks(workspaceId: string): Promise<Throwback[]> {
+  const now = new Date();
+  const periods: Array<{ label: string; days: number }> = [
+    { label: '30 days ago', days: 30 },
+    { label: '90 days ago', days: 90 },
+    { label: 'a year ago', days: 365 },
+  ];
+  const slabs = await Promise.all(
+    periods.map(async (p) => {
+      const target = new Date(now);
+      target.setDate(target.getDate() - p.days);
+      target.setHours(0, 0, 0, 0);
+      const end = new Date(target);
+      end.setHours(23, 59, 59, 999);
+      const e = await db.auditEvent.findFirst({
+        where: {
+          workspaceId,
+          createdAt: { gte: target, lte: end },
+          action: {
+            in: [
+              'application.created',
+              'application.approved',
+              'event.published',
+              'event.created',
+              'rsvp.confirmed',
+              'member.created',
+            ],
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { action: true, entityType: true, entityId: true, createdAt: true },
+      });
+      return e ? { period: p.label, ...e } : null;
+    }),
+  );
+  return slabs.filter((x): x is Throwback => x !== null);
+}
+
 export default async function OperatorDashboardPage() {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
@@ -82,6 +173,8 @@ export default async function OperatorDashboardPage() {
     checkedInToday,
     upcomingEventsFull,
     recentAudit,
+    birthdays,
+    throwbacks,
   ] = await Promise.all([
     db.application.count({ where: { workspaceId, status: 'PENDING' } }),
     db.application.findMany({
@@ -126,6 +219,8 @@ export default async function OperatorDashboardPage() {
       take: 8,
       select: { id: true, action: true, entityType: true, entityId: true, createdAt: true },
     }),
+    loadBirthdaysThisWeek(workspaceId),
+    loadThrowbacks(workspaceId),
   ]);
 
   // Capacity counts for the 3 upcoming events
@@ -254,6 +349,56 @@ export default async function OperatorDashboardPage() {
                           {formatRelativeTime(a.createdAt)}
                         </span>
                       </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {(birthdays.length > 0 || throwbacks.length > 0) ? (
+          <section className="mb-8 grid gap-3 lg:grid-cols-2">
+            {birthdays.length > 0 ? (
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                  <Cake className="h-3.5 w-3.5" aria-hidden />
+                  Birthdays this week
+                </div>
+                <ul className="space-y-1.5">
+                  {birthdays.map((b) => (
+                    <li key={b.memberId}>
+                      <Link
+                        href={`/operator/members/${b.memberId}`}
+                        className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-bg"
+                      >
+                        <span className="truncate text-text-primary">{b.name}</span>
+                        <span
+                          className="ml-2 shrink-0 text-xs font-medium"
+                          style={{ color: b.days === 0 ? 'var(--primary)' : 'var(--text-secondary)' }}
+                        >
+                          {b.label}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {throwbacks.length > 0 ? (
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                  <History className="h-3.5 w-3.5" aria-hidden />
+                  On this day
+                </div>
+                <ul className="space-y-1.5">
+                  {throwbacks.map((t) => (
+                    <li key={t.period} className="flex items-baseline gap-3 px-2 py-1">
+                      <span className="w-[88px] shrink-0 text-xs text-text-muted">{t.period}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                        {actionLabel(t.action)}
+                      </span>
                     </li>
                   ))}
                 </ul>

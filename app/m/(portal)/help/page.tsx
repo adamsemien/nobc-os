@@ -9,30 +9,30 @@ const DEFAULT_FAQ: Faq[] = [
   {
     question: 'What is No Bad Company?',
     answer:
-      'A curated member club for builders, hosts, and curators in Austin. We run dinners, residencies, and late-night gatherings for the people in our orbit.',
+      'A curated member club in Austin for builders, hosts, and curators. We run dinners, residencies, and late-night gatherings for the people in our orbit. The point isn’t scale — it’s the room you walk into.',
   },
   {
     question: 'How do I RSVP?',
     answer:
-      'Go to Events, pick what looks good, and follow the buttons. Some events are open to members, some require an application or ticket — you’ll see the path clearly.',
+      'Open Events, pick what looks good, follow the buttons. Some are open to members, some need an application or ticket — you’ll see the path clearly. Confirmed registrations show up under My RSVPs with your QR for the door.',
   },
   {
     question: 'What if I can’t make it?',
     answer:
-      'Cancel from My RSVPs as early as you can. If the event has a refund window, your card is refunded automatically. After that, we don’t refund — give your spot to someone who can use it.',
+      'Cancel from My RSVPs as early as you can. If the event has a refund window, your card is refunded automatically. Past that window we don’t refund — but you can pass your spot to someone who’ll actually use it.',
   },
   {
     question: 'How do plus-ones work?',
     answer:
-      'When an event allows plus-ones, you can add a name and Instagram handle during RSVP. They show up at the door under your name.',
+      'When an event allows plus-ones, you add a name and Instagram handle during RSVP. They show up at the door under your name. Some events are no-plus-ones — we’ll say so on the page.',
   },
   {
     question: 'How do I update my info?',
-    answer: 'Profile → edit your name, phone, contact preferences. Email lives in your Clerk account.',
+    answer: 'Profile → edit your name, phone, contact preferences. Email lives in your Clerk account (sign-in identity, so we don’t touch it from here).',
   },
   {
     question: 'Who do I contact?',
-    answer: 'team@thenobadcompany.com — Adam and Chloe read every message.',
+    answer: 'team@thenobadcompany.com — Adam and Chloe read every message. Not a help desk, just us.',
   },
 ];
 

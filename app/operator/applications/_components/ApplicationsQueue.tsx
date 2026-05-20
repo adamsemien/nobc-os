@@ -8,6 +8,7 @@ import { DEFAULT_TIER_NAMES, type TierNames } from '@/lib/score-display';
 import { EmptyState } from '../../_components/EmptyState';
 import { useTheme } from '../../_components/ThemeToggle';
 import { Avatar } from '../../_components/Avatar';
+import { WaxSealStamp } from './WaxSealStamp';
 
 export type ApplicationsQueueItem = {
   id: string;
@@ -967,26 +968,7 @@ function DetailPanel({
       {theme === 'parchment' && app.archetypeScores && (() => {
         const worth = memberWorthScores(app.archetypeScores!);
         if (worth.total < 22) return null;
-        return (
-          <div style={{ position: 'relative', height: 0 }}>
-            <div
-              className="parchment-wax-seal"
-              style={{
-                position: 'absolute',
-                top: -60,
-                right: 0,
-                width: 64,
-                height: 64,
-              }}
-            >
-              <svg viewBox="0 0 64 64" style={{ width: 64, height: 64 }}>
-                <circle cx="32" cy="32" r="30" fill="#8b3a2a" />
-                <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,240,225,0.3)" strokeWidth="1" />
-                <text x="32" y="37" textAnchor="middle" fill="rgba(255,240,225,0.9)" fontSize="12" fontFamily="Georgia, serif" fontStyle="italic" letterSpacing="2">NBC</text>
-              </svg>
-            </div>
-          </div>
-        );
+        return <WaxSealStamp />;
       })()}
 
       <section className="mt-8 border-t border-border pt-6">

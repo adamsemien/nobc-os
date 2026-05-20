@@ -2060,3 +2060,92 @@ button:not(:disabled):active,
 .ms-blinkie:nth-child(5) { color: #00FF7F; animation-delay: 1.0s; }
 .ms-blinkie:nth-child(6) { color: #FF69B4; animation-delay: 1.25s; }
 .ms-view-counter { color: #00BFFF; font-size: 11px; white-space: nowrap; }
+
+/* ============================================================
+   WCAG AA contrast remediation (audit pass 2026-05-19)
+   Each override moves a token that failed 4.5:1 contrast for
+   normal text. Vibe-preserving — only luminance/saturation tweaks.
+   Verified against all 11 standard pairs per theme (body, secondary,
+   tertiary, button text, success/warning/danger/primary chips).
+   ============================================================ */
+
+[data-theme="nobc"] {
+  --text-tertiary: #75665A;
+  --success: #246741;
+  --warning: #8F5500;
+}
+
+[data-theme="midnight"] {
+  --text-tertiary: #8A78B0;
+  --danger: #E08099;
+  --primary: #B884CC;
+}
+
+[data-theme="obsidian"] {
+  --text-secondary: #8A857D;
+  --text-tertiary: #807A72;
+  --success: #4EA872;
+  --warning: #B88A1F;
+  --danger: #D65555;
+}
+
+[data-theme="rose"] {
+  --text-secondary: #7A6E66;
+  --text-tertiary: #6E6259;
+  --primary: #A8401E;
+  --primary-hover: #8D3015;
+  --accent: #A8401E;
+  --accent-hover: #8D3015;
+  --success: #2F6841;
+  --warning: #7D4A18;
+}
+
+[data-theme="parchment"] {
+  --text-secondary: #5E5A52;
+  --text-tertiary: #6A655C;
+  --warning: #6F4800;
+}
+
+[data-theme="void"] {
+  --text-secondary: #9A9A9A;
+  --text-tertiary: #8A8A8A;
+  --success: #5CA878;
+  --warning: #C89C1A;
+  --danger: #F06060;
+  --primary: #E85B4E;
+  --on-primary: #0A0A0A;
+  --primary-soft: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+[data-theme="ember"] {
+  --text-secondary: #B39A78;
+  --text-tertiary: #A08864;
+  --success: #7FBC4A;
+  --danger: #F06868;
+}
+
+[data-theme="y2k"] {
+  --text-tertiary: #5A5A5A;
+  --success: #006400;
+  --success-soft: #F0FFF0;
+  --warning: #7A4A00;
+  --warning-soft: #FFF4DC;
+  --danger: #900000;
+  --danger-soft: #FFE8E8;
+  --primary: #002F7A;
+  --primary-soft: #E8ECFA;
+}
+
+[data-theme="aim"] {
+  --text-tertiary: #555555;
+  --success: #005A00;
+  --success-soft: #E6F2E6;
+  --warning: #7A4A00;
+  --warning-soft: #F2E8D2;
+  --danger: #900000;
+  --danger-soft: #F2E0E0;
+}
+
+[data-theme="myspace"] {
+  --on-primary: #1A0020;
+}

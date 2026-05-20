@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display, Cormorant_Garamond, DM_Sans, DM_Mono, Plus_Jakarta_Sans, Fraunces, DM_Serif_Display, Space_Grotesk, Syne, Instrument_Serif } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -90,7 +91,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider appearance={clerkAppearance}>
       <html lang="en" data-theme="nobc" suppressHydrationWarning>
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} ${dmSans.variable} ${dmMono.variable} ${plusJakarta.variable} ${fraunces.variable} ${dmSerifDisplay.variable} ${spaceGrotesk.variable} ${syne.variable} ${instrumentSerif.variable} font-sans antialiased`}
