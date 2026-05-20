@@ -55,6 +55,7 @@ model Workspace {
   operatorComments     OperatorComment[]
   operatorNotifications OperatorNotification[]
   qaMissions           QAMission[]
+  membershipTiers      MembershipTier[]
 
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
@@ -1181,4 +1182,24 @@ model QAMission {
   @@index([workspaceId, operatorId])
   @@index([workspaceId, status])
   @@index([workspaceId, score])
+}
+
+// Workspace-defined membership tiers — replaces the hardcoded top/mid/low
+// buckets. Order is operator-controlled (lowest tier = order 0). minScore
+// (0–1 canonical aiScore) keeps the bucket/gate semantics derivable from a
+// member's score; setting it null means anyone qualifies.
+model MembershipTier {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  order       Int       @default(0)
+  minScore    Float?
+  color       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, order])
 }

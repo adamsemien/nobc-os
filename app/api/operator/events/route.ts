@@ -94,6 +94,7 @@ const CreateSchema = z.object({
           minReferrals: z.number().int().positive().optional(),
           codes: z.array(z.string()).optional(),
           minTier: z.enum(['top', 'mid', 'low']).optional(),
+          minTierId: z.string().min(1).max(40).nullable().optional(),
         })
         .default({}),
     })
@@ -166,9 +167,33 @@ export async function POST(req: NextRequest) {
     }
 
     if (workflow) {
+      // Resolve a MembershipTier id (operator-named) down to the legacy
+      // 'top'|'mid'|'low' bucket the gate engine reads. Keeps the engine
+      // unchanged while letting operators pick from their custom tier list.
+      let resolvedConfig = workflow.config;
+      if (workflow.config?.minTierId) {
+        const tier = await tx.membershipTier.findFirst({
+          where: {
+            id: workflow.config.minTierId,
+            workspaceId,
+            deletedAt: null,
+          },
+          select: { minScore: true },
+        });
+        const minScore = tier?.minScore ?? null;
+        const bucket: 'top' | 'mid' | 'low' =
+          minScore == null
+            ? 'low'
+            : minScore >= 0.73
+              ? 'top'
+              : minScore >= 0.53
+                ? 'mid'
+                : 'low';
+        resolvedConfig = { ...workflow.config, minTier: bucket };
+      }
       const paths = buildPathsFromTemplate(
         workflow.templateKey as WorkflowTemplateKey,
-        workflow.config,
+        resolvedConfig,
       );
       await tx.eventWorkflow.create({
         data: {

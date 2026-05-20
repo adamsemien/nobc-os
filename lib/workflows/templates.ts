@@ -10,8 +10,12 @@ export type WorkflowTemplateConfig = {
   minReferrals?: number;
   /** Used by invitation_code (comma-split into list). */
   codes?: string[];
-  /** Used by members_only. */
+  /** Legacy bucket gate for members_only (top/mid/low). Kept for backwards
+   *  compatibility on events created before MembershipTier rows existed. */
   minTier?: 'top' | 'mid' | 'low';
+  /** Foreign key to MembershipTier. When set, gate uses the row's minScore
+   *  rather than the legacy bucket. `null` / undefined = any approved member. */
+  minTierId?: string | null;
 };
 
 export type WorkflowTemplateDef = {

@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplateConfig, buildPathsFromTemplate } from '@/lib/workflows/templates';
 import { renderWorkflowSummary } from '@/lib/workflows/render';
 import type { WorkflowTemplateKey } from '@/lib/workflows/types';
 import { HelpTip } from '../../../_components/Tooltip';
+import type { TierRow } from '@/app/api/operator/tiers/route';
 
 export type WorkflowSelection = {
   templateKey: WorkflowTemplateKey;
@@ -115,17 +117,7 @@ function ConfigEditor({
       return null;
     case 'members_only':
       return (
-        <Field label="Minimum tier">
-          <select
-            value={config.minTier ?? 'low'}
-            onChange={(e) => onChange({ minTier: e.target.value as 'top' | 'mid' | 'low' })}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-none"
-          >
-            <option value="low">Any member</option>
-            <option value="mid">Middle tier or above</option>
-            <option value="top">Top tier only</option>
-          </select>
-        </Field>
+        <MembersOnlyTierField config={config} onChange={onChange} />
       );
     case 'apply_or_pay':
       return (
@@ -273,9 +265,91 @@ function defaultConfigFor(key: WorkflowTemplateKey): WorkflowTemplateConfig {
     case 'invitation_code':
       return { codes: [] };
     case 'members_only':
-      return { minTier: 'low' };
+      return { minTierId: null };
     case 'open':
     default:
       return {};
   }
+}
+
+function MembersOnlyTierField({
+  config,
+  onChange,
+}: {
+  config: WorkflowTemplateConfig;
+  onChange: (patch: Partial<WorkflowTemplateConfig>) => void;
+}) {
+  const [tiers, setTiers] = useState<TierRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/operator/tiers', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { tiers: TierRow[] }) => {
+        if (cancelled) return;
+        setTiers(d.tiers);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError('Could not load tiers.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (tiers === null && !error) {
+    return (
+      <Field label="Minimum tier">
+        <p className="text-sm text-text-muted">Loading tiers…</p>
+      </Field>
+    );
+  }
+
+  if (error) {
+    return (
+      <Field label="Minimum tier">
+        <p className="text-sm text-danger">{error}</p>
+      </Field>
+    );
+  }
+
+  if (!tiers || tiers.length === 0) {
+    return (
+      <Field label="Minimum tier">
+        <div className="rounded-md border border-dashed border-border bg-background/50 px-3 py-3 text-sm">
+          <p className="text-text-secondary">
+            No tiers configured. Anyone with member status can RSVP.
+          </p>
+          <Link
+            href="/operator/settings/tiers"
+            className="mt-1 inline-block text-text-primary underline-offset-2 hover:underline"
+          >
+            Add tiers in Settings → Member Tiers →
+          </Link>
+        </div>
+      </Field>
+    );
+  }
+
+  return (
+    <Field label="Minimum tier">
+      <select
+        value={config.minTierId ?? ''}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange({ minTierId: v === '' ? null : v });
+        }}
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-none"
+      >
+        <option value="">Any member</option>
+        {tiers.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name} or above
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
 }
