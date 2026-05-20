@@ -138,7 +138,7 @@ If you report task completion without performing this checklist, the task is inc
 | 01 | `_context/01-apply/` | ✅ Shipped | #1, #5 |
 | 02 | `_context/02-approval/` | 🟡 In progress | #4, #16 |
 | 03 | `_context/03-events/` | ⚪ Not started | #6, #13, #14, #15 |
-| 04 | `_context/04-rsvp/` | ⚪ Not started | #7, #8 |
+| 04 | `_context/04-access/` | ⚪ Not started | #7, #8 |
 | 05 | `_context/05-payments/` | ⚪ Not started | #9, #10 |
 | 06 | `_context/06-wallet-checkin/` | ⚪ Not started | #11, #12 |
 | 07 | `_context/07-operator-dashboard/` | ⚪ Not started | #20 |
