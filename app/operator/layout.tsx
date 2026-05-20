@@ -55,7 +55,7 @@ export default async function OperatorLayout({
       >
         <OperatorNav pendingApplicationCount={pendingApplicationCount} />
         <main className="flex min-h-screen min-w-0 flex-1 flex-col">{children}</main>
-        {/* Cmd+K is owned by CommandPaletteProvider — AgentPanel binds Cmd+Shift+A. */}
+        {/* Cmd+K is owned by CommandPaletteProvider — AgentPanel binds Cmd+Option+A. */}
         <AgentPanel />
         <ObsidianIdleEgg />
         <AimEasterEgg />

@@ -1,6 +1,6 @@
 'use client';
 
-/** Operator AI agent panel (Item 18) — Cmd+Shift+A slide-over.
+/** Operator AI agent panel (Item 18) — Cmd+Option+A slide-over.
  *
  *  Talks to the SSE agent endpoints:
  *    POST /api/agent          { threadId?, message }  → SSE stream
@@ -11,7 +11,8 @@
  *  `tool_call`/`tool_result` activity, and `confirmation_required` pauses are
  *  rendered as bubbles, chips, and a Confirm/Cancel card respectively.
  *
- *  Cmd+K is owned by CommandPaletteProvider, so this panel binds Cmd+Shift+A.
+ *  Cmd+K is owned by CommandPaletteProvider. We bind Cmd+Option+A (Ctrl+Alt+A
+ *  on Windows) — Cmd+Shift+A would collide with Chrome's "Search tabs."
  *  The panel surface is an intentional fixed-dark chrome (terminal-like), so
  *  the #1a1520 literal is deliberate rather than a theme token. */
 
@@ -58,10 +59,11 @@ export function AgentPanel() {
 
   const pendingConfirm = messages.some((m) => m.kind === 'confirm' && !m.resolved);
 
-  // Cmd+Shift+A toggles; Escape closes. (Cmd+K is CommandPaletteProvider's.)
+  // Cmd+Option+A (Ctrl+Alt+A on Windows) toggles; Escape closes.
+  // We use e.code rather than e.key because Option+A produces 'å' on macOS.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyA') {
         e.preventDefault();
         setOpen((o) => !o);
       } else if (e.key === 'Escape' && open) {
@@ -227,8 +229,8 @@ export function AgentPanel() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          aria-label="Open AI agent (Cmd+Shift+A)"
-          title="AI agent — ⌘⇧A"
+          aria-label="Open AI agent (Cmd+Option+A)"
+          title="AI agent — ⌘⌥A"
           style={{
             position: 'fixed',
             bottom: 24,
@@ -288,7 +290,7 @@ export function AgentPanel() {
         >
           <Sparkles size={16} color="var(--primary)" />
           <span style={{ fontSize: 13, fontWeight: 600 }}>NoBC Agent</span>
-          <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 2 }}>⌘⇧A</span>
+          <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 2 }}>⌘⌥A</span>
           <button
             onClick={() => setOpen(false)}
             aria-label="Close AI agent"

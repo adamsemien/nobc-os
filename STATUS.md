@@ -71,7 +71,7 @@ Uncommitted. `tsc --noEmit` clean.
 
 ## Next session
 Apply migrations. Smoke-test QA Game Mode:
-- Open dev panel (⌘⇧D), pick Easy, click "Start Mission" — confirm panel
+- Open dev panel (⌘⌥D), pick Easy, click "Start Mission" — confirm panel
   docks bottom-left with steps + timer.
 - Navigate to a URL matching a `visit:` checkpoint — confirm auto-completion.
 - Click "🐛 Found a bug" — submit, confirm +25pt + entry in

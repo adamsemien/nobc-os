@@ -146,7 +146,9 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
   useEffect(() => {
     if (!isAllowed) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.shiftKey && e.key === 'D' && (e.metaKey || e.ctrlKey)) {
+      // Cmd+Option+D (Ctrl+Alt+D on Windows). We check e.code because
+      // Option+D produces '∂' on macOS, breaking an e.key === 'D' check.
+      if (e.altKey && e.code === 'KeyD' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         toggle();
       }
@@ -424,7 +426,7 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
       {/* Floating pill — always visible, hidden when panel is open */}
       <button
         onClick={toggle}
-        title="Dev Tools (⌘⇧D)"
+        title="Dev Tools (⌘⌥D)"
         style={{
           position: 'fixed',
           bottom: 20,

@@ -23,7 +23,7 @@ const STEPS = [
   },
   {
     title: 'Need help?',
-    body: 'Click the ? icon (bottom left) any time. Or hit Cmd+Shift+A to ask the AI agent.',
+    body: 'Click the ? icon (bottom left) any time. Or hit Cmd+Option+A to ask the AI agent.',
   },
 ];
 

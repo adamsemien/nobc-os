@@ -20,7 +20,7 @@ The platform has these features:
 - The Room (live event dashboard) at /operator/events/[id]
 - Workflow gates on events (apply_or_pay, members_only, open, ticketed, comp)
 - Purple list / Blocked list management at /operator/settings/lists
-- AI agent panel (Cmd+Shift+A)
+- AI agent panel (Cmd+Option+A)
 - Command palette (Cmd+K) — global search + quick actions
 - Bulk actions on applications + members
 - AI persona runner (dev toolbar)
