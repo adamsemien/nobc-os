@@ -98,6 +98,9 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
   const [missionLoading, setMissionLoading] = useState(false);
   const [missionError, setMissionError] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<MissionDifficulty>('medium');
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customSteps, setCustomSteps] = useState('');
+  const [customScenario, setCustomScenario] = useState('');
   const [leaderboard, setLeaderboard] = useState<
     Array<{ id: string; operatorName: string; score: number; missionType: string; difficulty: string }>
   >([]);
@@ -219,6 +222,43 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
         return;
       }
       setMission(data.mission as ActiveMission);
+    } catch (e) {
+      setMissionError(e instanceof Error ? e.message : 'Network error.');
+    } finally {
+      setMissionLoading(false);
+    }
+  }
+
+  async function handleStartCustom() {
+    const steps = customSteps
+      .split('\n')
+      .map((l) => l.replace(/^[-*]\s*\[\s*[xX ]?\s*\]\s*/, '').trim())
+      .filter((l) => l.length > 0);
+    if (steps.length === 0) {
+      setMissionError('Add at least one step.');
+      return;
+    }
+    setMissionLoading(true);
+    setMissionError(null);
+    setCompletionSummary(null);
+    try {
+      const res = await fetch('/api/dev/qa/custom', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          scenario: customScenario.trim() || undefined,
+          steps,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMissionError(data?.error ?? 'Could not start checklist.');
+        return;
+      }
+      setMission(data.mission as ActiveMission);
+      setCustomOpen(false);
+      setCustomSteps('');
+      setCustomScenario('');
     } catch (e) {
       setMissionError(e instanceof Error ? e.message : 'Network error.');
     } finally {
@@ -655,8 +695,76 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
             </div>
             {mission ? (
               <div style={{ color: '#c4b8d4', fontSize: 11 }}>
-                Mission in progress · {mission.score}pt · panel docked bottom-left
+                Mission in progress · {mission.score}pt · panel is draggable + collapsable
               </div>
+            ) : customOpen ? (
+              <>
+                <div style={{ color: '#5a4d6a', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Scenario (optional)
+                </div>
+                <input
+                  value={customScenario}
+                  onChange={(e) => setCustomScenario(e.target.value)}
+                  maxLength={300}
+                  placeholder="e.g. Smoke-test the new event create flow"
+                  style={{
+                    width: '100%',
+                    background: '#231d2e',
+                    border: '1px solid #3d3050',
+                    borderRadius: 6,
+                    color: '#f0eaf6',
+                    fontSize: 11,
+                    padding: '6px 8px',
+                    fontFamily: 'monospace',
+                    marginBottom: 6,
+                  }}
+                />
+                <div style={{ color: '#5a4d6a', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Steps · one per line
+                </div>
+                <textarea
+                  value={customSteps}
+                  onChange={(e) => setCustomSteps(e.target.value)}
+                  rows={6}
+                  placeholder={'Visit /operator/events/new\nFill out title + date\nClick Publish\nVerify it appears on /m/events'}
+                  style={{
+                    width: '100%',
+                    background: '#231d2e',
+                    border: '1px solid #3d3050',
+                    borderRadius: 6,
+                    color: '#f0eaf6',
+                    fontSize: 11,
+                    padding: '6px 8px',
+                    fontFamily: 'monospace',
+                    resize: 'vertical',
+                    marginBottom: 8,
+                    lineHeight: 1.5,
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={handleStartCustom}
+                    disabled={missionLoading || !customSteps.trim()}
+                    style={{ ...S.btn, flex: 1, textAlign: 'center', fontWeight: 700 }}
+                  >
+                    {missionLoading ? '⏳' : 'Start checklist →'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCustomOpen(false);
+                      setMissionError(null);
+                    }}
+                    style={S.btn}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {missionError && (
+                  <div style={{ color: '#f87171', fontSize: 10, marginTop: 6 }}>
+                    ✗ {missionError}
+                  </div>
+                )}
+              </>
             ) : (
               <>
                 {/* Difficulty selector */}
@@ -682,9 +790,18 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
                 <button
                   onClick={handleStartMission}
                   disabled={missionLoading}
-                  style={{ ...S.btn, width: '100%', textAlign: 'center', fontWeight: 700 }}
+                  style={{ ...S.btn, width: '100%', textAlign: 'center', fontWeight: 700, marginBottom: 6 }}
                 >
-                  {missionLoading ? '⏳ Generating…' : 'Start Mission →'}
+                  {missionLoading ? '⏳ Generating…' : 'Start AI Mission →'}
+                </button>
+                <button
+                  onClick={() => {
+                    setCustomOpen(true);
+                    setMissionError(null);
+                  }}
+                  style={{ ...S.btn, width: '100%', textAlign: 'center' }}
+                >
+                  📋 Custom checklist
                 </button>
                 {missionError && (
                   <div style={{ color: '#f87171', fontSize: 10, marginTop: 6 }}>
