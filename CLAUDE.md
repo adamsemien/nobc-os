@@ -161,7 +161,9 @@ Stage-specific env vars live in each stage's `CONTEXT.md`.
 
 ---
 
-## Design tokens (always-loaded)
+## Design tokens (always-loaded — reference values, do not hardcode)
+
+> These hex values document what the CSS variables resolve to. They are reference only. In component code, always use the semantic tokens (`bg-primary`, `text-text-primary`, etc.), never these literals. The "No hex literals" rule in Absolute Rules takes precedence.
 
 - Background day: `#f9f7f2` / night: `#1a1520`
 - NBC Red: `#B22E21` — primary buttons, accents
