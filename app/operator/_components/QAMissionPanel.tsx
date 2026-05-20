@@ -138,6 +138,7 @@ export function QAMissionPanel({
   );
   const [pos, setPos] = useState<Position | null>(null);
   const [flash, setFlash] = useState(false);
+  const [stepExpanded, setStepExpanded] = useState(false);
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -191,6 +192,11 @@ export function QAMissionPanel({
       setBugStepIndex(currentStepIndex >= 0 ? currentStepIndex : null);
     }
   }, [bugOpen, currentStepIndex]);
+
+  // Auto-collapse the expanded step text whenever the active step changes.
+  useEffect(() => {
+    setStepExpanded(false);
+  }, [currentStepIndex]);
 
   const markStep = useCallback(
     async (stepId: string, source: 'auto' | 'manual') => {
@@ -419,9 +425,9 @@ export function QAMissionPanel({
             transform: 'translateX(-50%)',
             zIndex: 9998,
             display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 14px',
+            flexDirection: 'column',
+            gap: stepExpanded && !allDone && currentStep ? 6 : 0,
+            padding: stepExpanded && !allDone && currentStep ? '8px 14px' : '6px 14px',
             background: flash
               ? 'rgba(74, 222, 128, 0.35)'
               : allDone
@@ -430,16 +436,17 @@ export function QAMissionPanel({
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
             border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 22,
+            borderRadius: stepExpanded && !allDone && currentStep ? 14 : 22,
             color: '#f0eaf6',
             fontFamily: 'monospace',
             fontSize: 13,
             boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
             minHeight: 44,
             maxWidth: 'min(720px, 92vw)',
-            transition: 'background 0.3s ease',
+            transition: 'background 0.3s ease, border-radius 0.15s ease, padding 0.15s ease',
           }}
         >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>🎮</span>
           {allDone ? (
             <>
@@ -465,19 +472,53 @@ export function QAMissionPanel({
               >
                 Step {currentStepIndex + 1}/{mission.steps.length}:
               </span>
-              <span
+              <button
+                onClick={() => setStepExpanded((v) => !v)}
+                title={currentStep.instruction}
+                aria-label={
+                  stepExpanded ? 'Hide full step instruction' : 'Show full step instruction'
+                }
+                aria-expanded={stepExpanded}
                 style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  margin: 0,
+                  cursor: 'pointer',
                   color: '#f0eaf6',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  font: 'inherit',
+                  textAlign: 'left',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
                   flex: 1,
                   minWidth: 0,
                   maxWidth: 380,
                 }}
               >
-                {currentStep.instruction}
-              </span>
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    minWidth: 0,
+                  }}
+                >
+                  {currentStep.instruction}
+                </span>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    fontSize: 10,
+                    color: '#8a7a9a',
+                    flexShrink: 0,
+                    transform: stepExpanded ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.15s ease',
+                  }}
+                >
+                  ▾
+                </span>
+              </button>
             </>
           ) : (
             <span style={{ color: '#b0a0c0' }}>No steps</span>
@@ -530,6 +571,24 @@ export function QAMissionPanel({
               ▢ Expand
             </button>
           </div>
+          </div>
+
+          {/* Expanded step text — wraps below the row when toggled */}
+          {stepExpanded && !allDone && currentStep && (
+            <div
+              style={{
+                color: '#e8dff2',
+                fontSize: 13,
+                lineHeight: 1.55,
+                padding: '4px 26px 2px',
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                whiteSpace: 'normal',
+                wordBreak: 'break-word',
+              }}
+            >
+              {currentStep.instruction}
+            </div>
+          )}
         </div>
 
         {/* Inline bug popover anchored above the HUD bar */}
