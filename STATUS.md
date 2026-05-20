@@ -5,36 +5,95 @@ _Last updated: 2026-05-19_
 ## Current branch: `main`
 
 ## Last 5 commits
-- `fix(validation)` zod schemas, length caps, phone normalization, inline client validation
-- `docs(status)` refresh after 5-block session
-- `feat(events)` hero images, live RSVP list, member event redesign
-- `feat(help)` operator + member help systems with tooltips
-- `feat(member)` complete member portal — home, rsvps, profile
+- `fix(counts)` single source of truth for all count badges
+- `feat(bulk)` bulk actions on applications + members
+- `feat(search)` global command palette + quick actions
+- `feat(comms)` operator comments + notifications + slack
+- `feat(ui)` design system primitives + page migration
 
 ## In flight
-Theme + help + delight pass. Uncommitted. `tsc --noEmit` clean.
+None. `tsc --noEmit` clean. Five-block session committed cleanly.
 
-## What shipped this session (uncommitted)
+## What shipped this session
 
-**Theme contrast audit** — all 10 themes (`nobc`, `midnight`, `obsidian`, `rose`, `parchment`, `void`, `ember`, `y2k`, `aim`, `myspace`) now hit WCAG 2.1 AA (4.5:1) on body/secondary/tertiary text, button text on primary, and all status chip pairs. Override block appended to `app/globals.css` — 110/110 verified pairs pass.
+**Block A — design system primitives + migration**
+- `components/ui/` — PageHeader, DataTable suite, StatusBadge (+ tone maps for
+  application / rsvp / event / member / recommendation), EmptyState,
+  DetailDrawer, ConfirmModal, Avatar. Single barrel at `components/ui/index.ts`.
+- Legacy `app/operator/_components/{PageHeader,EmptyState,Avatar}` re-export
+  from `components/ui` — older import paths keep working.
+- Migrated `/operator/audit`, `/operator/applications`, `/operator/events`,
+  `/operator/members`, `/operator/settings/lists`, `/theme`, `/webhooks` over
+  to the new primitives.
 
-**Help content rewrite**
-- `app/operator/_help/content.ts` — 8 sections rewritten in NoBC voice (direct, lowercase casual, members not users, "the way we think about it" anchors).
-- `app/m/(portal)/help/page.tsx` — DEFAULT_FAQ sharpened (6 entries). PlatformSetting `help.member.faq` integration already existed.
+**Block B — internal communication**
+- New models: `OperatorComment` (soft-deletable, scoped by entity) and
+  `OperatorNotification` (per-recipient, indexed for unread queries).
+  Migration committed at `prisma/migrations/20260520120000_operator_comments_notifications/`
+  but **not yet applied** — run `npx prisma migrate deploy` before deploy.
+- APIs: `/api/operator/comments` (GET/POST/DELETE), `/api/operator/notifications`
+  (GET/POST mark_read / mark_all_read), `/api/operator/operators` (Clerk org
+  member list for mention autocomplete).
+- `CommentThread` mounted on application + member detail. `@mention`
+  autocomplete pulls live operators; mentions create notifications.
+- `NotificationCenter` bell mounted top-right via `OperatorTopBar`. 60s poll,
+  unread badge, mark-read on click, mark-all-read action.
+- `lib/comments-notify.ts` `maybeFireSlack` reads `PlatformSetting`
+  `slack.webhook` and per-type toggles. Wired into application submit
+  (`application_new` + `application_high` at ≥ 22/30).
 
-**Delight pass**
-- `MemberConstellation` (SVG, no lib) at top of `/operator/intelligence`. Dots sized by aiScore, colored by archetype CSS vars, position hashed from member.id, parallax on mouse, lines between cosine-similar (>0.7) archetype profiles, hover tooltip, click → member detail.
-- Dashboard widgets below Action Required: **Birthdays this week** (queries `ApplicationAnswer` for `basics.birthday`) and **On this day** (AuditEvent at 30/90/365 days ago). Both hide on empty data.
-- `WaxSealStamp` component + `lib/sounds/wax-stamp.ts` — layered 80Hz sine thump + bandpass-filtered noise burst (~150ms), fires on mount with the existing parchment seal animation.
+**Block C — global command palette + search**
+- `/api/operator/search?q=` — fuzzy search across members + applications +
+  events, max 5 per type.
+- Existing Cmd+K palette now debounces hits into the ranked pool via
+  `lib/commands/search-commands.ts`.
+- New quick-action commands: Create event, Add to Purple list, Add to Blocked
+  list. New nav commands: Members, Lists, Settings.
 
-**Clerk appearance** — `lib/clerk-appearance.ts` passes a config matching NoBC tokens (cream bg, red primary, PP Editorial italic headings, Neue Haas body, 10px cards, 6px buttons). Wired into `<ClerkProvider>` in `app/layout.tsx`.
+**Block D — bulk actions**
+- `/api/operator/applications/bulk` — approve / reject / hold / waitlist,
+  per-item atomic, returns `{ok, succeeded, failed, failures[]}`. Approve
+  delegates to `approveApplication()` so welcome email + member creation
+  stays identical to single-row.
+- `/api/operator/members/bulk` — purple / unpurple / block / unblock / tag /
+  untag. Each emits `AuditEvent` with `bulk: true`.
+- ApplicationsQueue bulk bar now POSTs once to `/bulk` instead of N requests;
+  Reject confirms via `ConfirmModal`.
+- `MembersBulkActions` wraps the members table with sticky bulk bar + Block
+  confirm.
+
+**Block E — counts SoT**
+- `/api/operator/counts` — one call, `revalidate=30`. Returns applications,
+  members, events, rsvps groups. Charter / standard / waitlist on canonical
+  0–1 `aiScore` tier cuts.
+- `CountsProvider` polls every 60s and on a custom `nobc:counts:refresh`
+  event; `useCounts()` exposes `{counts, loading, refresh}`.
+- `LiveCount path fallback` — SSR fallback for first paint, hydrates from
+  provider after mount.
+- OperatorNav sidebar badge, applications page pill, and all tab counts wired
+  through. `ApplicationsQueue` emits the refresh event after every mutation so
+  sidebar stays in sync without reload.
 
 ## Known gaps
-- Birthday wall is wired but no `birthday` field on `Member` — depends on `basics.birthday` answer surviving on Application. Will surface for members whose application carried the answer.
+- **Migration not applied.** `OperatorComment` + `OperatorNotification` tables
+  exist in schema + migration file but not in the live DB. Run
+  `npx prisma migrate deploy` against Neon before deploy or comments /
+  notifications will 500 at runtime.
+- Operator pages still inline-render some hand-rolled tables (event detail
+  tabs, intelligence sub-views) — migration sweep covered the top wave but
+  not every surface.
+- No role-gating on the new endpoints — they match the rest of the operator
+  API (workspace-scoped, Clerk-authenticated). RBAC remains in the backlog.
 
 ## Blocked
 - Apple/Google Wallet passes — PassNinja account pending.
 - MCP server toolset incomplete.
 
 ## Next session
-Commit, smoke-test in dev (each theme + constellation + birthday/throwback widgets + Clerk sign-in styling), then deploy.
+Apply migration. Smoke-test in dev:
+- Comment on an application, verify @mention creates notification + bell
+  badge bumps.
+- Bulk-reject 3 applications, confirm sidebar count drops without reload.
+- Cmd+K search "ad" — verify members + applications + events show.
+- Bulk-Purple 2 members from members table.
+Then deploy.
