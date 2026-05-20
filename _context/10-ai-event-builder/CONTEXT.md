@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ⚪ Not started |
+| **State** | 🔶 Partial |
 | **V1 item** | #19 |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
-| **Blocked on** | Stages 03 (events) and 08 (MCP server) ship first |
-| **Next** | Spec the 5 stages of the event-builder flow + draft Runtype agent prompts |
+| **Blocked on** | Nothing |
+| **Next** | Build out the structured EventBuilder/Intake/Enrichment/Draft/Review UI flow (route handlers exist, UI flow incomplete) |
 
 ## Scope
 

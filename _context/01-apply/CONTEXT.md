@@ -8,7 +8,7 @@
 |---|---|
 | **State** | ✅ Shipped — live at `/apply` |
 | **V1 item** | #1, #5 |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
 | **Next** | Iterate archetype copy as data comes in; no structural changes |

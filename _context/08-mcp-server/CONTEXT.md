@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ⚪ Not started |
+| **State** | 🔶 Partial |
 | **V1 item** | #17 |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
-| **Blocked on** | Stages 02–05 ship first (need the actions to expose as tools) |
-| **Next** | Scaffold `/api/mcp` route + OAuth setup |
+| **Blocked on** | Nothing |
+| **Next** | Build out lib/mcp/ layer with full tool surface (route handler is live, library is thin) |
 
 ## Scope
 

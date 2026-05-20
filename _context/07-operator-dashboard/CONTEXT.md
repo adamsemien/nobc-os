@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ⚪ Not started |
+| **State** | ✅ Shipped |
 | **V1 item** | #20 (audit_events portion) |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Scaffold `/operator` layout + side nav + member directory page |
+| **Next** | 7-theme system polish + V1.5 customization features |
 
 ## Scope
 

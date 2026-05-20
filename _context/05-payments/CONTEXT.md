@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ⚪ Not started |
+| **State** | ✅ Shipped |
 | **V1 item** | #9, #10 |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
-| **Blocked on** | Stripe compliance pages (terms, privacy, refund policy) before going live |
-| **Next** | Build `/api/stripe/authorize` endpoint + wire `STRIPE_SECRET_KEY` |
+| **Blocked on** | Compliance pages legal review |
+| **Next** | Verify compliance pages are live + legally reviewed before flipping to live Stripe keys |
 
 ## Scope
 

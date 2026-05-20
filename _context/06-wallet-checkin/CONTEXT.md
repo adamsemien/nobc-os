@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🔴 Blocked |
+| **State** | 🔶 Partial |
 | **V1 item** | #11, #12 |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
-| **Blocked on** | Wallet pass vendor issue (per master spec — V1 wallet pass integration pending vendor resolution) |
-| **Next** | Resolve vendor blocker; in parallel, build QR check-in PWA which is unblocked |
+| **Blocked on** | Nothing (PassNinja was selected as the vendor — original blocker resolved) |
+| **Next** | Complete PassNinja wallet pass generation and revocation flows |
 
 ## Scope
 
@@ -59,6 +59,7 @@ lib/check-in/qr.ts                              ← QR encode/decode
 4. **Pass revocation on refund is mandatory.** No active passes for refunded RSVPs.
 5. **Double check-in protection.** If `RSVP.checkedInAt` is already set, surface to staff with timestamp; do not silently re-check-in.
 6. **Workspace-scoped.** Every endpoint checks workspace.
+7. **PassNinja is the chosen vendor — use `@passninja/passninja-js` for both Apple and Google passes.** Do not roll our own `.pkpass` builder or Google Wallet JWT signer. PassNinja handles cert management, pass updates, and platform-specific quirks.
 
 ## Environment variables
 

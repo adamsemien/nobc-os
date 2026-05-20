@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress |
+| **State** | ✅ Shipped |
 | **V1 item** | #4, #16 |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Wire `RESEND_API_KEY` and build approval endpoint |
+| **Next** | Monitor production; V1.5 will add SMS welcome via Stage 11 |
 
 ## Scope
 

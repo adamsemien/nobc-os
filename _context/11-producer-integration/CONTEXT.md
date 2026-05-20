@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ⚪ Not started |
+| **State** | ✅ Shipped |
 | **V1 item** | #20 (Svix portion), Phase J (cross-cutting), House Phone trigger (V1.5) |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
-| **Blocked on** | Stage 03 (events) ships first for Phase J; House Phone trigger blocked on House Phone migration to Adam's Runtype account (V1.5) |
-| **Next** | Build Phase J webhook sender + HMAC signing utility |
+| **Blocked on** | House Phone migration (V1.5) |
+| **Next** | V1.5 — wire House Phone trigger after House Phone migrates to Adam's Runtype account |
 
 ## Scope
 

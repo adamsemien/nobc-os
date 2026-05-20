@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ⚪ Not started |
+| **State** | ✅ Shipped |
 | **V1 item** | #6, #13, #14 (capacity portion), #15 |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
-| **Blocked on** | Stage 02 ships first (need approved Members to RSVP) |
-| **Next** | Scaffold `app/m/events/` calendar route + Event schema fields |
+| **Blocked on** | Nothing |
+| **Next** | Polish + iterate based on operator feedback |
 
 ## Scope
 

@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ⚪ Not started |
+| **State** | ✅ Shipped |
 | **V1 item** | #18 |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
-| **Blocked on** | Stage 08 ships first (MCP server must exist to be called) |
-| **Next** | Wire `/api/agent` proxy to Runtype + build chat UI shell |
+| **Blocked on** | Nothing |
+| **Next** | V1.5 refactor — currently uses Vercel AI SDK direct; route through Runtype master agent |
 
 ## Scope
 

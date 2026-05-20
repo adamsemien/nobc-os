@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ⚪ Not started |
+| **State** | ✅ Shipped |
 | **V1 item** | #7, #8, #14 (waitlist auto-promote portion) |
-| **Last updated** | 2026-05-19 |
+| **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
-| **Blocked on** | Stage 03 ships first (need Events to RSVP to) |
-| **Next** | Build `app/api/rsvp/route.ts` + capacity decrement logic |
+| **Blocked on** | Nothing |
+| **Next** | Polish + V1.5 enhancements |
 
 ## Scope
 
