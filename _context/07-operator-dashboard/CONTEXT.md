@@ -33,11 +33,11 @@ app/operator/page.tsx                           ← dashboard home / activity fe
 app/operator/members/page.tsx                   ← directory
 app/operator/members/[id]/page.tsx              ← member detail
 app/operator/audit/page.tsx                     ← audit log viewer
-app/operator/settings/page.tsx                  ← workspace settings
-app/operator/settings/team/page.tsx             ← team / operator users
-app/operator/settings/theme/page.tsx            ← theme settings (white-label)
-lib/audit/log.ts                                ← AuditEvent write helper
-lib/audit/query.ts                              ← AuditEvent read with filters
+app/operator/settings/                          ← workspace settings (entire directory)
+app/operator/_help/                             ← in-app help / onboarding (entire directory)
+lib/theme.ts                                    ← active theme resolution (7-theme system + per-workspace override)
+lib/permissions.ts                              ← role → action matrix used by every operator API route
+lib/audit.ts                                    ← AuditEvent write + query helpers (single module)
 ```
 
 ## Inputs
@@ -53,7 +53,12 @@ lib/audit/query.ts                              ← AuditEvent read with filters
 
 ## Schema models
 
-- **AuditEvent**: workspaceId, actorType (`operator | member | system | agent`), actorId, action, resourceType, resourceId, metadata (JSON), createdAt
+- **AuditEvent**: workspaceId, actorType (`OPERATOR | MEMBER | SYSTEM | AGENT`), actorId, action, resourceType, resourceId, metadata (JSON), createdAt
+- **PlatformSetting**: workspace-scoped key/value settings (theme, branding, feature flags)
+- **OperatorComment**: per-resource notes (on an Application, Member, Event, etc.)
+- **OperatorNotification**: in-app notifications surfaced in the operator shell
+- **Tag** + **EntityTag**: member/application tagging surface used in the directory
+- **AccessToken**: operator API tokens (when present)
 - Indexes: (workspaceId, createdAt DESC), (resourceType, resourceId)
 
 ## Rules — DO NOT VIOLATE

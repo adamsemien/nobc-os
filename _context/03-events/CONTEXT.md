@@ -32,6 +32,9 @@ app/operator/events/[id]/edit/page.tsx          ← operator edit UI
 app/api/events/route.ts                         ← list/create
 app/api/events/[id]/route.ts                    ← read/update/delete
 app/api/events/[id]/publish/route.ts            ← publish (fires Phase J)
+app/api/media/event-hero/[assetId]/route.ts     ← event hero image read/transform
+app/api/media/upload/route.ts                   ← media upload entrypoint
+app/api/cron/event-reminders/route.ts           ← scheduled reminder emails
 lib/events/access-mode.ts                       ← access mode resolution
 config/event-questions.ts                       ← default question library
 ```
@@ -52,6 +55,11 @@ config/event-questions.ts                       ← default question library
 - **EventQuestion**: eventId, label, type (`text | select | boolean | photo`), required, options (JSON), order
 - **TicketTier**: eventId, name, price, capacity, salesStart, salesEnd
 - **EventSeries**: workspaceId, name, recurrence pattern (for "Mahjong League" / "French Leave Friday")
+- **EventFlowTemplate**: reusable event flow definitions (registration steps, comp paths)
+- **EventWorkflow**: per-event resolved workflow instance (`apply_or_pay`, `members_only`, etc.)
+- **EventCustomQuestion**: per-event question rows surfaced to members as "Registration fields"
+- **GeneratedAsset**: AI-generated hero images and other event media
+- **SeriesSponsor**: sponsor attachment to an EventSeries
 
 ## Rules — DO NOT VIOLATE
 

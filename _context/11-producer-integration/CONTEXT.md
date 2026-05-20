@@ -31,6 +31,7 @@ lib/webhooks/phase-j.ts                         ← Phase J HMAC + retry
 lib/webhooks/svix-client.ts                     ← Svix SDK wrapper
 lib/runtype/trigger.ts                          ← House Phone trigger
 lib/webhooks/queue.ts                           ← retry queue for failed deliveries
+lib/producer-webhook.ts                         ← consolidated Phase J sender (current implementation)
 ```
 
 ## Inputs

@@ -28,7 +28,14 @@ app/api/apply/membership/[id]/route.ts          ← GET + PATCH: read/update dra
 app/api/apply/membership/[id]/submit/route.ts   ← POST: dual Claude calls
 app/api/apply/membership/upload/route.ts        ← photo upload to Vercel Blob
 config/archetypes.ts                            ← ALL archetype copy lives here
+lib/scoring.ts                                  ← Member Worth axes + threshold logic
 ```
+
+## Schema models owned
+
+- **Application** (form data + scoring outputs), **ApplicationAnswer** (per-question payloads, including the `_photos` system key)
+- **ApplicationTemplate** (form variant definitions)
+- **QuestionDefinition** (the canonical question library — APPLY_QUESTIONS lives here when surfaced via DB)
 
 ## Inputs
 

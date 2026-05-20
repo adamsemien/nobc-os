@@ -34,7 +34,9 @@ app/api/rsvp/[id]/approve/route.ts              ← operator approve (if require
 app/api/rsvp/[id]/reject/route.ts               ← operator reject
 lib/rsvp/capacity.ts                            ← capacity decrement + waitlist promote
 lib/rsvp/waitlist.ts                            ← FIFO promote logic
-app/operator/events/[id]/rsvps/page.tsx         ← operator RSVP management
+app/operator/events/[id]/rsvps/page.tsx         ← operator Access (RSVP) management
+app/api/m/profile/route.ts                      ← member profile read/update (used during Access flow)
+app/api/m/rsvps/route.ts                        ← member-facing list of their own Access entries
 ```
 
 ## Inputs
@@ -53,7 +55,8 @@ app/operator/events/[id]/rsvps/page.tsx         ← operator RSVP management
 
 ## Schema fields
 
-- **RSVP**: workspaceId, eventId, memberId, status, plusOnesCount, customAnswers (JSON), waitlistPosition, stripePaymentIntentId, walletPassId, checkedInAt, refundedAt
+- **RSVP**: workspaceId, eventId, memberId, status, plusOnesCount, customAnswers (JSON), waitlistPosition, stripePaymentIntentId, walletPassId, checkedInAt, refundedAt — the schema name stays `RSVP` even though the product term is "Access"
+- **WaitlistEntry**: structured waitlist position rows (back-reference to the RSVP they promoted from)
 - Indexes: (eventId, status), (memberId, eventId) unique
 
 ## Rules — DO NOT VIOLATE

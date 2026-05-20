@@ -48,11 +48,14 @@ lib/duplicates/detect.ts                        ← email/phone/name match
 
 ## Schema fields
 
-- `Application.status` enum: `draft | submitted | approved | rejected | waitlisted`
+- `Application.status` enum: `PENDING | APPROVED | REJECTED | WAITLISTED | HOLD`
 - `Application.duplicateOf` nullable FK to another Application
 - `Application.redListMatch` boolean
 - `Member.applicationId` FK back to Application
-- `RedList` model: workspaceId, email, phone, name, reason, createdBy
+- **RedList** model: workspaceId, type, matchEmail, reason
+- **WatchList** model: soft-flag counterpart to RedList
+- **EmailTemplate** model: per-workspace overridable templates (welcome, comp ticket, etc.) — Resend `from` always resolves to `team@thenobadcompany.com`
+- **MembershipTier** model: the tier assigned to a Member at approval time (charter / standard / waitlist)
 
 ## Rules — DO NOT VIOLATE
 

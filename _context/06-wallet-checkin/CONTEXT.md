@@ -30,6 +30,8 @@ app/api/wallet/[rsvpId]/revoke/route.ts         ← pass revocation
 app/check-in/page.tsx                           ← PWA scanner UI
 app/check-in/[eventSlug]/page.tsx               ← event-specific scanner
 app/api/check-in/scan/route.ts                  ← QR scan handler
+app/api/check-in/event/route.ts                 ← event-context check-in (door staff workflow)
+app/api/check-in/walkin/route.ts                ← walk-in check-in (no prior RSVP)
 public/manifest.json                            ← PWA manifest
 public/sw.js                                    ← service worker (offline)
 lib/wallet/apple-pass.ts                        ← .pkpass builder

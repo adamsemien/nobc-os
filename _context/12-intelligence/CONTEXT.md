@@ -70,6 +70,7 @@ lib/demo-data.ts                                                    ← syntheti
 
 - **IntelligenceInsight**: workspaceId, metricId, narrative, delta (JSON), generatedAt, acknowledged
 - **SavedReport**: workspaceId, name, question, metricIds (String[]), filters (JSON), createdById, createdAt, lastRunAt
+- **SponsorBrandProfile**: sponsor metadata used by `lib/intelligence/sponsor-targets.ts` for segment matching
 
 ## Rules — DO NOT VIOLATE
 

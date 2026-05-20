@@ -24,12 +24,22 @@ app/api/stripe/authorize/route.ts               ← create PaymentIntent, author
 app/api/stripe/capture/route.ts                 ← capture authorized payment
 app/api/stripe/refund/route.ts                  ← operator-triggered refund
 app/api/stripe/webhook/route.ts                 ← Stripe webhook receiver
+app/api/cron/capture-payments/route.ts          ← scheduled capture for confirmed events (no-shows / post-event)
 app/legal/terms/page.tsx                        ← compliance page
 app/legal/privacy/page.tsx                      ← compliance page
 app/legal/refund-policy/page.tsx                ← compliance page
 lib/stripe/client.ts                            ← Stripe SDK singleton
 lib/stripe/idempotency.ts                       ← idempotency key generation
 ```
+
+## Schema models owned
+
+- **Order**: workspaceId, memberId, total, currency, status — the top-level commerce record
+- **Payment**: order-level Stripe PaymentIntent record (authorize / capture / refund states)
+- **Ticket**: issued ticket row attached to an Access (RSVP) for a ticketed event
+- **TicketHold**: short-lived inventory hold during checkout
+- **TicketTier**: lives in Stage 03 (event-side definition); referenced here at purchase time
+- **PromoCode** + **PromoRedemption**: discount / comp eligibility
 
 ## Inputs
 
