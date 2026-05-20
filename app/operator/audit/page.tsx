@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
@@ -33,14 +33,18 @@ interface ResolvedActor {
   role: 'OPERATOR' | 'AGENT' | 'MEMBER' | 'SYSTEM';
 }
 
-/** Resolve actorId → "First Last" via the Member table (matches both clerkUserId and member.id).
- *  SYSTEM/AGENT/MEMBER without a name fall back to the role label. */
+/** Resolve actorId → "First Last" via:
+ *  1. Member table (club members, matches clerkUserId or member.id)
+ *  2. Clerk user lookup (operators who are not club members)
+ *  Falls back to a typed short-ID label if neither resolves. */
 async function buildActorIndex(
   workspaceId: string,
   actorIds: string[],
 ): Promise<Map<string, string>> {
   const ids = Array.from(new Set(actorIds.filter(Boolean)));
   if (ids.length === 0) return new Map();
+
+  // 1. Try Member table first (covers approved club members who are also operators)
   const members = await db.member.findMany({
     where: {
       workspaceId,
@@ -54,7 +58,66 @@ async function buildActorIndex(
     byKey.set(m.clerkUserId, name);
     byKey.set(m.id, name);
   }
+
+  // 2. For any IDs that look like Clerk user IDs (user_*) and weren't resolved above,
+  //    fall back to the Clerk user directory (covers operators without a Member row).
+  const unresolved = ids.filter(
+    (id) => id.startsWith('user_') && !byKey.has(id),
+  );
+  if (unresolved.length > 0) {
+    try {
+      const client = await clerkClient();
+      const { data: users } = await client.users.getUserList({
+        userId: unresolved,
+        limit: unresolved.length,
+      });
+      for (const u of users) {
+        const name =
+          [u.firstName, u.lastName].filter(Boolean).join(' ') ||
+          u.emailAddresses[0]?.emailAddress ||
+          u.id;
+        byKey.set(u.id, name);
+      }
+    } catch {
+      // Clerk lookup is best-effort — fall back to short-ID label below
+    }
+  }
+
   return byKey;
+}
+
+/** Resolve entityId → human-readable name for common entity types. */
+async function buildEntityIndex(
+  workspaceId: string,
+  events: Array<{ entityType: string; entityId: string }>,
+): Promise<Map<string, string>> {
+  const byId = new Map<string, string>();
+
+  const appIds = events
+    .filter((e) => e.entityType === 'application')
+    .map((e) => e.entityId);
+  if (appIds.length > 0) {
+    const apps = await db.application.findMany({
+      where: { id: { in: appIds }, workspaceId },
+      select: { id: true, fullName: true },
+    });
+    for (const a of apps) byId.set(a.id, a.fullName);
+  }
+
+  const memberIds = events
+    .filter((e) => e.entityType === 'member')
+    .map((e) => e.entityId);
+  if (memberIds.length > 0) {
+    const mbs = await db.member.findMany({
+      where: { id: { in: memberIds }, workspaceId },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+    for (const m of mbs) {
+      byId.set(m.id, `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim() || m.email);
+    }
+  }
+
+  return byId;
 }
 
 function resolveActor(
@@ -105,10 +168,13 @@ export default async function AuditPage({
     db.auditEvent.count({ where: { workspaceId } }),
   ]);
 
-  const actorIndex = await buildActorIndex(
-    workspaceId,
-    events.map((e) => e.actorId).filter((v): v is string => !!v),
-  );
+  const [actorIndex, entityIndex] = await Promise.all([
+    buildActorIndex(
+      workspaceId,
+      events.map((e) => e.actorId).filter((v): v is string => !!v),
+    ),
+    buildEntityIndex(workspaceId, events),
+  ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -156,12 +222,18 @@ export default async function AuditPage({
                     </span>
                   </DataTableCell>
                   <DataTableCell tone="secondary">
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs capitalize">
                       {e.entityType}
                     </span>{' '}
-                    <span className="font-mono text-xs text-text-muted">
-                      {e.entityId.slice(-8)}
-                    </span>
+                    {entityIndex.has(e.entityId) ? (
+                      <span className="text-xs text-text-secondary font-medium">
+                        {entityIndex.get(e.entityId)}
+                      </span>
+                    ) : (
+                      <span className="font-mono text-xs text-text-muted">
+                        {e.entityId.slice(-8)}
+                      </span>
+                    )}
                   </DataTableCell>
                   <DataTableCell tone="tertiary">
                     {(() => {

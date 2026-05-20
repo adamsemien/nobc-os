@@ -123,3 +123,54 @@ export async function POST(
     completedSteps: updated.completedSteps,
   });
 }
+
+/** PATCH /api/dev/qa/[id]/checkpoint — undo a completed step.
+ *  Body: { stepId: string }
+ *  Removes the step from completedSteps and reverses its pointsAwarded. */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { userId } = await auth();
+  if (!userId || !ALLOWED.includes(userId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  const workspaceId = await requireWorkspaceId(userId);
+  const { id } = await params;
+
+  let body: { stepId?: string } = {};
+  try {
+    body = await req.json();
+  } catch {}
+
+  const stepId = typeof body.stepId === 'string' ? body.stepId : null;
+  if (!stepId) return NextResponse.json({ error: 'stepId required' }, { status: 400 });
+
+  const mission = await db.qAMission.findFirst({
+    where: { id, workspaceId, operatorId: userId, status: 'active' },
+  });
+  if (!mission) {
+    return NextResponse.json({ error: 'Mission not found or not active' }, { status: 404 });
+  }
+
+  const completed = (mission.completedSteps as unknown as CompletedStep[]) ?? [];
+  const entry = completed.find((c) => c.id === stepId);
+  if (!entry) {
+    return NextResponse.json({ error: 'Step not found in completedSteps' }, { status: 400 });
+  }
+
+  const remaining = completed.filter((c) => c.id !== stepId);
+  const updated = await db.qAMission.update({
+    where: { id },
+    data: {
+      completedSteps: remaining as unknown as object,
+      score: { decrement: entry.pointsAwarded },
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    score: updated.score,
+    completedSteps: updated.completedSteps,
+  });
+}

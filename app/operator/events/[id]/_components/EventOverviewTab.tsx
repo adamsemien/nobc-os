@@ -1,4 +1,5 @@
 import { accessModeLabel } from '@/lib/format-enums';
+import { StatusBadge } from '@/components/ui';
 
 type EventFull = {
   id: string;
@@ -125,7 +126,14 @@ export function EventOverviewTab({ event, heroImageUrl }: Props) {
             {event.location}
           </p>
         )}
-        <p className="pt-1 text-xs text-text-muted">{accessModeLabel(event.accessMode)}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <StatusBadge tone={event.status === 'PUBLISHED' ? 'success' : 'warning'}>
+            {event.status === 'PUBLISHED' ? 'Published' : 'Draft'}
+          </StatusBadge>
+          <StatusBadge tone="neutral">
+            {accessModeLabel(event.accessMode)}
+          </StatusBadge>
+        </div>
       </div>
 
       {/* Stat cards */}

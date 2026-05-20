@@ -445,6 +445,21 @@ export function QAMissionPanel({
     });
   }
 
+  async function handleUndoStep(stepId: string) {
+    if (!window.confirm('Undo this step? Its points will be reversed.')) return;
+    try {
+      const res = await fetch(`/api/dev/qa/${mission.id}/checkpoint`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ stepId }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { score: number; completedSteps: CompletedStep[] };
+        onUpdate({ ...mission, score: data.score, completedSteps: data.completedSteps });
+      }
+    } catch {}
+  }
+
   async function handleSkip(stepId: string) {
     if (!window.confirm('Skip this step? Costs 10 points.')) return;
     try {
@@ -1191,13 +1206,28 @@ export function QAMissionPanel({
                                 ...S.btn,
                                 fontSize: 10,
                                 padding: '3px 8px',
-                                marginLeft: done ? 'auto' : 0,
+                                marginLeft: done ? 0 : 0,
                                 color: '#f0b8ae',
                               }}
                               title={`Report a bug on step ${i + 1}`}
                             >
                               🐛 Bug
                             </button>
+                            {done && (
+                              <button
+                                onClick={() => handleUndoStep(step.id)}
+                                style={{
+                                  ...S.btn,
+                                  fontSize: 10,
+                                  padding: '3px 8px',
+                                  marginLeft: 'auto',
+                                  color: '#b0a0c0',
+                                }}
+                                title="Undo this step — marks it incomplete again"
+                              >
+                                ↩ Undo
+                              </button>
+                            )}
                             {!done && (
                               <>
                                 <button

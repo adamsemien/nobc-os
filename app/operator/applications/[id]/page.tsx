@@ -123,54 +123,101 @@ export default async function OperatorApplicationDetailPage({
           ]}
         />
 
+        {/* Prominent page identity header */}
+        <div className="mb-8 flex items-center gap-4 border-b pb-6" style={{ borderColor: 'var(--border)' }}>
+          {app.photos.length > 0 ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={app.photos[0]}
+              alt={`${app.fullName} portrait`}
+              className="h-14 w-14 shrink-0 rounded-full object-cover"
+              style={{ border: '1px solid var(--border)' }}
+            />
+          ) : (
+            <Avatar name={app.fullName} email={app.email} size={56} />
+          )}
+          <div className="min-w-0">
+            <h1
+              className="text-3xl font-normal leading-tight sm:text-4xl"
+              style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+            >
+              {app.fullName}
+            </h1>
+            <p className="mt-0.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              {app.email}
+              {app.city ? ` · ${app.city}` : ''}
+              {' · Applied '}{formatDateTime(app.createdAt)}
+            </p>
+          </div>
+          <div className="ml-auto shrink-0">
+            <StatusBadge tone={applicationTone(app.status)}>
+              {app.status === 'HOLD' ? 'Hold' : app.status.toLowerCase()}
+            </StatusBadge>
+          </div>
+        </div>
+
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-          <section className="space-y-6">
-            <div className="flex items-center gap-4">
-              {app.photos.length > 0 ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={app.photos[0]}
-                  alt={`${app.fullName} portrait`}
-                  className="h-16 w-16 rounded-full object-cover"
-                  style={{ border: '1px solid var(--border)' }}
-                />
-              ) : (
-                <Avatar name={app.fullName} email={app.email} size={64} />
-              )}
-              <h1
-                className="text-3xl font-normal leading-tight sm:text-4xl"
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  color: 'var(--text-primary)',
-                }}
+          {/* LEFT: Application answers — the primary review content */}
+          <section className="space-y-8">
+            <div>
+              <h2
+                className="mb-4 text-xs font-semibold uppercase tracking-[0.25em]"
+                style={{ color: 'var(--text-secondary)' }}
               >
-                {app.fullName}
-              </h1>
+                Application answers
+              </h2>
+              <div className="space-y-6">
+                {app.substantiveAnswers.map(row => {
+                  const chip = urlChip(row.answer);
+                  return (
+                    <div key={row.questionKey}>
+                      <p
+                        className="mb-1 text-xs font-semibold uppercase tracking-[0.18em]"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {row.label}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm font-normal leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                        {row.answer.trim() ? row.answer : '—'}
+                      </p>
+                      {chip ? (
+                        <a
+                          href={chip.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-text-primary transition-colors hover:border-primary hover:text-primary"
+                        >
+                          {chip.label}
+                          <ExternalLink className="h-3 w-3" aria-hidden />
+                        </a>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {app.photos.length > 1 && (
-              <div>
-                <h2
-                  className="mb-2 text-xs font-semibold uppercase tracking-[0.2em]"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  Photos
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {app.photos.map((url, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={url}
-                      src={url}
-                      alt={`${app.fullName} photo ${i + 1}`}
-                      className="h-24 w-24 rounded-md object-cover"
-                      style={{ border: '1px solid var(--border)' }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            <div>
+              <h2
+                className="mb-3 text-xs font-semibold uppercase tracking-[0.25em]"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Consents
+              </h2>
+              <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                <ConsentReadOnlyRow label={labelForModelField('consentEmail')} checked={app.consentEmail} />
+                <ConsentReadOnlyRow label={labelForModelField('consentSms')} checked={app.consentSms} />
+                {app.consentAnswers.map(row => (
+                  <ConsentReadOnlyRow key={row.questionKey} label={row.label} checked={row.checked} />
+                ))}
+              </ul>
+            </div>
 
+            <CommentThread entityType="application" entityId={app.id} />
+          </section>
+
+          {/* RIGHT: AI intelligence + contact details + photos */}
+          <section className="space-y-6">
             {(app.aiScore !== null || app.archetype) && (
               <div
                 className="rounded-md p-4"
@@ -270,38 +317,16 @@ export default async function OperatorApplicationDetailPage({
             )}
 
             <dl className="space-y-3 text-sm" style={{ color: 'var(--text-primary)' }}>
-              <div>
-                <dt className="sr-only">Email</dt>
-                <dd>
-                  <a href={`mailto:${app.email}`} className="underline-offset-2 hover:underline">
-                    {app.email}
-                  </a>
-                </dd>
-              </div>
               {app.phone ? (
                 <div>
-                  <dt className="sr-only">Phone</dt>
-                  <dd>
+                  <dt className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Phone</dt>
+                  <dd className="mt-0.5">
                     <a href={`tel:${app.phone}`} className="underline-offset-2 hover:underline">
                       {app.phone}
                     </a>
                   </dd>
                 </div>
               ) : null}
-              {app.city ? (
-                <div>
-                  <dt className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                    City
-                  </dt>
-                  <dd className="mt-0.5">{app.city}</dd>
-                </div>
-              ) : null}
-              <div>
-                <dt className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                  Applied
-                </dt>
-                <dd className="mt-0.5">{formatDateTime(app.createdAt)}</dd>
-              </div>
             </dl>
 
             {app.referrers.length > 0 ? (
@@ -320,12 +345,6 @@ export default async function OperatorApplicationDetailPage({
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone={applicationTone(app.status)}>
-                {app.status === 'HOLD' ? 'Hold' : app.status.toLowerCase()}
-              </StatusBadge>
-            </div>
-
             {app.status === 'APPROVED' && reviewedDate ? (
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                 Approved on {reviewedDate}
@@ -341,64 +360,29 @@ export default async function OperatorApplicationDetailPage({
                 ) : null}
               </div>
             ) : null}
-          </section>
 
-          <section className="space-y-8">
-            <div>
-              <h2
-                className="mb-4 text-xs font-semibold uppercase tracking-[0.25em]"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Application answers
-              </h2>
-              <div className="space-y-6">
-                {app.substantiveAnswers.map(row => {
-                  const chip = urlChip(row.answer);
-                  return (
-                    <div key={row.questionKey}>
-                      <p
-                        className="mb-1 text-xs font-semibold uppercase tracking-[0.18em]"
-                        style={{ color: 'var(--text-secondary)' }}
-                      >
-                        {row.label}
-                      </p>
-                      <p className="whitespace-pre-wrap text-sm font-normal leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-                        {row.answer.trim() ? row.answer : '—'}
-                      </p>
-                      {chip ? (
-                        <a
-                          href={chip.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-text-primary transition-colors hover:border-primary hover:text-primary"
-                        >
-                          {chip.label}
-                          <ExternalLink className="h-3 w-3" aria-hidden />
-                        </a>
-                      ) : null}
-                    </div>
-                  );
-                })}
+            {app.photos.length > 0 && (
+              <div>
+                <h2
+                  className="mb-2 text-xs font-semibold uppercase tracking-[0.2em]"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Photos
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {app.photos.map((url, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={url}
+                      src={url}
+                      alt={`${app.fullName} photo ${i + 1}`}
+                      className="h-24 w-24 rounded-md object-cover"
+                      style={{ border: '1px solid var(--border)' }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div>
-              <h2
-                className="mb-3 text-xs font-semibold uppercase tracking-[0.25em]"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Consents
-              </h2>
-              <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                <ConsentReadOnlyRow label={labelForModelField('consentEmail')} checked={app.consentEmail} />
-                <ConsentReadOnlyRow label={labelForModelField('consentSms')} checked={app.consentSms} />
-                {app.consentAnswers.map(row => (
-                  <ConsentReadOnlyRow key={row.questionKey} label={row.label} checked={row.checked} />
-                ))}
-              </ul>
-            </div>
-
-            <CommentThread entityType="application" entityId={app.id} />
+            )}
           </section>
         </div>
       </div>

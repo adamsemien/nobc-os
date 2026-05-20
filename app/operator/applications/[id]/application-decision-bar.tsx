@@ -131,16 +131,18 @@ export function ApplicationDecisionBar({
           </div>
         ) : null}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <button
-            type="button"
-            onClick={approve}
-            disabled={busy !== null}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 px-5 text-base font-medium text-white disabled:opacity-60 sm:min-w-[10rem] sm:w-auto"
-            style={{ borderRadius: '4px', background: 'var(--primary)' }}
-          >
-            {busy === 'approve' ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null}
-            Approve
-          </button>
+          {!rejectOpen && (
+            <button
+              type="button"
+              onClick={approve}
+              disabled={busy !== null}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 px-5 text-base font-medium text-white disabled:opacity-60 sm:min-w-[10rem] sm:w-auto"
+              style={{ borderRadius: '4px', background: 'var(--primary)' }}
+            >
+              {busy === 'approve' ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null}
+              Approve
+            </button>
+          )}
           {!rejectOpen ? (
             <button
               type="button"
@@ -162,7 +164,7 @@ export function ApplicationDecisionBar({
               Reject
             </button>
           ) : (
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:w-auto">
+            <div className="flex w-full flex-col gap-2 sm:flex-row">
               <button
                 type="button"
                 onClick={() => {
@@ -170,7 +172,7 @@ export function ApplicationDecisionBar({
                   setReason('');
                 }}
                 disabled={busy !== null}
-                className="inline-flex min-h-12 flex-1 items-center justify-center px-4 text-sm font-medium disabled:opacity-60"
+                className="inline-flex min-h-12 items-center justify-center px-6 text-sm font-medium disabled:opacity-60 sm:w-auto"
                 style={{
                   borderRadius: '4px',
                   borderWidth: '1px',
@@ -185,11 +187,11 @@ export function ApplicationDecisionBar({
                 type="button"
                 onClick={reject}
                 disabled={busy !== null}
-                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 px-4 text-sm font-medium text-white disabled:opacity-60"
-                style={{ borderRadius: '4px', background: 'var(--text-primary)' }}
+                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 px-5 text-base font-medium text-white disabled:opacity-60"
+                style={{ borderRadius: '4px', background: 'var(--primary)' }}
               >
                 {busy === 'reject' ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null}
-                Confirm reject
+                Confirm Rejection
               </button>
             </div>
           )}
