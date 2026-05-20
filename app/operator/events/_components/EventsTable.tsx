@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { logQAAction } from '@/lib/dev/qa-action-log';
 
 type EventRow = {
   id: string;
@@ -64,6 +65,7 @@ export function EventsTable({ events }: { events: EventRow[] }) {
         body: JSON.stringify({ ids: Array.from(selected) }),
       });
       if (res.ok) {
+        logQAAction(`bulk deleted ${selected.size} event(s)`);
         setSelected(new Set());
         setConfirmOpen(false);
         router.refresh();

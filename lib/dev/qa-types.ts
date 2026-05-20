@@ -14,12 +14,18 @@ export interface MissionStep {
   points: number;
 }
 
+export type JudgeVerdict = 'pass' | 'partial' | 'fail';
+
 export interface CompletedStep {
   id: string;
   completedAt: string;
   pointsAwarded: number;
   source: 'auto' | 'manual';
   evidence?: string;
+  /** AI judge verdict at the time the step was marked complete, if a judge ran. */
+  verdict?: JudgeVerdict | null;
+  /** One-sentence reason returned by the judge (partial/fail only). */
+  verdictReason?: string | null;
 }
 
 export type BugSeverity = 'low' | 'medium' | 'high';

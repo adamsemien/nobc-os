@@ -10,6 +10,7 @@ import { useTheme } from '../../_components/ThemeToggle';
 import { Avatar } from '../../_components/Avatar';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { emitCountsRefresh } from '@/components/counts/CountsProvider';
+import { logQAAction } from '@/lib/dev/qa-action-log';
 import { WaxSealStamp } from './WaxSealStamp';
 
 export type ApplicationsQueueItem = {
@@ -291,6 +292,7 @@ export function ApplicationsQueue({
         };
         removeAndNotify(id, messages[path]);
         emitCountsRefresh();
+        logQAAction(`application ${path} (queue)`);
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Something went wrong. Try again.';
         setFlash({ type: 'error', message });
@@ -343,6 +345,7 @@ export function ApplicationsQueue({
       const failCount = data.failed ?? Math.max(0, ids.length - (data.succeeded ?? 0));
       setApplications(prev => prev.filter(a => !succeededIds.includes(a.id)));
       setSelectedIds(new Set());
+      logQAAction(`bulk ${action} ${succeededIds.length} application(s)`);
       const label = action === 'approve' ? 'approved' : action === 'hold' ? 'moved to hold' : 'rejected';
       const msg = failCount === 0
         ? `${succeededIds.length} application${succeededIds.length !== 1 ? 's' : ''} ${label}.`

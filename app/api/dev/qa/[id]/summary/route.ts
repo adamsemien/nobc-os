@@ -11,6 +11,7 @@ const ALLOWED = (process.env.DEV_USER_IDS ?? '')
   .filter(Boolean);
 
 type Severity = 'low' | 'medium' | 'high';
+type Verdict = 'pass' | 'partial' | 'fail';
 
 interface TargetStep {
   id: string;
@@ -24,6 +25,15 @@ interface CompletedStep {
   pointsAwarded: number;
   source: 'auto' | 'manual';
   evidence?: string;
+  verdict?: Verdict | null;
+  verdictReason?: string | null;
+}
+
+function verdictBadge(v?: Verdict | null): string {
+  if (v === 'pass') return ' [pass]';
+  if (v === 'partial') return ' [partial]';
+  if (v === 'fail') return ' [miss]';
+  return '';
 }
 
 interface BugReport {
@@ -51,9 +61,20 @@ function buildMarkdown(args: {
   bugs: BugReport[];
   passingSteps: TargetStep[];
   skippedStepIds: Set<string>;
+  verdictByStepId: Map<string, { verdict: Verdict; reason: string | null }>;
   fixes: string | null;
 }): string {
-  const { title, completedAt, stepsPassed, stepsTotal, bugs, passingSteps, skippedStepIds, fixes } = args;
+  const {
+    title,
+    completedAt,
+    stepsPassed,
+    stepsTotal,
+    bugs,
+    passingSteps,
+    skippedStepIds,
+    verdictByStepId,
+    fixes,
+  } = args;
   const lines: string[] = [];
   lines.push(`## QA Mission Summary — ${title}`);
   lines.push(`Completed: ${completedAt}`);
@@ -85,7 +106,16 @@ function buildMarkdown(args: {
   } else {
     passingSteps.forEach((s, i) => {
       const skipped = skippedStepIds.has(s.id);
-      lines.push(`${skipped ? '↷' : '✓'} Step ${i + 1}: ${s.instruction}${skipped ? ' _(skipped)_' : ''}`);
+      const j = verdictByStepId.get(s.id);
+      const badge = j ? verdictBadge(j.verdict) : '';
+      lines.push(
+        `${skipped ? '↷' : '✓'} Step ${i + 1}: ${s.instruction}${badge}${
+          skipped ? ' _(skipped)_' : ''
+        }`,
+      );
+      if (j && j.verdict !== 'pass' && j.reason) {
+        lines.push(`    — ${j.reason}`);
+      }
     });
   }
   lines.push('');
@@ -166,6 +196,12 @@ export async function GET(
   const completedIds = new Set(completed.map((c) => c.id));
   const skippedIds = new Set(completed.filter((c) => c.evidence === 'skipped').map((c) => c.id));
   const passingSteps = steps.filter((s) => completedIds.has(s.id));
+  const verdictByStepId = new Map<string, { verdict: Verdict; reason: string | null }>();
+  for (const c of completed) {
+    if (c.verdict) {
+      verdictByStepId.set(c.id, { verdict: c.verdict, reason: c.verdictReason ?? null });
+    }
+  }
 
   const titleSource = mission.scenario.split('\n')[0] || 'Untitled mission';
   const title =
@@ -183,6 +219,7 @@ export async function GET(
     bugs,
     passingSteps,
     skippedStepIds: skippedIds,
+    verdictByStepId,
     fixes,
   });
 

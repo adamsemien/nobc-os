@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Loader2 } from 'lucide-react';
 import { formatDateOnly } from '@/lib/operator-application-display';
+import { logQAAction } from '@/lib/dev/qa-action-log';
 
 type Props = {
   applicationId: string;
@@ -32,6 +33,7 @@ export function ApplicationDecisionBar({
         credentials: 'include',
       });
       if (!r.ok) throw new Error('request failed');
+      logQAAction('approved application');
       router.push('/operator/applications');
       router.refresh();
     } catch {
@@ -52,6 +54,7 @@ export function ApplicationDecisionBar({
         body: JSON.stringify({ reason: reason.trim() || undefined }),
       });
       if (!r.ok) throw new Error('request failed');
+      logQAAction('rejected application');
       router.push('/operator/applications');
       router.refresh();
     } catch {

@@ -16,6 +16,7 @@ import {
 import { defaultEventAccess, type EventAccess } from '@/lib/event-access-schema';
 import { newGate } from '@/lib/event-gates';
 import { type AccessQuestion, toApiQuestion, coerceFieldType } from '@/lib/registration-fields';
+import { logQAAction } from '@/lib/dev/qa-action-log';
 
 type FlowTemplate = {
   id: string;
@@ -377,6 +378,7 @@ export default function NewEventPage() {
         throw new Error(text || `Save failed (${res.status})`);
       }
       const { event } = (await res.json()) as { event: { id: string } };
+      logQAAction(`created event (status=${status})`);
       router.push(`/operator/events/${event.id}`);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Save failed. Try again.');

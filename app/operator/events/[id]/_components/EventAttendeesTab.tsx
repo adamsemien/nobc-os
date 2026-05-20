@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Gift, Loader2, X, DollarSign, AlertTriangle, ArrowUpCircle, UserX, Ban } from 'lucide-react';
 import { EmptyState } from '../../../_components/EmptyState';
+import { logQAAction } from '@/lib/dev/qa-action-log';
 
 type RsvpRow = {
   id: string;
@@ -209,6 +210,7 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
         const d = await res.json().catch(() => ({}));
         alert(d.error ?? 'Promote failed');
       } else {
+        logQAAction('approved RSVP');
         router.refresh();
       }
     } finally {
@@ -228,6 +230,7 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
         const d = await res.json().catch(() => ({}));
         alert(d.error ?? 'Reject failed');
       } else {
+        logQAAction('rejected RSVP');
         router.refresh();
       }
     } finally {
@@ -247,6 +250,7 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
         const d = await res.json().catch(() => ({}));
         alert(d.error ?? 'Cancel failed');
       } else {
+        logQAAction('cancelled RSVP');
         router.refresh();
       }
     } finally {
@@ -748,6 +752,7 @@ function CompDrawer({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Failed (${res.status})`);
       }
+      logQAAction('issued comp ticket');
       onIssued();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');

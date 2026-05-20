@@ -15,12 +15,17 @@ interface TargetStep {
   points: number;
 }
 
+type Verdict = 'pass' | 'partial' | 'fail';
+const VALID_VERDICTS = new Set<Verdict>(['pass', 'partial', 'fail']);
+
 interface CompletedStep {
   id: string;
   completedAt: string;
   evidence?: string;
   pointsAwarded: number;
   source: 'auto' | 'manual';
+  verdict?: Verdict | null;
+  verdictReason?: string | null;
 }
 
 export async function POST(
@@ -42,6 +47,8 @@ export async function POST(
     skip?: boolean;
     /** True-skip: advance without marking pass/fail. Awards 0 points. */
     softSkip?: boolean;
+    verdict?: Verdict | null;
+    verdictReason?: string | null;
   } = {};
   try {
     body = await req.json();
@@ -78,6 +85,14 @@ export async function POST(
   }
 
   const delta = isSoftSkip ? 0 : isSkip ? -SKIP_COST : step.points;
+  const verdict: Verdict | null =
+    typeof body.verdict === 'string' && VALID_VERDICTS.has(body.verdict as Verdict)
+      ? (body.verdict as Verdict)
+      : null;
+  const verdictReason =
+    typeof body.verdictReason === 'string' && body.verdictReason.trim()
+      ? body.verdictReason.slice(0, 240).trim()
+      : null;
   const next: CompletedStep = {
     id: stepId,
     completedAt: new Date().toISOString(),
@@ -90,6 +105,8 @@ export async function POST(
       : undefined,
     pointsAwarded: delta,
     source: body.source === 'manual' ? 'manual' : 'auto',
+    verdict,
+    verdictReason,
   };
 
   const updated = await db.qAMission.update({

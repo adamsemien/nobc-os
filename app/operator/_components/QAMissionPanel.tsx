@@ -7,9 +7,46 @@ import type {
   BugReport,
   BugSeverity,
   CompletedStep,
+  JudgeVerdict,
   MissionDisplayMode,
 } from '@/lib/dev/qa-types';
 import { matchCheckpoint } from '@/lib/dev/qa-types';
+import {
+  QA_ACTION_EVENT,
+  setQAActive,
+  type QAActionEntry,
+} from '@/lib/dev/qa-action-log';
+
+const MAX_TRAIL_ENTRIES = 20;
+const JUDGE_CLIENT_TIMEOUT_MS = 3500;
+const VERDICT_COLOR_MS = { pass: 500, partial: 800, fail: 1000 } as const;
+const VERDICT_REASON_MS = 3000;
+
+const VERDICT_PALETTE: Record<JudgeVerdict, { bg: string; border: string; text: string; label: string }> = {
+  pass: {
+    bg: 'rgba(74, 222, 128, 0.35)',
+    border: 'rgba(74, 222, 128, 0.6)',
+    text: '#4ade80',
+    label: '✓ Correct',
+  },
+  partial: {
+    bg: 'rgba(251, 191, 36, 0.35)',
+    border: 'rgba(251, 191, 36, 0.6)',
+    text: '#fbbf24',
+    label: '△ Partial',
+  },
+  fail: {
+    bg: 'rgba(248, 113, 113, 0.35)',
+    border: 'rgba(248, 113, 113, 0.6)',
+    text: '#f87171',
+    label: '✗ Miss',
+  },
+};
+
+interface JudgeResult {
+  verdict: JudgeVerdict | null;
+  reason: string | null;
+}
 
 export interface MissionCompletionSummary {
   score: number;
@@ -140,15 +177,20 @@ export function QAMissionPanel({
     popoutWindow ? 'expanded' : 'hud',
   );
   const [pos, setPos] = useState<Position | null>(null);
-  const [flash, setFlash] = useState(false);
   const [stepExpanded, setStepExpanded] = useState(false);
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [judging, setJudging] = useState(false);
+  const [verdictColor, setVerdictColor] = useState<JudgeVerdict | null>(null);
+  const [verdictReason, setVerdictReason] = useState<
+    { verdict: JudgeVerdict; reason: string } | null
+  >(null);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const detectedFor = useRef<Set<string>>(new Set());
   const summarySubmittedRef = useRef<MissionCompletionSummary | null>(null);
+  const actionLogRef = useRef<QAActionEntry[]>([]);
 
   // Restore persisted state. Pop-out window ignores persisted displayMode.
   useEffect(() => {
@@ -182,6 +224,11 @@ export function QAMissionPanel({
     () => new Set(mission.completedSteps.map((c) => c.id)),
     [mission.completedSteps],
   );
+  const completedById = useMemo(() => {
+    const m = new Map<string, CompletedStep>();
+    for (const c of mission.completedSteps) m.set(c.id, c);
+    return m;
+  }, [mission.completedSteps]);
   const currentStepIndex = mission.steps.findIndex((s) => !completedIds.has(s.id));
   const currentStep = currentStepIndex >= 0 ? mission.steps[currentStepIndex] : null;
   const allDone = mission.steps.length > 0 && mission.steps.every((s) => completedIds.has(s.id));
@@ -203,22 +250,116 @@ export function QAMissionPanel({
     setStepExpanded(false);
   }, [currentStepIndex]);
 
+  // Mark this window as having an active QA mission so logQAAction() emits events.
+  useEffect(() => {
+    setQAActive(true);
+    return () => setQAActive(false);
+  }, []);
+
+  // Reset the action trail whenever a new step becomes active.
+  useEffect(() => {
+    actionLogRef.current = [];
+  }, [currentStepIndex]);
+
+  const pushAction = useCallback((entry: QAActionEntry) => {
+    const next = [...actionLogRef.current, entry];
+    if (next.length > MAX_TRAIL_ENTRIES) {
+      next.splice(0, next.length - MAX_TRAIL_ENTRIES);
+    }
+    actionLogRef.current = next;
+  }, []);
+
+  // Log every pathname change as a navigation entry.
+  useEffect(() => {
+    if (!pathname) return;
+    pushAction({
+      timestamp: Date.now(),
+      type: 'navigate',
+      label: pathname,
+      url: pathname,
+    });
+  }, [pathname, pushAction]);
+
+  // Subscribe to operator actions emitted via logQAAction().
+  useEffect(() => {
+    function onAction(e: Event) {
+      const detail = (e as CustomEvent<QAActionEntry>).detail;
+      if (!detail || typeof detail.label !== 'string') return;
+      pushAction({
+        timestamp: detail.timestamp || Date.now(),
+        type: 'action',
+        label: detail.label,
+      });
+    }
+    window.addEventListener(QA_ACTION_EVENT, onAction as EventListener);
+    return () => window.removeEventListener(QA_ACTION_EVENT, onAction as EventListener);
+  }, [pushAction]);
+
+  /** Ask Claude to grade what the operator did against the step instruction. */
+  const runJudge = useCallback(
+    async (stepInstruction: string): Promise<JudgeResult> => {
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), JUDGE_CLIENT_TIMEOUT_MS);
+        const res = await fetch('/api/dev/qa/judge', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            stepInstruction,
+            actionTrail: actionLogRef.current,
+          }),
+          signal: ctl.signal,
+        });
+        clearTimeout(t);
+        if (!res.ok) return { verdict: null, reason: null };
+        const data = (await res.json()) as JudgeResult;
+        return {
+          verdict: data.verdict ?? null,
+          reason: data.reason ?? null,
+        };
+      } catch {
+        return { verdict: null, reason: null };
+      }
+    },
+    [],
+  );
+
+  const showVerdictFlash = useCallback((v: JudgeVerdict, reason: string | null) => {
+    setVerdictColor(v);
+    setTimeout(() => setVerdictColor((cur) => (cur === v ? null : cur)), VERDICT_COLOR_MS[v]);
+    if (v !== 'pass' && reason) {
+      setVerdictReason({ verdict: v, reason });
+      setTimeout(() => {
+        setVerdictReason((cur) =>
+          cur && cur.verdict === v && cur.reason === reason ? null : cur,
+        );
+      }, VERDICT_REASON_MS);
+    }
+  }, []);
+
   const markStep = useCallback(
-    async (stepId: string, source: 'auto' | 'manual') => {
+    async (
+      stepId: string,
+      source: 'auto' | 'manual',
+      verdict?: JudgeVerdict | null,
+      verdictReason?: string | null,
+    ) => {
       if (completedIds.has(stepId)) return;
       try {
         const res = await fetch(`/api/dev/qa/${mission.id}/checkpoint`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ stepId, success: true, source }),
+          body: JSON.stringify({
+            stepId,
+            success: true,
+            source,
+            verdict: verdict ?? null,
+            verdictReason: verdictReason ?? null,
+          }),
         });
         if (!res.ok) return;
         const data = (await res.json()) as { score: number; completedSteps: CompletedStep[] };
         onUpdate({ ...mission, score: data.score, completedSteps: data.completedSteps });
-        if (source === 'manual') {
-          setFlash(true);
-          setTimeout(() => setFlash(false), 300);
-        }
       } catch {}
     },
     [mission, completedIds, onUpdate],
@@ -307,18 +448,49 @@ export function QAMissionPanel({
   }
 
   // HUD soft-skip: advance without marking pass/fail (0 points, no penalty).
-  async function handleSoftSkip(stepId: string) {
+  async function handleSoftSkip(
+    stepId: string,
+    verdict?: JudgeVerdict | null,
+    verdictReason?: string | null,
+  ) {
     try {
       const res = await fetch(`/api/dev/qa/${mission.id}/checkpoint`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ stepId, success: true, source: 'manual', softSkip: true }),
+        body: JSON.stringify({
+          stepId,
+          success: true,
+          source: 'manual',
+          softSkip: true,
+          verdict: verdict ?? null,
+          verdictReason: verdictReason ?? null,
+        }),
       });
       if (res.ok) {
         const data = (await res.json()) as { score: number; completedSteps: CompletedStep[] };
         onUpdate({ ...mission, score: data.score, completedSteps: data.completedSteps });
       }
     } catch {}
+  }
+
+  /** Pass click — ask judge first, then advance with verdict attached. */
+  async function handlePass() {
+    if (!currentStep || judging) return;
+    setJudging(true);
+    const result = await runJudge(currentStep.instruction);
+    setJudging(false);
+    if (result.verdict) showVerdictFlash(result.verdict, result.reason);
+    await markStep(currentStep.id, 'manual', result.verdict, result.reason);
+  }
+
+  /** Soft-skip click — judge runs informationally; 0 points either way. */
+  async function handleSoftSkipWithJudge() {
+    if (!currentStep || judging) return;
+    setJudging(true);
+    const result = await runJudge(currentStep.instruction);
+    setJudging(false);
+    if (result.verdict) showVerdictFlash(result.verdict, result.reason);
+    await handleSoftSkip(currentStep.id, result.verdict, result.reason);
   }
 
   async function submitBug() {
@@ -439,6 +611,8 @@ export function QAMissionPanel({
   // HUD mode — compact bottom-center bar with current step.
   // ─────────────────────────────────────────────────────────────────────
   if (displayMode === 'hud' && !popoutWindow && !summary) {
+    const verdictBg = verdictColor ? VERDICT_PALETTE[verdictColor].bg : null;
+    const verdictBorder = verdictColor ? VERDICT_PALETTE[verdictColor].border : null;
     return (
       <>
         <div
@@ -452,14 +626,14 @@ export function QAMissionPanel({
             flexDirection: 'column',
             gap: stepExpanded && !allDone && currentStep ? 6 : 0,
             padding: stepExpanded && !allDone && currentStep ? '8px 14px' : '6px 14px',
-            background: flash
-              ? 'rgba(74, 222, 128, 0.35)'
-              : allDone
-              ? 'rgba(74, 222, 128, 0.18)'
-              : 'rgba(20, 10, 30, 0.75)',
+            background:
+              verdictBg ??
+              (allDone
+                ? 'rgba(74, 222, 128, 0.18)'
+                : 'rgba(20, 10, 30, 0.75)'),
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: `1px solid ${verdictBorder ?? 'rgba(255,255,255,0.1)'}`,
             borderRadius: stepExpanded && !allDone && currentStep ? 14 : 22,
             color: '#f0eaf6',
             fontFamily: 'monospace',
@@ -467,7 +641,7 @@ export function QAMissionPanel({
             boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
             minHeight: 44,
             maxWidth: 'min(720px, 92vw)',
-            transition: 'background 0.3s ease, border-radius 0.15s ease, padding 0.15s ease',
+            transition: 'background 0.3s ease, border-color 0.3s ease, border-radius 0.15s ease, padding 0.15s ease',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -584,16 +758,22 @@ export function QAMissionPanel({
             </button>
             {currentStep && !allDone && (
               <button
-                onClick={() => markStep(currentStep.id, 'manual')}
-                title="Mark current step done"
-                style={HUD_BTN_STYLE}
+                onClick={handlePass}
+                disabled={judging}
+                title={judging ? 'Asking judge…' : 'Mark current step done'}
+                style={{
+                  ...HUD_BTN_STYLE,
+                  opacity: judging ? 0.7 : 1,
+                  cursor: judging ? 'wait' : 'pointer',
+                }}
               >
-                ✓ Pass
+                {judging ? '⏳ Judging…' : '✓ Pass'}
               </button>
             )}
             {currentStep && !allDone && (
               <button
-                onClick={() => handleSoftSkip(currentStep.id)}
+                onClick={handleSoftSkipWithJudge}
+                disabled={judging}
                 title="Skip this step — advances without marking pass or fail"
                 style={{
                   ...HUD_BTN_STYLE,
@@ -602,6 +782,8 @@ export function QAMissionPanel({
                   color: '#8a7a9a',
                   fontSize: 11,
                   padding: '3px 8px',
+                  opacity: judging ? 0.5 : 1,
+                  cursor: judging ? 'wait' : 'pointer',
                 }}
               >
                 → Skip
@@ -629,7 +811,63 @@ export function QAMissionPanel({
               {currentStep.instruction}
             </div>
           )}
+
+          {/* Inline verdict label flashing inside the bar (pass shows briefly) */}
+          {verdictColor && (
+            <div
+              style={{
+                fontSize: 11,
+                color: VERDICT_PALETTE[verdictColor].text,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                padding: '2px 26px 4px',
+                borderTop: '1px dashed rgba(255,255,255,0.06)',
+              }}
+            >
+              {VERDICT_PALETTE[verdictColor].label}
+            </div>
+          )}
         </div>
+
+        {/* Auto-collapsing reason banner for partial/fail */}
+        {verdictReason && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: 76,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 9997,
+              maxWidth: 'min(720px, 92vw)',
+              padding: '8px 14px',
+              background: VERDICT_PALETTE[verdictReason.verdict].bg,
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: `1px solid ${VERDICT_PALETTE[verdictReason.verdict].border}`,
+              borderRadius: 8,
+              color: '#f0eaf6',
+              fontFamily: 'monospace',
+              fontSize: 12,
+              lineHeight: 1.5,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <span
+              style={{
+                color: VERDICT_PALETTE[verdictReason.verdict].text,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                flexShrink: 0,
+              }}
+            >
+              {VERDICT_PALETTE[verdictReason.verdict].label}
+            </span>
+            <span style={{ color: '#e8dff2' }}>{verdictReason.reason}</span>
+          </div>
+        )}
 
         {/* Inline bug popover anchored above the HUD bar */}
         {bugOpen && (
@@ -857,6 +1095,9 @@ export function QAMissionPanel({
                   const done = completedIds.has(step.id);
                   const current = !done && i === currentStepIndex;
                   const checkpointKind = step.checkpoint.startsWith('visit:') ? 'auto' : 'manual';
+                  const completedRow = completedById.get(step.id);
+                  const stepVerdict = completedRow?.verdict ?? null;
+                  const stepVerdictReason = completedRow?.verdictReason ?? null;
                   return (
                     <li
                       key={step.id}
@@ -894,6 +1135,25 @@ export function QAMissionPanel({
                           >
                             {step.instruction}
                           </div>
+                          {stepVerdict && (
+                            <div
+                              style={{
+                                marginTop: 4,
+                                fontSize: 11,
+                                color: VERDICT_PALETTE[stepVerdict].text,
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              <span style={{ fontWeight: 700, letterSpacing: '0.05em' }}>
+                                {VERDICT_PALETTE[stepVerdict].label}
+                              </span>
+                              {stepVerdictReason && (
+                                <span style={{ color: '#b0a0c0', marginLeft: 6 }}>
+                                  — {stepVerdictReason}
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div
                             style={{
                               display: 'flex',
@@ -910,15 +1170,21 @@ export function QAMissionPanel({
                             {!done && (
                               <>
                                 <button
-                                  onClick={() => markStep(step.id, 'manual')}
+                                  onClick={() => {
+                                    if (current) handlePass();
+                                    else markStep(step.id, 'manual');
+                                  }}
+                                  disabled={current && judging}
                                   style={{
                                     ...S.btn,
                                     fontSize: 10,
                                     padding: '3px 8px',
                                     marginLeft: 'auto',
+                                    opacity: current && judging ? 0.6 : 1,
+                                    cursor: current && judging ? 'wait' : 'pointer',
                                   }}
                                 >
-                                  Mark done
+                                  {current && judging ? '⏳ Judging…' : 'Mark done'}
                                 </button>
                                 <button onClick={() => handleSkip(step.id)} style={S.danger}>
                                   Skip

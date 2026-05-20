@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { logQAAction } from '@/lib/dev/qa-action-log';
 
 export type RoomData = {
   event: {
@@ -280,7 +281,10 @@ export function RoomDashboard({
       const res = await fetch(`/api/operator/events/${eventId}/promote-waitlist`, {
         method: 'POST',
       });
-      if (res.ok) await fetchRoom();
+      if (res.ok) {
+        logQAAction('promoted from waitlist');
+        await fetchRoom();
+      }
     } catch (err) {
       console.error('[Room] promote failed:', err);
     } finally {

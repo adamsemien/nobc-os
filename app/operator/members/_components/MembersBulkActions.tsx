@@ -13,6 +13,7 @@ import {
 } from '@/components/ui';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { ScoreBadge } from '../../_components/ScoreBadge';
+import { logQAAction } from '@/lib/dev/qa-action-log';
 
 export type MembersBulkMember = {
   id: string;
@@ -89,6 +90,7 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
           const succeeded = payload.succeeded ?? ids.length;
           setFlash(`${ACTION_LABEL[action]} applied to ${succeeded} member${succeeded === 1 ? '' : 's'}.`);
           setSelected(new Set());
+          logQAAction(`bulk ${action} ${succeeded} member(s)`);
         }
       } catch {
         setFlash('Network error. Try again.');
