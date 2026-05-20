@@ -53,6 +53,8 @@ lib/audit.ts                                    ← AuditEvent write + query hel
 
 ## Schema models
 
+- **Workspace**: the tenant root. Cross-cutting — `workspaceId` lives on every other user-data table. Read/write from any stage; canonical owner is this one.
+- **Member**: the approved-applicant record. Created by Stage 02 at approval time, lives in the operator directory here, referenced by Stages 03/04/05/06/11/12.
 - **AuditEvent**: workspaceId, actorType (`OPERATOR | MEMBER | SYSTEM | AGENT`), actorId, action, resourceType, resourceId, metadata (JSON), createdAt
 - **PlatformSetting**: workspace-scoped key/value settings (theme, branding, feature flags)
 - **OperatorComment**: per-resource notes (on an Application, Member, Event, etc.)
