@@ -18,6 +18,13 @@ import './navigation/go-to-intelligence';
 import './navigation/go-to-events';
 import './navigation/go-to-audit';
 import './navigation/go-to-webhooks';
+import './navigation/go-to-members';
+import './navigation/go-to-lists';
+import './navigation/go-to-settings';
+
+import './action/create-event';
+import './action/add-purple-list';
+import './action/add-blocked-list';
 
 export * from './types';
 export * from './registry';

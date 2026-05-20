@@ -12,6 +12,7 @@ import {
   type CommandGroup,
 } from '@/lib/commands/types';
 import { buildEventCommands, type EventLite } from '@/lib/commands/event-commands';
+import { buildSearchCommands, type SearchHit } from '@/lib/commands/search-commands';
 import { CommandResultRow } from './CommandResultRow';
 import { AskAIRow } from './AskAIRow';
 import { AgentMode } from './AgentMode';
@@ -46,6 +47,8 @@ export function CommandPalette({
   /** Non-null = the palette body is replaced by the agent transcript, seeded
    *  with this query. */
   const [agentSeed, setAgentSeed] = useState<string | null>(null);
+  /** Server-side search hits (members + applications + events). Debounced. */
+  const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -86,7 +89,12 @@ export function CommandPalette({
 
     // Typed query → flat ranked list over the merged pool.
     const eventScope = pastSearch ? events : upcomingEvents;
-    const pool = [...staticCommands, ...buildEventCommands(eventScope, now)];
+    const searchPool = buildSearchCommands(searchHits);
+    const pool = [
+      ...staticCommands,
+      ...buildEventCommands(eventScope, now),
+      ...searchPool,
+    ];
     const ranked = rankCommands(pool, query);
 
     // No upcoming event matched — offer to broaden the search to past events.
@@ -110,7 +118,7 @@ export function CommandPalette({
       execute: () => setAgentSeed(query.trim()),
     });
     return ranked;
-  }, [query, staticCommands, events, upcomingEvents, now, pastSearch]);
+  }, [query, staticCommands, events, upcomingEvents, now, pastSearch, searchHits]);
 
   const grouped = query.trim() === '';
   const safeIndex = results.length ? Math.min(activeIndex, results.length - 1) : 0;
@@ -130,6 +138,29 @@ export function CommandPalette({
   // A new query is a fresh search — drop back to the upcoming-only scope.
   useEffect(() => {
     setPastSearch(false);
+  }, [query]);
+
+  // Debounced fetch against /api/operator/search for members + applications.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setSearchHits([]);
+      return;
+    }
+    const ctrl = new AbortController();
+    const t = window.setTimeout(() => {
+      fetch(`/api/operator/search?q=${encodeURIComponent(q)}`, {
+        credentials: 'include',
+        signal: ctrl.signal,
+      })
+        .then((r) => (r.ok ? r.json() : { hits: [] }))
+        .then((data: { hits: SearchHit[] }) => setSearchHits(data.hits ?? []))
+        .catch(() => {});
+    }, 180);
+    return () => {
+      window.clearTimeout(t);
+      ctrl.abort();
+    };
   }, [query]);
 
   useEffect(() => {
