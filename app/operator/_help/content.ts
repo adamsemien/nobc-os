@@ -119,8 +119,8 @@ The way we think about it: Intelligence is not a vanity dashboard — it's how y
     title: 'Keyboard shortcuts',
     body: `**Global**
 - Cmd+K — search & navigate (events, members, applications, settings)
-- Cmd+Option+A — open the AI agent panel
-- Cmd+Option+D — open the dev toolbar (DEV_USER_IDS only)
+- Cmd+Shift+Option+A — open the AI agent panel
+- Cmd+Shift+Option+D — open the dev toolbar (DEV_USER_IDS only)
 - ? — open this help panel
 - Esc — close any open panel
 
