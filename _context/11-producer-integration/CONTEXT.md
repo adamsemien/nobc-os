@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | **State** | ✅ Shipped |
-| **V1 item** | #20 (Svix portion), Phase J (cross-cutting), House Phone trigger (V1.5) |
+| **V1 item** | #20 (Svix portion), #26 (Phase J webhook to Producer), House Phone trigger (V1.5) |
 | **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | House Phone migration (V1.5) |

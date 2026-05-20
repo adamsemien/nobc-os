@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | **State** | ✅ Shipped |
-| **V1 item** | #6, #13, #14 (capacity portion), #15 |
+| **V1 item** | #6, #13, #14 (capacity portion), #15, #23 (hero images) |
 | **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |

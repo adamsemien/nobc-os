@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | **State** | ✅ Shipped |
-| **V1 item** | #9, #10 |
+| **V1 item** | #9, #10, #21 (comp tickets — payment-side bookkeeping), #25 (compliance pages) |
 | **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | Compliance pages legal review |

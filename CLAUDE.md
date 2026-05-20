@@ -136,16 +136,16 @@ If you report task completion without performing this checklist, the task is inc
 | # | Stage | State | V1 items |
 |---|---|---|---|
 | 01 | `_context/01-apply/` | ✅ Shipped | #1, #5 |
-| 02 | `_context/02-approval/` | 🟡 In progress | #4, #16 |
-| 03 | `_context/03-events/` | ⚪ Not started | #6, #13, #14, #15 |
-| 04 | `_context/04-access/` | ⚪ Not started | #7, #8 |
-| 05 | `_context/05-payments/` | ⚪ Not started | #9, #10 |
-| 06 | `_context/06-wallet-checkin/` | ⚪ Not started | #11, #12 |
-| 07 | `_context/07-operator-dashboard/` | ⚪ Not started | #20 |
-| 08 | `_context/08-mcp-server/` | ⚪ Not started | #17 |
-| 09 | `_context/09-ai-chat/` | ⚪ Not started | #18 |
-| 10 | `_context/10-ai-event-builder/` | ⚪ Not started | #19 |
-| 11 | `_context/11-producer-integration/` | ⚪ Not started | Phase J, House Phone trigger |
+| 02 | `_context/02-approval/` | ✅ Shipped | #4, #16 |
+| 03 | `_context/03-events/` | ✅ Shipped | #6, #13, #14, #15, #23 |
+| 04 | `_context/04-access/` | ✅ Shipped | #7, #8, #21 |
+| 05 | `_context/05-payments/` | ✅ Shipped | #9, #10, #21, #25 |
+| 06 | `_context/06-wallet-checkin/` | 🔶 Partial | #11, #12 |
+| 07 | `_context/07-operator-dashboard/` | ✅ Shipped | #20, #22, #24, #28 |
+| 08 | `_context/08-mcp-server/` | 🔶 Partial | #17 |
+| 09 | `_context/09-ai-chat/` | ✅ Shipped | #18 |
+| 10 | `_context/10-ai-event-builder/` | 🔶 Partial | #19 |
+| 11 | `_context/11-producer-integration/` | ✅ Shipped | #20, #26, House Phone trigger (V1.5) |
 | 12 | `_context/12-intelligence/` | ✅ Shipped (base) / 🔶 sponsor-facing partial | #27 |
 | 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) | — |
 

@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | **State** | ✅ Shipped |
-| **V1 item** | #7, #8, #14 (waitlist auto-promote portion) |
+| **V1 item** | #7, #8, #14 (waitlist auto-promote portion), #21 (comp tickets — issuance + member-facing flow) |
 | **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |

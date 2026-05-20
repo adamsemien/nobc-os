@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | **State** | ✅ Shipped |
-| **V1 item** | #20 (audit_events portion) |
+| **V1 item** | #20 (audit_events portion), #22 (7-theme system), #24 (operator bulk delete), #28 (roles & permissions — Roles & Permissions section lives in root CLAUDE.md) |
 | **Last updated** | 2026-05-20 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
