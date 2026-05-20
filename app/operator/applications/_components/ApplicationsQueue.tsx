@@ -68,8 +68,76 @@ const LEGACY_LABELS: Record<string, string> = {
   'RAPID.MOSTDONTKNOW': "something most people don't know",
 };
 
+// Legacy/external keys (UPPER_SNAKE) that bypass APPLY_QUESTIONS but still
+// need human-readable labels in the preview panel.
+const QUESTION_LABELS: Record<string, string> = {
+  WORK_WEBSITE: 'Website',
+  IF_NOT_HERE: "If not here…",
+  PASSION_PROJECTS: 'Passion projects',
+  WHY_NOBC: 'Why No Bad Company',
+  WHAT_YOU_DO: 'What you do',
+  WHAT_BRING: 'What you bring',
+  SUNDAY_MORNING: 'Sunday morning',
+  KARAOKE_ORDER: 'Karaoke order',
+  WHERE_FROM: "Where you're from",
+  HOME_ADDRESS: 'Location',
+  OBSESSED_WITH: 'Obsessed with',
+  ALWAYS_CALLED_ABOUT: "What people call you about",
+  COMMUNITY_LOYALTY: "Community you've stayed loyal to",
+  COFFEE_TABLE: 'Coffee table',
+  BUSY_DAY: 'Busy during the day',
+  SOCIAL_LINK: 'Social link you revisit',
+  MOST_DONT_KNOW: "Something most people don't know",
+  PLACE_DETAILS: 'Place that gets the details right',
+  TRUST_TASTE: 'Whose taste you trust',
+  RECOMMEND_LIKE_PAID: "What you recommend like you're paid",
+  SPLURGE_VS_SAVE: 'Splurge vs save',
+  CONNECTED_PEOPLE: 'A time you connected two people',
+  MOST_INTERESTING: 'Most interesting people in your life',
+  LEARNED_THIS_YEAR: 'Learned this year',
+  GREAT_ENERGY: 'Where you bring great energy',
+  MEET_PEOPLE: 'Who you want to meet',
+};
+
+/** Snake/UPPER_SNAKE → "Sentence case" fallback. Used when a key isn't
+ *  in APPLY_QUESTIONS, LEGACY_LABELS, or QUESTION_LABELS — keeps the
+ *  panel from ever showing a raw DB key. */
+function prettyKey(key: string): string {
+  const cleaned = key.replace(/^_+/, '').replace(/[._]+/g, ' ').trim();
+  if (!cleaned) return key;
+  const lower = cleaned.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
 function labelForKey(key: string): string {
-  return APPLY_QUESTIONS.find(q => q.key === key)?.label ?? LEGACY_LABELS[key] ?? key;
+  return (
+    APPLY_QUESTIONS.find(q => q.key === key)?.label ??
+    LEGACY_LABELS[key] ??
+    QUESTION_LABELS[key] ??
+    prettyKey(key)
+  );
+}
+
+/** `_photos` and any other underscore-prefixed key is system metadata,
+ *  not a Q&A row — never render them in the answers list. */
+function isSystemKey(key: string): boolean {
+  return key.startsWith('_');
+}
+
+/** Parse the JSON-encoded photo array stored under the `_photos` answer key.
+ *  Returns up to 5 valid http(s) URLs, or [] if absent/malformed. */
+function readPhotos(answers: Record<string, string>): string[] {
+  const raw = answers._photos;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((v): v is string => typeof v === 'string' && /^https?:\/\//.test(v))
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
 }
 
 function parseReferrer(v: string): string {
@@ -741,7 +809,10 @@ function DetailPanel({
 }) {
   const { theme } = useTheme();
   const approveBtnRef = useRef<HTMLButtonElement>(null);
-  const entries = orderedAnswerEntries(app.answers);
+  // Hide system-metadata keys (e.g. `_photos`) so they never leak as raw JSON
+  // into the Q&A list — they're rendered as a photo strip instead.
+  const entries = orderedAnswerEntries(app.answers).filter(([k]) => !isSystemKey(k));
+  const photos = readPhotos(app.answers);
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [eggVisible, setEggVisible] = useState(false);
@@ -810,8 +881,12 @@ function DetailPanel({
   }, [showEasterEgg]);
 
   return (
+    // Independent scroll: panel takes full available height of the parent grid cell
+    // and scrolls on its own. `min-h-0` is critical inside a flex/grid parent so the
+    // child can actually grow to fill and then clip — without it the scroll silently
+    // breaks and the bottom of the answer list disappears under the action footer.
     <div
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface-elevated p-4 sm:p-6 lg:max-h-[calc(100vh-11rem)]"
+      className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface-elevated p-4 sm:p-6"
       style={{ borderRadius: '8px' }}
     >
       {showEasterEgg && (
@@ -847,6 +922,20 @@ function DetailPanel({
       >
         {app.fullName}
       </h2>
+
+      {typeof app.aiScore === 'number' && (
+        <div className="mt-5 flex items-baseline gap-3">
+          <span
+            className="text-3xl font-semibold tabular-nums text-text-primary sm:text-4xl"
+            style={headingFont}
+          >
+            {(app.aiScore * 10).toFixed(1)}
+          </span>
+          <span className="text-sm text-text-muted">
+            / 10 AI score · {Math.round(app.aiScore * 100)}%
+          </span>
+        </div>
+      )}
 
       {app.aiReasoning ? (
         <div className="mt-5 rounded-lg border border-border bg-muted p-4 shadow-sm sm:p-5">
@@ -1008,6 +1097,24 @@ function DetailPanel({
         return <WaxSealStamp />;
       })()}
 
+      {photos.length > 0 && (
+        <section className="mt-6 border-t border-border pt-6">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Photos</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {photos.map((url, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={url}
+                src={url}
+                alt={`${app.fullName} photo ${i + 1}`}
+                className="h-24 w-24 rounded-md object-cover"
+                style={{ border: '1px solid var(--border)' }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="mt-8 border-t border-border pt-6">
         <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Answers</h3>
         <div className="mt-4 space-y-6">
@@ -1018,11 +1125,16 @@ function DetailPanel({
                 <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
                   {labelForKey(key)}
                 </p>
-                <p className="mt-2 whitespace-pre-wrap text-[15px] font-medium leading-relaxed text-text-primary">
+                <p className="mt-2 whitespace-pre-wrap break-words text-[15px] font-medium leading-relaxed text-text-primary">
                   {displayAnswerValue(value)}
                 </p>
               </div>
             ))}
+          {entries.filter(([, v]) => v.trim()).length === 0 && (
+            <p className="text-sm italic text-text-muted">
+              No answers recorded for this application.
+            </p>
+          )}
         </div>
       </section>
 
