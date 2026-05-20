@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import type { ActiveMission, CompletedStep } from '@/lib/dev/qa-types';
+import type {
+  ActiveMission,
+  BugReport,
+  BugSeverity,
+  CompletedStep,
+  MissionDisplayMode,
+} from '@/lib/dev/qa-types';
 import { matchCheckpoint } from '@/lib/dev/qa-types';
 
 export interface MissionCompletionSummary {
@@ -21,11 +27,31 @@ interface QAMissionPanelProps {
   onUpdate: (next: ActiveMission) => void;
   onComplete: (summary: MissionCompletionSummary) => void;
   onAbandon: () => void;
+  /** True when rendered inside the pop-out window — disables HUD mode and pop-out button. */
+  popoutWindow?: boolean;
+  /** Caller wants the pop-out feature; if false, the ⤢ button is hidden. */
+  enablePopout?: boolean;
+  /** Called when the user clicks ⤢ in the main window. */
+  onRequestPopout?: () => void;
 }
 
 const LS_POS = 'nobc-qa-panel-pos';
 const LS_MIN = 'nobc-qa-panel-minimized';
+const LS_MODE = 'nobc-qa-display-mode';
 const WIDTH = 380;
+const HUD_BTN_STYLE: React.CSSProperties = {
+  background: 'rgba(35, 29, 46, 0.7)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 6,
+  color: '#f0eaf6',
+  fontSize: 12,
+  padding: '4px 10px',
+  cursor: 'pointer',
+  fontFamily: 'monospace',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+};
 
 const S = {
   btn: {
@@ -79,22 +105,48 @@ interface Position {
   y: number;
 }
 
-export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAMissionPanelProps) {
+interface SummaryPayload {
+  markdown: string;
+  fixes: string | null;
+  title: string;
+  stepsPassed: number;
+  stepsTotal: number;
+}
+
+export function QAMissionPanel({
+  mission,
+  onUpdate,
+  onComplete,
+  onAbandon,
+  popoutWindow = false,
+  enablePopout = false,
+  onRequestPopout,
+}: QAMissionPanelProps) {
   const pathname = usePathname();
   const [elapsed, setElapsed] = useState(() => Date.now() - new Date(mission.startedAt).getTime());
   const [bugOpen, setBugOpen] = useState(false);
   const [bugDescription, setBugDescription] = useState('');
+  const [bugStepIndex, setBugStepIndex] = useState<number | null>(null);
+  const [bugSeverity, setBugSeverity] = useState<BugSeverity>('medium');
   const [completeOpen, setCompleteOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [minimized, setMinimized] = useState(false);
+  const [displayMode, setDisplayMode] = useState<MissionDisplayMode>(
+    popoutWindow ? 'expanded' : 'hud',
+  );
   const [pos, setPos] = useState<Position | null>(null);
+  const [flash, setFlash] = useState(false);
+  const [summary, setSummary] = useState<SummaryPayload | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const detectedFor = useRef<Set<string>>(new Set());
+  const summarySubmittedRef = useRef<MissionCompletionSummary | null>(null);
 
-  // Restore persisted state.
+  // Restore persisted state. Pop-out window ignores persisted displayMode.
   useEffect(() => {
     try {
       const rawPos = localStorage.getItem(LS_POS);
@@ -104,8 +156,14 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
       }
       const rawMin = localStorage.getItem(LS_MIN);
       if (rawMin === 'true') setMinimized(true);
+      if (!popoutWindow) {
+        const rawMode = localStorage.getItem(LS_MODE);
+        if (rawMode === 'expanded' || rawMode === 'hud') {
+          setDisplayMode(rawMode as MissionDisplayMode);
+        }
+      }
     } catch {}
-  }, []);
+  }, [popoutWindow]);
 
   // Live timer.
   useEffect(() => {
@@ -120,11 +178,19 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
     () => new Set(mission.completedSteps.map((c) => c.id)),
     [mission.completedSteps],
   );
-  const nextStep = mission.steps.find((s) => !completedIds.has(s.id));
+  const currentStepIndex = mission.steps.findIndex((s) => !completedIds.has(s.id));
+  const currentStep = currentStepIndex >= 0 ? mission.steps[currentStepIndex] : null;
   const allDone = mission.steps.length > 0 && mission.steps.every((s) => completedIds.has(s.id));
   const timeLimitMs = mission.timeLimit ? mission.timeLimit * 1000 : null;
   const overTime = timeLimitMs !== null && elapsed > timeLimitMs;
   const remainingMs = timeLimitMs !== null ? Math.max(0, timeLimitMs - elapsed) : null;
+
+  // Default bug step selector to current active step whenever bug form opens.
+  useEffect(() => {
+    if (bugOpen) {
+      setBugStepIndex(currentStepIndex >= 0 ? currentStepIndex : null);
+    }
+  }, [bugOpen, currentStepIndex]);
 
   const markStep = useCallback(
     async (stepId: string, source: 'auto' | 'manual') => {
@@ -138,6 +204,10 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
         if (!res.ok) return;
         const data = (await res.json()) as { score: number; completedSteps: CompletedStep[] };
         onUpdate({ ...mission, score: data.score, completedSteps: data.completedSteps });
+        if (source === 'manual') {
+          setFlash(true);
+          setTimeout(() => setFlash(false), 300);
+        }
       } catch {}
     },
     [mission, completedIds, onUpdate],
@@ -157,29 +227,32 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
     }
   }, [pathname, mission.steps, mission.id, completedIds, allDone, markStep]);
 
-  // Drag handling — header acts as handle.
+  function setMode(next: MissionDisplayMode) {
+    setDisplayMode(next);
+    if (!popoutWindow) {
+      try {
+        localStorage.setItem(LS_MODE, next);
+      } catch {}
+    }
+  }
+
   function onHeaderMouseDown(e: React.MouseEvent) {
-    // Ignore clicks on header buttons.
     if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
     const rect = panelRef.current?.getBoundingClientRect();
     const startX = rect?.left ?? pos?.x ?? 20;
     const startY = rect?.top ?? pos?.y ?? window.innerHeight - 200;
     dragRef.current = { dx: e.clientX - startX, dy: e.clientY - startY };
-    // Set initial pos so the panel switches from bottom-left to top-left positioning.
     if (!pos) setPos({ x: startX, y: startY });
 
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
-      const x = ev.clientX - dragRef.current.dx;
-      const y = ev.clientY - dragRef.current.dy;
-      setPos({ x, y });
+      setPos({ x: ev.clientX - dragRef.current.dx, y: ev.clientY - dragRef.current.dy });
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       dragRef.current = null;
-      // Clamp + persist.
       setPos((p) => {
         if (!p) return p;
         const panelH = panelRef.current?.offsetHeight ?? 200;
@@ -228,23 +301,47 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
     setSubmitting(true);
     setError(null);
     try {
+      const stepTitle =
+        typeof bugStepIndex === 'number' && mission.steps[bugStepIndex]
+          ? mission.steps[bugStepIndex].instruction
+          : null;
       const res = await fetch(`/api/dev/qa/${mission.id}/bug`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ description: text, location: pathname ?? 'unknown' }),
+        body: JSON.stringify({
+          description: text,
+          location: pathname ?? 'unknown',
+          stepIndex: bugStepIndex,
+          stepTitle,
+          severity: bugSeverity,
+        }),
       });
       if (!res.ok) {
         setError('Could not save bug report.');
         return;
       }
-      const data = (await res.json()) as { score: number; bugsFound: ActiveMission['bugsFound'] };
+      const data = (await res.json()) as { score: number; bugsFound: BugReport[] };
       onUpdate({ ...mission, score: data.score, bugsFound: data.bugsFound });
       setBugDescription('');
+      setBugSeverity('medium');
       setBugOpen(false);
     } catch {
       setError('Network error.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function loadSummary() {
+    setSummaryLoading(true);
+    try {
+      const res = await fetch(`/api/dev/qa/${mission.id}/summary`);
+      if (!res.ok) return;
+      const data = (await res.json()) as SummaryPayload;
+      setSummary(data);
+      setMode('expanded');
+    } catch {} finally {
+      setSummaryLoading(false);
     }
   }
 
@@ -267,12 +364,30 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
       const data = (await res.json()) as {
         mission: MissionCompletionSummary & { id: string };
       };
-      onComplete(data.mission);
+      // Show the summary inside the panel instead of dismissing.
+      setCompleteOpen(false);
+      await loadSummary();
+      // Defer the parent unmount until the user dismisses the summary.
+      summarySubmittedRef.current = data.mission;
     } catch {
       setError('Network error.');
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function dismissSummary() {
+    if (summarySubmittedRef.current) onComplete(summarySubmittedRef.current);
+    setSummary(null);
+  }
+
+  async function copySummary() {
+    if (!summary) return;
+    try {
+      await navigator.clipboard.writeText(summary.markdown);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
   }
 
   async function abandon() {
@@ -290,40 +405,206 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
       ? '#fbbf24'
       : '#4ade80';
 
-  // Panel positioning: when no drag has happened, anchor to bottom-left.
-  // After first drag, use absolute top/left coordinates.
-  const panelStyle: React.CSSProperties = {
-    position: 'fixed',
+  // ─────────────────────────────────────────────────────────────────────
+  // HUD mode — compact bottom-center bar with current step.
+  // ─────────────────────────────────────────────────────────────────────
+  if (displayMode === 'hud' && !popoutWindow && !summary) {
+    return (
+      <>
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9998,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 14px',
+            background: flash
+              ? 'rgba(74, 222, 128, 0.35)'
+              : allDone
+              ? 'rgba(74, 222, 128, 0.18)'
+              : 'rgba(20, 10, 30, 0.75)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 22,
+            color: '#f0eaf6',
+            fontFamily: 'monospace',
+            fontSize: 13,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+            minHeight: 44,
+            maxWidth: 'min(720px, 92vw)',
+            transition: 'background 0.3s ease',
+          }}
+        >
+          <span style={{ fontSize: 16 }}>🎮</span>
+          {allDone ? (
+            <>
+              <span style={{ color: '#4ade80', fontWeight: 700 }}>
+                ✓ Mission Complete · {mission.score}pt
+              </span>
+              <button
+                onClick={() => setCompleteOpen(true)}
+                style={{ ...HUD_BTN_STYLE, background: 'rgba(74, 222, 128, 0.25)' }}
+              >
+                View Summary →
+              </button>
+            </>
+          ) : currentStep ? (
+            <>
+              <span
+                style={{
+                  color: '#b0a0c0',
+                  fontSize: 11,
+                  letterSpacing: '0.05em',
+                  flexShrink: 0,
+                }}
+              >
+                Step {currentStepIndex + 1}/{mission.steps.length}:
+              </span>
+              <span
+                style={{
+                  color: '#f0eaf6',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flex: 1,
+                  minWidth: 0,
+                  maxWidth: 380,
+                }}
+              >
+                {currentStep.instruction}
+              </span>
+            </>
+          ) : (
+            <span style={{ color: '#b0a0c0' }}>No steps</span>
+          )}
+
+          <span
+            style={{
+              color: '#fbbf24',
+              fontWeight: 700,
+              fontSize: 13,
+              flexShrink: 0,
+              borderLeft: '1px solid rgba(255,255,255,0.1)',
+              paddingLeft: 8,
+              marginLeft: 4,
+            }}
+          >
+            {mission.score}
+          </span>
+          <span style={{ color: overTime ? '#f87171' : '#d4c8e0', fontSize: 11, flexShrink: 0 }}>
+            {remainingMs !== null ? fmtElapsed(remainingMs) : fmtElapsed(elapsed)}
+          </span>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: 4,
+              flexShrink: 0,
+              borderLeft: '1px solid rgba(255,255,255,0.1)',
+              paddingLeft: 8,
+              marginLeft: 4,
+            }}
+          >
+            <button
+              onClick={() => setBugOpen((v) => !v)}
+              title="Report a bug"
+              style={{ ...HUD_BTN_STYLE, background: bugOpen ? 'rgba(178, 46, 33, 0.45)' : HUD_BTN_STYLE.background }}
+            >
+              🐛 Bug
+            </button>
+            {currentStep && !allDone && (
+              <button
+                onClick={() => markStep(currentStep.id, 'manual')}
+                title="Mark current step done"
+                style={HUD_BTN_STYLE}
+              >
+                ✓ Pass
+              </button>
+            )}
+            <button onClick={() => setMode('expanded')} title="Expand panel" style={HUD_BTN_STYLE}>
+              ▢ Expand
+            </button>
+          </div>
+        </div>
+
+        {/* Inline bug popover anchored above the HUD bar */}
+        {bugOpen && (
+          <BugFormPopover
+            anchor="hud"
+            steps={mission.steps}
+            bugStepIndex={bugStepIndex}
+            setBugStepIndex={setBugStepIndex}
+            bugDescription={bugDescription}
+            setBugDescription={setBugDescription}
+            bugSeverity={bugSeverity}
+            setBugSeverity={setBugSeverity}
+            submit={submitBug}
+            cancel={() => setBugOpen(false)}
+            submitting={submitting}
+            error={error}
+          />
+        )}
+
+        {/* Complete-flow modal stays available even from HUD */}
+        {completeOpen && (
+          <CompleteFormPopover
+            feedback={feedback}
+            setFeedback={setFeedback}
+            submit={submitComplete}
+            cancel={() => setCompleteOpen(false)}
+            submitting={submitting}
+            summaryLoading={summaryLoading}
+          />
+        )}
+      </>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Expanded panel.
+  // ─────────────────────────────────────────────────────────────────────
+  const baseStyle: React.CSSProperties = {
     zIndex: 9999,
-    width: WIDTH,
-    background: '#0f0c14',
-    border: '1px solid #3a2540',
+    background: 'rgba(18, 10, 28, 0.88)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 10,
     fontFamily: 'monospace',
     fontSize: 13,
     color: '#f0eaf6',
     boxShadow: '0 8px 48px rgba(0,0,0,0.7)',
     overflow: 'hidden',
-    maxHeight: minimized ? undefined : '85vh',
     display: 'flex',
     flexDirection: 'column',
-    ...(pos
-      ? { top: pos.y, left: pos.x }
-      : { bottom: 20, left: 20 }),
   };
+  const panelStyle: React.CSSProperties = popoutWindow
+    ? { ...baseStyle, position: 'relative', width: '100%', maxHeight: 'none' }
+    : {
+        ...baseStyle,
+        position: 'fixed',
+        width: WIDTH,
+        maxHeight: minimized ? undefined : '85vh',
+        ...(pos ? { top: pos.y, left: pos.x } : { bottom: 20, left: 20 }),
+      };
 
   return (
     <div ref={panelRef} style={panelStyle}>
-      {/* Header — drag handle */}
+      {/* Header */}
       <div
-        onMouseDown={onHeaderMouseDown}
+        onMouseDown={popoutWindow ? undefined : onHeaderMouseDown}
         style={{
           padding: '10px 14px',
-          borderBottom: minimized ? 'none' : '1px solid #3a2540',
+          borderBottom: minimized && !summary ? 'none' : '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          cursor: 'move',
+          cursor: popoutWindow ? 'default' : 'move',
           userSelect: 'none',
           gap: 8,
         }}
@@ -337,7 +618,7 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
               fontSize: 10,
               padding: '2px 6px',
               borderRadius: 4,
-              background: '#231d2e',
+              background: 'rgba(35, 29, 46, 0.7)',
               border: `1px solid ${difficultyColor}`,
               color: difficultyColor,
               letterSpacing: '0.1em',
@@ -364,6 +645,38 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
           <span style={{ color: overTime ? '#f87171' : '#d4c8e0', fontSize: 12 }}>
             {remainingMs !== null ? fmtElapsed(remainingMs) : fmtElapsed(elapsed)}
           </span>
+          {enablePopout && !popoutWindow && (
+            <button
+              onClick={onRequestPopout}
+              title="Pop out to a separate window"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#8a7a9a',
+                cursor: 'pointer',
+                fontSize: 13,
+                padding: '2px 4px',
+              }}
+            >
+              ⤢
+            </button>
+          )}
+          {!popoutWindow && (
+            <button
+              onClick={() => setMode('hud')}
+              title="Collapse to HUD"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#8a7a9a',
+                cursor: 'pointer',
+                fontSize: 13,
+                padding: '2px 4px',
+              }}
+            >
+              ⌄
+            </button>
+          )}
           <button
             onClick={toggleMinimize}
             title={minimized ? 'Expand' : 'Minimize'}
@@ -382,7 +695,17 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
         </div>
       </div>
 
-      {!minimized && (
+      {!minimized && summary && (
+        <SummaryView
+          summary={summary}
+          loading={summaryLoading}
+          copied={copied}
+          onCopy={copySummary}
+          onDismiss={dismissSummary}
+        />
+      )}
+
+      {!minimized && !summary && (
         <>
           {/* Scrolling body */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
@@ -390,7 +713,7 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
             <div
               style={{
                 padding: '12px 14px',
-                borderBottom: '1px solid #2d2438',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
                 color: '#e8dff2',
                 lineHeight: 1.6,
                 fontSize: 14,
@@ -399,13 +722,12 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
               {mission.scenario}
             </div>
 
-            {/* Bonus objective */}
             {mission.bonusObjective && (
               <div
                 style={{
                   padding: '10px 14px',
-                  borderBottom: '1px solid #2d2438',
-                  background: '#1a1520',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  background: 'rgba(26, 21, 32, 0.7)',
                   color: '#fbbf24',
                   fontSize: 13,
                   lineHeight: 1.5,
@@ -416,7 +738,7 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
             )}
 
             {/* Steps */}
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid #2d2438' }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ ...S.label, marginBottom: 10 }}>Steps</div>
               <ol
                 style={{
@@ -428,9 +750,9 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
                   gap: 8,
                 }}
               >
-                {mission.steps.map((step) => {
+                {mission.steps.map((step, i) => {
                   const done = completedIds.has(step.id);
-                  const current = !done && step === nextStep;
+                  const current = !done && i === currentStepIndex;
                   const checkpointKind = step.checkpoint.startsWith('visit:') ? 'auto' : 'manual';
                   return (
                     <li
@@ -438,8 +760,12 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
                       style={{
                         padding: '8px 10px',
                         borderRadius: 6,
-                        border: current ? '1px solid #B22E21' : '1px solid #2d2438',
-                        background: done ? '#152418' : current ? '#231820' : '#15121a',
+                        border: current ? '1px solid #B22E21' : '1px solid rgba(255,255,255,0.06)',
+                        background: done
+                          ? 'rgba(21, 36, 24, 0.6)'
+                          : current
+                          ? 'rgba(35, 24, 32, 0.6)'
+                          : 'rgba(21, 18, 26, 0.4)',
                         opacity: done ? 0.75 : 1,
                       }}
                     >
@@ -505,9 +831,8 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
               </ol>
             </div>
 
-            {/* Bug list */}
             {mission.bugsFound.length > 0 && (
-              <div style={{ padding: '12px 14px', borderBottom: '1px solid #2d2438' }}>
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ ...S.label, marginBottom: 8 }}>
                   Bugs found · {mission.bugsFound.length}
                 </div>
@@ -523,7 +848,28 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
                   {mission.bugsFound.map((b) => (
                     <div key={b.id} style={{ display: 'flex', gap: 6 }}>
                       <span style={{ color: '#fbbf24', flexShrink: 0 }}>🐛</span>
-                      <span style={{ flex: 1, lineHeight: 1.5 }}>{b.description}</span>
+                      <span style={{ flex: 1, lineHeight: 1.5 }}>
+                        {typeof b.stepIndex === 'number' && (
+                          <span style={{ color: '#8a7a9a' }}>Step {b.stepIndex + 1} · </span>
+                        )}
+                        <span
+                          style={{
+                            color:
+                              b.severity === 'high'
+                                ? '#f87171'
+                                : b.severity === 'low'
+                                ? '#9ab89a'
+                                : '#fbbf24',
+                            fontSize: 10,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            marginRight: 4,
+                          }}
+                        >
+                          [{b.severity ?? 'medium'}]
+                        </span>
+                        {b.description}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -535,23 +881,36 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
           <div
             style={{
               padding: '10px 14px',
-              borderTop: '1px solid #3a2540',
-              background: '#0f0c14',
+              borderTop: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(15, 12, 20, 0.85)',
             }}
           >
             {bugOpen ? (
+              <BugFormInline
+                steps={mission.steps}
+                bugStepIndex={bugStepIndex}
+                setBugStepIndex={setBugStepIndex}
+                bugDescription={bugDescription}
+                setBugDescription={setBugDescription}
+                bugSeverity={bugSeverity}
+                setBugSeverity={setBugSeverity}
+                submit={submitBug}
+                cancel={() => setBugOpen(false)}
+                submitting={submitting}
+              />
+            ) : completeOpen ? (
               <div>
-                <div style={{ ...S.label, marginBottom: 6 }}>Found a bug — describe</div>
+                <div style={{ ...S.label, marginBottom: 6 }}>How was it?</div>
                 <textarea
-                  value={bugDescription}
-                  onChange={(e) => setBugDescription(e.target.value)}
-                  maxLength={2000}
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  maxLength={4000}
                   rows={3}
-                  placeholder="What broke? Steps to reproduce?"
+                  placeholder="Feedback (optional)"
                   style={{
                     width: '100%',
-                    background: '#231d2e',
-                    border: '1px solid #3d3050',
+                    background: 'rgba(35, 29, 46, 0.5)',
+                    border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: 6,
                     color: '#f0eaf6',
                     fontSize: 13,
@@ -564,43 +923,11 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
                 />
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
-                    onClick={submitBug}
-                    disabled={submitting || !bugDescription.trim()}
+                    onClick={submitComplete}
+                    disabled={submitting || summaryLoading}
                     style={S.primary}
                   >
-                    {submitting ? '…' : '+25pt'}
-                  </button>
-                  <button onClick={() => setBugOpen(false)} style={S.btn}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : completeOpen ? (
-              <div>
-                <div style={{ ...S.label, marginBottom: 6 }}>How was it?</div>
-                <textarea
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  maxLength={4000}
-                  rows={3}
-                  placeholder="Feedback (optional)"
-                  style={{
-                    width: '100%',
-                    background: '#231d2e',
-                    border: '1px solid #3d3050',
-                    borderRadius: 6,
-                    color: '#f0eaf6',
-                    fontSize: 13,
-                    padding: '8px 10px',
-                    fontFamily: 'monospace',
-                    resize: 'vertical',
-                    marginBottom: 8,
-                    lineHeight: 1.5,
-                  }}
-                />
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={submitComplete} disabled={submitting} style={S.primary}>
-                    {submitting ? '…' : 'Save score'}
+                    {submitting || summaryLoading ? '…' : 'Save & view summary'}
                   </button>
                   <button onClick={() => setCompleteOpen(false)} style={S.btn}>
                     Cancel
@@ -635,6 +962,344 @@ export function QAMissionPanel({ mission, onUpdate, onComplete, onAbandon }: QAM
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Helper components
+// ─────────────────────────────────────────────────────────────────────
+
+interface BugFormFieldsProps {
+  steps: ActiveMission['steps'];
+  bugStepIndex: number | null;
+  setBugStepIndex: (n: number | null) => void;
+  bugDescription: string;
+  setBugDescription: (s: string) => void;
+  bugSeverity: BugSeverity;
+  setBugSeverity: (s: BugSeverity) => void;
+  submit: () => void;
+  cancel: () => void;
+  submitting: boolean;
+}
+
+function StepSelector({
+  steps,
+  value,
+  onChange,
+}: {
+  steps: ActiveMission['steps'];
+  value: number | null;
+  onChange: (n: number | null) => void;
+}) {
+  return (
+    <select
+      value={value === null ? '__general' : String(value)}
+      onChange={(e) =>
+        onChange(e.target.value === '__general' ? null : Number(e.target.value))
+      }
+      style={{
+        width: '100%',
+        background: 'rgba(35, 29, 46, 0.7)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 6,
+        color: '#f0eaf6',
+        fontSize: 12,
+        padding: '6px 8px',
+        fontFamily: 'monospace',
+      }}
+    >
+      <option value="__general">General / Not step-specific</option>
+      {steps.map((s, i) => (
+        <option key={s.id} value={i}>
+          Step {i + 1}: {s.instruction.length > 60 ? s.instruction.slice(0, 57) + '…' : s.instruction}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SeverityPicker({
+  value,
+  onChange,
+}: {
+  value: BugSeverity;
+  onChange: (s: BugSeverity) => void;
+}) {
+  const opts: Array<{ key: BugSeverity; label: string; color: string }> = [
+    { key: 'low', label: 'Low', color: '#9ab89a' },
+    { key: 'medium', label: 'Medium', color: '#fbbf24' },
+    { key: 'high', label: 'High', color: '#f87171' },
+  ];
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      {opts.map((o) => (
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          style={{
+            flex: 1,
+            background: value === o.key ? `${o.color}22` : 'rgba(35, 29, 46, 0.7)',
+            border: `1px solid ${value === o.key ? o.color : 'rgba(255,255,255,0.1)'}`,
+            color: value === o.key ? o.color : '#b0a0c0',
+            borderRadius: 6,
+            padding: '6px',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            cursor: 'pointer',
+            letterSpacing: '0.05em',
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BugFormInline({
+  steps,
+  bugStepIndex,
+  setBugStepIndex,
+  bugDescription,
+  setBugDescription,
+  bugSeverity,
+  setBugSeverity,
+  submit,
+  cancel,
+  submitting,
+}: BugFormFieldsProps) {
+  return (
+    <div>
+      <div style={{ ...S.label, marginBottom: 6 }}>Which step?</div>
+      <div style={{ marginBottom: 8 }}>
+        <StepSelector steps={steps} value={bugStepIndex} onChange={setBugStepIndex} />
+      </div>
+      <div style={{ ...S.label, marginBottom: 6 }}>Severity</div>
+      <div style={{ marginBottom: 8 }}>
+        <SeverityPicker value={bugSeverity} onChange={setBugSeverity} />
+      </div>
+      <div style={{ ...S.label, marginBottom: 6 }}>What broke?</div>
+      <textarea
+        value={bugDescription}
+        onChange={(e) => setBugDescription(e.target.value)}
+        maxLength={2000}
+        rows={3}
+        placeholder="Steps to reproduce, what you expected, what happened"
+        style={{
+          width: '100%',
+          background: 'rgba(35, 29, 46, 0.5)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 6,
+          color: '#f0eaf6',
+          fontSize: 13,
+          padding: '8px 10px',
+          fontFamily: 'monospace',
+          resize: 'vertical',
+          marginBottom: 8,
+          lineHeight: 1.5,
+        }}
+      />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          onClick={submit}
+          disabled={submitting || !bugDescription.trim()}
+          style={S.primary}
+        >
+          {submitting ? '…' : 'Report +25pt'}
+        </button>
+        <button onClick={cancel} style={S.btn}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BugFormPopover({
+  anchor,
+  steps,
+  bugStepIndex,
+  setBugStepIndex,
+  bugDescription,
+  setBugDescription,
+  bugSeverity,
+  setBugSeverity,
+  submit,
+  cancel,
+  submitting,
+  error,
+}: BugFormFieldsProps & { anchor: 'hud'; error: string | null }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 80,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 9999,
+        width: 'min(420px, 92vw)',
+        background: 'rgba(18, 10, 28, 0.92)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 10,
+        padding: 14,
+        boxShadow: '0 8px 48px rgba(0,0,0,0.6)',
+        fontFamily: 'monospace',
+        color: '#f0eaf6',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontWeight: 700, color: '#B22E21', fontSize: 12, letterSpacing: '0.1em' }}>
+          🐛 REPORT BUG
+        </span>
+        <button onClick={cancel} style={{ background: 'none', border: 'none', color: '#8a7a9a', cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1 }}>
+          ×
+        </button>
+      </div>
+      <BugFormInline
+        steps={steps}
+        bugStepIndex={bugStepIndex}
+        setBugStepIndex={setBugStepIndex}
+        bugDescription={bugDescription}
+        setBugDescription={setBugDescription}
+        bugSeverity={bugSeverity}
+        setBugSeverity={setBugSeverity}
+        submit={submit}
+        cancel={cancel}
+        submitting={submitting}
+      />
+      {error && (
+        <div style={{ color: '#f87171', fontSize: 11, marginTop: 8 }}>{error}</div>
+      )}
+      {anchor === 'hud' && null}
+    </div>
+  );
+}
+
+function CompleteFormPopover({
+  feedback,
+  setFeedback,
+  submit,
+  cancel,
+  submitting,
+  summaryLoading,
+}: {
+  feedback: string;
+  setFeedback: (s: string) => void;
+  submit: () => void;
+  cancel: () => void;
+  submitting: boolean;
+  summaryLoading: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 80,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 9999,
+        width: 'min(420px, 92vw)',
+        background: 'rgba(18, 10, 28, 0.92)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 10,
+        padding: 14,
+        boxShadow: '0 8px 48px rgba(0,0,0,0.6)',
+        fontFamily: 'monospace',
+        color: '#f0eaf6',
+      }}
+    >
+      <div style={{ ...S.label, marginBottom: 6 }}>How was it?</div>
+      <textarea
+        value={feedback}
+        onChange={(e) => setFeedback(e.target.value)}
+        maxLength={4000}
+        rows={3}
+        placeholder="Feedback (optional)"
+        style={{
+          width: '100%',
+          background: 'rgba(35, 29, 46, 0.5)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 6,
+          color: '#f0eaf6',
+          fontSize: 13,
+          padding: '8px 10px',
+          fontFamily: 'monospace',
+          resize: 'vertical',
+          marginBottom: 8,
+          lineHeight: 1.5,
+        }}
+      />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={submit} disabled={submitting || summaryLoading} style={S.primary}>
+          {submitting || summaryLoading ? 'Generating summary…' : 'Save & view summary'}
+        </button>
+        <button onClick={cancel} style={S.btn}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SummaryView({
+  summary,
+  loading,
+  copied,
+  onCopy,
+  onDismiss,
+}: {
+  summary: SummaryPayload;
+  loading: boolean;
+  copied: boolean;
+  onCopy: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ ...S.label, marginBottom: 6 }}>Mission complete</div>
+        <div style={{ color: '#f0eaf6', fontSize: 14, lineHeight: 1.5, marginBottom: 4 }}>
+          {summary.title}
+        </div>
+        <div style={{ color: '#b0a0c0', fontSize: 12 }}>
+          {summary.stepsPassed}/{summary.stepsTotal} steps passed
+        </div>
+      </div>
+      <div
+        style={{
+          padding: '12px 14px',
+          flex: 1,
+          overflowY: 'auto',
+          whiteSpace: 'pre-wrap',
+          fontSize: 13,
+          lineHeight: 1.6,
+          color: '#e8dff2',
+        }}
+      >
+        {loading ? '⏳ Building summary + asking Claude for fix recs…' : summary.markdown}
+      </div>
+      <div
+        style={{
+          padding: '10px 14px',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(15, 12, 20, 0.85)',
+          display: 'flex',
+          gap: 6,
+          alignItems: 'center',
+        }}
+      >
+        <button onClick={onCopy} style={S.primary}>
+          {copied ? '✓ Copied!' : '📋 Copy for Claude Code'}
+        </button>
+        <button onClick={onDismiss} style={S.btn}>
+          Done
+        </button>
+      </div>
     </div>
   );
 }

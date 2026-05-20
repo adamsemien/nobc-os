@@ -22,6 +22,8 @@ export interface CompletedStep {
   evidence?: string;
 }
 
+export type BugSeverity = 'low' | 'medium' | 'high';
+
 export interface BugReport {
   id: string;
   description: string;
@@ -29,7 +31,14 @@ export interface BugReport {
   screenshotUrl?: string;
   reportedAt: string;
   pointsAwarded: number;
+  /** 0-based index into mission.steps, or null if not tied to a step. */
+  stepIndex?: number | null;
+  /** Snapshot of the step.instruction at time of report. */
+  stepTitle?: string | null;
+  severity?: BugSeverity;
 }
+
+export type MissionDisplayMode = 'hud' | 'expanded';
 
 export interface ActiveMission {
   id: string;

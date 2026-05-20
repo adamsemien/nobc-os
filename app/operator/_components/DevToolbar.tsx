@@ -101,6 +101,8 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
   const [customOpen, setCustomOpen] = useState(false);
   const [customSteps, setCustomSteps] = useState('');
   const [customScenario, setCustomScenario] = useState('');
+  const [popoutActive, setPopoutActive] = useState(false);
+  const popoutRef = useRef<Window | null>(null);
   const [leaderboard, setLeaderboard] = useState<
     Array<{ id: string; operatorName: string; score: number; missionType: string; difficulty: string }>
   >([]);
@@ -206,6 +208,44 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
     refreshBoards();
   }, [isAllowed, open, refreshBoards]);
 
+  // Restore popout-active state on mount; detect external pop-out close.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('nobc-qa-popout-active') === 'true') {
+        setPopoutActive(true);
+      }
+    } catch {}
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'nobc-qa-popout-active') {
+        setPopoutActive(e.newValue === 'true');
+      }
+      if (e.key === 'nobc-qa-tick') {
+        // Pop-out mutated mission state — refetch.
+        fetch('/api/dev/qa/active')
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d?.mission) setMission(d.mission as ActiveMission);
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    // Poll for popout window closed (storage events only fire cross-window).
+    const t = setInterval(() => {
+      if (popoutRef.current && popoutRef.current.closed) {
+        popoutRef.current = null;
+        setPopoutActive(false);
+        try {
+          localStorage.setItem('nobc-qa-popout-active', 'false');
+        } catch {}
+      }
+    }, 1000);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      clearInterval(t);
+    };
+  }, []);
+
   async function handleStartMission() {
     setMissionLoading(true);
     setMissionError(null);
@@ -287,6 +327,39 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
 
   function handleMissionUpdate(next: ActiveMission) {
     setMission(next);
+    try {
+      localStorage.setItem('nobc-qa-tick', String(Date.now()));
+    } catch {}
+  }
+
+  function handlePopout() {
+    const w = window.open(
+      '/qa-panel',
+      'nobc-qa-panel',
+      'width=420,height=720,resizable=yes,scrollbars=yes',
+    );
+    if (!w) {
+      // Pop-up blocked — surface a tiny notice.
+      setMissionError('Allow pop-ups for this site to use the pop-out window.');
+      return;
+    }
+    popoutRef.current = w;
+    setPopoutActive(true);
+    try {
+      localStorage.setItem('nobc-qa-popout-active', 'true');
+    } catch {}
+  }
+
+  function reAttachPopout() {
+    try {
+      popoutRef.current?.close();
+    } catch {}
+    popoutRef.current = null;
+    setPopoutActive(false);
+    try {
+      localStorage.setItem('nobc-qa-popout-active', 'false');
+      localStorage.setItem('nobc-qa-popout-close-signal', String(Date.now()));
+    } catch {}
   }
 
   if (!isLoaded || !isAllowed) return null;
@@ -461,14 +534,58 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
 
   return (
     <>
-      {/* Mission panel — floats bottom-left whenever a mission is active */}
-      {mission && (
+      {/* Mission panel — defaults to HUD bar; floats / pops out on user toggle */}
+      {mission && !popoutActive && (
         <QAMissionPanel
           mission={mission}
           onUpdate={handleMissionUpdate}
           onComplete={handleMissionComplete}
           onAbandon={handleMissionAbandon}
+          enablePopout
+          onRequestPopout={handlePopout}
         />
+      )}
+
+      {/* Popped-out chip in main window */}
+      {mission && popoutActive && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9998,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '6px 14px',
+            background: 'rgba(20, 10, 30, 0.75)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 22,
+            color: '#f0eaf6',
+            fontFamily: 'monospace',
+            fontSize: 12,
+          }}
+        >
+          <span>📋 QA panel is open in a separate window</span>
+          <button
+            onClick={reAttachPopout}
+            style={{
+              background: 'rgba(35, 29, 46, 0.7)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 6,
+              color: '#f0eaf6',
+              fontSize: 11,
+              padding: '4px 10px',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+            }}
+          >
+            Re-attach
+          </button>
+        </div>
       )}
 
       {/* Floating pill — always visible, hidden when panel is open */}

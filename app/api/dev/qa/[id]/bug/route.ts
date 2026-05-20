@@ -8,6 +8,8 @@ const ALLOWED = (process.env.DEV_USER_IDS ?? '')
   .map((s) => s.trim())
   .filter(Boolean);
 
+type BugSeverity = 'low' | 'medium' | 'high';
+
 interface BugReport {
   id: string;
   description: string;
@@ -15,9 +17,13 @@ interface BugReport {
   screenshotUrl?: string;
   reportedAt: string;
   pointsAwarded: number;
+  stepIndex?: number | null;
+  stepTitle?: string | null;
+  severity?: BugSeverity;
 }
 
 const BUG_POINTS = 25;
+const VALID_SEVERITY = new Set<BugSeverity>(['low', 'medium', 'high']);
 
 export async function POST(
   req: NextRequest,
@@ -30,7 +36,14 @@ export async function POST(
   const workspaceId = await requireWorkspaceId(userId);
   const { id } = await params;
 
-  let body: { description?: string; location?: string; screenshotUrl?: string } = {};
+  let body: {
+    description?: string;
+    location?: string;
+    screenshotUrl?: string;
+    stepIndex?: number | null;
+    stepTitle?: string | null;
+    severity?: string;
+  } = {};
   try {
     body = await req.json();
   } catch {}
@@ -41,6 +54,17 @@ export async function POST(
   if (description.length > 2000) {
     return NextResponse.json({ error: 'description too long' }, { status: 400 });
   }
+  const stepIndex =
+    typeof body.stepIndex === 'number' && Number.isFinite(body.stepIndex) && body.stepIndex >= 0
+      ? Math.floor(body.stepIndex)
+      : null;
+  const stepTitle =
+    typeof body.stepTitle === 'string' && body.stepTitle.trim()
+      ? body.stepTitle.trim().slice(0, 300)
+      : null;
+  const severity: BugSeverity = VALID_SEVERITY.has(body.severity as BugSeverity)
+    ? (body.severity as BugSeverity)
+    : 'medium';
 
   const mission = await db.qAMission.findFirst({
     where: { id, workspaceId, operatorId: userId, status: 'active' },
@@ -60,6 +84,9 @@ export async function POST(
         : undefined,
     reportedAt: new Date().toISOString(),
     pointsAwarded: BUG_POINTS,
+    stepIndex,
+    stepTitle,
+    severity,
   };
 
   const updated = await db.qAMission.update({
