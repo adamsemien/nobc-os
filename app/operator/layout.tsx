@@ -11,6 +11,7 @@ import { CommandKPill } from '@/components/command-palette/CommandKPill';
 import { DevToolbar } from './_components/DevToolbar';
 import { HelpPanel } from './_components/HelpPanel';
 import { OnboardingTour } from './_components/OnboardingTour';
+import { OperatorTopBar } from './_components/OperatorTopBar';
 
 export default async function OperatorLayout({
   children,
@@ -58,6 +59,7 @@ export default async function OperatorLayout({
         <AimEasterEgg />
         <MyspaceEasterEgg />
         <CommandKPill />
+        <OperatorTopBar />
         <HelpPanel />
         <OnboardingTour hasEvents={eventsRaw.length > 0} hasMembers={memberCount > 0} />
         <DevToolbar workspaceId={workspaceId} />

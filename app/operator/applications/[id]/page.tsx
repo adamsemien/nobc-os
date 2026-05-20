@@ -5,6 +5,8 @@ import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { formatDateTime } from '@/lib/operator-application-display';
 import { Breadcrumbs } from '@/app/operator/_components/PageHeader';
 import { Avatar } from '@/app/operator/_components/Avatar';
+import { CommentThread } from '@/components/comments/CommentThread';
+import { StatusBadge, applicationTone } from '@/components/ui';
 import {
   ApplicationDecisionBar,
   ConsentReadOnlyRow,
@@ -169,11 +171,9 @@ export default async function OperatorApplicationDetailPage({
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`rounded px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${statusBadgeClass(app.status)}`}
-              >
+              <StatusBadge tone={applicationTone(app.status)}>
                 {app.status === 'HOLD' ? 'Hold' : app.status.toLowerCase()}
-              </span>
+              </StatusBadge>
             </div>
 
             {app.status === 'APPROVED' && reviewedDate ? (
@@ -247,6 +247,8 @@ export default async function OperatorApplicationDetailPage({
                 ))}
               </ul>
             </div>
+
+            <CommentThread entityType="application" entityId={app.id} />
           </section>
         </div>
       </div>

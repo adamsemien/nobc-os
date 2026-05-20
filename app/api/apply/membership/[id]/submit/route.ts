@@ -6,6 +6,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { scoreApplication } from '@/lib/scoring';
 import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
+import { maybeFireSlack } from '@/lib/comments-notify';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -154,6 +155,26 @@ Write 2-3 sentences that feel like we truly read their application and see them.
       personalizedCopy,
     },
   });
+
+  // Slack notify — fire-and-forget. Distinct events for "new application"
+  // and "high-score application" (>= 22 on the 30 scale, i.e. ~0.73 on the
+  // 0–1 canonical aiScore).
+  void maybeFireSlack({
+    workspaceId: application.workspaceId,
+    type: 'application_new',
+    title: `New application — ${application.fullName}`,
+    body: result.archetype ?? undefined,
+    link: `/operator/applications/${id}`,
+  });
+  if (result.memberWorthTotal >= 22 * (100 / 30)) {
+    void maybeFireSlack({
+      workspaceId: application.workspaceId,
+      type: 'application_high',
+      title: `High-score application — ${application.fullName}`,
+      body: `${result.archetype ?? 'Unknown archetype'} · ${Math.round(result.memberWorthTotal / (100 / 30))}/30`,
+      link: `/operator/applications/${id}`,
+    });
+  }
 
   return NextResponse.json({
     archetype: result.archetype,

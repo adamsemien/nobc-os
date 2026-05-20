@@ -52,6 +52,8 @@ model Workspace {
   emailTemplates       EmailTemplate[]
   platformSettings     PlatformSetting[]
   eventWorkflows       EventWorkflow[]
+  operatorComments     OperatorComment[]
+  operatorNotifications OperatorNotification[]
 
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
@@ -1109,4 +1111,45 @@ model GeneratedAsset {
   workspace    Workspace            @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
+}
+
+// Internal operator-to-operator notes attached to any entity
+// (application / member / event / rsvp / generic). Mentions push into
+// OperatorNotification on save.
+model OperatorComment {
+  id          String    @id @default(cuid())
+  workspaceId String
+  authorId    String
+  authorName  String
+  entityType  String
+  entityId    String
+  body        String
+  mentions    String[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, entityType, entityId])
+  @@index([workspaceId, createdAt])
+}
+
+// Internal notifications surfaced in the operator top-bar bell.
+// Read state is per-recipient; createdAt is the canonical sort key.
+model OperatorNotification {
+  id          String    @id @default(cuid())
+  workspaceId String
+  recipientId String
+  type        String
+  title       String
+  body        String?
+  link        String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([recipientId, readAt])
+  @@index([workspaceId, createdAt])
 }

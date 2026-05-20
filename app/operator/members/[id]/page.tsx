@@ -3,6 +3,7 @@ import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { PageHeader } from '../../_components/PageHeader';
 import { Avatar } from '../../_components/Avatar';
 import { ScoreBadge } from '../../_components/ScoreBadge';
+import { CommentThread } from '@/components/comments/CommentThread';
 
 type Detail = {
   member: {
@@ -179,6 +180,10 @@ export default async function MemberDetailPage({
                 </p>
               </Card>
             ) : null}
+
+            <Card>
+              <CommentThread entityType="member" entityId={member.id} />
+            </Card>
           </aside>
         </div>
       </div>
