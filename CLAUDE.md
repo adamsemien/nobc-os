@@ -34,6 +34,75 @@ Methodology: see the `nobc-icm` skill.
 
 ---
 
+## Locked Decisions (NEVER override)
+
+These are hard constants. Any agent that violates them is broken.
+
+- **Email `from` address:** `team@thenobadcompany.com` — always, every transactional email, every welcome, every notification
+- **AI model:** `claude-sonnet-4-20250514` — every Anthropic call. Do not substitute a different model, do not "upgrade" to a newer version, do not swap to a cheaper one. Adam decides model bumps explicitly.
+- **Never modify legal copy** in /apply screen 7 (waiver). Pending attorney review. Any change requires Adam's explicit sign-off.
+- **Never break /apply, archetype config (config/archetypes.ts), or the AI scoring system.** These are shipped and live. Changes require explicit task authorization.
+
+---
+
+## Canonical Terminology (UI copy law)
+
+Product language is locked. Do NOT improvise. Do NOT use synonyms.
+
+- The user-facing concept is **"Access" / "Event Access"** — NEVER "RSVP" in operator UI or member-facing copy. (RSVP is acceptable only in internal code/schema names where the table is already named RSVP.)
+- Three access groups: **Member Access, Guest Access, Comp Access**
+- Member-facing CTA copy depending on access mode:
+  - Open events: "Register"
+  - Apply-required events: "Apply to Attend"
+  - Ticketed events: "Get Ticket — $X"
+  - Confirmation state: "Reserve My Spot" → "You're on the list"
+- **Never expose raw enum values in UI** — `apply_or_pay`, `OPEN`, `MemberStatus.GUEST` must always be mapped to display strings
+- "Non-member ticket buyer" displays as **Guest** (where MemberStatus=GUEST)
+- "Custom questions" displays as **"Registration fields"** in operator UI
+
+When writing any UI copy, audit against this list. If a label doesn't match, fix it before shipping.
+
+---
+
+## Roles & Permissions
+
+Five operator roles. Permissions are enforced at the API layer; UI hide/disable is for UX, not security.
+
+- **owner** — full access including workspace settings and billing
+- **admin** — full access except billing and workspace deletion
+- **manager** — approve/reject applications, create/publish events, view intelligence, issue comps
+- **staff** — check-in PWA only
+- **readonly** — view applications, events, intelligence; no writes
+
+Rules:
+1. Every operator API route is permission-gated. 403 on failure.
+2. Every permission check writes an AuditEvent.
+3. UI hides or disables unauthorized actions but the API is the real security boundary.
+
+---
+
+## Architecture (load-bearing detail)
+
+```
+Producer (Replit) ←Phase J HMAC webhook→ NoBC OS (Vercel)
+       │                                       │
+       └──── Both connect to ────────→ Postgres (Neon)
+                  same instance
+
+NoBC OS → Runtype Master Agent → House Phone → Twilio
+                                  (sub-agent)
+```
+
+**Critical:** Producer and NoBC OS share the SAME Postgres instance. This is why schema changes are production-affecting and must NEVER auto-push — they could break Producer.
+
+Phase J details:
+- HMAC-SHA256 with shared secret
+- Header: `X-NoBC-Signature`
+- Fire-and-forget pattern, one retry, queue on failure
+- Env vars: `PRODUCER_WEBHOOK_URL`, `PRODUCER_WEBHOOK_SECRET`
+
+---
+
 ## Absolute Rules (apply to every stage)
 
 ### No Twilio. Ever.
