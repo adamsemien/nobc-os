@@ -20,11 +20,14 @@ This stage owns everything from the moment an `Application` row is written (by s
 ## Files in play
 
 ```
-app/operator/applications/page.tsx              ← review queue UI
-app/operator/applications/[id]/page.tsx         ← single application detail
-app/api/applications/[id]/approve/route.ts      ← approve endpoint
-app/api/applications/[id]/reject/route.ts       ← reject endpoint
-app/api/applications/[id]/waitlist/route.ts     ← waitlist endpoint
+app/operator/applications/page.tsx                            ← review queue UI
+app/operator/applications/[id]/page.tsx                       ← single application detail
+app/api/operator/applications/[id]/route.ts                   ← single-application read (detail panel)
+app/api/operator/applications/[id]/approve/route.ts           ← approve endpoint
+app/api/operator/applications/[id]/reject/route.ts            ← reject endpoint
+app/api/operator/applications/[id]/waitlist/route.ts          ← waitlist endpoint
+app/api/operator/applications/[id]/hold/route.ts              ← on-hold endpoint
+app/api/operator/applications/bulk/route.ts                   ← bulk approve/reject/waitlist
 lib/email/welcome.ts                            ← Resend welcome template
 lib/red-list/check.ts                           ← Red List screening
 lib/duplicates/detect.ts                        ← email/phone/name match
@@ -49,7 +52,7 @@ lib/duplicates/detect.ts                        ← email/phone/name match
 - `Application.duplicateOf` nullable FK to another Application
 - `Application.redListMatch` boolean
 - `Member.applicationId` FK back to Application
-- `RedListEntry` model: workspaceId, email, phone, name, reason, createdBy
+- `RedList` model: workspaceId, email, phone, name, reason, createdBy
 
 ## Rules — DO NOT VIOLATE
 

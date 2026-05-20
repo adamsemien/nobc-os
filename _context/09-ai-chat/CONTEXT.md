@@ -34,10 +34,10 @@ app/operator/chat/page.tsx                      ← dedicated chat route
 components/operator/ChatPanel.tsx               ← reusable side-panel chat
 components/operator/VoiceInput.tsx              ← mic + STT
 components/operator/ToolUseDisplay.tsx          ← show MCP tool calls inline
-app/api/agent/route.ts                          ← POST to Runtype, stream SSE
-app/api/agent/conversations/route.ts            ← list/create conversation
-app/api/agent/conversations/[id]/route.ts       ← read/append messages
-lib/runtype/client.ts                           ← Runtype API client
+app/api/agent/route.ts                          ← POST to model (currently Vercel AI SDK), stream SSE
+app/api/agent/conversations/route.ts            ← list/create AgentConversation
+app/api/agent/conversations/[id]/route.ts       ← read/append AgentTurn rows
+lib/runtype/client.ts                           ← Runtype API client (V1.5 target)
 lib/runtype/sse.ts                              ← SSE stream handling
 ```
 
@@ -51,17 +51,18 @@ lib/runtype/sse.ts                              ← SSE stream handling
 
 - Streaming response in the chat UI
 - MCP tool calls executed via Runtype → stage 08 (NoBC OS MCP) and others
-- `Conversation` rows + `Message` rows
+- `AgentConversation` rows + `AgentTurn` rows (turns are stored relationally on the conversation, not as a separate `Message` model)
 - `AuditEvent` rows for any platform actions taken
 
 ## Schema models
 
-- **Conversation**: workspaceId, operatorId, title, lastMessageAt
-- **Message**: conversationId, role (`user | assistant | tool`), content, toolCalls (JSON), createdAt
+- **AgentConversation**: workspaceId, operatorId, title, lastTurnAt
+- **AgentTurn**: agentConversationId, role (`user | assistant | tool`), content, toolCalls (JSON), createdAt
+  (Turns are stored on `AgentConversation`. There is no standalone `Message` model — historic references should be read as `AgentTurn`.)
 
 ## Rules — DO NOT VIOLATE
 
-1. **Never call Anthropic directly from this stage.** All AI calls go through Runtype master agent. Direct Anthropic calls for tagging/scoring are owned by their respective stages (e.g., stage 01's archetype scoring).
+1. **Current implementation uses Vercel AI SDK directly via `@ai-sdk/anthropic`.** V1.5 refactor target is routing through the Runtype master agent. Until that refactor, direct Vercel AI SDK calls are acceptable but new features should be designed to be Runtype-compatible (workspace-scoped context, tool-use visibility, SSE streaming). Direct Anthropic calls for tagging/scoring still belong to their feature stage (e.g., stage 01's archetype scoring, stage 12's insight narration).
 2. **Pass workspace context to every Runtype call.** The agent must never operate outside the operator's workspace.
 3. **Workspace-scoped OAuth tokens for MCP access.** Runtype receives short-lived tokens (1-hour TTL); never long-lived credentials.
 4. **Stream responses via SSE.** Block-and-wait responses are unacceptable UX.
