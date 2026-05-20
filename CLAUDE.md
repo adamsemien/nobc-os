@@ -146,6 +146,8 @@ If you report task completion without performing this checklist, the task is inc
 | 09 | `_context/09-ai-chat/` | ⚪ Not started | #18 |
 | 10 | `_context/10-ai-event-builder/` | ⚪ Not started | #19 |
 | 11 | `_context/11-producer-integration/` | ⚪ Not started | Phase J, House Phone trigger |
+| 12 | `_context/12-intelligence/` | ✅ Shipped (base) / 🔶 sponsor-facing partial | #27 |
+| 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) | — |
 
 ---
 
