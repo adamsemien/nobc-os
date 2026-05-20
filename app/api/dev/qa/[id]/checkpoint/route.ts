@@ -40,6 +40,8 @@ export async function POST(
     evidence?: string;
     source?: 'auto' | 'manual';
     skip?: boolean;
+    /** True-skip: advance without marking pass/fail. Awards 0 points. */
+    softSkip?: boolean;
   } = {};
   try {
     body = await req.json();
@@ -52,6 +54,7 @@ export async function POST(
   }
   const SKIP_COST = 10;
   const isSkip = body.skip === true;
+  const isSoftSkip = body.softSkip === true;
 
   const mission = await db.qAMission.findFirst({
     where: { id, workspaceId, operatorId: userId, status: 'active' },
@@ -74,11 +77,13 @@ export async function POST(
     });
   }
 
-  const delta = isSkip ? -SKIP_COST : step.points;
+  const delta = isSoftSkip ? 0 : isSkip ? -SKIP_COST : step.points;
   const next: CompletedStep = {
     id: stepId,
     completedAt: new Date().toISOString(),
-    evidence: isSkip
+    evidence: isSoftSkip
+      ? 'soft-skipped'
+      : isSkip
       ? 'skipped'
       : typeof body.evidence === 'string'
       ? body.evidence.slice(0, 500)

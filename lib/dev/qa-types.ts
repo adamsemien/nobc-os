@@ -29,6 +29,8 @@ export interface BugReport {
   description: string;
   location: string;
   screenshotUrl?: string;
+  /** Optional base64 data URL of a pasted/uploaded screenshot — dev-only. */
+  screenshotDataUrl?: string | null;
   reportedAt: string;
   pointsAwarded: number;
   /** 0-based index into mission.steps, or null if not tied to a step. */

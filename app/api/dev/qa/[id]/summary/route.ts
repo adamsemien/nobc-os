@@ -34,6 +34,7 @@ interface BugReport {
   stepIndex?: number | null;
   stepTitle?: string | null;
   severity?: Severity;
+  screenshotDataUrl?: string;
 }
 
 function severityLabel(s?: Severity): string {
@@ -71,6 +72,9 @@ function buildMarkdown(args: {
       lines.push(`User reported: "${b.description}"`);
       if (b.location && b.location !== 'unknown') {
         lines.push(`Location: \`${b.location}\``);
+      }
+      if (b.screenshotDataUrl) {
+        lines.push('[Screenshot attached — see panel]');
       }
       lines.push('');
     });

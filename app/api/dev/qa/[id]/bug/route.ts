@@ -20,6 +20,7 @@ interface BugReport {
   stepIndex?: number | null;
   stepTitle?: string | null;
   severity?: BugSeverity;
+  screenshotDataUrl?: string;
 }
 
 const BUG_POINTS = 25;
@@ -40,6 +41,7 @@ export async function POST(
     description?: string;
     location?: string;
     screenshotUrl?: string;
+    screenshotDataUrl?: string;
     stepIndex?: number | null;
     stepTitle?: string | null;
     severity?: string;
@@ -66,6 +68,18 @@ export async function POST(
     ? (body.severity as BugSeverity)
     : 'medium';
 
+  // Validate screenshot data URL: image MIME prefix + 4MB hard cap on the base64 string.
+  let screenshotDataUrl: string | null = null;
+  if (typeof body.screenshotDataUrl === 'string' && body.screenshotDataUrl.length > 0) {
+    if (!body.screenshotDataUrl.startsWith('data:image/')) {
+      return NextResponse.json({ error: 'screenshot must be a data:image/ URL' }, { status: 400 });
+    }
+    if (body.screenshotDataUrl.length > 4 * 1024 * 1024) {
+      return NextResponse.json({ error: 'screenshot too large (max ~3MB)' }, { status: 400 });
+    }
+    screenshotDataUrl = body.screenshotDataUrl;
+  }
+
   const mission = await db.qAMission.findFirst({
     where: { id, workspaceId, operatorId: userId, status: 'active' },
   });
@@ -87,6 +101,7 @@ export async function POST(
     stepIndex,
     stepTitle,
     severity,
+    screenshotDataUrl: screenshotDataUrl ?? undefined,
   };
 
   const updated = await db.qAMission.update({

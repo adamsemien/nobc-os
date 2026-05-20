@@ -111,6 +111,7 @@ interface SummaryPayload {
   title: string;
   stepsPassed: number;
   stepsTotal: number;
+  bugs?: BugReport[];
 }
 
 export function QAMissionPanel({
@@ -128,6 +129,8 @@ export function QAMissionPanel({
   const [bugDescription, setBugDescription] = useState('');
   const [bugStepIndex, setBugStepIndex] = useState<number | null>(null);
   const [bugSeverity, setBugSeverity] = useState<BugSeverity>('medium');
+  const [bugScreenshot, setBugScreenshot] = useState<string | null>(null);
+  const [screenshotError, setScreenshotError] = useState<string | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -190,6 +193,8 @@ export function QAMissionPanel({
   useEffect(() => {
     if (bugOpen) {
       setBugStepIndex(currentStepIndex >= 0 ? currentStepIndex : null);
+      setBugScreenshot(null);
+      setScreenshotError(null);
     }
   }, [bugOpen, currentStepIndex]);
 
@@ -301,6 +306,21 @@ export function QAMissionPanel({
     } catch {}
   }
 
+  // HUD soft-skip: advance without marking pass/fail (0 points, no penalty).
+  async function handleSoftSkip(stepId: string) {
+    try {
+      const res = await fetch(`/api/dev/qa/${mission.id}/checkpoint`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ stepId, success: true, source: 'manual', softSkip: true }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { score: number; completedSteps: CompletedStep[] };
+        onUpdate({ ...mission, score: data.score, completedSteps: data.completedSteps });
+      }
+    } catch {}
+  }
+
   async function submitBug() {
     const text = bugDescription.trim();
     if (!text) return;
@@ -320,16 +340,20 @@ export function QAMissionPanel({
           stepIndex: bugStepIndex,
           stepTitle,
           severity: bugSeverity,
+          screenshotDataUrl: bugScreenshot ?? undefined,
         }),
       });
       if (!res.ok) {
-        setError('Could not save bug report.');
+        const data = await res.json().catch(() => ({}));
+        setError(typeof data?.error === 'string' ? data.error : 'Could not save bug report.');
         return;
       }
       const data = (await res.json()) as { score: number; bugsFound: BugReport[] };
       onUpdate({ ...mission, score: data.score, bugsFound: data.bugsFound });
       setBugDescription('');
       setBugSeverity('medium');
+      setBugScreenshot(null);
+      setScreenshotError(null);
       setBugOpen(false);
     } catch {
       setError('Network error.');
@@ -567,6 +591,22 @@ export function QAMissionPanel({
                 ✓ Pass
               </button>
             )}
+            {currentStep && !allDone && (
+              <button
+                onClick={() => handleSoftSkip(currentStep.id)}
+                title="Skip this step — advances without marking pass or fail"
+                style={{
+                  ...HUD_BTN_STYLE,
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  color: '#8a7a9a',
+                  fontSize: 11,
+                  padding: '3px 8px',
+                }}
+              >
+                → Skip
+              </button>
+            )}
             <button onClick={() => setMode('expanded')} title="Expand panel" style={HUD_BTN_STYLE}>
               ▢ Expand
             </button>
@@ -602,6 +642,10 @@ export function QAMissionPanel({
             setBugDescription={setBugDescription}
             bugSeverity={bugSeverity}
             setBugSeverity={setBugSeverity}
+            bugScreenshot={bugScreenshot}
+            setBugScreenshot={setBugScreenshot}
+            screenshotError={screenshotError}
+            setScreenshotError={setScreenshotError}
             submit={submitBug}
             cancel={() => setBugOpen(false)}
             submitting={submitting}
@@ -905,30 +949,46 @@ export function QAMissionPanel({
                   }}
                 >
                   {mission.bugsFound.map((b) => (
-                    <div key={b.id} style={{ display: 'flex', gap: 6 }}>
-                      <span style={{ color: '#fbbf24', flexShrink: 0 }}>🐛</span>
-                      <span style={{ flex: 1, lineHeight: 1.5 }}>
-                        {typeof b.stepIndex === 'number' && (
-                          <span style={{ color: '#8a7a9a' }}>Step {b.stepIndex + 1} · </span>
-                        )}
-                        <span
-                          style={{
-                            color:
-                              b.severity === 'high'
-                                ? '#f87171'
-                                : b.severity === 'low'
-                                ? '#9ab89a'
-                                : '#fbbf24',
-                            fontSize: 10,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                            marginRight: 4,
-                          }}
-                        >
-                          [{b.severity ?? 'medium'}]
+                    <div key={b.id} style={{ display: 'flex', gap: 6, flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <span style={{ color: '#fbbf24', flexShrink: 0 }}>🐛</span>
+                        <span style={{ flex: 1, lineHeight: 1.5 }}>
+                          {typeof b.stepIndex === 'number' && (
+                            <span style={{ color: '#8a7a9a' }}>Step {b.stepIndex + 1} · </span>
+                          )}
+                          <span
+                            style={{
+                              color:
+                                b.severity === 'high'
+                                  ? '#f87171'
+                                  : b.severity === 'low'
+                                  ? '#9ab89a'
+                                  : '#fbbf24',
+                              fontSize: 10,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              marginRight: 4,
+                            }}
+                          >
+                            [{b.severity ?? 'medium'}]
+                          </span>
+                          {b.description}
                         </span>
-                        {b.description}
-                      </span>
+                      </div>
+                      {b.screenshotDataUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={b.screenshotDataUrl}
+                          alt="Bug screenshot"
+                          style={{
+                            maxHeight: 120,
+                            maxWidth: '100%',
+                            borderRadius: 4,
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            marginLeft: 18,
+                          }}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -953,6 +1013,10 @@ export function QAMissionPanel({
                 setBugDescription={setBugDescription}
                 bugSeverity={bugSeverity}
                 setBugSeverity={setBugSeverity}
+                bugScreenshot={bugScreenshot}
+                setBugScreenshot={setBugScreenshot}
+                screenshotError={screenshotError}
+                setScreenshotError={setScreenshotError}
                 submit={submitBug}
                 cancel={() => setBugOpen(false)}
                 submitting={submitting}
@@ -1037,9 +1101,41 @@ interface BugFormFieldsProps {
   setBugDescription: (s: string) => void;
   bugSeverity: BugSeverity;
   setBugSeverity: (s: BugSeverity) => void;
+  bugScreenshot: string | null;
+  setBugScreenshot: (s: string | null) => void;
+  screenshotError: string | null;
+  setScreenshotError: (s: string | null) => void;
   submit: () => void;
   cancel: () => void;
   submitting: boolean;
+}
+
+const MAX_SCREENSHOT_BYTES = 4 * 1024 * 1024;
+
+function ingestImageFile(
+  file: File,
+  setScreenshot: (s: string) => void,
+  setErr: (s: string) => void,
+) {
+  if (!file.type.startsWith('image/')) {
+    setErr('Not an image.');
+    return;
+  }
+  if (file.size > 3 * 1024 * 1024) {
+    setErr('Screenshot too large (max 3MB).');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const result = reader.result;
+    if (typeof result === 'string' && result.length <= MAX_SCREENSHOT_BYTES) {
+      setScreenshot(result);
+    } else {
+      setErr('Screenshot encoded too large.');
+    }
+  };
+  reader.onerror = () => setErr('Could not read the file.');
+  reader.readAsDataURL(file);
 }
 
 function StepSelector({
@@ -1124,10 +1220,40 @@ function BugFormInline({
   setBugDescription,
   bugSeverity,
   setBugSeverity,
+  bugScreenshot,
+  setBugScreenshot,
+  screenshotError,
+  setScreenshotError,
   submit,
   cancel,
   submitting,
 }: BugFormFieldsProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(e.clipboardData?.items ?? []);
+    for (const it of items) {
+      if (it.kind === 'file' && it.type.startsWith('image/')) {
+        const file = it.getAsFile();
+        if (file) {
+          e.preventDefault();
+          setScreenshotError(null);
+          ingestImageFile(file, setBugScreenshot, setScreenshotError);
+          return;
+        }
+      }
+    }
+  }
+
+  function onFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScreenshotError(null);
+    ingestImageFile(file, setBugScreenshot, setScreenshotError);
+    // Reset so picking the same file again still fires onChange.
+    e.target.value = '';
+  }
+
   return (
     <div>
       <div style={{ ...S.label, marginBottom: 6 }}>Which step?</div>
@@ -1142,9 +1268,10 @@ function BugFormInline({
       <textarea
         value={bugDescription}
         onChange={(e) => setBugDescription(e.target.value)}
+        onPaste={onPaste}
         maxLength={2000}
         rows={3}
-        placeholder="Steps to reproduce, what you expected, what happened"
+        placeholder="Paste an image, or describe what broke"
         style={{
           width: '100%',
           background: 'rgba(35, 29, 46, 0.5)',
@@ -1159,6 +1286,71 @@ function BugFormInline({
           lineHeight: 1.5,
         }}
       />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          style={{ ...S.btn, fontSize: 11, padding: '4px 8px' }}
+        >
+          📎 Attach screenshot
+        </button>
+        <span style={{ color: '#6a5a7a', fontSize: 10 }}>or paste image into text box</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={onFilePick}
+          style={{ display: 'none' }}
+        />
+      </div>
+      {bugScreenshot && (
+        <div
+          style={{
+            position: 'relative',
+            marginBottom: 8,
+            display: 'inline-block',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 6,
+            padding: 2,
+            background: 'rgba(15, 12, 20, 0.5)',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={bugScreenshot}
+            alt="Screenshot preview"
+            style={{ display: 'block', maxHeight: 120, maxWidth: '100%', borderRadius: 4 }}
+          />
+          <button
+            type="button"
+            onClick={() => setBugScreenshot(null)}
+            aria-label="Remove screenshot"
+            style={{
+              position: 'absolute',
+              top: -8,
+              right: -8,
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              background: '#231d2e',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: '#f0eaf6',
+              fontSize: 13,
+              lineHeight: 1,
+              cursor: 'pointer',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {screenshotError && (
+        <div style={{ color: '#f87171', fontSize: 11, marginBottom: 8 }}>{screenshotError}</div>
+      )}
       <div style={{ display: 'flex', gap: 6 }}>
         <button
           onClick={submit}
@@ -1184,6 +1376,10 @@ function BugFormPopover({
   setBugDescription,
   bugSeverity,
   setBugSeverity,
+  bugScreenshot,
+  setBugScreenshot,
+  screenshotError,
+  setScreenshotError,
   submit,
   cancel,
   submitting,
@@ -1225,6 +1421,10 @@ function BugFormPopover({
         setBugDescription={setBugDescription}
         bugSeverity={bugSeverity}
         setBugSeverity={setBugSeverity}
+        bugScreenshot={bugScreenshot}
+        setBugScreenshot={setBugScreenshot}
+        screenshotError={screenshotError}
+        setScreenshotError={setScreenshotError}
         submit={submit}
         cancel={cancel}
         submitting={submitting}
@@ -1329,18 +1529,79 @@ function SummaryView({
           {summary.stepsPassed}/{summary.stepsTotal} steps passed
         </div>
       </div>
-      <div
-        style={{
-          padding: '12px 14px',
-          flex: 1,
-          overflowY: 'auto',
-          whiteSpace: 'pre-wrap',
-          fontSize: 13,
-          lineHeight: 1.6,
-          color: '#e8dff2',
-        }}
-      >
-        {loading ? '⏳ Building summary + asking Claude for fix recs…' : summary.markdown}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {loading ? (
+          <div style={{ padding: '12px 14px', fontSize: 13, color: '#e8dff2' }}>
+            ⏳ Building summary + asking Claude for fix recs…
+          </div>
+        ) : (
+          <>
+            {/* Bug thumbnails inline — markdown can't carry images cleanly. */}
+            {summary.bugs && summary.bugs.length > 0 && (
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ ...S.label, marginBottom: 8 }}>
+                  Screenshots ·{' '}
+                  {summary.bugs.filter((b) => b.screenshotDataUrl).length} of{' '}
+                  {summary.bugs.length} bugs
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {summary.bugs.map((b, i) => (
+                    <div key={b.id ?? i}>
+                      <div style={{ fontSize: 12, color: '#dcd2e6', marginBottom: 4 }}>
+                        Bug #{i + 1} —{' '}
+                        {typeof b.stepIndex === 'number' && b.stepTitle
+                          ? `Step ${b.stepIndex + 1}: ${b.stepTitle.slice(0, 60)}`
+                          : 'General'}{' '}
+                        <span
+                          style={{
+                            color:
+                              b.severity === 'high'
+                                ? '#f87171'
+                                : b.severity === 'low'
+                                ? '#9ab89a'
+                                : '#fbbf24',
+                            fontSize: 10,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          [{b.severity ?? 'medium'}]
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#b0a0c0', marginBottom: 6, lineHeight: 1.5 }}>
+                        {b.description}
+                      </div>
+                      {b.screenshotDataUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={b.screenshotDataUrl}
+                          alt={`Bug #${i + 1} screenshot`}
+                          style={{
+                            maxHeight: 200,
+                            maxWidth: '100%',
+                            borderRadius: 4,
+                            border: '1px solid rgba(255,255,255,0.08)',
+                          }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div
+              style={{
+                padding: '12px 14px',
+                whiteSpace: 'pre-wrap',
+                fontSize: 13,
+                lineHeight: 1.6,
+                color: '#e8dff2',
+              }}
+            >
+              {summary.markdown}
+            </div>
+          </>
+        )}
       </div>
       <div
         style={{
