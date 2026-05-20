@@ -29,7 +29,6 @@ export async function submitMemberRsvp(
     select: {
       id: true,
       accessMode: true,
-      applyMode: true,
       approvalRequired: true,
       capacity: true,
       priceInCents: true,
@@ -72,26 +71,22 @@ export async function submitMemberRsvp(
     return { ok: true, rsvpId: 'blocked', memberQrCode: null, ticketStatus: 'confirmed' };
   }
 
-  if (event.accessMode === 'APPLY_OR_PAY' && !member.approved) {
-    if (event.applyMode === 'APPROVAL_HOLDS_TICKET') {
-      return {
-        ok: false,
-        status: 403,
-        error:
-          'Complete membership application to hold a spot for this event — use Apply with this event linked.',
-      };
-    }
-    return { ok: false, status: 403, error: 'Members only' };
+  if (event.approvalRequired && !member.approved) {
+    return {
+      ok: false,
+      status: 403,
+      error:
+        'Complete membership application to hold a spot for this event — use Apply with this event linked.',
+    };
   }
 
-  if (event.accessMode === 'TICKETED' && !member.approved) {
+  if (!event.approvalRequired && !member.approved) {
     return { ok: false, status: 403, error: 'Members only' };
   }
 
   const memberPrice = event.priceInCents ?? 0;
   const needsStripePayment =
-    (event.accessMode === 'TICKETED' && memberPrice > 0) ||
-    (event.accessMode === 'APPLY_OR_PAY' && member.approved && memberPrice > 0);
+    event.accessMode === 'TICKETED' && memberPrice > 0 && member.approved;
 
   if (needsStripePayment) {
     return {

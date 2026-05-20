@@ -48,7 +48,7 @@ const events = [
     startAt: daysOut(55, 19),
     endAt: new Date(daysOut(55, 19).getTime() + 3 * 60 * 60 * 1000),
     location: "Downtown Austin, TX",
-    accessMode: "APPLY_OR_PAY" as const,
+    accessMode: "TICKETED" as const,
     approvalRequired: true,
     capacity: 75,
     status: "PUBLISHED" as const,

@@ -242,7 +242,7 @@ export default function NewEventPage() {
         endDatetime?: string;
         venue?: string;
         capacity?: number;
-        accessMode?: 'OPEN' | 'TICKETED' | 'APPLY_OR_PAY';
+        accessMode?: 'OPEN' | 'TICKETED';
         template?: TemplateKey;
       };
 
@@ -262,12 +262,6 @@ export default function NewEventPage() {
       if (data.accessMode === 'TICKETED') {
         setAccess({
           member: { enabled: true, gates: [newGate('ticket')], priceCents: 0 },
-          guest: { enabled: true, gates: [newGate('ticket')], priceCents: 0 },
-          comp: { enabled: false, budgetCap: null },
-        });
-      } else if (data.accessMode === 'APPLY_OR_PAY') {
-        setAccess({
-          member: { enabled: true, gates: [newGate('application')], priceCents: 0 },
           guest: { enabled: true, gates: [newGate('ticket')], priceCents: 0 },
           comp: { enabled: false, budgetCap: null },
         });
@@ -307,12 +301,6 @@ export default function NewEventPage() {
       setAccess({
         member: { enabled: true, gates: memberPrice > 0 ? [newGate('ticket')] : [], priceCents: memberPrice },
         guest: { enabled: guestPrice > 0, gates: [newGate('ticket')], priceCents: guestPrice },
-        comp: { enabled: false, budgetCap: null },
-      });
-    } else if (t.accessMode === 'APPLY_OR_PAY') {
-      setAccess({
-        member: { enabled: true, gates: approved ? [newGate('application')] : [], priceCents: 0 },
-        guest: { enabled: true, gates: approved ? [newGate('application')] : [newGate('ticket')], priceCents: guestPrice },
         comp: { enabled: false, budgetCap: null },
       });
     } else {

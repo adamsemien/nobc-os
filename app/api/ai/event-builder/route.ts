@@ -25,8 +25,8 @@ const EventBuildSchema = z.object({
   endDatetime: z.string().optional().describe('ISO 8601 datetime for event end.'),
   venue: z.string().optional().describe('Venue name and/or address if inferable'),
   capacity: z.number().int().positive().optional().describe('Expected headcount if inferable'),
-  accessMode: z.enum(['OPEN', 'TICKETED', 'APPLY_OR_PAY']).optional().describe(
-    'OPEN for free, TICKETED for paid, APPLY_OR_PAY for members-apply/others-pay',
+  accessMode: z.enum(['OPEN', 'TICKETED']).optional().describe(
+    'OPEN for free, TICKETED for paid (combine with approvalRequired: true to gate purchase behind operator approval)',
   ),
   template: z.enum(['editorial', 'split', 'minimal']).optional(),
   memberGates: z.array(GateSuggestionSchema).describe('Ordered gates for members to pass through'),

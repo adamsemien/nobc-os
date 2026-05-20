@@ -13,10 +13,12 @@
 | **Blocked on** | Nothing |
 | **Next** | Polish + V1.5 enhancements |
 
+> **Architecture note (2026-05-20):** `apply_or_pay` was removed as a standalone `AccessMode` enum value. It was not a real third mode — it is now expressed as `TICKETED` + `approvalRequired: true`. Migration `20260520000000_remove_apply_or_pay` applied. The `applyMode` column and `EventApplyMode` enum were dropped entirely. Workflow template key renamed `apply_or_pay` → `ticketed_approval`.
+
 ## Scope
 
 Everything from a member clicking "RSVP" on an event to a confirmed RSVP row. Handles:
-- All three access modes (`open`, `ticketed`, `apply_or_pay`)
+- Two composable access modes: `OPEN` and `TICKETED`
 - `approvalRequired` toggle (operator approves each RSVP before confirmation)
 - Capacity enforcement
 - Waitlist queue
@@ -62,9 +64,9 @@ app/api/m/rsvps/route.ts                        ← member-facing list of their 
 ## Rules — DO NOT VIOLATE
 
 1. **Respect access mode.**
-   - `open`: confirm immediately (subject to capacity)
-   - `ticketed`: confirm only after Stripe authorize succeeds
-   - `apply_or_pay`: free path needs operator approval; paid path skips it
+   - `OPEN`: confirm immediately (subject to capacity)
+   - `TICKETED`: confirm only after Stripe authorize succeeds
+   - `TICKETED` + `approvalRequired: true`: members apply (wait for approval) OR pay non-member price to skip the queue
 2. **Capacity is atomic.** Use a DB transaction or row lock — never check-then-write. Two simultaneous RSVPs on the last seat must not both succeed.
 3. **Waitlist auto-promote runs on every seat-opening event.** Cancellation, refund, capacity raise. Promote in FIFO order by `waitlistPosition`.
 4. **`approvalRequired` overrides everything except waitlisting.** Even paid RSVPs need operator approval if the flag is set.

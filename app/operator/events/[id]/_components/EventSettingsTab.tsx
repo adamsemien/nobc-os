@@ -176,7 +176,6 @@ export function EventSettingsTab({ event }: Props) {
         body: JSON.stringify({
           name: templateName.trim(),
           accessMode: derived.accessMode,
-          applyMode: derived.applyMode,
           priceInCents: derived.priceInCents,
           nonMemberPriceInCents: derived.nonMemberPriceInCents,
           approvalRequired: derived.approvalRequired,

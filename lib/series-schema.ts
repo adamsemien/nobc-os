@@ -12,7 +12,7 @@ const seriesFields = {
   count: z.number().int().positive().optional().nullable(),
   defaultHeroImageAssetId: z.string().optional().nullable(),
   defaultDescription: z.string().max(2000).optional().nullable(),
-  defaultAccessMode: z.enum(['OPEN', 'TICKETED', 'APPLY_OR_PAY']).optional(),
+  defaultAccessMode: z.enum(['OPEN', 'TICKETED']).optional(),
   defaultPlusOnesAllowed: z.boolean().optional(),
   defaultRefundPolicy: z.enum(['none', 'window', 'credit']).optional(),
   brandColorHex: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().nullable(),

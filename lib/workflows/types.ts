@@ -30,7 +30,7 @@ export type WorkflowPath = {
 export type WorkflowTemplateKey =
   | 'open'
   | 'members_only'
-  | 'apply_or_pay'
+  | 'ticketed_approval'
   | 'paid_only'
   | 'referral_required'
   | 'invitation_code';

@@ -1,7 +1,7 @@
 const ACCESS_MODE_LABELS: Record<string, string> = {
   OPEN: 'RSVP (Free)',
   TICKETED: 'Paid Ticket',
-  APPLY_OR_PAY: 'Members Apply / Others Pay',
+  TICKETED_APPROVAL: 'Ticketed + Approval Required',
   APPLICATION_ONLY: 'Application Only',
   INVITE_ONLY: 'Invite Only',
 };

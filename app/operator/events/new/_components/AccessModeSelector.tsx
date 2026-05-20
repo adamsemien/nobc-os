@@ -277,8 +277,7 @@ export function modeConfigToApiFields(cfg: AccessModeConfig): Record<string, unk
       };
     case 'APPLICATION':
       return {
-        accessMode: 'APPLY_OR_PAY',
-        applyMode: 'SUBMIT_CONFIRMS_ENTRY',
+        accessMode: 'TICKETED',
         approvalRequired: true,
         capacity: cfg.capacity ? parseInt(cfg.capacity, 10) : null,
       };
@@ -295,9 +294,8 @@ export function modeConfigToApiFields(cfg: AccessModeConfig): Record<string, unk
       };
     case 'HYBRID':
       return {
-        accessMode: 'APPLY_OR_PAY',
-        applyMode: 'APPROVAL_HOLDS_TICKET',
-        approvalRequired: cfg.approvalRequired ?? false,
+        accessMode: 'TICKETED',
+        approvalRequired: true,
         priceInCents: cfg.memberPriceCents
           ? Math.round(parseFloat(cfg.memberPriceCents) * 100)
           : 0,

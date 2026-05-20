@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       nonMemberPriceInCents: true,
       capacity: true,
       accessMode: true,
+      approvalRequired: true,
     },
   });
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -39,18 +40,21 @@ export async function POST(req: NextRequest) {
     where: { workspaceId, clerkUserId: userId },
     select: { id: true, approved: true, email: true, firstName: true, lastName: true },
   });
-  if (!member && event.accessMode === 'APPLY_OR_PAY') {
+  // Approval-required ticketed events allow non-members to purchase at non-member price.
+  if (!member && event.approvalRequired) {
     member = await getOrCreateMemberFromClerk(workspaceId, userId);
   }
 
   if (!member) return NextResponse.json({ error: 'Members only' }, { status: 403 });
 
-  if (event.accessMode === 'TICKETED' && !member.approved) {
+  // Standard ticketed (no approval gate): must be an approved member.
+  if (!event.approvalRequired && !member.approved) {
     return NextResponse.json({ error: 'Members only' }, { status: 403 });
   }
 
   let amountCents = event.priceInCents ?? 0;
-  if (event.accessMode === 'APPLY_OR_PAY' && !member.approved) {
+  // Approval-required: unapproved purchasers pay non-member price.
+  if (event.approvalRequired && !member.approved) {
     amountCents = event.nonMemberPriceInCents ?? event.priceInCents ?? 0;
   }
 

@@ -13,7 +13,7 @@ export type EventCardDTO = {
   date: string;
   startTime: string;
   location: string | null;
-  accessMode: 'OPEN' | 'TICKETED' | 'APPLY_OR_PAY';
+  accessMode: 'OPEN' | 'TICKETED';
   approvalRequired: boolean;
   heroImageAssetId: string | null;
 };

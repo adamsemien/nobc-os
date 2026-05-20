@@ -113,7 +113,7 @@ const DEMO_EVENTS = [
     endAt: new Date(weeksFromNow(8).getTime() + 3 * 3600_000),
     location: 'TBA — Austin, TX',
     capacity: 40,
-    accessMode: 'APPLY_OR_PAY' as const,
+    accessMode: 'TICKETED' as const,
     approvalRequired: true,
     plusOnesAllowed: false,
     status: 'PUBLISHED' as const,
@@ -446,14 +446,13 @@ export async function POST() {
   // ── 3b. EventWorkflow records ─────────────────────────────────────────────
   const WORKFLOW_SEEDS: Array<{
     slug: string;
-    templateKey: 'open' | 'members_only' | 'apply_or_pay' | 'paid_only' | 'referral_required' | 'invitation_code';
+    templateKey: 'open' | 'members_only' | 'ticketed_approval' | 'paid_only' | 'referral_required' | 'invitation_code';
     config: Record<string, unknown>;
   }> = [
     { slug: '__demo-residency-summer', templateKey: 'open', config: {} },
-    { slug: '__demo-house-dinner-4', templateKey: 'apply_or_pay', config: { amountCents: 15000, requiresApproval: true } },
-    // Founder's Circle is apply-or-pay: members apply, non-members can pay.
-    // This must match the event's APPLY_OR_PAY accessMode declared above.
-    { slug: '__demo-founders-circle-aug', templateKey: 'apply_or_pay', config: { amountCents: 15000, requiresApproval: true } },
+    { slug: '__demo-house-dinner-4', templateKey: 'ticketed_approval', config: { amountCents: 15000, requiresApproval: true } },
+    // Founder's Circle: TICKETED + approvalRequired — members apply, non-members pay at non-member price.
+    { slug: '__demo-founders-circle-aug', templateKey: 'ticketed_approval', config: { amountCents: 15000, requiresApproval: true } },
     { slug: '__demo-late-night-july', templateKey: 'open', config: {} },
     { slug: '__demo-members-preview', templateKey: 'members_only', config: { minTier: 'low' } },
   ];
@@ -583,7 +582,7 @@ export async function POST() {
       rsvpRow(m.email, '__demo-house-dinner-4', { status: 'WAITLISTED', ticketStatus: 'waitlisted' }),
     ),
 
-    // Event 3 — Founder's Circle (apply_or_pay) — indices 0–11 CONFIRMED, 12–15 WAITLISTED
+    // Event 3 — Founder's Circle (ticketed + approvalRequired) — indices 0–11 CONFIRMED, 12–15 WAITLISTED
     ...M.slice(0, 12).map((m) => rsvpRow(m.email, '__demo-founders-circle-aug', { status: 'CONFIRMED' })),
     ...M.slice(12, 16).map((m) =>
       rsvpRow(m.email, '__demo-founders-circle-aug', { status: 'WAITLISTED', ticketStatus: 'waitlisted' }),

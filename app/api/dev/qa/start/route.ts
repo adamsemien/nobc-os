@@ -18,7 +18,7 @@ The platform has these features:
 - Members (view / edit / comment) at /operator/members and /operator/members/[id]
 - Check-in (live + walk-ins) at /check-in/[slug]
 - The Room (live event dashboard) at /operator/events/[id]
-- Workflow gates on events (apply_or_pay, members_only, open, ticketed, comp)
+- Workflow gates on events (ticketed_approval, members_only, open, ticketed, comp)
 - Purple list / Blocked list management at /operator/settings/lists
 - AI agent panel (Cmd+Shift+Option+A)
 - Command palette (Cmd+K) — global search + quick actions
@@ -51,7 +51,7 @@ Checkpoint syntax:
 Vary creativity. Mix obvious flows with edge cases. Examples of mission ideas:
 - Speed: "Approve 3 applications, leave a comment on one, all in under 90 seconds"
 - Discovery: "Find a member who lives in East Cesar Chavez using only the command palette"
-- Workflow: "Create a ticketed event for next Friday with apply_or_pay workflow and 2 custom questions"
+- Workflow: "Create a ticketed event for next Friday with approval required and 2 custom questions"
 - Stress test: "Try to break the application form — submit malformed inputs, see what survives"
 - Bug hunt: "Find one UI inconsistency anywhere in the operator dashboard. Document it via the bug button."
 

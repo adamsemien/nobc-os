@@ -2,9 +2,9 @@ import type { WorkflowPath, WorkflowTemplateKey } from './types';
 
 /** Per-template configurable options the operator sets in the event UI. */
 export type WorkflowTemplateConfig = {
-  /** Used by apply_or_pay, paid_only. */
+  /** Used by ticketed_approval, paid_only. */
   amountCents?: number;
-  /** Used by apply_or_pay. */
+  /** Used by ticketed_approval: gates purchase behind operator approval. */
   requiresApproval?: boolean;
   /** Used by referral_required. */
   minReferrals?: number;
@@ -58,9 +58,9 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplateDef[] = [
     ],
   },
   {
-    key: 'apply_or_pay',
-    label: 'Apply or pay',
-    description: 'Apply for free entry, or skip the line and buy a ticket.',
+    key: 'ticketed_approval',
+    label: 'Ticketed + approval',
+    description: 'Apply for free entry, or skip the line and buy a ticket. Approval required.',
     build: (c) => [
       {
         id: 'p-apply',

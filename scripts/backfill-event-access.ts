@@ -6,7 +6,6 @@ async function main() {
       id: true,
       slug: true,
       accessMode: true,
-      applyMode: true,
       approvalRequired: true,
       priceInCents: true,
       nonMemberPriceInCents: true,
@@ -46,13 +45,15 @@ async function main() {
         break
       case "TICKETED":
         memberGate = memberPrice > 0 ? "pay" : "auto_confirm"
-        guestEnabled = guestPrice > 0
-        guestGate = "pay"
-        break
-      case "APPLY_OR_PAY":
-        memberGate = needsApproval ? "questions_approval" : "auto_confirm"
-        guestEnabled = true
-        guestGate = needsApproval ? "apply" : "pay"
+        // approvalRequired on a TICKETED event: members apply, guests pay non-member price
+        if (needsApproval) {
+          memberGate = "questions_approval"
+          guestEnabled = guestPrice > 0
+          guestGate = "pay"
+        } else {
+          guestEnabled = guestPrice > 0
+          guestGate = "pay"
+        }
         break
     }
 

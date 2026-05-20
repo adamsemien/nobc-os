@@ -29,8 +29,7 @@ const UpdateSchema = z.object({
   location: z.string().optional().nullable(),
   heroImageAssetId: z.string().optional().nullable(),
   capacity: z.number().int().positive().nullable().optional(),
-  accessMode: z.enum(['OPEN', 'TICKETED', 'APPLY_OR_PAY']).optional(),
-  applyMode: z.enum(['APPROVAL_HOLDS_TICKET', 'SUBMIT_CONFIRMS_ENTRY']).optional().nullable(),
+  accessMode: z.enum(['OPEN', 'TICKETED']).optional(),
   priceInCents: z.number().int().nonnegative().nullable().optional(),
   nonMemberPriceInCents: z.number().int().nonnegative().nullable().optional(),
   approvalRequired: z.boolean().optional(),
@@ -114,7 +113,6 @@ export async function PATCH(
     const derived = deriveLegacyFromAccess(eventAccessInput);
     eventData.eventAccess = eventAccessInput as object;
     eventData.accessMode = derived.accessMode;
-    eventData.applyMode = derived.applyMode;
     eventData.approvalRequired = derived.approvalRequired;
     eventData.priceInCents = derived.priceInCents;
     eventData.nonMemberPriceInCents = derived.nonMemberPriceInCents;

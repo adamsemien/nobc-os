@@ -10,7 +10,7 @@ export type MemberEventsExplorerRow = {
   title: string;
   startAt: string;
   location: string | null;
-  accessMode: 'OPEN' | 'TICKETED' | 'APPLY_OR_PAY';
+  accessMode: 'OPEN' | 'TICKETED';
   showCapacity: boolean;
   capacity: number | null;
   confirmedRsvpCount: number;
@@ -33,8 +33,6 @@ function accessBadgeLabel(accessMode: MemberEventsExplorerRow['accessMode']): st
       return 'OPEN';
     case 'TICKETED':
       return 'TICKETED';
-    case 'APPLY_OR_PAY':
-      return 'MEMBERS APPLY';
     default:
       return 'EVENT';
   }

@@ -13,7 +13,7 @@ type AttachParams = {
 
 /**
  * After a membership application is submitted: optionally create an event RSVP
- * when `eventId` is present, user is signed in, and the event uses apply_or_pay sub-modes.
+ * when `eventId` is present, user is signed in, and the event is TICKETED + approvalRequired.
  */
 export async function attachEventRsvpAfterApply(p: AttachParams): Promise<void> {
   const { workspaceId, clerkUserId, eventId, email, fullName, phone, actorIdForAudit } = p;
@@ -24,12 +24,11 @@ export async function attachEventRsvpAfterApply(p: AttachParams): Promise<void> 
       id: eventId.trim(),
       workspaceId,
       status: 'PUBLISHED',
-      accessMode: 'APPLY_OR_PAY',
-      applyMode: { in: ['APPROVAL_HOLDS_TICKET', 'SUBMIT_CONFIRMS_ENTRY'] },
+      approvalRequired: true,
     },
     select: {
       id: true,
-      applyMode: true,
+      approvalRequired: true,
       capacity: true,
     },
   });
@@ -74,7 +73,7 @@ export async function attachEventRsvpAfterApply(p: AttachParams): Promise<void> 
     if (taken >= event.capacity) return;
   }
 
-  if (event.applyMode === 'APPROVAL_HOLDS_TICKET') {
+  if (event.approvalRequired) {
     const rsvp = await db.rSVP.create({
       data: {
         workspaceId,

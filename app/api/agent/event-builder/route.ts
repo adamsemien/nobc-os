@@ -19,8 +19,8 @@ const EventDraftSchema = z.object({
   ),
   venue: z.string().optional().describe('Venue name and/or address if inferable'),
   capacity: z.number().int().positive().optional().describe('Expected headcount if inferable'),
-  accessMode: z.enum(['OPEN', 'TICKETED', 'APPLY_OR_PAY']).optional().describe(
-    'OPEN for free community events, TICKETED for paid, APPLY_OR_PAY for members-apply/others-pay'
+  accessMode: z.enum(['OPEN', 'TICKETED']).optional().describe(
+    'OPEN for free community events, TICKETED for paid (set approvalRequired: true to gate purchase behind operator approval)'
   ),
   template: z.enum(['editorial', 'split', 'minimal']).optional().describe(
     'editorial for hero-forward events with strong imagery, split for brand-focused events, minimal for intimate/exclusive events'

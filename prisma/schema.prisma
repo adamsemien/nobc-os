@@ -210,13 +210,6 @@ model ApplicationAnswer {
 enum EventAccessMode {
   OPEN
   TICKETED
-  APPLY_OR_PAY
-}
-
-/// Sub-mode when accessMode is APPLY_OR_PAY (non-member / hybrid flows).
-enum EventApplyMode {
-  APPROVAL_HOLDS_TICKET
-  SUBMIT_CONFIRMS_ENTRY
 }
 
 enum EventStatus {
@@ -267,7 +260,6 @@ model Event {
   mapsUrl               String?
   capacity         Int?
   accessMode            EventAccessMode @default(OPEN)
-  applyMode             EventApplyMode?
   approvalRequired      Boolean         @default(false)
   plusOnesAllowed       Boolean         @default(false)
   status                EventStatus     @default(DRAFT)

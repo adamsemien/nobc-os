@@ -119,7 +119,7 @@ function ConfigEditor({
       return (
         <MembersOnlyTierField config={config} onChange={onChange} />
       );
-    case 'apply_or_pay':
+    case 'ticketed_approval':
       return (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Non-member price (USD)">
@@ -256,7 +256,7 @@ function Toggle({
 
 function defaultConfigFor(key: WorkflowTemplateKey): WorkflowTemplateConfig {
   switch (key) {
-    case 'apply_or_pay':
+    case 'ticketed_approval':
       return { amountCents: 15000, requiresApproval: true };
     case 'paid_only':
       return { amountCents: 5000 };
