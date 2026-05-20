@@ -18,8 +18,44 @@ interface ActionEntry {
   url?: string;
 }
 
-/** Hard ceiling on the Claude call. Client also enforces its own timeout. */
-const JUDGE_TIMEOUT_MS = 3000;
+/** Hard ceiling on the Claude call. Client also enforces its own timeout (slightly higher).
+ *  3s was too tight in practice — Sonnet often takes 2.5–3.5s on this prompt and the abort
+ *  raced the response. 4s gives Sonnet headroom while still satisfying the spec's "non-blocking"
+ *  intent (user sees Pass advance within ~4s worst case). */
+const JUDGE_TIMEOUT_MS = 4000;
+
+/** Extract the first balanced top-level JSON object in a string.
+ *  Safer than non-greedy regex when Claude returns nested objects or
+ *  wraps the JSON in markdown fences. Returns null if nothing parses. */
+function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (c === '\\') {
+      escape = true;
+      continue;
+    }
+    if (c === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -50,7 +86,9 @@ function formatTrail(trail: ActionEntry[]): string {
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
+  console.log('[qa/judge] POST', { userId, hasAllowlist: ALLOWED.length > 0 });
   if (!userId || !ALLOWED.includes(userId)) {
+    console.warn('[qa/judge] forbidden', { userId, allowedCount: ALLOWED.length });
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -66,6 +104,10 @@ export async function POST(req: NextRequest) {
   }
   const trail = Array.isArray(body.actionTrail) ? body.actionTrail.slice(0, 30) : [];
   const trailText = formatTrail(trail);
+  console.log('[qa/judge] judging step', {
+    instruction: instruction.slice(0, 80),
+    trailLength: trail.length,
+  });
 
   const prompt = `You are a QA judge for a web app. The tester was given this instruction:
 "${instruction}"
@@ -88,22 +130,39 @@ fail = did something unrelated or navigated away without completing it`;
       generateText({
         model: anthropic('claude-sonnet-4-6'),
         prompt,
-        maxOutputTokens: 100,
+        maxOutputTokens: 120,
         temperature: 0.2,
       }),
       JUDGE_TIMEOUT_MS,
     );
-    const match = text.match(/\{[\s\S]*?\}/);
-    if (!match) return NextResponse.json({ verdict: null, reason: null });
-    const parsed = JSON.parse(match[0]) as { verdict?: unknown; reason?: unknown };
+    const jsonStr = extractFirstJsonObject(text);
+    if (!jsonStr) {
+      console.warn('[qa/judge] no JSON object in Claude response', { rawText: text.slice(0, 300) });
+      return NextResponse.json({ verdict: null, reason: null });
+    }
+    let parsed: { verdict?: unknown; reason?: unknown };
+    try {
+      parsed = JSON.parse(jsonStr) as { verdict?: unknown; reason?: unknown };
+    } catch (e) {
+      console.warn('[qa/judge] JSON.parse failed', {
+        error: e instanceof Error ? e.message : String(e),
+        candidate: jsonStr.slice(0, 300),
+        rawText: text.slice(0, 300),
+      });
+      return NextResponse.json({ verdict: null, reason: null });
+    }
     const verdict: Verdict | null =
       typeof parsed.verdict === 'string' && VALID_VERDICTS.has(parsed.verdict as Verdict)
         ? (parsed.verdict as Verdict)
         : null;
     const reason =
       typeof parsed.reason === 'string' ? parsed.reason.slice(0, 200).trim() : null;
+    console.log('[qa/judge] verdict', { verdict, hasReason: !!reason });
     return NextResponse.json({ verdict, reason });
-  } catch {
+  } catch (e) {
+    console.warn('[qa/judge] generation failed', {
+      error: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json({ verdict: null, reason: null });
   }
 }

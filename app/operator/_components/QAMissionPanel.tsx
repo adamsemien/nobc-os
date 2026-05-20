@@ -18,7 +18,9 @@ import {
 } from '@/lib/dev/qa-action-log';
 
 const MAX_TRAIL_ENTRIES = 20;
-const JUDGE_CLIENT_TIMEOUT_MS = 3500;
+// Slightly higher than the server's 4s timeout — gives the response time to land
+// before the client aborts. Empirically Sonnet runs 2.5–3.5s on this prompt.
+const JUDGE_CLIENT_TIMEOUT_MS = 5000;
 const VERDICT_COLOR_MS = { pass: 500, partial: 800, fail: 1000 } as const;
 const VERDICT_REASON_MS = 3000;
 

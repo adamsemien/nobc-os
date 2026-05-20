@@ -52,6 +52,9 @@ const DEMO_MEMBERS = [
   { idx: 27, firstName: 'Camille',   lastName: 'Doré',      email: 'camille.dore.demo@nobadco.dev',     archetype: 'Maker',     aiScore: 0.45, status: 'WAITLISTED', energyScore: 48, networkValueScore: 45, daysAgoCreated: 40 },
   { idx: 28, firstName: 'Reza',      lastName: 'Karimi',    email: 'reza.karimi.demo@nobadco.dev',      archetype: 'Builder',   aiScore: 0.41, status: 'WAITLISTED', energyScore: 44, networkValueScore: 42, daysAgoCreated: 25 },
   { idx: 29, firstName: 'Lumi',      lastName: 'Takahashi', email: 'lumi.takahashi.demo@nobadco.dev',   archetype: 'Host',      aiScore: 0.36, status: 'WAITLISTED', energyScore: 39, networkValueScore: 37, daysAgoCreated: 15 },
+  // Jordan — the "incident" persona used by the QA Game Mode "bad-actor" scenario.
+  // Approved member so Cmd+K finds him and the Blocked-List flow has a real target.
+  { idx: 30, firstName: 'Jordan',    lastName: 'Ellis',     email: 'jordan.ellis.demo@nobadco.dev',     archetype: 'Connector', aiScore: 0.64, status: 'APPROVED',   energyScore: 67, networkValueScore: 65, daysAgoCreated: 120 },
 ] as const;
 
 type DemoMember = (typeof DEMO_MEMBERS)[number];

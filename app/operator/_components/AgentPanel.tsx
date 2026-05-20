@@ -233,7 +233,12 @@ export function AgentPanel() {
     <>
       <style>{`@keyframes nobcAgentPulse{0%,80%,100%{opacity:.2}40%{opacity:1}}`}</style>
 
-      {/* Floating launcher — hidden while the panel is open. */}
+      {/* Floating launcher — hidden while the panel is open.
+       *  Positioned ABOVE the DevToolbar "DEV" pill (which sits at bottom:20, right:20,
+       *  zIndex:9999). The FAB was previously at bottom:24, right:24, zIndex:60 — fully
+       *  covered by the dev pill in dev mode. Stacking it ~64px higher keeps both
+       *  visible in dev mode and looks fine in production (DevToolbar isn't rendered).
+       *  zIndex matches the dev pill so the FAB stays clickable even if they overlap. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -241,8 +246,8 @@ export function AgentPanel() {
           title="AI agent — ⌘⇧⌥A"
           style={{
             position: 'fixed',
-            bottom: 24,
-            right: 24,
+            bottom: 64,
+            right: 20,
             width: 48,
             height: 48,
             borderRadius: '50%',
@@ -254,14 +259,15 @@ export function AgentPanel() {
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: '0 4px 16px rgba(0,0,0,0.28)',
-            zIndex: 60,
+            zIndex: 10000,
           }}
         >
           <Sparkles size={20} />
         </button>
       )}
 
-      {/* Slide-over panel — always mounted so it can animate in/out. */}
+      {/* Slide-over panel — always mounted so it can animate in/out.
+       *  Z-index matches FAB so the open panel covers DevToolbar + QA HUD. */}
       <div
         role="dialog"
         aria-label="AI agent"
@@ -278,7 +284,7 @@ export function AgentPanel() {
           background: PANEL_BG,
           borderLeft: '1px solid rgba(255,255,255,0.08)',
           boxShadow: '-8px 0 40px rgba(0,0,0,0.5)',
-          zIndex: 60,
+          zIndex: 10000,
           transform: open ? 'translateX(0)' : 'translateX(110%)',
           transition: 'transform 0.22s ease',
           fontFamily: 'inherit',
