@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
+import { ARCHETYPES, type ArchetypeName } from '@/config/archetypes';
 import { formatDateTime } from '@/lib/operator-application-display';
 import { Breadcrumbs } from '@/app/operator/_components/PageHeader';
 import { Avatar } from '@/app/operator/_components/Avatar';
@@ -49,8 +50,26 @@ type DetailPayload = {
     referrers: string[];
     substantiveAnswers: { questionKey: string; label: string; answer: string }[];
     consentAnswers: { questionKey: string; label: string; checked: boolean }[];
+    aiScore: number | null;
+    aiRecommendation: string | null;
+    aiReasoning: string | null;
+    archetype: string | null;
+    archetypeScores: Record<string, number> | null;
+    photos: string[];
   };
 };
+
+const SCORE_DIMENSIONS = ['influence', 'contribution', 'activation', 'taste'] as const;
+
+function scoreOutOfTen(score: number | null): string {
+  if (typeof score !== 'number') return '—';
+  return (score * 10).toFixed(1);
+}
+
+function scorePercent(score: number | null): string {
+  if (typeof score !== 'number') return '—';
+  return `${Math.round(score * 100)}%`;
+}
 
 function labelForModelField(key: string): string {
   return APPLY_QUESTIONS.find(q => q.key === key)?.label ?? key;
@@ -107,7 +126,17 @@ export default async function OperatorApplicationDetailPage({
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
           <section className="space-y-6">
             <div className="flex items-center gap-4">
-              <Avatar name={app.fullName} email={app.email} size={64} />
+              {app.photos.length > 0 ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={app.photos[0]}
+                  alt={`${app.fullName} portrait`}
+                  className="h-16 w-16 rounded-full object-cover"
+                  style={{ border: '1px solid var(--border)' }}
+                />
+              ) : (
+                <Avatar name={app.fullName} email={app.email} size={64} />
+              )}
               <h1
                 className="text-3xl font-normal leading-tight sm:text-4xl"
                 style={{
@@ -118,6 +147,127 @@ export default async function OperatorApplicationDetailPage({
                 {app.fullName}
               </h1>
             </div>
+
+            {app.photos.length > 1 && (
+              <div>
+                <h2
+                  className="mb-2 text-xs font-semibold uppercase tracking-[0.2em]"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Photos
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {app.photos.map((url, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={url}
+                      src={url}
+                      alt={`${app.fullName} photo ${i + 1}`}
+                      className="h-24 w-24 rounded-md object-cover"
+                      style={{ border: '1px solid var(--border)' }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(app.aiScore !== null || app.archetype) && (
+              <div
+                className="rounded-md p-4"
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  {app.aiScore !== null && (
+                    <div>
+                      <p
+                        className="text-[10px] uppercase tracking-[0.18em]"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        AI score
+                      </p>
+                      <p
+                        className="text-2xl font-semibold tabular-nums"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        {scoreOutOfTen(app.aiScore)}
+                        <span
+                          className="ml-1 text-sm font-normal"
+                          style={{ color: 'var(--text-secondary)' }}
+                        >
+                          / 10 · {scorePercent(app.aiScore)}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                  {app.archetype && (
+                    <div className="ml-auto">
+                      <p
+                        className="text-[10px] uppercase tracking-[0.18em]"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        Archetype
+                      </p>
+                      <p
+                        className="text-lg font-semibold"
+                        style={{ color: 'var(--primary)' }}
+                      >
+                        {app.archetype}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {app.archetype && ARCHETYPES[app.archetype as ArchetypeName] && (
+                  <p
+                    className="mt-3 text-sm leading-relaxed"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {ARCHETYPES[app.archetype as ArchetypeName].dayStory}
+                  </p>
+                )}
+                {app.aiReasoning && (
+                  <p
+                    className="mt-3 text-sm italic leading-relaxed"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    {app.aiReasoning}
+                  </p>
+                )}
+                {app.archetypeScores && (
+                  <div className="mt-4 space-y-2">
+                    {SCORE_DIMENSIONS.map((dim) => {
+                      const v = app.archetypeScores?.[dim];
+                      if (typeof v !== 'number') return null;
+                      const pct = Math.round(v * 100);
+                      return (
+                        <div key={dim} className="flex items-center gap-3">
+                          <span
+                            className="w-24 text-[11px] uppercase tracking-[0.12em]"
+                            style={{ color: 'var(--text-secondary)' }}
+                          >
+                            {dim}
+                          </span>
+                          <div
+                            className="h-1.5 flex-1 overflow-hidden rounded-full"
+                            style={{ background: 'var(--border)' }}
+                          >
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${pct}%`, background: 'var(--primary)' }}
+                            />
+                          </div>
+                          <span
+                            className="w-10 text-right text-xs tabular-nums"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            {pct}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             <dl className="space-y-3 text-sm" style={{ color: 'var(--text-primary)' }}>
               <div>

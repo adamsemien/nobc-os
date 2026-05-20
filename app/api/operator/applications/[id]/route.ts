@@ -27,8 +27,10 @@ export async function GET(
 
   const consentKeys = new Set(['consentMembershipRead', 'consentPhotos']);
   const skipRight = new Set(['referrer2', 'referrer3', 'referrer4']);
+  // Anything underscore-prefixed is system metadata (e.g. `_photos`), not Q&A.
+  const isSystemKey = (k: string) => k.startsWith('_');
   const substantiveAnswers = answerQuestions
-    .filter(q => !consentKeys.has(q.key) && !skipRight.has(q.key))
+    .filter(q => !consentKeys.has(q.key) && !skipRight.has(q.key) && !isSystemKey(q.key))
     .map(q => {
       const row = app.answers.find(a => a.questionKey === q.key);
       return {
@@ -49,6 +51,21 @@ export async function GET(
       };
     });
 
+  // `_photos` is a synthetic answer holding a JSON array of portrait URLs.
+  // The detail UI renders up to 5 in a strip.
+  let photos: string[] = [];
+  const photoRow = app.answers.find((a) => a.questionKey === '_photos');
+  if (photoRow) {
+    try {
+      const parsed = JSON.parse(photoRow.answer) as unknown;
+      if (Array.isArray(parsed)) {
+        photos = parsed
+          .filter((v): v is string => typeof v === 'string' && /^https?:\/\//.test(v))
+          .slice(0, 5);
+      }
+    } catch {}
+  }
+
   return NextResponse.json({
     application: {
       id: app.id,
@@ -65,6 +82,12 @@ export async function GET(
       referrers: referrerLines(app.referredBy, app.answers),
       substantiveAnswers,
       consentAnswers,
+      aiScore: app.aiScore,
+      aiRecommendation: app.aiRecommendation,
+      aiReasoning: app.aiReasoning,
+      archetype: app.archetype,
+      archetypeScores: app.archetypeScores as Record<string, number> | null,
+      photos,
     },
   });
 }

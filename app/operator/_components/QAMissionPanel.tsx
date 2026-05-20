@@ -238,14 +238,24 @@ export function QAMissionPanel({
   const overTime = timeLimitMs !== null && elapsed > timeLimitMs;
   const remainingMs = timeLimitMs !== null ? Math.max(0, timeLimitMs - elapsed) : null;
 
-  // Default bug step selector to current active step whenever bug form opens.
-  useEffect(() => {
-    if (bugOpen) {
-      setBugStepIndex(currentStepIndex >= 0 ? currentStepIndex : null);
+  /** Open the bug form. If `stepIndex` is provided, ties the bug to that step;
+   *  otherwise defaults to the current active step. Per-step Bug buttons in the
+   *  expanded panel pass an explicit index so the report attaches to the right card. */
+  const openBugForm = useCallback(
+    (stepIndex?: number) => {
+      const next =
+        typeof stepIndex === 'number'
+          ? stepIndex
+          : currentStepIndex >= 0
+          ? currentStepIndex
+          : null;
+      setBugStepIndex(next);
       setBugScreenshot(null);
       setScreenshotError(null);
-    }
-  }, [bugOpen, currentStepIndex]);
+      setBugOpen(true);
+    },
+    [currentStepIndex],
+  );
 
   // Auto-collapse the expanded step text whenever the active step changes.
   useEffect(() => {
@@ -367,19 +377,20 @@ export function QAMissionPanel({
     [mission, completedIds, onUpdate],
   );
 
-  // URL-based auto-detection.
+  // URL-based auto-detection — sequential only.
+  // Previously this iterated every incomplete step, so navigating to a URL that
+  // matched step N+2's checkpoint could auto-complete it while N+1 was still
+  // open (e.g. happened when the operator opened a page to take a screenshot
+  // before filing a bug). Now only the *next* incomplete step can auto-fire.
   useEffect(() => {
-    if (!pathname || allDone) return;
-    for (const step of mission.steps) {
-      if (completedIds.has(step.id)) continue;
-      const key = `${mission.id}:${step.id}:${pathname}`;
-      if (detectedFor.current.has(key)) continue;
-      if (matchCheckpoint(step.checkpoint, pathname)) {
-        detectedFor.current.add(key);
-        markStep(step.id, 'auto');
-      }
+    if (!pathname || allDone || !currentStep) return;
+    const key = `${mission.id}:${currentStep.id}:${pathname}`;
+    if (detectedFor.current.has(key)) return;
+    if (matchCheckpoint(currentStep.checkpoint, pathname)) {
+      detectedFor.current.add(key);
+      markStep(currentStep.id, 'auto');
     }
-  }, [pathname, mission.steps, mission.id, completedIds, allDone, markStep]);
+  }, [pathname, currentStep, mission.id, allDone, markStep]);
 
   function setMode(next: MissionDisplayMode) {
     setDisplayMode(next);
@@ -495,6 +506,8 @@ export function QAMissionPanel({
     await handleSoftSkip(currentStep.id, result.verdict, result.reason);
   }
 
+  /** Submit a bug. Strictly informational — does NOT mark a checkpoint
+   *  or advance the active step. Only ✓ Pass and → Skip move progress. */
   async function submitBug() {
     const text = bugDescription.trim();
     if (!text) return;
@@ -752,7 +765,7 @@ export function QAMissionPanel({
             }}
           >
             <button
-              onClick={() => setBugOpen((v) => !v)}
+              onClick={() => (bugOpen ? setBugOpen(false) : openBugForm())}
               title="Report a bug"
               style={{ ...HUD_BTN_STYLE, background: bugOpen ? 'rgba(178, 46, 33, 0.45)' : HUD_BTN_STYLE.background }}
             >
@@ -1169,6 +1182,22 @@ export function QAMissionPanel({
                             <span style={{ color: '#8a7a9a', fontSize: 10 }}>
                               {checkpointKind === 'auto' ? '⤷ auto-detect' : '⤷ manual confirm'}
                             </span>
+                            {/* Per-step Report Bug — works on ANY step, not just current.
+                             *  Pre-selects this step in the bug form so the report ties
+                             *  to the right card even when filing later. */}
+                            <button
+                              onClick={() => openBugForm(i)}
+                              style={{
+                                ...S.btn,
+                                fontSize: 10,
+                                padding: '3px 8px',
+                                marginLeft: done ? 'auto' : 0,
+                                color: '#f0b8ae',
+                              }}
+                              title={`Report a bug on step ${i + 1}`}
+                            >
+                              🐛 Bug
+                            </button>
                             {!done && (
                               <>
                                 <button
@@ -1327,7 +1356,7 @@ export function QAMissionPanel({
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button onClick={() => setBugOpen(true)} style={S.btn}>
+                <button onClick={() => openBugForm()} style={S.btn}>
                   🐛 Found a bug
                 </button>
                 <button

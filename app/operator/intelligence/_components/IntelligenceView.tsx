@@ -9,6 +9,7 @@ import { DrillDownPanel } from './DrillDownPanel';
 import { InsightCard, type InsightRecord } from './InsightCard';
 import { InsightComposer } from '@/components/intelligence/InsightComposer';
 import { MemberConstellation, type ConstellationMember } from './MemberConstellation';
+import { ApplicationFunnel, type FunnelSnapshot } from './ApplicationFunnel';
 
 const CATEGORIES: { key: string; label: string }[] = [
   { key: 'pipeline', label: 'Pipeline' },
@@ -27,11 +28,13 @@ export function IntelligenceView({
   tiles,
   insights,
   constellation = [],
+  funnel,
 }: {
   filters: IntelligenceFilterState;
   tiles: Tile[];
   insights: InsightRecord[];
   constellation?: ConstellationMember[];
+  funnel?: FunnelSnapshot;
 }) {
   const router = useRouter();
   const [drill, setDrill] = useState<{ id: string; name: string } | null>(null);
@@ -72,6 +75,8 @@ export function IntelligenceView({
           A registry of metrics — the dashboard, the agent, and sponsor decks all read from it.
         </p>
       </div>
+
+      {funnel && <ApplicationFunnel snapshot={funnel} />}
 
       {constellation.length > 0 && <MemberConstellation members={constellation} />}
 

@@ -21,6 +21,58 @@ function formatAction(action: string): string {
   return action.replace(/\./g, ' › ').replace(/_/g, ' ');
 }
 
+function formatActorType(t: 'OPERATOR' | 'AGENT' | 'MEMBER' | 'SYSTEM'): string {
+  if (t === 'OPERATOR') return 'operator';
+  if (t === 'AGENT') return 'agent';
+  if (t === 'MEMBER') return 'member';
+  return 'system';
+}
+
+interface ResolvedActor {
+  name: string;
+  role: 'OPERATOR' | 'AGENT' | 'MEMBER' | 'SYSTEM';
+}
+
+/** Resolve actorId → "First Last" via the Member table (matches both clerkUserId and member.id).
+ *  SYSTEM/AGENT/MEMBER without a name fall back to the role label. */
+async function buildActorIndex(
+  workspaceId: string,
+  actorIds: string[],
+): Promise<Map<string, string>> {
+  const ids = Array.from(new Set(actorIds.filter(Boolean)));
+  if (ids.length === 0) return new Map();
+  const members = await db.member.findMany({
+    where: {
+      workspaceId,
+      OR: [{ clerkUserId: { in: ids } }, { id: { in: ids } }],
+    },
+    select: { id: true, clerkUserId: true, firstName: true, lastName: true, email: true },
+  });
+  const byKey = new Map<string, string>();
+  for (const m of members) {
+    const name = `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim() || m.email;
+    byKey.set(m.clerkUserId, name);
+    byKey.set(m.id, name);
+  }
+  return byKey;
+}
+
+function resolveActor(
+  actorId: string | null,
+  actorType: 'OPERATOR' | 'AGENT' | 'MEMBER' | 'SYSTEM',
+  byKey: Map<string, string>,
+): ResolvedActor {
+  if (!actorId) {
+    return { name: actorType === 'SYSTEM' ? 'System' : '—', role: actorType };
+  }
+  const resolved = byKey.get(actorId);
+  if (resolved) return { name: resolved, role: actorType };
+  // No Member match — use a typed fallback so the row never shows a raw ID.
+  if (actorType === 'AGENT') return { name: 'NoBC Agent', role: actorType };
+  if (actorType === 'SYSTEM') return { name: 'System', role: actorType };
+  return { name: `${actorType.toLowerCase()} · ${actorId.slice(-6)}`, role: actorType };
+}
+
 function actionColor(action: string): string {
   if (action.startsWith('application.approved')) return 'var(--success)';
   if (action.startsWith('application.rejected')) return 'var(--danger)';
@@ -52,6 +104,11 @@ export default async function AuditPage({
     }),
     db.auditEvent.count({ where: { workspaceId } }),
   ]);
+
+  const actorIndex = await buildActorIndex(
+    workspaceId,
+    events.map((e) => e.actorId).filter((v): v is string => !!v),
+  );
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -106,8 +163,16 @@ export default async function AuditPage({
                       {e.entityId.slice(-8)}
                     </span>
                   </DataTableCell>
-                  <DataTableCell tone="tertiary" className="font-mono text-xs">
-                    {e.actorId ? e.actorId.slice(-12) : '—'}
+                  <DataTableCell tone="tertiary">
+                    {(() => {
+                      const a = resolveActor(e.actorId, e.actorType, actorIndex);
+                      return (
+                        <span className="text-sm">
+                          <span className="font-medium text-text-primary">{a.name}</span>{' '}
+                          <span className="text-xs text-text-muted">({formatActorType(a.role)})</span>
+                        </span>
+                      );
+                    })()}
                   </DataTableCell>
                 </DataTableRow>
               ))}

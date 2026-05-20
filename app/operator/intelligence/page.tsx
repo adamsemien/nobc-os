@@ -16,6 +16,57 @@ import type { ConstellationMember } from './_components/MemberConstellation';
 
 export const dynamic = 'force-dynamic';
 
+/** Top-of-page funnel: raw counts the operator actually understands.
+ *  Synchronous DB read — cheap, runs once per page load. */
+async function loadFunnel(workspaceId: string) {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  const [submitted, pending, approved, rejected, waitlisted, holdRows, stale, scoreAgg, staleSample] =
+    await Promise.all([
+      db.application.count({ where: { workspaceId } }),
+      db.application.count({ where: { workspaceId, status: 'PENDING' } }),
+      db.application.count({ where: { workspaceId, status: 'APPROVED' } }),
+      db.application.count({ where: { workspaceId, status: 'REJECTED' } }),
+      db.application.count({ where: { workspaceId, status: 'WAITLISTED' } }),
+      db.application.count({ where: { workspaceId, status: 'HOLD' } }),
+      db.application.count({
+        where: { workspaceId, status: 'PENDING', createdAt: { lt: sevenDaysAgo } },
+      }),
+      db.application.aggregate({
+        where: { workspaceId, status: 'PENDING', aiScore: { not: null } },
+        _avg: { aiScore: true },
+        _count: { aiScore: true },
+      }),
+      db.application.findMany({
+        where: { workspaceId, status: 'PENDING', createdAt: { lt: sevenDaysAgo } },
+        orderBy: { createdAt: 'asc' },
+        take: 5,
+        select: { id: true, fullName: true, aiScore: true, createdAt: true },
+      }),
+    ]);
+  const aboveThreshold = await db.application.count({
+    where: { workspaceId, status: 'PENDING', aiScore: { gte: 0.7 } },
+  });
+  return {
+    submitted,
+    pending,
+    approved,
+    rejected,
+    waitlisted,
+    hold: holdRows,
+    stale,
+    avgScore: scoreAgg._avg.aiScore ?? null,
+    scoredCount: scoreAgg._count.aiScore,
+    aboveThreshold,
+    belowThreshold: pending - aboveThreshold,
+    staleSample: staleSample.map((s) => ({
+      id: s.id,
+      fullName: s.fullName,
+      aiScore: s.aiScore,
+      createdAt: s.createdAt.toISOString(),
+    })),
+  };
+}
+
 async function loadConstellation(workspaceId: string): Promise<ConstellationMember[]> {
   const apps = await db.application.findMany({
     where: {
@@ -66,6 +117,7 @@ export default async function IntelligencePage({
   const ctx = buildContext(workspaceId, filters);
 
   const constellation = await loadConstellation(workspaceId);
+  const funnel = await loadFunnel(workspaceId);
 
   if (filters.category === 'insights') {
     const rows = await db.intelligenceInsight.findMany({
@@ -85,6 +137,7 @@ export default async function IntelligencePage({
           acknowledged: r.acknowledged,
         }))}
         constellation={constellation}
+        funnel={funnel}
       />
     );
   }
@@ -106,6 +159,7 @@ export default async function IntelligencePage({
       tiles={tiles}
       insights={[]}
       constellation={constellation}
+      funnel={funnel}
     />
   );
 }
