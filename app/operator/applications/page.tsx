@@ -5,6 +5,7 @@ import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { requireWorkspaceId } from '@/lib/auth';
 import { getWorkspaceTierNames } from '@/lib/workspace-tier-names';
 import { PageHeader } from '@/components/ui';
+import { LiveCount } from '@/components/counts/LiveCount';
 import {
   ApplicationsQueue,
   type ApplicationsQueueItem,
@@ -121,7 +122,7 @@ export default async function OperatorApplicationsPage({
             <span className="flex items-center gap-3">
               Applications
               <span className="rounded-full bg-primary px-2.5 py-0.5 text-sm font-medium tabular-nums text-primary-foreground">
-                {pendingCount}
+                <LiveCount path="applications.pending" fallback={pendingCount} />
               </span>
             </span>
           }
@@ -167,7 +168,17 @@ export default async function OperatorApplicationsPage({
                         : 'bg-muted text-text-secondary'
                     }`}
                   >
-                    {count}
+                    {value === 'pending' ? (
+                      <LiveCount path="applications.pending" fallback={count} />
+                    ) : value === 'hold' ? (
+                      <LiveCount path="applications.hold" fallback={count} />
+                    ) : value === 'approved' ? (
+                      <LiveCount path="applications.approved" fallback={count} />
+                    ) : value === 'rejected' ? (
+                      <LiveCount path="applications.rejected" fallback={count} />
+                    ) : (
+                      count
+                    )}
                   </span>
                 ) : null}
               </Link>

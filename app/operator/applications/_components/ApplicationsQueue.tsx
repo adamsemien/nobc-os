@@ -9,6 +9,7 @@ import { EmptyState } from '../../_components/EmptyState';
 import { useTheme } from '../../_components/ThemeToggle';
 import { Avatar } from '../../_components/Avatar';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { emitCountsRefresh } from '@/components/counts/CountsProvider';
 import { WaxSealStamp } from './WaxSealStamp';
 
 export type ApplicationsQueueItem = {
@@ -289,6 +290,7 @@ export function ApplicationsQueue({
           hold: 'Application moved to hold.',
         };
         removeAndNotify(id, messages[path]);
+        emitCountsRefresh();
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Something went wrong. Try again.';
         setFlash({ type: 'error', message });
@@ -346,6 +348,7 @@ export function ApplicationsQueue({
         ? `${succeededIds.length} application${succeededIds.length !== 1 ? 's' : ''} ${label}.`
         : `${succeededIds.length} ${label}; ${failCount} failed (already processed or error).`;
       setFlash({ type: failCount === 0 ? 'success' : 'error', message: msg });
+      emitCountsRefresh();
     } catch {
       setFlash({ type: 'error', message: 'Network error. Try again.' });
     } finally {

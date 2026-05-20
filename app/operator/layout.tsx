@@ -8,6 +8,7 @@ import { AimEasterEgg } from './_components/AimEasterEgg';
 import { MyspaceEasterEgg } from './_components/MyspaceEasterEgg';
 import { CommandPaletteProvider } from '@/components/command-palette/CommandPaletteProvider';
 import { CommandKPill } from '@/components/command-palette/CommandKPill';
+import { CountsProvider } from '@/components/counts/CountsProvider';
 import { DevToolbar } from './_components/DevToolbar';
 import { HelpPanel } from './_components/HelpPanel';
 import { OnboardingTour } from './_components/OnboardingTour';
@@ -47,6 +48,7 @@ export default async function OperatorLayout({
 
   return (
     <CommandPaletteProvider workspaceId={workspaceId} events={events}>
+      <CountsProvider>
       <div
         className="operator-scope flex min-h-screen"
         style={{ background: 'var(--page-bg)' }}
@@ -64,6 +66,7 @@ export default async function OperatorLayout({
         <OnboardingTour hasEvents={eventsRaw.length > 0} hasMembers={memberCount > 0} />
         <DevToolbar workspaceId={workspaceId} />
       </div>
+      </CountsProvider>
     </CommandPaletteProvider>
   );
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
+import { useCounts } from '@/components/counts/CountsProvider';
 import {
   Home,
   Inbox,
@@ -47,8 +48,17 @@ const EXTERNAL_LINKS = [
   { href: '/apply', label: 'Apply Form' },
 ];
 
-export function OperatorNav({ pendingApplicationCount = 0 }: { pendingApplicationCount?: number }) {
+export function OperatorNav({
+  pendingApplicationCount = 0,
+}: {
+  pendingApplicationCount?: number;
+}) {
   const pathname = usePathname();
+  const { counts } = useCounts();
+  // Prefer the live counts from the SoT provider; fall back to the SSR-rendered
+  // value so the badge is correct on first paint before the client fetch lands.
+  const livePending =
+    counts?.applications.pending ?? pendingApplicationCount;
 
   const renderItem = (item: NavItem) => {
     const active = item.exact
@@ -60,7 +70,7 @@ export function OperatorNav({ pendingApplicationCount = 0 }: { pendingApplicatio
     const isActive = item.exact
       ? pathname === item.match
       : pathname.startsWith(item.match);
-    const showBadge = item.href === '/operator/applications' && pendingApplicationCount > 0;
+    const showBadge = item.href === '/operator/applications' && livePending > 0;
     const Icon = item.Icon;
     return (
       <Link
@@ -92,9 +102,9 @@ export function OperatorNav({ pendingApplicationCount = 0 }: { pendingApplicatio
           <span
             className="relative z-10 hidden rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary-foreground md:inline-flex"
             style={{ background: 'var(--primary)' }}
-            aria-label={`${pendingApplicationCount} pending`}
+            aria-label={`${livePending} pending`}
           >
-            {pendingApplicationCount}
+            {livePending}
           </span>
         ) : null}
         {/* Compact-sidebar badge dot */}
