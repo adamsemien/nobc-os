@@ -64,6 +64,9 @@ export const LEGACY_ANSWER_LABELS: Record<string, string> = {
   'taste.recommendWellnessFitness': 'Wellness & fitness recommendation',
   'taste.splurgeVsSave': 'Splurge vs save',
 
+  // photos
+  'photos.foodAccessibility': 'Food & accessibility notes',
+
   // rapid fire
   'rapid.coffeeTable': 'Coffee table',
   'rapid.contentStopsScrolling': 'Content that stops their scroll',
