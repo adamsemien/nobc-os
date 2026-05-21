@@ -4,23 +4,9 @@ import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { answerQuestions } from '@/lib/apply-config';
 import { referrerLines } from '@/lib/operator-application-display';
+import { resolveAnswerLabel } from '@/lib/legacy-answer-labels';
 
-const QUESTION_LABELS = new Map(answerQuestions.map(q => [q.key, q.label]));
 const QUESTION_ORDER = new Map(answerQuestions.map((q, i) => [q.key, i]));
-
-/** Question keys span generations: bare camelCase from the current /apply form,
- *  dotted `section.field` from older forms, and snake_case from the seed
- *  generator. Resolve a human label from the current config, else prettify the
- *  raw key so the panel never shows a bare DB key. */
-function prettyKey(key: string): string {
-  const cleaned = key.replace(/^_+/, '').replace(/[._]+/g, ' ').trim();
-  if (!cleaned) return key;
-  const lower = cleaned.toLowerCase();
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
-}
-function answerLabel(key: string): string {
-  return QUESTION_LABELS.get(key) ?? prettyKey(key);
-}
 
 export async function GET(
   _req: Request,
@@ -68,7 +54,7 @@ export async function GET(
     )
     .map(a => ({
       questionKey: a.questionKey,
-      label: answerLabel(a.questionKey),
+      label: resolveAnswerLabel(a.questionKey),
       answer: a.answer,
     }));
 

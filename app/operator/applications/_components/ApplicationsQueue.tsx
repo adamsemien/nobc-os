@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowLeft, Check, Clock, Loader2, Mail, MapPin, Phone, Search, X, XCircle } from 'lucide-react';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
+import { LEGACY_ANSWER_LABELS } from '@/lib/legacy-answer-labels';
 import { DEFAULT_TIER_NAMES, type TierNames } from '@/lib/score-display';
 import { EmptyState } from '../../_components/EmptyState';
 import { useTheme } from '../../_components/ThemeToggle';
@@ -114,6 +115,7 @@ function labelForKey(key: string): string {
     APPLY_QUESTIONS.find(q => q.key === key)?.label ??
     LEGACY_LABELS[key] ??
     QUESTION_LABELS[key] ??
+    LEGACY_ANSWER_LABELS[key] ??
     prettyKey(key)
   );
 }
