@@ -11,7 +11,7 @@
 | **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Monitor production; V1.5 will add SMS welcome via Stage 11. Detail-panel scroll fixed (bounded height chain) + AI profile now normalizes archetypeScores to 0–100 (`scorePct`) so worth scores/bars render. NOTE: dev-seed apps carry only 3 substantive answers each — enrich if richer demo applications are needed. |
+| **Next** | Monitor production; V1.5 will add SMS welcome via Stage 11. (2026-05-21: review queue + full-page detail now render genuine-shape submissions — full-page archetype bars iterate the six archetypes via `scorePct`, `basics.referrers` JSON → clean Referrers list, `photos.urls` → photo strip, split-view consents → checkboxes (`consentEmail`/`consentSms`), all dotted answer keys labeled. Demo seed enriched to the full ~43-field live-form answer set. Non-demo stray data (Jordan Mercer et al.) purged — workspace is demo-seed-only.) |
 
 ## Scope
 
