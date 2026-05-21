@@ -13,7 +13,7 @@
 | **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | V1.5 — route the loop through the Runtype master agent behind the same tool registry. Optional hardening: extend `lib/agent/tools/*` to cover the RSVP / check-in / event-write / tag / ticketing operations that today only exist in the remote `lib/mcp/` surface (see gap list below). |
+| **Next** | V1.5 — route the loop through the Runtype master agent behind the same tool registry. RSVP + check-in tools now landed; remaining `lib/mcp/`-only gaps the chat agent still lacks: event writes (create/update/publish/cancel), member tagging, red list, ticketing tiers, and event series. |
 
 ## Scope
 
@@ -49,12 +49,29 @@ lib/agent/lib/spotlight.ts                  ← workspace-context / spotlight he
 lib/agent/registry.ts                       ← tool registry: boot-time workspace-scope guard, buildToolSet, executeTool (audit), confirmation gating
 lib/agent/types.ts                          ← AgentToolContext, AnyAgentTool
 lib/agent/tools/index.ts                    ← side-effect imports that register every Phase 1 tool
-lib/agent/tools/{applications,members,events,rsvps,intelligence,emails,audit}/*  ← 17 registered tools
+lib/agent/tools/{applications,members,events,rsvps,checkin,intelligence,emails,audit}/*  ← 25 registered tools
 # lib/runtype/client.ts                      ← V1.5 only — Runtype API client (not yet created)
 # lib/runtype/sse.ts                         ← V1.5 only — SSE stream handling (not yet created)
 ```
 
-> **Note on `lib/mcp/` (stage 08):** the in-app chat does **not** import `lib/mcp/`. `lib/mcp/` is the *remote* MCP surface (JSON-RPC at `/api/mcp`) for external clients (Runtype, Claude Desktop). Today these are two parallel registries with overlapping but non-identical tool coverage. Consolidating onto one catalog is a V1.5 option; until then, see the gap list in this stage's notes for operations the chat agent cannot yet perform.
+> **Note on `lib/mcp/` (stage 08):** the in-app chat does **not** import `lib/mcp/`. `lib/mcp/` is the *remote* MCP surface (JSON-RPC at `/api/mcp`) for external clients (Runtype, Claude Desktop). Today these are two parallel registries with overlapping but non-identical tool coverage. Consolidating onto one catalog is a V1.5 option.
+
+## Tool coverage (`lib/agent/tools/*`)
+
+Reads run un-gated (no confirmation, no audit). Writes pause for operator confirmation in the panel and emit an `AuditEvent` (`actorType=AGENT`) via the registry.
+
+| Group | Reads | Writes (confirmation + audit) |
+|---|---|---|
+| applications | `find`, `get` | `approve`, `reject`, `waitlist`, `move_to_hold` |
+| members | `find`, `get`, `search` | — |
+| events | `find`, `get`, `list` | — |
+| rsvps | `list`, `get` | `approve`, `reject`, `promote`, `comp_ticket` |
+| checkin | `status`, `lookup` | `checkin` |
+| intelligence | `run_metric`, `compose` | — |
+| emails | — | `send_custom` |
+| audit | `search` | — |
+
+> RSVP/check-in tools (added for live-event questions) cover the guest list, approval-gated access, waitlist promotion, and door check-in. `checkin.status`/`checkin.lookup` are reads (no confirmation) so "how many are here?" / "is X here?" answer instantly; only `checkin.checkin` and the RSVP writes gate. This closes the demo-critical gaps where the chat agent previously could not read RSVPs or run the door.
 
 ## Inputs
 

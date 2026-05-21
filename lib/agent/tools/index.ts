@@ -18,5 +18,13 @@ import './intelligence/run-metric';
 import './intelligence/compose';
 import './emails/send-custom';
 import './rsvps/comp-ticket';
+import './rsvps/list';
+import './rsvps/get';
+import './rsvps/approve';
+import './rsvps/reject';
+import './rsvps/promote';
+import './checkin/status';
+import './checkin/lookup';
+import './checkin/checkin';
 
 export * from '../registry';
