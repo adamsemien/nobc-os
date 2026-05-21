@@ -52,6 +52,8 @@ type EventFull = {
     heldCount: number;
     capacityUsed: number;
     revenueCents: number;
+    checkedInCount: number;
+    capturedRevenueCents: number;
   };
 };
 

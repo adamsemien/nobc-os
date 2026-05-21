@@ -51,7 +51,7 @@ export async function GET(
   const workspaceId = await requireWorkspaceId(userId);
   const { id } = await params;
 
-  const [event, rsvpStats] = await Promise.all([
+  const [event, rsvpStats, checkedInCount, capturedAgg] = await Promise.all([
     db.event.findFirst({
       where: { id, workspaceId },
       include: {
@@ -64,21 +64,36 @@ export async function GET(
       where: { workspaceId, eventId: id },
       _count: { _all: true },
     }),
+    db.rSVP.count({ where: { workspaceId, eventId: id, checkedIn: true } }),
+    db.rSVP.aggregate({
+      where: { workspaceId, eventId: id, paymentStatus: 'CAPTURED' },
+      _sum: { amountCents: true },
+    }),
   ]);
 
   if (!event) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const confirmedCount = rsvpStats.find(r => r.ticketStatus === 'confirmed')?._count._all ?? 0;
   const heldCount = rsvpStats.find(r => r.ticketStatus === 'held')?._count._all ?? 0;
+  // Projected revenue (confirmed × price) — used for the upcoming-event card.
   const revenueCents =
     event.priceInCents != null && event.priceInCents > 0
       ? confirmedCount * event.priceInCents
       : 0;
+  // Realized revenue — sum of captured payments, mirrors the Attendees tab.
+  const capturedRevenueCents = capturedAgg._sum.amountCents ?? 0;
 
   return NextResponse.json({
     event: {
       ...event,
-      _stats: { confirmedCount, heldCount, capacityUsed: confirmedCount + heldCount, revenueCents },
+      _stats: {
+        confirmedCount,
+        heldCount,
+        capacityUsed: confirmedCount + heldCount,
+        revenueCents,
+        checkedInCount,
+        capturedRevenueCents,
+      },
     },
   });
 }

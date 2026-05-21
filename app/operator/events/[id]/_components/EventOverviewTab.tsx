@@ -20,6 +20,8 @@ type EventFull = {
     heldCount: number;
     capacityUsed: number;
     revenueCents: number;
+    checkedInCount: number;
+    capturedRevenueCents: number;
   };
 };
 
@@ -68,9 +70,45 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
+// Replaces the "Days Until" card once an event is in the past — a single
+// at-a-glance recap of how the night actually went.
+function PostEventCard({
+  attendance,
+  rate,
+  noShows,
+  revenue,
+}: {
+  attendance: string;
+  rate: number;
+  noShows: number;
+  revenue: string;
+}) {
+  return (
+    <div
+      className="op-card flex flex-1 flex-col gap-1 border border-border px-4 py-3.5"
+      style={{ minWidth: '200px' }}
+    >
+      <span className="text-[0.65rem] font-medium uppercase tracking-widest text-text-muted">
+        Post-Event Summary
+      </span>
+      <span
+        className="text-3xl font-light text-text-primary"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
+        {attendance}
+      </span>
+      <span className="text-xs text-text-muted">
+        checked in · {rate}% rate · {noShows} no-show{noShows === 1 ? '' : 's'}
+      </span>
+      <span className="text-xs text-text-muted">{revenue} captured</span>
+    </div>
+  );
+}
+
 export function EventOverviewTab({ event, heroImageUrl }: Props) {
   const { _stats } = event;
   const until = daysUntil(event.startAt);
+  const isPast = new Date(event.startAt).getTime() < Date.now();
 
   const capacityRemaining =
     event.capacity != null ? Math.max(0, event.capacity - _stats.capacityUsed) : null;
@@ -78,6 +116,17 @@ export function EventOverviewTab({ event, heroImageUrl }: Props) {
   const revenueLabel =
     _stats.revenueCents > 0
       ? `$${(_stats.revenueCents / 100).toLocaleString('en-US', { minimumFractionDigits: 0 })}`
+      : '$0';
+
+  // Post-event recap figures (only shown once the event has passed).
+  const checkInRate =
+    _stats.confirmedCount > 0
+      ? Math.round((_stats.checkedInCount / _stats.confirmedCount) * 100)
+      : 0;
+  const noShows = Math.max(0, _stats.confirmedCount - _stats.checkedInCount);
+  const capturedRevenueLabel =
+    _stats.capturedRevenueCents > 0
+      ? `$${(_stats.capturedRevenueCents / 100).toLocaleString('en-US', { minimumFractionDigits: 0 })}`
       : '$0';
 
   return (
@@ -149,7 +198,16 @@ export function EventOverviewTab({ event, heroImageUrl }: Props) {
           sub={_stats.heldCount > 0 ? `${_stats.heldCount} held` : 'open spots'}
         />
         <StatCard label="Revenue" value={revenueLabel} sub="confirmed only" />
-        <StatCard label="Days Until" value={until.value} sub={until.sub} />
+        {isPast ? (
+          <PostEventCard
+            attendance={`${_stats.checkedInCount} / ${_stats.confirmedCount}`}
+            rate={checkInRate}
+            noShows={noShows}
+            revenue={capturedRevenueLabel}
+          />
+        ) : (
+          <StatCard label="Days Until" value={until.value} sub={until.sub} />
+        )}
       </div>
 
       {/* Description */}
