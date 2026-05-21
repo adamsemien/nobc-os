@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped — live at `/apply` |
 | **V1 item** | #1, #5 |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Iterate archetype copy as data comes in; no structural changes |
+| **Next** | Iterate archetype copy as data comes in; no structural changes. (One-time data fix done 2026-05-21: 20 legacy Application rows had archetypeScores on the 0–1 scale; migrated to 0–100 to match the seed/normalizer fix.) |
 
 ## Scope
 
@@ -29,6 +29,7 @@ app/api/apply/membership/[id]/submit/route.ts   ← POST: dual Claude calls
 app/api/apply/membership/upload/route.ts        ← photo upload to Vercel Blob
 config/archetypes.ts                            ← ALL archetype copy lives here
 lib/scoring.ts                                  ← Member Worth axes + threshold logic
+scripts/fix-archetype-scores-scale.ts           ← one-time backfill: archetypeScores 0–1 → 0–100 (run 2026-05-21)
 ```
 
 ## Schema models owned
