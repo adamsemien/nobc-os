@@ -131,16 +131,15 @@ export default async function OperatorDashboardPage() {
   const today1 = endOfToday();
   const week1 = plusDays(7);
 
-  // NOTE: data fetching is unchanged — the Promise.all queries below are
-  // byte-identical. The liquid-editorial layout surfaces the first eight
-  // results; birthdays/throwbacks are still fetched (last two) but not rendered.
+  // The dashboard is a morning brief, not a live event surface — it intentionally
+  // does NOT fetch check-in / capacity data (that lives in The Room). Birthdays
+  // and throwbacks are still fetched (last two) but not rendered in this layout.
   const [
     pendingCount,
     pendingApps,
     memberCount,
     upcomingThisWeek,
     todaysEvents,
-    checkedInToday,
     upcomingEventsFull,
     recentAudit,
   ] = await Promise.all([
@@ -171,9 +170,6 @@ export default async function OperatorDashboardPage() {
       where: { workspaceId, status: 'PUBLISHED', startAt: { gte: today0, lte: today1 } },
       orderBy: { startAt: 'asc' },
       select: { id: true, slug: true, title: true, startAt: true, location: true, capacity: true },
-    }),
-    db.rSVP.count({
-      where: { workspaceId, checkedIn: true, checkedInAt: { gte: today0, lte: today1 } },
     }),
     db.event.findMany({
       where: { workspaceId, status: 'PUBLISHED', startAt: { gte: today0 } },
@@ -207,12 +203,6 @@ export default async function OperatorDashboardPage() {
   const weekday = today.toLocaleDateString('en-US', { weekday: 'short' });
   const monthShort = today.toLocaleDateString('en-US', { month: 'short' });
   const dateLine = `${weekday} ${today.getDate()} ${monthShort} ${today.getFullYear()}`;
-  const clockSub = todaysEvents.length > 0 ? 'doors soon' : 'all quiet';
-
-  const tonight = todaysEvents.map((e) => ({
-    ...e,
-    confirmed: confirmedByEvent.get(e.id) ?? 0,
-  }));
 
   return (
     <>
@@ -225,7 +215,7 @@ export default async function OperatorDashboardPage() {
         >
           <div className="min-w-0">
             <div
-              className="mb-[18px] text-[11px] uppercase tracking-[0.2em]"
+              className="mb-[18px] text-[13px] font-medium uppercase tracking-[0.2em]"
               style={{ color: 'var(--text-tertiary)' }}
             >
               The operator&rsquo;s desk ·{' '}
@@ -255,11 +245,11 @@ export default async function OperatorDashboardPage() {
               Everything you need to run the night.
             </div>
           </div>
-          <DeskClock sub={clockSub} />
+          <DeskClock sub="Austin, TX" />
         </header>
 
-        {/* FIGURES — asymmetric */}
-        <section className="mt-[34px] grid grid-cols-1 gap-[18px] md:grid-cols-2 lg:grid-cols-[1.42fr_1fr_1fr]">
+        {/* FIGURES — asymmetric: Pending (lead) + Members / Upcoming stacked */}
+        <section className="mt-[34px] grid grid-cols-1 gap-[18px] md:grid-cols-2 lg:grid-cols-[1.5fr_1fr]">
           <StatFigure
             variant="lead"
             eyebrow="Pending applications"
@@ -306,7 +296,7 @@ export default async function OperatorDashboardPage() {
             className="op-rise"
             footer={
               <div
-                className="mt-2 flex items-center gap-[5px] text-[12.5px]"
+                className="mt-2 flex items-center gap-[5px] text-[13px]"
                 style={{ color: 'var(--text-secondary)' }}
               >
                 <TrendingUp className="h-4 w-4" style={{ color: 'var(--success)' }} aria-hidden />
@@ -322,7 +312,7 @@ export default async function OperatorDashboardPage() {
             className="op-rise"
             footer={
               <div
-                className="mt-2 flex items-center gap-[5px] text-[12.5px]"
+                className="mt-2 flex items-center gap-[5px] text-[13px]"
                 style={{ color: 'var(--text-secondary)' }}
               >
                 <Calendar className="h-4 w-4" aria-hidden />
@@ -330,34 +320,16 @@ export default async function OperatorDashboardPage() {
               </div>
             }
           />
-
-          <StatFigure
-            variant="wide"
-            eyebrow="Checked in today"
-            value={checkedInToday}
-            className="op-rise md:col-span-2 lg:col-span-2"
-            aside={
-              <div className="text-right text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
-                <b
-                  className="block text-[13px]"
-                  style={{ color: 'var(--text-primary)', fontWeight: 600 }}
-                >
-                  {checkedInToday > 0 ? 'Counting tonight' : "Doors haven't opened"}
-                </b>
-                {checkedInToday > 0 ? 'live at the door' : 'first scan starts the clock'}
-              </div>
-            }
-          />
         </section>
 
         {/* TONIGHT */}
-        {tonight.length > 0 ? (
+        {todaysEvents.length > 0 ? (
           <div className="mt-[42px]">
             <div className="op-rise" style={{ animationDelay: '0.36s' }}>
               <SectionHeader icon={<MoonStar className="h-[15px] w-[15px]" />} title="Tonight" />
             </div>
             <div className="op-rise" style={{ animationDelay: '0.4s' }}>
-              <TonightPanel events={tonight} />
+              <TonightPanel events={todaysEvents} />
             </div>
           </div>
         ) : null}
@@ -371,7 +343,7 @@ export default async function OperatorDashboardPage() {
               action={
                 <Link
                   href="/operator/events"
-                  className="text-[12px] font-semibold"
+                  className="text-[13px] font-semibold"
                   style={{ color: 'var(--primary)' }}
                 >
                   All events →
@@ -425,7 +397,7 @@ export default async function OperatorDashboardPage() {
                         {e.title}
                       </h4>
                       <div
-                        className="mt-[3px] text-[12.5px]"
+                        className="mt-[3px] text-[13px]"
                         style={{ color: 'var(--text-secondary)' }}
                       >
                         {fmtDate(e.startAt)} · {fmtTime(e.startAt)}
@@ -455,7 +427,7 @@ export default async function OperatorDashboardPage() {
               action={
                 <Link
                   href="/operator/audit"
-                  className="text-[12px] font-semibold"
+                  className="text-[13px] font-semibold"
                   style={{ color: 'var(--primary)' }}
                 >
                   Full log →

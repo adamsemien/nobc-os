@@ -39,14 +39,14 @@ export function StatFigure({
   const numeral = (
     <>
       <div
-        className="text-[11px] uppercase tracking-[0.18em]"
+        className="text-[13px] font-medium uppercase tracking-[0.18em]"
         style={{ color: 'var(--text-tertiary)' }}
       >
         {eyebrow}
       </div>
       <CountUp
         value={value}
-        className={`${numeralSize} mt-2 block leading-[0.86] tabular-nums`}
+        className={`${numeralSize} mt-[14px] block leading-[0.86] tabular-nums`}
         style={{
           fontFamily: 'var(--font-display)',
           fontWeight: 400,

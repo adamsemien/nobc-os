@@ -28,7 +28,7 @@ export function ActivityRow({
         <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
           {actionLabel(action)}
         </div>
-        <div className="mt-[2px] text-[11.5px]" style={{ color: 'var(--text-tertiary)' }}>
+        <div className="mt-[2px] text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
           {formatRelativeTime(createdAt)}
         </div>
       </div>

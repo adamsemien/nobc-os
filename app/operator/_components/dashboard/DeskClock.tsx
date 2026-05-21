@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 /**
  * Masthead live clock — large serif HH·MM with a `--primary` separator, over a
- * small contextual sub line ("doors soon" / "all quiet", passed from the server).
+ * small static sub line (the workspace location, passed from the server).
  *
  * Renders a neutral placeholder until mounted so server and client markup match.
  */
@@ -36,7 +36,7 @@ export function DeskClock({ sub }: { sub: string }) {
         {mm}
       </div>
       <div
-        className="mt-2 text-[11px] uppercase tracking-[0.18em]"
+        className="mt-2 text-[13px] font-medium uppercase tracking-[0.18em]"
         style={{ color: 'var(--text-tertiary)' }}
       >
         {sub}

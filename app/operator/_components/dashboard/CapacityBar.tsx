@@ -54,7 +54,7 @@ export function CapacityBar({
         />
       </div>
       <div
-        className="mt-[7px] flex justify-between text-[11.5px]"
+        className="mt-[7px] flex justify-between text-[13px]"
         style={{ color: 'var(--text-tertiary)' }}
       >
         <span>

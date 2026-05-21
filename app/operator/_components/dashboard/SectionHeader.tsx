@@ -21,7 +21,7 @@ export function SectionHeader({
         </span>
       ) : null}
       <span
-        className="text-[11.5px] font-semibold uppercase tracking-[0.2em]"
+        className="text-[13px] font-semibold uppercase tracking-[0.2em]"
         style={{ color: 'var(--text-secondary)' }}
       >
         {title}
