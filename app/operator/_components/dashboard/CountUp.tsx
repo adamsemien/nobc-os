@@ -7,6 +7,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
  *
  * Renders 0 during SSR / pre-hydration, then ramps on the client. Under
  * prefers-reduced-motion the final value is set immediately with no animation.
+ * In the editorial (riso) theme the ramp is crisp (900ms) to match print motion.
  */
 export function CountUp({
   value,
@@ -27,11 +28,13 @@ export function CountUp({
       setDisplay(value);
       return;
     }
+    const editorial = document.documentElement.dataset.theme === 'editorial';
+    const dur = editorial ? 900 : durationMs;
     let raf = 0;
     const start = performance.now();
     const ease = (t: number) => 1 - Math.pow(1 - t, 3);
     const tick = (now: number) => {
-      const p = Math.min((now - start) / durationMs, 1);
+      const p = Math.min((now - start) / dur, 1);
       setDisplay(Math.round(ease(p) * value));
       if (p < 1) raf = requestAnimationFrame(tick);
     };

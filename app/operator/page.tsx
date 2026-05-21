@@ -208,6 +208,13 @@ export default async function OperatorDashboardPage() {
     <>
       <LiquidAmbient />
       <div className="relative z-10 flex min-h-screen w-full flex-1 flex-col px-6 pb-12 pt-[38px] sm:px-10 lg:px-14 xl:px-20">
+        {/* NAMEPLATE — revealed only in the editorial (riso) theme */}
+        <div className="op-nameplate" aria-hidden>
+          <span className="op-nameplate-edition">Edition №47</span>
+          <span className="op-nameplate-mid">No Bad Company · Austin, TX</span>
+          <span>{dateLine}</span>
+        </div>
+
         {/* MASTHEAD */}
         <header
           className="op-rise flex flex-wrap items-end justify-between gap-10 border-b pb-[22px]"
@@ -255,7 +262,7 @@ export default async function OperatorDashboardPage() {
             eyebrow="Pending applications"
             value={pendingCount}
             accentValue
-            className="op-rise md:col-span-2 lg:col-span-1 lg:row-span-2"
+            className="op-fig-lead op-rise md:col-span-2 lg:col-span-1 lg:row-span-2"
             footer={
               <>
                 <div
@@ -326,7 +333,7 @@ export default async function OperatorDashboardPage() {
         {todaysEvents.length > 0 ? (
           <div className="mt-[42px]">
             <div className="op-rise" style={{ animationDelay: '0.36s' }}>
-              <SectionHeader icon={<MoonStar className="h-[15px] w-[15px]" />} title="Tonight" />
+              <SectionHeader folio="01" icon={<MoonStar className="h-[15px] w-[15px]" />} title="Tonight" />
             </div>
             <div className="op-rise" style={{ animationDelay: '0.4s' }}>
               <TonightPanel events={todaysEvents} />
@@ -338,6 +345,7 @@ export default async function OperatorDashboardPage() {
         <div className="mt-[42px] grid flex-1 grid-cols-1 gap-[18px] lg:grid-cols-[1.62fr_1fr] lg:grid-rows-[minmax(0,1fr)]">
           <div className="op-rise flex flex-col" style={{ animationDelay: '0.46s' }}>
             <SectionHeader
+              folio="02"
               icon={<CalendarDays className="h-[15px] w-[15px]" />}
               title="Upcoming events"
               action={
@@ -422,6 +430,7 @@ export default async function OperatorDashboardPage() {
 
           <div className="op-rise flex flex-col" style={{ animationDelay: '0.56s' }}>
             <SectionHeader
+              folio="03"
               icon={<Activity className="h-[15px] w-[15px]" />}
               title="Recent activity"
               action={

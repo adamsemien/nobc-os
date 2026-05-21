@@ -11,7 +11,7 @@
 | **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Build the Editorial (riso) theme as an alternate look (separate task); optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx` |
+| **Next** | Editorial (riso) theme shipped as the 11th theme. Member-facing brand polish (apply form + event pages) is tracked in `04-access/`. Optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx`. |
 
 ## Scope
 
@@ -45,8 +45,9 @@ app/operator/_components/dashboard/CapacityBar.tsx       ← (client) 3px capaci
 app/operator/_components/dashboard/ActivityRow.tsx       ← activity-feed row: colored tick + bold label + relative time
 app/operator/_components/dashboard/TonightPanel.tsx      ← glass "Tonight" band: a gig per event today, ink "The Room" button
 app/operator/_components/dashboard/format.ts             ← shared date/action formatters; actionColor → theme tokens
-_context/07-operator-dashboard/glass-reference.html      ← the liquid-editorial visual target (mockup)
-lib/theme.ts                                             ← active theme resolution (10-theme system + per-workspace override)
+_context/07-operator-dashboard/glass-reference.html      ← the liquid-editorial (default) visual target (mockup)
+_context/07-operator-dashboard/riso-reference.html       ← the editorial/riso-print visual target (mockup)
+lib/theme.ts                                             ← active theme resolution (11-theme system, incl. editorial + per-workspace override)
 lib/permissions.ts                                       ← role → action matrix used by every operator API route
 lib/audit.ts                                             ← AuditEvent write + query helpers (single module)
 app/globals.css                                          ← glass tokens (.operator-scope), .op-glass material, .op-btn, .op-ambient + drift, .op-rise entrance (all honor prefers-reduced-motion)
@@ -83,7 +84,7 @@ The operator home (`app/operator/page.tsx`) is editorial typography on transluce
 
 - **Full-bleed, asymmetric magazine grid** — NOT a centered column. Section order: masthead → four figures (asymmetric) → Tonight band → Upcoming events + Recent activity (asymmetric lower grid).
 - **Masthead:** dateline ("The operator's desk · {date}", date in `--primary`) → large serif headline with the period in `--primary` → italic serif standfirst. A live `DeskClock` sits at the right.
-- **Figures grid** (`1.42fr 1fr 1fr`, two rows): **Pending applications** is the dominant tall `--glass-strong` panel with a **red** count-up numeral, avatar faces, and the red "Review the queue" pill — this is the single dominant red moment. Members + Upcoming are small figures; Checked-in-today is a wide figure spanning the bottom-right.
+- **Figures grid** (`1.5fr 1fr`, two rows — morning brief, not a live event board): **Pending applications** is the dominant tall `--glass-strong` panel with a **red** count-up numeral, avatar faces, and the red "Review the queue" pill — this is the single dominant red moment. Members + Upcoming are the two small figures stacked beside it. (The "Checked in today" figure + its `db.rSVP` query were removed in the IA polish pass — live check-in lives in The Room.)
 - **One accent moment.** Red = the lead figure (numeral + pill). Everywhere else red is punctuation-scale only (the headline period, the dateline date, 3px capacity fills, 7px activity ticks, section icons, "Tonight" eyebrows). **Primary CTA buttons are ink (`.op-btn-primary`), never red.**
 - **Glass material — token-driven.** Use `GlassPanel` / `.op-glass` (or `.op-glass-strong`). The material reads only theme tokens: `--glass`, `--glass-strong`, `--glass-edge`, `--glass-highlight`, `--glass-shadow`, `--glass-sheen`. These are defined on `.operator-scope` via `color-mix` on the live `--surface`, so they retheme automatically; dark themes (midnight/obsidian/void/ember) get denser glass + faint light edges + a real drop shadow; high-chroma themes (y2k/aim/myspace) get near-opaque glass for legibility. **Readability is the gate** — if a theme's `--glass` ever drops text below AA, raise its opacity.
 - **Ambient stays quiet.** `--ambient-1/2/3` tint three blurred `.op-blob`s at ~0.14 opacity (the "liquid" feeling comes from the glass + motion, not loud clouds).
@@ -92,6 +93,18 @@ The operator home (`app/operator/page.tsx`) is editorial typography on transluce
 - **Reusable dashboard components live under `app/operator/_components/dashboard/`** — extracting from `page.tsx` (rather than inline JSX) is the default when adding an editorial surface here.
 
 > Data note: `page.tsx`'s `Promise.all` is unchanged (byte-identical). It still fetches birthdays/throwbacks (last two results) which the liquid layout no longer renders — trim later if desired.
+
+## Dashboard home — editorial / riso mode (11th theme)
+
+Selecting the **Editorial** theme (`data-theme="editorial"`, the 11th theme in `lib/theme.ts` + the Appearance picker) transforms the *same* dashboard into a printed daily broadsheet. Visual target: `riso-reference.html`. The transform is **pure CSS** — no component branching, no JS theme logic — driven entirely by the editorial token block + `[data-theme="editorial"] .operator-scope` overrides in `globals.css`:
+
+- **Flat print, not glass.** `.op-glass` / `.op-glass-strong` lose backdrop-filter, shadow depth, hover lift, and sheen; they become solid `--surface` cards with a 1px solid `--text-primary` ink rule and square corners. The `LiquidAmbient` blobs are `display:none`.
+- **Nameplate** — a `.op-nameplate` strip (rendered in `page.tsx`, hidden in every other theme) reveals at the top: inked bar, mono uppercase "Edition №47" / "No Bad Company · Austin, TX" / date.
+- **Folios** — `SectionHeader`'s `folio` prop ("01"/"02"/"03") shows a mono section number before each label (`.op-folio`, hidden elsewhere).
+- **Inverted lead** — the Pending figure (`.op-fig-lead`) inverts: ink panel, paper text (semantic `--text-*` re-pointed to paper inside the panel), brightened poster-red numeral (`--lead-red`, lifted for AA on ink).
+- **Film grain** — a fixed `.operator-scope::before` SVG fractal-noise overlay at 3% / `mix-blend-mode: multiply`.
+- **Crisp motion** — `CountUp` ramps in 900ms when editorial is active; blob drift is off; the `.op-rise` entrance stagger stays.
+- **Tokens:** `--bg` warm cream `#EFE9DA`, `--surface` warmer cream, `--text-primary` warm ink `#1A1813`, `--primary` NoBC Red, glass tokens flattened to opaque. `--font-mono` (JetBrains/Fira/system stack) is defined on every theme block for the mono print labels.
 
 ## Rules — DO NOT VIOLATE
 

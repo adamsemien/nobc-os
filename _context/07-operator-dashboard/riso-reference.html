@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NoBC — Operator Dashboard · Editorial Riso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#EFE9DA; --ink:#1A1813; --ink-2:#5C564A;
+    --red:#B5301C; --red-soft:#D98C7C;
+    --hair:#1A1813;
+    --serif:'Fraunces',Georgia,serif; --sans:'Hanken Grotesk',system-ui,sans-serif;
+    --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--sans);background:var(--paper);color:var(--ink);
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;min-height:100vh;}
+
+  .grain{position:fixed;inset:0;z-index:50;pointer-events:none;opacity:.5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+    mix-blend-mode:multiply;}
+
+  .shell{display:flex;min-height:100vh;}
+  .rail{width:218px;flex-shrink:0;padding:0;
+    border-right:1.5px solid var(--hair);display:flex;flex-direction:column;}
+  .rail-head{padding:22px 22px 18px;border-bottom:1.5px solid var(--hair);}
+  .wordmark{font-family:var(--serif);font-size:22px;line-height:1;
+    letter-spacing:-.01em;}
+  .wordmark em{font-style:italic;color:var(--red);}
+  .rail-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink-2);margin-top:8px;}
+  .nav{padding:14px 0;flex:1;}
+  .nav-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-2);padding:0 22px 8px;}
+  .nav-item{display:flex;align-items:baseline;gap:10px;padding:7px 22px;
+    color:var(--ink-2);font-size:13.5px;font-weight:500;text-decoration:none;}
+  .nav-item .fo{font-family:var(--mono);font-size:10px;color:var(--ink-2);}
+  .nav-item:hover{color:var(--ink);}
+  .nav-item.on{color:var(--ink);background:var(--ink);color:var(--paper);}
+  .nav-item.on .fo{color:var(--red-soft);}
+  .nav-item .ct{margin-left:auto;font-family:var(--mono);font-size:11px;
+    color:var(--red);font-weight:500;}
+  .op{padding:14px 22px;border-top:1.5px solid var(--hair);
+    display:flex;align-items:center;gap:10px;}
+  .op .disc{width:30px;height:30px;background:var(--ink);color:var(--paper);
+    font-size:11px;font-weight:600;display:flex;align-items:center;
+    justify-content:center;}
+  .op .nm{font-size:12.5px;font-weight:600;}
+  .op .rl{font-family:var(--mono);font-size:9.5px;color:var(--ink-2);
+    text-transform:uppercase;letter-spacing:.1em;}
+
+  .content{flex:1;min-width:0;}
+  .reg{position:relative;}
+  .reg::before,.reg::after{content:"+";position:absolute;font-size:14px;
+    color:var(--red);font-weight:400;}
+  .reg::before{top:10px;right:14px;}
+
+  .nameplate{padding:18px 48px 14px;border-bottom:1.5px solid var(--hair);
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-2);}
+  .nameplate .mid{color:var(--ink);font-weight:500;}
+  .nameplate b{color:var(--red);font-weight:500;}
+
+  .masthead{padding:40px 48px 30px;border-bottom:3px solid var(--hair);
+    position:relative;}
+  .kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--red);margin-bottom:18px;}
+  h1{font-family:var(--serif);font-weight:380;
+    font-size:clamp(3.6rem,7vw,6.4rem);line-height:.9;letter-spacing:-.025em;}
+  h1 .period{color:var(--red);}
+  .standfirst{font-family:var(--serif);font-style:italic;font-size:18px;
+    color:var(--ink-2);margin-top:14px;max-width:30ch;}
+  .dots{position:absolute;right:48px;top:50%;transform:translateY(-50%);
+    width:150px;height:150px;
+    background-image:radial-gradient(var(--red) 1.7px,transparent 1.8px);
+    background-size:13px 13px;opacity:.5;}
+
+  .figures{display:grid;grid-template-columns:repeat(4,1fr);
+    border-bottom:3px solid var(--hair);}
+  .fig{padding:24px 26px;border-right:1.5px solid var(--hair);}
+  .fig:last-child{border-right:none;}
+  .fig .fo{font-family:var(--mono);font-size:10px;color:var(--ink-2);}
+  .fig .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink-2);margin:4px 0 6px;}
+  .numeral{font-family:var(--serif);font-weight:360;line-height:.85;
+    letter-spacing:-.03em;}
+  .fig .numeral{font-size:clamp(3.4rem,5vw,5rem);}
+  .fig.lead{background:var(--ink);color:var(--paper);}
+  .fig.lead .fo,.fig.lead .eyebrow{color:var(--red-soft);}
+  .fig.lead .numeral em{font-style:normal;color:#fff;}
+  .fig .sub{font-size:12px;color:var(--ink-2);margin-top:9px;}
+  .fig.lead .sub{color:#C9C0AE;}
+  .fig.lead .review{font-family:var(--mono);font-size:11px;color:var(--red-soft);
+    margin-top:12px;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;}
+
+  .body-grid{display:grid;grid-template-columns:1.6fr 1fr;}
+  .lead-story{padding:30px 44px;border-right:1.5px solid var(--hair);}
+  .col-head{display:flex;align-items:baseline;gap:12px;
+    border-bottom:1.5px solid var(--hair);padding-bottom:10px;margin-bottom:22px;}
+  .col-head .nm{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;
+    text-transform:uppercase;font-weight:500;}
+  .col-head .ln{flex:1;}
+  .col-head a{font-family:var(--mono);font-size:10px;color:var(--red);
+    text-decoration:none;text-transform:uppercase;letter-spacing:.1em;}
+
+  .story{padding:20px 0;border-bottom:1.5px solid var(--hair);
+    display:grid;grid-template-columns:64px 1fr;gap:20px;}
+  .story:last-child{border-bottom:none;}
+  .story .when{font-family:var(--mono);font-size:10px;color:var(--red);
+    text-transform:uppercase;line-height:1.5;}
+  .story h3{font-family:var(--serif);font-weight:380;font-size:25px;
+    line-height:1.04;letter-spacing:-.018em;}
+  .story .meta{font-size:12.5px;color:var(--ink-2);margin-top:5px;}
+  .cap{margin:14px 0 13px;}
+  .cap .track{height:6px;border:1px solid var(--hair);
+    background:repeating-linear-gradient(90deg,var(--red) 0 3px,transparent 3px 6px);
+    background-size:6px 100%;background-repeat:no-repeat;}
+  .cap .lbl{font-family:var(--mono);font-size:10px;color:var(--ink-2);
+    margin-top:6px;display:flex;justify-content:space-between;
+    text-transform:uppercase;letter-spacing:.06em;}
+  .acts{display:flex;gap:8px;}
+  .btn{font-family:var(--mono);font-size:10.5px;font-weight:500;
+    text-transform:uppercase;letter-spacing:.08em;padding:8px 14px;
+    border:1.5px solid var(--hair);cursor:pointer;background:transparent;
+    color:var(--ink);}
+  .btn.solid{background:var(--ink);color:var(--paper);}
+  .btn.red{background:var(--red);color:#fff;border-color:var(--red);}
+
+  .ledger{padding:30px 30px;}
+  .rec{display:grid;grid-template-columns:auto 1fr auto;gap:12px;
+    align-items:baseline;padding:12px 0;border-bottom:1px dashed var(--hair);
+    font-size:13px;}
+  .rec:last-child{border-bottom:none;}
+  .rec .mk{font-family:var(--mono);font-size:11px;width:14px;}
+  .rec .mk.red{color:var(--red);}
+  .rec .mk.green{color:#3B6D2E;}
+  .rec .mk.gold{color:#9A6B14;}
+  .rec b{font-weight:600;}
+  .rec .when{font-family:var(--mono);font-size:10px;color:var(--ink-2);}
+
+  @media(max-width:1080px){
+    .figures{grid-template-columns:1fr 1fr;}
+    .fig{border-bottom:1.5px solid var(--hair);}
+    .body-grid{grid-template-columns:1fr;}
+    .lead-story{border-right:none;border-bottom:3px solid var(--hair);}
+    .dots{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="rail-head">
+      <div class="wordmark">No Bad <em>Co.</em></div>
+      <div class="rail-tag">Operator's Desk · Est. 2024</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-eyebrow">— Sections —</div>
+      <a class="nav-item on"><span class="fo">01</span>Dashboard</a>
+      <a class="nav-item"><span class="fo">02</span>Applications<span class="ct">3</span></a>
+      <a class="nav-item"><span class="fo">03</span>Events</a>
+      <a class="nav-item"><span class="fo">04</span>Check-in</a>
+      <a class="nav-item"><span class="fo">05</span>Members</a>
+      <a class="nav-item"><span class="fo">06</span>Lists</a>
+      <a class="nav-item"><span class="fo">07</span>Intelligence</a>
+      <a class="nav-item"><span class="fo">08</span>Activity</a>
+    </nav>
+    <div class="op">
+      <div class="disc">AS</div>
+      <div><div class="nm">Adam Semien</div><div class="rl">Operator</div></div>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div class="nameplate">
+      <span>No. 142</span>
+      <span class="mid">The Operator's Desk — Daily Edition</span>
+      <span><b>Thu 21 May 2026</b></span>
+    </div>
+
+    <header class="masthead">
+      <div class="kicker">Tonight's edition · Austin, Texas</div>
+      <h1>Tonight, tomorrow,<br>this week<span class="period">.</span></h1>
+      <div class="standfirst">Everything you need to run the night.</div>
+      <div class="dots" aria-hidden="true"></div>
+    </header>
+
+    <section class="figures">
+      <div class="fig lead">
+        <div class="fo">Fig. 01</div>
+        <div class="eyebrow">Pending applications</div>
+        <div class="numeral"><em data-count="3">0</em></div>
+        <div class="sub">Awaiting your decision — Mercer ×2, Vega-Okonkwo.</div>
+        <div class="review">▸ Review the queue</div>
+      </div>
+      <div class="fig">
+        <div class="fo">Fig. 02</div>
+        <div class="eyebrow">Members</div>
+        <div class="numeral" data-count="4">0</div>
+        <div class="sub">The room, growing.</div>
+      </div>
+      <div class="fig">
+        <div class="fo">Fig. 03</div>
+        <div class="eyebrow">This week</div>
+        <div class="numeral" data-count="2">0</div>
+        <div class="sub">Both events tonight.</div>
+      </div>
+      <div class="fig">
+        <div class="fo">Fig. 04</div>
+        <div class="eyebrow">Checked in today</div>
+        <div class="numeral" data-count="0">0</div>
+        <div class="sub">Doors not yet open.</div>
+      </div>
+    </section>
+
+    <div class="body-grid">
+      <div class="lead-story">
+        <div class="col-head">
+          <span class="nm">Tonight — The Lead</span><span class="ln"></span>
+          <a>All events ▸</a>
+        </div>
+        <div class="story">
+          <div class="when">Tonight<br>1:00 AM</div>
+          <div>
+            <h3>The Good Time Society</h3>
+            <div class="meta">Tenur House · Ticketed admission</div>
+            <div class="cap">
+              <div class="track"></div>
+              <div class="lbl"><span>0 / 75 confirmed</span><span>Capacity 75</span></div>
+            </div>
+            <div class="acts">
+              <button class="btn">Check in</button>
+              <button class="btn red">The Room ▸</button>
+            </div>
+          </div>
+        </div>
+        <div class="story">
+          <div class="when">Tonight<br>1:00 AM</div>
+          <div>
+            <h3>Members Only: An Evening of Connection</h3>
+            <div class="meta">Tenur House · Ticketed · approval required</div>
+            <div class="cap">
+              <div class="track"></div>
+              <div class="lbl"><span>0 confirmed</span><span>Approval gated</span></div>
+            </div>
+            <div class="acts">
+              <button class="btn">Check in</button>
+              <button class="btn red">The Room ▸</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ledger">
+        <div class="col-head">
+          <span class="nm">The Ledger</span><span class="ln"></span>
+          <a>Full log ▸</a>
+        </div>
+        <div class="rec"><span class="mk red">✕</span><b>Application rejected</b><span class="when">14h</span></div>
+        <div class="rec"><span class="mk">●</span><b>Member created</b><span class="when">14h</span></div>
+        <div class="rec"><span class="mk green">✓</span><b>Application approved</b><span class="when">14h</span></div>
+        <div class="rec"><span class="mk">●</span><b>Member created</b><span class="when">21h</span></div>
+        <div class="rec"><span class="mk green">✓</span><b>Application approved</b><span class="when">21h</span></div>
+        <div class="rec"><span class="mk gold">◆</span><b>Event created</b><span class="when">22h</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const ease=t=>1-Math.pow(1-t,3);
+  function countUp(el){
+    const t=+el.dataset.count,d=900,s=performance.now();
+    function tick(n){const p=Math.min((n-s)/d,1);
+      el.textContent=Math.round(ease(p)*t);
+      if(p<1)requestAnimationFrame(tick);}
+    requestAnimationFrame(tick);
+  }
+  window.addEventListener('load',()=>{
+    setTimeout(()=>document.querySelectorAll('[data-count]').forEach(countUp),300);
+  });
+</script>
+</body>
+</html>

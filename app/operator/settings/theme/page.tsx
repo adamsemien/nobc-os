@@ -16,6 +16,7 @@ const SHORT_LABELS: Record<ThemeId, string> = {
   y2k:      'Y2K',
   aim:      'AIM',
   myspace:  'MySpace',
+  editorial:'Editorial',
 };
 
 const EASTER_EGG = new Set<ThemeId>(['aim', 'myspace']);
