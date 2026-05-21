@@ -34,6 +34,56 @@ Methodology: see the `nobc-icm` skill.
 
 ---
 
+## Current Build State
+
+**As of 2026-05-21 — V1 is functionally complete.**
+17/20 V1 items are DONE in code. 2 are PARTIAL (credentials only, not code). 0 are NOT STARTED.
+
+### V1 scope status (items 1–20)
+
+> Status reflects the code-verified inventory in `_context/GROUND_TRUTH.md`.
+
+| # | Feature | Status |
+|---|---|---|
+| 1 | Membership application form (`/apply`) | ✅ DONE |
+| 2 | Multi-tenant Postgres schema (Prisma) | ✅ DONE |
+| 3 | Clerk auth + Organizations (org = workspace) | ✅ DONE |
+| 4 | Approval workflow → welcome email | ✅ DONE |
+| 5 | AI archetype scoring | ✅ DONE |
+| 6 | Member event calendar + detail | ✅ DONE |
+| 7 | Event Access submission | ✅ DONE |
+| 8 | Approval-required access handling | ✅ DONE |
+| 9 | Stripe payments (authorize/capture) | ✅ DONE |
+| 10 | Operator refunds | ✅ DONE |
+| 11 | Wallet passes (Apple/Google via PassNinja) | ⚠️ PARTIAL — code complete, `PASSNINJA_*` keys unset in Vercel |
+| 12 | Offline check-in PWA | ✅ DONE |
+| 13 | Custom question builder / registration fields | ✅ DONE |
+| 14 | Capacity + waitlist (auto-promote) | ✅ DONE |
+| 15 | Plus-ones | ✅ DONE |
+| 16 | Red List / duplicate handling | ✅ DONE |
+| 17 | NoBC OS MCP server | ✅ DONE |
+| 18 | Operator AI chat panel | ✅ DONE |
+| 19 | AI Event Builder | ✅ DONE |
+| 20 | Audit events + Svix outbound | ⚠️ PARTIAL — audit DONE, Svix code complete but `SVIX_API_KEY` unset |
+
+### Remaining before full V1 launch
+
+- Set `PASSNINJA_API_KEY` + `PASSNINJA_TEMPLATE_ID` in Vercel (wallet passes go live)
+- Set `SVIX_API_KEY` in Vercel (outbound webhooks go live)
+- Fix 3 bugs in `/operator/applications/[id]` (display, scroll, post-approval stale ID)
+- Seed demo database for Tenur call / first external show
+- Enforce roles/permissions on operator API routes (any workspace member can currently hit any route)
+
+### What shipped beyond V1 scope (already live)
+
+- Comp tickets, 7-theme white-label system, hero images, bulk delete, compliance pages
+- Producer Phase J webhook integration
+- Intelligence system, ticketing V2/tiers, event series, lists, comments, notifications
+- Cmd+K palette, event room/vibe, model switcher
+- Internal QA/persona/seed dev tooling
+
+---
+
 ## Locked Decisions (NEVER override)
 
 These are hard constants. Any agent that violates them is broken.
@@ -160,6 +210,13 @@ If you report task completion without performing this checklist, the task is inc
 - `CLERK_SECRET_KEY`
 - `NEXT_PUBLIC_APP_URL`
 - `ANTHROPIC_API_KEY` — application archetype scoring + personalization
+
+**Code-complete, value not yet set in Vercel** (features no-op until set):
+
+- `PASSNINJA_API_KEY` — wallet passes (#11). Required by `lib/wallet-pass.ts`.
+- `PASSNINJA_ACCOUNT_ID` — wallet passes (#11). Required alongside the API key.
+- `PASSNINJA_PASS_TYPE` — wallet pass-type slug (defaults `nobc.member`). NOTE: the code reads `PASSNINJA_PASS_TYPE`, not `PASSNINJA_TEMPLATE_ID`.
+- `SVIX_API_KEY` — outbound operator webhooks (#20). `getSvix()` returns null until set.
 
 Stage-specific env vars live in each stage's `CONTEXT.md`.
 
