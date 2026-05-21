@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #7, #8, #14 (waitlist auto-promote portion), #21 (comp tickets — issuance + member-facing flow) |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Polish + V1.5 enhancements |
+| **Next** | Polish + V1.5 enhancements. (2026-05-21: member events **calendar** `app/m/events/_components/MemberEventsExplorer.tsx` brought onto the ivory editorial brand system — warm ivory canvas, ink type, NoBC Red access badge, full-bleed grid — to match the already-ivory event detail page. Access-mode badge now shows display labels ("Open"/"Ticketed"), never the raw enum. Visual only; RSVP/access flow untouched.) |
 
 > **Architecture note (2026-05-20):** `apply_or_pay` was removed as a standalone `AccessMode` enum value. It was not a real third mode — it is now expressed as `TICKETED` + `approvalRequired: true`. Migration `20260520000000_remove_apply_or_pay` applied. The `applyMode` column and `EventApplyMode` enum were dropped entirely. Workflow template key renamed `apply_or_pay` → `ticketed_approval`.
 
