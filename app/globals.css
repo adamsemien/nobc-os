@@ -2164,9 +2164,12 @@ button:not(:disabled):active,
   --glass-highlight: color-mix(in srgb, white 72%, transparent);
   --glass-shadow: color-mix(in srgb, var(--text-primary) 22%, transparent);
   --glass-sheen: color-mix(in srgb, white 50%, transparent);
-  --ambient-1: color-mix(in srgb, var(--primary) 15%, transparent);
-  --ambient-2: color-mix(in srgb, var(--warning) 13%, transparent);
-  --ambient-3: color-mix(in srgb, var(--success) 12%, transparent);
+  /* Solid warm tones — gold / coral / peach. The blob's own `opacity`
+     does the dialing-down; pre-attenuating the color here too would make
+     the wash effectively invisible (~2%) and leave the glass nothing to frost. */
+  --ambient-1: var(--warning);
+  --ambient-2: var(--primary);
+  --ambient-3: color-mix(in srgb, var(--warning) 60%, var(--primary));
 }
 
 /* Dark themes: denser glass, faint light edges, real drop shadow,
@@ -2181,9 +2184,9 @@ button:not(:disabled):active,
   --glass-highlight: color-mix(in srgb, white 14%, transparent);
   --glass-shadow: color-mix(in srgb, black 55%, transparent);
   --glass-sheen: color-mix(in srgb, white 16%, transparent);
-  --ambient-1: color-mix(in srgb, var(--primary) 18%, transparent);
-  --ambient-2: color-mix(in srgb, var(--accent) 15%, transparent);
-  --ambient-3: color-mix(in srgb, var(--primary) 12%, transparent);
+  --ambient-1: var(--primary);
+  --ambient-2: var(--accent);
+  --ambient-3: color-mix(in srgb, var(--primary) 60%, var(--accent));
 }
 
 /* High-chroma novelty themes: keep glass nearly opaque so text stays
@@ -2278,7 +2281,10 @@ button:not(:disabled):active,
   opacity: 0.9;
 }
 
-/* ---- ambient liquid field (dialed way down — a faint warm wash) ---- */
+/* ---- ambient liquid field (visible warm wash — fixed, behind content) ----
+   Fixed + z-index:0 paints above the operator-scope page background but below
+   the z-10 content, so the frosted panels have real color to blur against.
+   Normal blend (no multiply); the blob `opacity` is the single dial. */
 .op-ambient {
   position: fixed;
   inset: 0;
@@ -2290,7 +2296,7 @@ button:not(:disabled):active,
 .op-blob {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.14;
+  opacity: 0.16;
 }
 .op-blob-1 {
   width: 46vw;

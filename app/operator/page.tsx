@@ -131,10 +131,9 @@ export default async function OperatorDashboardPage() {
   const today1 = endOfToday();
   const week1 = plusDays(7);
 
-  // NOTE: data fetching is unchanged from the prior dashboard — the Promise.all
-  // queries below are byte-identical. The liquid-editorial layout surfaces the
-  // first eight results; birthdays/throwbacks are still fetched (last two) but
-  // are not rendered in this view.
+  // NOTE: data fetching is unchanged — the Promise.all queries below are
+  // byte-identical. The liquid-editorial layout surfaces the first eight
+  // results; birthdays/throwbacks are still fetched (last two) but not rendered.
   const [
     pendingCount,
     pendingApps,
@@ -218,274 +217,272 @@ export default async function OperatorDashboardPage() {
   return (
     <>
       <LiquidAmbient />
-      <div className="relative z-10 px-6 pb-20 pt-[38px] lg:px-14">
-        <div className="mx-auto w-full max-w-[1180px]">
-          {/* MASTHEAD */}
-          <header
-            className="op-rise flex flex-wrap items-end justify-between gap-10 border-b pb-[22px]"
-            style={{ borderColor: 'var(--border)', animationDelay: '0.05s' }}
-          >
-            <div className="min-w-0">
-              <div
-                className="mb-[18px] text-[11px] uppercase tracking-[0.2em]"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                The operator&rsquo;s desk ·{' '}
-                <b style={{ color: 'var(--primary)', fontWeight: 600 }}>{dateLine}</b>
-              </div>
-              <h1
-                className="text-[clamp(3.4rem,6.4vw,6rem)] leading-[0.92]"
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 360,
-                  letterSpacing: '-0.022em',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                Tonight, tomorrow,
-                <br />
-                this week<span style={{ color: 'var(--primary)' }}>.</span>
-              </h1>
-              <div
-                className="mt-[14px] text-[18px] italic"
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 400,
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                Everything you need to run the night.
-              </div>
+      <div className="relative z-10 flex min-h-screen w-full flex-1 flex-col px-6 pb-12 pt-[38px] sm:px-10 lg:px-14 xl:px-20">
+        {/* MASTHEAD */}
+        <header
+          className="op-rise flex flex-wrap items-end justify-between gap-10 border-b pb-[22px]"
+          style={{ borderColor: 'var(--border)', animationDelay: '0.05s' }}
+        >
+          <div className="min-w-0">
+            <div
+              className="mb-[18px] text-[11px] uppercase tracking-[0.2em]"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              The operator&rsquo;s desk ·{' '}
+              <b style={{ color: 'var(--primary)', fontWeight: 600 }}>{dateLine}</b>
             </div>
-            <DeskClock sub={clockSub} />
-          </header>
-
-          {/* FIGURES — asymmetric */}
-          <section className="mt-[34px] grid grid-cols-1 gap-[18px] md:grid-cols-2 lg:grid-cols-[1.42fr_1fr_1fr]">
-            <StatFigure
-              variant="lead"
-              eyebrow="Pending applications"
-              value={pendingCount}
-              accentValue
-              className="op-rise md:col-span-2 lg:col-span-1 lg:row-span-2"
-              footer={
-                <>
-                  <div
-                    className="mt-1 text-[17px] italic"
-                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
-                  >
-                    awaiting your decision
-                  </div>
-                  {pendingApps.length > 0 ? (
-                    <div className="mt-auto flex pt-6">
-                      {pendingApps.slice(0, 3).map((a, i) => (
-                        <span
-                          key={a.id}
-                          className={`inline-flex rounded-full ${i > 0 ? '-ml-[9px]' : ''}`}
-                          style={{ boxShadow: '0 0 0 2px var(--surface)' }}
-                        >
-                          <Avatar name={a.fullName} email={a.email} size={36} />
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                  <Link
-                    href="/operator/applications"
-                    className="mt-[22px] inline-flex items-center gap-2 self-start rounded-[30px] px-5 py-[11px] text-[13px] font-semibold transition-opacity hover:opacity-90"
-                    style={{ background: 'var(--primary)', color: 'var(--on-primary)' }}
-                  >
-                    Review the queue
-                    <ArrowRight className="h-4 w-4" aria-hidden />
-                  </Link>
-                </>
-              }
-            />
-
-            <StatFigure
-              variant="sm"
-              eyebrow="Members"
-              value={memberCount}
-              className="op-rise"
-              footer={
-                <div
-                  className="mt-2 flex items-center gap-[5px] text-[12.5px]"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  <TrendingUp className="h-4 w-4" style={{ color: 'var(--success)' }} aria-hidden />
-                  the room, growing
-                </div>
-              }
-            />
-
-            <StatFigure
-              variant="sm"
-              eyebrow="Upcoming this week"
-              value={upcomingThisWeek}
-              className="op-rise"
-              footer={
-                <div
-                  className="mt-2 flex items-center gap-[5px] text-[12.5px]"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  <Calendar className="h-4 w-4" aria-hidden />
-                  on the schedule
-                </div>
-              }
-            />
-
-            <StatFigure
-              variant="wide"
-              eyebrow="Checked in today"
-              value={checkedInToday}
-              className="op-rise md:col-span-2 lg:col-span-2"
-              aside={
-                <div className="text-right text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
-                  <b
-                    className="block text-[13px]"
-                    style={{ color: 'var(--text-primary)', fontWeight: 600 }}
-                  >
-                    {checkedInToday > 0 ? 'Counting tonight' : "Doors haven't opened"}
-                  </b>
-                  {checkedInToday > 0 ? 'live at the door' : 'first scan starts the clock'}
-                </div>
-              }
-            />
-          </section>
-
-          {/* TONIGHT */}
-          {tonight.length > 0 ? (
-            <div className="mt-[42px]">
-              <div className="op-rise" style={{ animationDelay: '0.36s' }}>
-                <SectionHeader icon={<MoonStar className="h-[15px] w-[15px]" />} title="Tonight" />
-              </div>
-              <div className="op-rise" style={{ animationDelay: '0.4s' }}>
-                <TonightPanel events={tonight} />
-              </div>
+            <h1
+              className="text-[clamp(3.4rem,6.4vw,6rem)] leading-[0.92]"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontWeight: 360,
+                letterSpacing: '-0.022em',
+                color: 'var(--text-primary)',
+              }}
+            >
+              Tonight, tomorrow,
+              <br />
+              this week<span style={{ color: 'var(--primary)' }}>.</span>
+            </h1>
+            <div
+              className="mt-[14px] text-[18px] italic"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontWeight: 400,
+                color: 'var(--text-secondary)',
+              }}
+            >
+              Everything you need to run the night.
             </div>
-          ) : null}
+          </div>
+          <DeskClock sub={clockSub} />
+        </header>
 
-          {/* LOWER — asymmetric: events + activity */}
-          <div className="mt-[42px] grid grid-cols-1 gap-[18px] lg:grid-cols-[1.62fr_1fr] lg:items-start">
-            <div className="op-rise" style={{ animationDelay: '0.46s' }}>
-              <SectionHeader
-                icon={<CalendarDays className="h-[15px] w-[15px]" />}
-                title="Upcoming events"
-                action={
-                  <Link
-                    href="/operator/events"
-                    className="text-[12px] font-semibold"
-                    style={{ color: 'var(--primary)' }}
-                  >
-                    All events →
-                  </Link>
-                }
-              />
-              {upcomingEventsFull.length === 0 ? (
-                <GlassPanel className="px-[26px] py-10">
-                  <p
-                    className="italic"
-                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
-                  >
-                    No upcoming events.
-                  </p>
-                  <Link
-                    href="/operator/events/new"
-                    className="mt-3 inline-block text-sm"
-                    style={{ color: 'var(--primary)' }}
-                  >
-                    Create one →
-                  </Link>
-                </GlassPanel>
-              ) : (
-                <GlassPanel className="px-[26px] pb-[18px] pt-2">
-                  {upcomingEventsFull.map((e, i) => (
-                    <div
-                      key={e.id}
-                      className="flex items-center gap-[22px] py-[22px]"
-                      style={
-                        i < upcomingEventsFull.length - 1
-                          ? { borderBottom: '1px solid var(--border)' }
-                          : undefined
-                      }
-                    >
-                      <div
-                        className="w-6 shrink-0 text-[15px] italic"
-                        style={{ fontFamily: 'var(--font-display)', color: 'var(--text-tertiary)' }}
+        {/* FIGURES — asymmetric */}
+        <section className="mt-[34px] grid grid-cols-1 gap-[18px] md:grid-cols-2 lg:grid-cols-[1.42fr_1fr_1fr]">
+          <StatFigure
+            variant="lead"
+            eyebrow="Pending applications"
+            value={pendingCount}
+            accentValue
+            className="op-rise md:col-span-2 lg:col-span-1 lg:row-span-2"
+            footer={
+              <>
+                <div
+                  className="mt-1 text-[17px] italic"
+                  style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
+                >
+                  awaiting your decision
+                </div>
+                {pendingApps.length > 0 ? (
+                  <div className="mt-auto flex pt-6">
+                    {pendingApps.slice(0, 3).map((a, i) => (
+                      <span
+                        key={a.id}
+                        className={`inline-flex rounded-full ${i > 0 ? '-ml-[9px]' : ''}`}
+                        style={{ boxShadow: '0 0 0 2px var(--surface)' }}
                       >
-                        {String(i + 1).padStart(2, '0')}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4
-                          className="text-[21px]"
-                          style={{
-                            fontFamily: 'var(--font-display)',
-                            fontWeight: 400,
-                            letterSpacing: '-0.01em',
-                            color: 'var(--text-primary)',
-                          }}
-                        >
-                          {e.title}
-                        </h4>
-                        <div
-                          className="mt-[3px] text-[12.5px]"
-                          style={{ color: 'var(--text-secondary)' }}
-                        >
-                          {fmtDate(e.startAt)} · {fmtTime(e.startAt)}
-                          {e.location ? ` · ${e.location}` : ''}
-                        </div>
-                        <div className="mt-[11px]">
-                          <CapacityBar
-                            confirmed={confirmedByEvent.get(e.id) ?? 0}
-                            capacity={e.capacity}
-                          />
-                        </div>
-                      </div>
-                      <Link href={`/operator/events/${e.id}`} className="op-btn shrink-0">
-                        Open
-                        <ArrowRight className="h-4 w-4" aria-hidden />
-                      </Link>
-                    </div>
-                  ))}
-                </GlassPanel>
-              )}
-            </div>
+                        <Avatar name={a.fullName} email={a.email} size={36} />
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <Link
+                  href="/operator/applications"
+                  className="mt-[22px] inline-flex items-center gap-2 self-start rounded-[30px] px-5 py-[11px] text-[13px] font-semibold transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--primary)', color: 'var(--on-primary)' }}
+                >
+                  Review the queue
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+              </>
+            }
+          />
 
-            <div className="op-rise" style={{ animationDelay: '0.56s' }}>
-              <SectionHeader
-                icon={<Activity className="h-[15px] w-[15px]" />}
-                title="Recent activity"
-                action={
-                  <Link
-                    href="/operator/audit"
-                    className="text-[12px] font-semibold"
-                    style={{ color: 'var(--primary)' }}
-                  >
-                    Full log →
-                  </Link>
-                }
-              />
-              {recentAudit.length === 0 ? (
-                <GlassPanel className="px-6 py-6">
-                  <p
-                    className="italic"
-                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
-                  >
-                    Nothing has happened yet.
-                  </p>
-                </GlassPanel>
-              ) : (
-                <GlassPanel className="px-6 pb-[14px] pt-2">
-                  {recentAudit.map((e, i) => (
-                    <ActivityRow
-                      key={e.id}
-                      action={e.action}
-                      createdAt={e.createdAt}
-                      last={i === recentAudit.length - 1}
-                    />
-                  ))}
-                </GlassPanel>
-              )}
+          <StatFigure
+            variant="sm"
+            eyebrow="Members"
+            value={memberCount}
+            className="op-rise"
+            footer={
+              <div
+                className="mt-2 flex items-center gap-[5px] text-[12.5px]"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <TrendingUp className="h-4 w-4" style={{ color: 'var(--success)' }} aria-hidden />
+                the room, growing
+              </div>
+            }
+          />
+
+          <StatFigure
+            variant="sm"
+            eyebrow="Upcoming this week"
+            value={upcomingThisWeek}
+            className="op-rise"
+            footer={
+              <div
+                className="mt-2 flex items-center gap-[5px] text-[12.5px]"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <Calendar className="h-4 w-4" aria-hidden />
+                on the schedule
+              </div>
+            }
+          />
+
+          <StatFigure
+            variant="wide"
+            eyebrow="Checked in today"
+            value={checkedInToday}
+            className="op-rise md:col-span-2 lg:col-span-2"
+            aside={
+              <div className="text-right text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
+                <b
+                  className="block text-[13px]"
+                  style={{ color: 'var(--text-primary)', fontWeight: 600 }}
+                >
+                  {checkedInToday > 0 ? 'Counting tonight' : "Doors haven't opened"}
+                </b>
+                {checkedInToday > 0 ? 'live at the door' : 'first scan starts the clock'}
+              </div>
+            }
+          />
+        </section>
+
+        {/* TONIGHT */}
+        {tonight.length > 0 ? (
+          <div className="mt-[42px]">
+            <div className="op-rise" style={{ animationDelay: '0.36s' }}>
+              <SectionHeader icon={<MoonStar className="h-[15px] w-[15px]" />} title="Tonight" />
             </div>
+            <div className="op-rise" style={{ animationDelay: '0.4s' }}>
+              <TonightPanel events={tonight} />
+            </div>
+          </div>
+        ) : null}
+
+        {/* LOWER — asymmetric: events + activity. Grows to fill remaining height. */}
+        <div className="mt-[42px] grid flex-1 grid-cols-1 gap-[18px] lg:grid-cols-[1.62fr_1fr] lg:grid-rows-[minmax(0,1fr)]">
+          <div className="op-rise flex flex-col" style={{ animationDelay: '0.46s' }}>
+            <SectionHeader
+              icon={<CalendarDays className="h-[15px] w-[15px]" />}
+              title="Upcoming events"
+              action={
+                <Link
+                  href="/operator/events"
+                  className="text-[12px] font-semibold"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  All events →
+                </Link>
+              }
+            />
+            {upcomingEventsFull.length === 0 ? (
+              <GlassPanel className="flex flex-1 flex-col px-[26px] py-10">
+                <p
+                  className="italic"
+                  style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
+                >
+                  No upcoming events.
+                </p>
+                <Link
+                  href="/operator/events/new"
+                  className="mt-3 inline-block text-sm"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  Create one →
+                </Link>
+              </GlassPanel>
+            ) : (
+              <GlassPanel className="flex-1 px-[26px] pb-[18px] pt-2">
+                {upcomingEventsFull.map((e, i) => (
+                  <div
+                    key={e.id}
+                    className="flex items-center gap-[22px] py-[22px]"
+                    style={
+                      i < upcomingEventsFull.length - 1
+                        ? { borderBottom: '1px solid var(--border)' }
+                        : undefined
+                    }
+                  >
+                    <div
+                      className="w-6 shrink-0 text-[15px] italic"
+                      style={{ fontFamily: 'var(--font-display)', color: 'var(--text-tertiary)' }}
+                    >
+                      {String(i + 1).padStart(2, '0')}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4
+                        className="text-[21px]"
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontWeight: 400,
+                          letterSpacing: '-0.01em',
+                          color: 'var(--text-primary)',
+                        }}
+                      >
+                        {e.title}
+                      </h4>
+                      <div
+                        className="mt-[3px] text-[12.5px]"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {fmtDate(e.startAt)} · {fmtTime(e.startAt)}
+                        {e.location ? ` · ${e.location}` : ''}
+                      </div>
+                      <div className="mt-[11px]">
+                        <CapacityBar
+                          confirmed={confirmedByEvent.get(e.id) ?? 0}
+                          capacity={e.capacity}
+                        />
+                      </div>
+                    </div>
+                    <Link href={`/operator/events/${e.id}`} className="op-btn shrink-0">
+                      Open
+                      <ArrowRight className="h-4 w-4" aria-hidden />
+                    </Link>
+                  </div>
+                ))}
+              </GlassPanel>
+            )}
+          </div>
+
+          <div className="op-rise flex flex-col" style={{ animationDelay: '0.56s' }}>
+            <SectionHeader
+              icon={<Activity className="h-[15px] w-[15px]" />}
+              title="Recent activity"
+              action={
+                <Link
+                  href="/operator/audit"
+                  className="text-[12px] font-semibold"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  Full log →
+                </Link>
+              }
+            />
+            {recentAudit.length === 0 ? (
+              <GlassPanel className="flex flex-1 flex-col px-6 py-6">
+                <p
+                  className="italic"
+                  style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
+                >
+                  Nothing has happened yet.
+                </p>
+              </GlassPanel>
+            ) : (
+              <GlassPanel className="flex-1 px-6 pb-[14px] pt-2">
+                {recentAudit.map((e, i) => (
+                  <ActivityRow
+                    key={e.id}
+                    action={e.action}
+                    createdAt={e.createdAt}
+                    last={i === recentAudit.length - 1}
+                  />
+                ))}
+              </GlassPanel>
+            )}
           </div>
         </div>
       </div>
