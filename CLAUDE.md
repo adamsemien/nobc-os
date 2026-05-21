@@ -68,9 +68,9 @@ Methodology: see the `nobc-icm` skill.
 
 ### Remaining before full V1 launch
 
-- Set `PASSNINJA_API_KEY` + `PASSNINJA_TEMPLATE_ID` in Vercel (wallet passes go live)
+- Set `PASSNINJA_API_KEY` + `PASSNINJA_ACCOUNT_ID` + `PASSNINJA_PASS_TYPE` in Vercel (wallet passes go live)
 - Set `SVIX_API_KEY` in Vercel (outbound webhooks go live)
-- Fix 3 bugs in `/operator/applications/[id]` (display, scroll, post-approval stale ID)
+- Verify application review QA bugs — could not reproduce in code, needs live confirmation
 - Seed demo database for Tenur call / first external show
 - Enforce roles/permissions on operator API routes (any workspace member can currently hit any route)
 
