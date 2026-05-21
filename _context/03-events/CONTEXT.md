@@ -37,6 +37,7 @@ app/api/media/upload/route.ts                   ← media upload entrypoint
 app/api/cron/event-reminders/route.ts           ← scheduled reminder emails
 lib/events/access-mode.ts                       ← access mode resolution
 config/event-questions.ts                       ← default question library
+app/operator/events/[id]/_components/EventApplicationsTab.tsx ← event-scoped applications tab (reuses the stage-02 review queue)
 ```
 
 ## Inputs

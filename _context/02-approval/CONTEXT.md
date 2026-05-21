@@ -20,8 +20,10 @@ This stage owns everything from the moment an `Application` row is written (by s
 ## Files in play
 
 ```
-app/operator/applications/page.tsx                            ← review queue UI
-app/operator/applications/[id]/page.tsx                       ← single application detail
+app/operator/applications/page.tsx                            ← review queue page (server)
+app/operator/applications/_components/ApplicationsQueue.tsx   ← split-view triage queue + detail panel (bars, consents, photos, answers)
+app/operator/applications/[id]/page.tsx                       ← single application detail (full-page)
+app/api/operator/applications/route.ts                        ← list endpoint (queue feed; returns consents)
 app/api/operator/applications/[id]/route.ts                   ← single-application read (detail panel)
 app/api/operator/applications/[id]/approve/route.ts           ← approve endpoint
 app/api/operator/applications/[id]/reject/route.ts            ← reject endpoint
@@ -31,6 +33,8 @@ app/api/operator/applications/bulk/route.ts                   ← bulk approve/r
 lib/email/welcome.ts                            ← Resend welcome template
 lib/red-list/check.ts                           ← Red List screening
 lib/duplicates/detect.ts                        ← email/phone/name match
+lib/operator-application-display.ts             ← referrer lines (parses basics.referrers JSON), queue preview
+lib/legacy-answer-labels.ts                     ← dotted-key → human label resolution for answer rows
 ```
 
 ## Inputs
