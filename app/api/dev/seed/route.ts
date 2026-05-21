@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { requireWorkspaceId } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { ensureCommunicationsSeed } from '@/lib/ensure-communications';
+import { seedPendingDemoApplications } from '@/lib/dev/demo-applications';
 
 const ALLOWED = (process.env.DEV_USER_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -155,211 +156,9 @@ const DEMO_EVENTS = [
   },
 ];
 
-// Standalone pending applications (not linked to demo members)
-const STANDALONE_APPS = [
-  {
-    email: 'taylor.brooks.demo@nobadco.dev',
-    fullName: 'Taylor Brooks',
-    phone: '+15124440001',
-    city: 'Austin',
-    neighborhood: 'East Austin',
-    referredBy: 'Maya Chen',
-    archetype: 'Connector',
-    aiScore: 0.72,
-    aiRecommendation: 'yes' as const,
-    aiReasoning: 'Strong network signals; active in multiple creative communities across Austin and NYC.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Community strategist at a climate tech startup. Before that, ran partnerships at a DTCF brand.' },
-      { questionKey: 'meetPeople', answer: "Maya told me the community here is the real thing. I've been looking for a room I actually want to be in." },
-      { questionKey: 'greatEnergy', answer: "I know everyone in the Austin creative tech scene and I'm happy to make introductions that matter." },
-    ],
-  },
-  {
-    email: 'monique.delacroix.demo@nobadco.dev',
-    fullName: 'Monique Delacroix',
-    phone: '+15124440002',
-    city: 'New Orleans',
-    neighborhood: 'Marigny',
-    referredBy: 'Event — The Late Night',
-    archetype: 'Host',
-    aiScore: 0.81,
-    aiRecommendation: 'yes' as const,
-    aiReasoning: 'Authentic host energy; runs a well-regarded supper club. High activation and contribution signals.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Chef and supper club operator. I run 12-person dinners twice a month in New Orleans.' },
-      { questionKey: 'meetPeople', answer: "Attended the Late Night event and felt a quality of presence I haven't experienced at other communities." },
-      { questionKey: 'greatEnergy', answer: 'I can create experiences. If you ever want to do a dinner, I can make it unforgettable.' },
-    ],
-  },
-  {
-    email: 'rashid.alfarsi.demo@nobadco.dev',
-    fullName: 'Rashid Al-Farsi',
-    phone: '+15124440003',
-    city: 'Austin',
-    neighborhood: 'Domain',
-    referredBy: 'Eliot Park',
-    archetype: 'Builder',
-    aiScore: 0.64,
-    aiRecommendation: 'yes' as const,
-    aiReasoning: 'Consistent builder signals. Early stage but high quality trajectory.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'CTO at a Series A fintech. Previously built payments infrastructure at Stripe for 4 years.' },
-      { questionKey: 'meetPeople', answer: "Eliot keeps telling me the conversations here are different. I'm finally listening." },
-      { questionKey: 'greatEnergy', answer: 'Technical depth and genuine curiosity. I ask good questions.' },
-    ],
-  },
-  {
-    email: 'ingrid.svensson.demo@nobadco.dev',
-    fullName: 'Ingrid Svensson',
-    phone: '+15124440004',
-    city: 'Stockholm',
-    neighborhood: 'Södermalm',
-    referredBy: null,
-    archetype: 'Curator',
-    aiScore: 0.55,
-    aiRecommendation: 'unclear' as const,
-    aiReasoning: 'Strong curatorial taste signals but limited US presence. Worth a conversation before approving.',
-    answers: [
-      { questionKey: 'workingOn', answer: "Creative director and independent curator. I've placed work in MoMA, Serpentine, and LACMA." },
-      { questionKey: 'meetPeople', answer: 'I found you through a piece in The Drift. The philosophy resonated.' },
-      { questionKey: 'greatEnergy', answer: 'I have a different eye. I notice things others miss, and I say so.' },
-    ],
-  },
-  {
-    email: 'leo.zhang.demo@nobadco.dev',
-    fullName: 'Leo Zhang',
-    phone: '+15124440005',
-    city: 'San Francisco',
-    neighborhood: 'Mission',
-    referredBy: null,
-    archetype: 'Maker',
-    aiScore: 0.44,
-    aiRecommendation: 'no' as const,
-    aiReasoning: "Genuine maker energy but answers feel generic. Low specificity on what they'd contribute to the community.",
-    answers: [
-      { questionKey: 'workingOn', answer: 'Hardware engineer. I build things.' },
-      { questionKey: 'meetPeople', answer: 'Heard it was a good community.' },
-      { questionKey: 'greatEnergy', answer: 'I know a lot of people in tech.' },
-    ],
-  },
-  {
-    email: 'amara.osei.demo@nobadco.dev',
-    fullName: 'Amara Osei',
-    phone: '+15124440006',
-    city: 'Austin',
-    neighborhood: 'Travis Heights',
-    referredBy: 'Carlos Vega',
-    archetype: 'Patron',
-    aiScore: 0.79,
-    aiRecommendation: 'yes' as const,
-    aiReasoning: 'Strong patron signals. Angel investor with clear community orientation and cultural taste.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Angel investor and philanthropist. I focus on Black founders and cultural institutions.' },
-      { questionKey: 'meetPeople', answer: 'Carlos told me this was the room where the best ideas in Austin find each other. I want to be part of that.' },
-      { questionKey: 'greatEnergy', answer: 'Capital, connections, and a genuine commitment to making Austin more interesting.' },
-    ],
-  },
-  // Borderline scores — make review interesting (scores 0.50-0.57 ≈ 15-17/30).
-  { email: 'ada.lin.demo@nobadco.dev',        fullName: 'Ada Lin',          phone: '+15124440007', city: 'Brooklyn',  neighborhood: 'Bed-Stuy',     referredBy: null,            archetype: 'Curator',   aiScore: 0.55, aiRecommendation: 'unclear' as const,
-    aiReasoning: 'Borderline. Strong taste signals but limited specificity on what they bring.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Editor at an independent magazine. Mostly cultural criticism.' },
-      { questionKey: 'meetPeople',     answer: 'I keep meeting people who are part of NoBC and they all carry themselves a certain way.' },
-      { questionKey: 'greatEnergy',   answer: 'Curiosity. I read everything.' },
-    ] },
-  { email: 'jonas.weiss.demo@nobadco.dev',    fullName: 'Jonas Weiss',      phone: '+15124440008', city: 'Berlin',    neighborhood: 'Kreuzberg',    referredBy: 'Eliot Park',     archetype: 'Builder',   aiScore: 0.57, aiRecommendation: 'unclear' as const,
-    aiReasoning: 'Builder credentials are real but answers feel transactional.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Solo founder. Building a music tools startup.' },
-      { questionKey: 'meetPeople',     answer: 'Network expansion. Want to find collaborators stateside.' },
-      { questionKey: 'greatEnergy',   answer: 'European music scene access.' },
-    ] },
-  { email: 'priscilla.adams.demo@nobadco.dev', fullName: 'Priscilla Adams', phone: '+15124440009', city: 'Austin',    neighborhood: 'South Lamar',  referredBy: 'Sofia Reyes',    archetype: 'Host',      aiScore: 0.52, aiRecommendation: 'unclear' as const,
-    aiReasoning: 'Genuine warmth in answers but no track record of hosting at scale.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'I run a small natural-wine bar. Two locations.' },
-      { questionKey: 'meetPeople',     answer: 'Sofia is a regular. She told me I would like the people here.' },
-      { questionKey: 'greatEnergy',   answer: 'I can pour you something great. I host every Sunday.' },
-    ] },
-  { email: 'devon.archer.demo@nobadco.dev',   fullName: 'Devon Archer',     phone: '+15124440010', city: 'LA',        neighborhood: 'Echo Park',    referredBy: null,             archetype: 'Maker',     aiScore: 0.54, aiRecommendation: 'unclear' as const,
-    aiReasoning: 'Strong maker signals but unclear connection to NoBC community.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Ceramicist. I make functional objects for restaurants.' },
-      { questionKey: 'meetPeople',     answer: 'A friend forwarded me your newsletter and I read every issue since.' },
-      { questionKey: 'greatEnergy',   answer: 'A different kind of attention. I notice the table before the food.' },
-    ] },
-  { email: 'naomi.harper.demo@nobadco.dev',   fullName: 'Naomi Harper',     phone: '+15124440011', city: 'Austin',    neighborhood: 'Mueller',      referredBy: 'Maya Chen',      archetype: 'Connector', aiScore: 0.56, aiRecommendation: 'unclear' as const,
-    aiReasoning: 'Borderline. Maya referral matters; answers are short but specific.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Director of partnerships at a climate fund.' },
-      { questionKey: 'meetPeople',     answer: 'Maya. Enough said.' },
-      { questionKey: 'greatEnergy',   answer: 'Access to ten different worlds and the patience to introduce them.' },
-    ] },
-  // Higher-confidence approvals (scores 0.75-0.88).
-  { email: 'silas.bookman.demo@nobadco.dev',  fullName: 'Silas Bookman',    phone: '+15124440012', city: 'Austin',    neighborhood: 'Hyde Park',    referredBy: 'Aisha Watkins',  archetype: 'Builder',   aiScore: 0.81, aiRecommendation: 'yes' as const,
-    aiReasoning: 'Repeat founder with strong network and clear community orientation.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Founder/CEO of a logistics platform — Series B.' },
-      { questionKey: 'meetPeople',     answer: 'I want to be in rooms where my company is the smallest thing about me.' },
-      { questionKey: 'greatEnergy',   answer: 'Operator depth and a strict no-pitch policy at dinners.' },
-    ] },
-  { email: 'celia.moss.demo@nobadco.dev',     fullName: 'Celia Moss',       phone: '+15124440013', city: 'Brooklyn',  neighborhood: 'Williamsburg', referredBy: null,             archetype: 'Curator',   aiScore: 0.85, aiRecommendation: 'yes' as const,
-    aiReasoning: 'Tastemaker with public-facing influence. Real signal in her work.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'I run a small editorial brand and a Substack with 40k readers.' },
-      { questionKey: 'meetPeople',     answer: 'I never write about communities I belong to. I want one of those.' },
-      { questionKey: 'greatEnergy',   answer: 'A reliable filter. I will not waste your time on anything that is not good.' },
-    ] },
-  { email: 'wolfgang.steiner.demo@nobadco.dev', fullName: 'Wolfgang Steiner', phone: '+15124440014', city: 'Austin', neighborhood: 'Travis Heights', referredBy: 'Amara Osei',  archetype: 'Patron',    aiScore: 0.77, aiRecommendation: 'yes' as const,
-    aiReasoning: 'Quiet capital. Family office. Real history of cultural backing.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'I manage my family office. We invest in cultural institutions and emerging artists.' },
-      { questionKey: 'meetPeople',     answer: 'Amara mentioned the dinners. I am tired of black-tie things.' },
-      { questionKey: 'greatEnergy',   answer: 'Patience and capital. No need to be in the foreground.' },
-    ] },
-  { email: 'jana.kovalenko.demo@nobadco.dev', fullName: 'Jana Kovalenko',   phone: '+15124440015', city: 'NYC',       neighborhood: 'LES',          referredBy: 'Eliot Park',     archetype: 'Maker',     aiScore: 0.73, aiRecommendation: 'yes' as const,
-    aiReasoning: 'Working artist with active collectors. Real maker energy.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Painter. I show at Carl Kostyál and Almine Rech.' },
-      { questionKey: 'meetPeople',     answer: 'Eliot has been telling me to apply for two years.' },
-      { questionKey: 'greatEnergy',   answer: 'I will paint your portrait if you bore me.' },
-    ] },
-  { email: 'evan.maxwell.demo@nobadco.dev',   fullName: 'Evan Maxwell',     phone: '+15124440016', city: 'Austin',    neighborhood: 'East Austin',  referredBy: null,             archetype: 'Host',      aiScore: 0.69, aiRecommendation: 'yes' as const,
-    aiReasoning: 'Active host in his own scene. Solid mid-range fit.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'I run a private dinner series for the Austin tech scene. 24-person tables.' },
-      { questionKey: 'meetPeople',     answer: 'You are doing what I am doing but better. I want to learn.' },
-      { questionKey: 'greatEnergy',   answer: 'Twenty people you would want to know.' },
-    ] },
-  { email: 'aurelia.dupont.demo@nobadco.dev', fullName: 'Aurelia Dupont',   phone: '+15124440017', city: 'Paris',     neighborhood: 'Le Marais',    referredBy: null,             archetype: 'Connector', aiScore: 0.66, aiRecommendation: 'yes' as const,
-    aiReasoning: 'European fashion industry network. Could enrich the room.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Head of communications at a heritage maison.' },
-      { questionKey: 'meetPeople',     answer: 'I split my time between Paris and Austin. I want a US chapter for my life.' },
-      { questionKey: 'greatEnergy',   answer: 'A different vocabulary for elegance.' },
-    ] },
-  { email: 'parker.huang.demo@nobadco.dev',   fullName: 'Parker Huang',     phone: '+15124440018', city: 'SF',        neighborhood: 'Hayes Valley', referredBy: 'Silas Bookman',  archetype: 'Builder',   aiScore: 0.62, aiRecommendation: 'unclear' as const,
-    aiReasoning: 'Builder credentials but answers lack the warmth NoBC tends to prize.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Engineering manager. Anthropic. I lead applied research tooling.' },
-      { questionKey: 'meetPeople',     answer: 'I am bored of pitch events.' },
-      { questionKey: 'greatEnergy',   answer: 'Technical depth. Honest opinions.' },
-    ] },
-  { email: 'rosalind.hahn.demo@nobadco.dev',  fullName: 'Rosalind Hahn',    phone: '+15124440019', city: 'Mexico City', neighborhood: 'Roma Norte', referredBy: null,           archetype: 'Curator',   aiScore: 0.71, aiRecommendation: 'yes' as const,
-    aiReasoning: 'Tastemaker with strong CDMX network. Could open up a new geography.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'I curate restaurants. I open them and then I leave.' },
-      { questionKey: 'meetPeople',     answer: 'I want a list of friends in cities I do not yet love.' },
-      { questionKey: 'greatEnergy',   answer: 'A reservation at any of fourteen restaurants in CDMX, on me.' },
-    ] },
-  { email: 'kit.olsen.demo@nobadco.dev',      fullName: 'Kit Olsen',        phone: '+15124440020', city: 'Austin',    neighborhood: 'Crestview',    referredBy: 'Nina Volkov',    archetype: 'Patron',    aiScore: 0.39, aiRecommendation: 'no' as const,
-    aiReasoning: 'Low signal across dimensions. Answers feel impersonal.',
-    answers: [
-      { questionKey: 'workingOn', answer: 'Real estate.' },
-      { questionKey: 'meetPeople',     answer: 'A friend told me about it.' },
-      { questionKey: 'greatEnergy',   answer: 'Connections.' },
-    ] },
-];
+// Standalone pending applicants (the operator queue) now live in the shared
+// module lib/dev/demo-applications.ts, so this route and `npm run seed:demo`
+// produce identical, complete, fully-reviewed applications. See section 6.
 
 export async function POST() {
   const { userId } = await auth();
@@ -613,70 +412,11 @@ export async function POST() {
 
   await db.rSVP.createMany({ skipDuplicates: true, data: rsvpData });
 
-  // ── 6. Standalone applications ────────────────────────────────────────────
-  let appCount = 0;
-  for (const app of STANDALONE_APPS) {
-    const existing = await db.application.findFirst({
-      where: { workspaceId, email: app.email },
-      select: { id: true },
-    });
-    if (!existing) {
-      const created = await db.application.create({
-        data: {
-          workspaceId,
-          email: app.email,
-          fullName: app.fullName,
-          phone: app.phone,
-          city: app.city,
-          neighborhood: app.neighborhood ?? null,
-          referredBy: app.referredBy ?? null,
-          consentEmail: true,
-          consentSms: false,
-          status: 'PENDING',
-          aiTags: ['__demo'],
-          aiScore: app.aiScore,
-          aiRecommendation: app.aiRecommendation,
-          aiReasoning: app.aiReasoning,
-          archetype: app.archetype,
-          // archetypeScores are 0–100 (see lib/scoring.ts) — the operator AI
-          // profile (worth scores, spectrum bars) reads them on that scale.
-          archetypeScores: {
-            Connector: app.archetype === 'Connector' ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
-            Host:      app.archetype === 'Host'      ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
-            Curator:   app.archetype === 'Curator'   ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
-            Builder:   app.archetype === 'Builder'   ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
-            Maker:     app.archetype === 'Maker'     ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
-            Patron:    app.archetype === 'Patron'    ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
-          },
-          createdAt: daysAgo(Math.floor(Math.random() * 7 + 1)),
-        },
-      });
-      // Synthetic portrait URLs — picsum is deterministic per seed so demo applicants
-      // always render the same photos. Stored under `_photos` (underscore-prefixed so
-      // the operator UI treats it as system metadata, not a Q&A answer).
-      const photoSeed = app.email.split('@')[0];
-      const photos = [
-        `https://picsum.photos/seed/${photoSeed}/600/750`,
-        `https://picsum.photos/seed/${photoSeed}-2/600/750`,
-        `https://picsum.photos/seed/${photoSeed}-3/600/750`,
-      ];
-      await db.applicationAnswer.createMany({
-        data: [
-          ...app.answers.map((a) => ({
-            applicationId: created.id,
-            questionKey: a.questionKey,
-            answer: a.answer,
-          })),
-          {
-            applicationId: created.id,
-            questionKey: '_photos',
-            answer: JSON.stringify(photos),
-          },
-        ],
-      });
-      appCount++;
-    }
-  }
+  // ── 6. Standalone pending applications ────────────────────────────────────
+  // Wipe-and-reseed (scoped to `__demo-pending`) so every applicant carries the
+  // FULL answer set + a complete AI profile (archetype, score, reasoning,
+  // archetypeScores on the 0–100 scale). Shared with `npm run seed:demo`.
+  await seedPendingDemoApplications(db, workspaceId);
 
   // ── 7. Communications (email templates + platform settings) ──────────────
   await ensureCommunicationsSeed(workspaceId);

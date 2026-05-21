@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped (internal tooling) |
 | **V1 item** | — (internal, not in the V1 customer-facing scope table) |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Iterate QA judge accuracy; expand persona archetype coverage; polish DevToolbar surface |
+| **Next** | Iterate QA judge accuracy; expand persona archetype coverage; polish DevToolbar surface. (2026-05-21: demo applicants made complete + reviewed — full standard answer set, deterministic 0–100 archetypeScores, aiReasoning — via shared `lib/dev/demo-applications.ts`; both `npm run seed:demo` and the dev seed route now wipe-and-reseed cleanly.) |
 
 ## Scope
 
@@ -40,7 +40,7 @@ app/api/dev/qa/[id]/summary/route.ts                ← markdown mission summary
 app/api/dev/persona/seed-batch/route.ts             ← generate N personas as a batch
 app/api/dev/persona/generate/route.ts               ← generate one persona
 app/api/dev/persona/run/route.ts                    ← run a persona through /apply
-app/api/dev/seed/route.ts                           ← rebuild demo workspace dataset
+app/api/dev/seed/route.ts                           ← rebuild demo workspace dataset (uses shared demo-applications)
 app/api/dev/reset/route.ts                          ← teardown demo dataset
 app/api/dev/test-apply-flow/route.ts                ← programmatic /apply exerciser
 app/operator/_components/QAMissionPanel.tsx        ← floating mission HUD + per-step bug + judge flash
@@ -48,6 +48,9 @@ app/operator/_components/DevToolbar.tsx             ← dev pill + tool launcher
 lib/dev/qa-action-log.ts                            ← CustomEvent ring buffer for judge context
 lib/dev/qa-types.ts                                 ← JudgeVerdict, CompletedStep types
 lib/dev/persona-types.ts                            ← persona schema for generator
+lib/dev/demo-applications.ts                        ← shared demo-app content: full answer set + 0–100 archetypeScores + wipe/seed helpers
+prisma/seed-demo.ts                                 ← `npm run seed:demo` — Tenur-call demo (members, events, RSVPs, complete applications)
+scripts/verify-demo-applications.ts                 ← read-only check: every demo app has full answers + AI profile
 ```
 
 ## Inputs
@@ -76,7 +79,7 @@ lib/dev/persona-types.ts                            ← persona schema for gener
 3. **Judge uses `claude-sonnet-4-6` (dev tooling), not the locked `claude-sonnet-4-20250514`.** This is the deliberate exception to CLAUDE.md's model rule — the application scoring path stays on `claude-sonnet-4-20250514`; dev tooling uses the latest Sonnet for faster iteration on judge prompts.
 4. **Server timeout on judge is 4s, client AbortController at 5s, with `{verdict: null}` fallback.** A slow judge must never block step advancement.
 5. **Bugs are decoupled from step progression.** Filing a bug on step N records the bug; it does not auto-advance to step N+1. Step auto-advance only fires for the currentStep's URL detector.
-6. **Seed data is canonical demo data, not random.** Applicants have stable seeds (e.g. picsum URLs keyed on the email local-part) so screenshots are reproducible across runs.
+6. **Seed data is canonical demo data, not random.** Applicants have stable seeds (e.g. picsum URLs keyed on the email local-part) so screenshots are reproducible across runs. Answer content and archetypeScores are deterministic too (`lib/dev/demo-applications.ts` — index/archetype-derived, no `Math.random`), so re-seeding reproduces identical applications.
 7. **No hex literals in QAMissionPanel HUD.** Use semantic tokens; verdict palette (`var(--success)`, `var(--warning)`, `var(--danger)`) only.
 
 ## What this stage does NOT own

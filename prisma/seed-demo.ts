@@ -19,6 +19,12 @@ import { PrismaNeon } from '@prisma/adapter-neon';
 import { randomUUID } from 'node:crypto';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import {
+  wipeDemoApplications,
+  seedPendingDemoApplications,
+  buildFullAnswers,
+  type DemoArchetype,
+} from '../lib/dev/demo-applications';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -92,6 +98,16 @@ const CURATED: Curated[] = [
     scores: { Connector: 56, Host: 52, Curator: 58, Builder: 40, Maker: 34, Patron: 90 }, aiScore: 0.85, aiRecommendation: 'strong_yes',
     tags: ['Investor'], monthsMember: 18 },
 ];
+
+// AI reasoning shown on each curated member's (approved) application detail.
+const CURATED_REASONING: Record<Archetype, string> = {
+  Connector: 'Connector archetype — an exceptional network and a track record of making the introductions that actually matter. Clear charter-tier fit.',
+  Host: 'Host archetype — creates the conditions a great room needs without making it about themselves. Strong activation and contribution signals.',
+  Curator: 'Curator archetype — trusted taste and a genuine point of view. The kind of member others quietly calibrate against.',
+  Builder: 'Builder archetype — makes things from nothing and brings other people along for it. High-contribution profile across the board.',
+  Maker: 'Maker archetype — real craft and a distinct eye. Adds the kind of texture to the room you cannot manufacture.',
+  Patron: 'Patron archetype — quiet, patient backing of people and culture. A long-term, high-trust member.',
+};
 
 // Supporting attendee pool — fills events to real capacity (unique RSVP per
 // member, so "sold out 80" needs ~80 distinct bodies). Approved members, light.
@@ -180,37 +196,53 @@ async function main() {
   });
   const memberIdByEmail = new Map(memberRows.map((r) => [r.email, r.id]));
 
-  // ── 2. Curated members' APPROVED applications (carry archetype + scores) ──
-  for (const m of CURATED) {
+  // ── 2. Applications ────────────────────────────────────────────────────────
+  // Start clean: wipe ALL demo applications (curated + pending + any legacy
+  // leftovers from older seed runs) so the operator queue is consistent every
+  // time — no half-answered or unscored rows. Scoped to demo aiTags only.
+  const wiped = await wipeDemoApplications(db, workspaceId);
+
+  // 2a. Curated members' APPROVED applications — full answer set + AI profile.
+  for (let i = 0; i < CURATED.length; i++) {
+    const m = CURATED[i];
     const memberId = memberIdByEmail.get(m.email)!;
-    const existing = await db.application.findFirst({
-      where: { workspaceId, email: m.email },
-      select: { id: true },
+    const created = await db.application.create({
+      data: {
+        workspaceId,
+        memberId,
+        email: m.email,
+        fullName: `${m.firstName} ${m.lastName}`,
+        phone: m.phone,
+        city: 'Austin, TX',
+        referredBy: m.referredBy ?? null,
+        consentEmail: true,
+        consentSms: false,
+        status: 'APPROVED' as const,
+        reviewedAt: monthsAgo(m.monthsMember),
+        aiTags: ['__demo', '__demo-tenur'],
+        aiScore: m.aiScore,
+        aiRecommendation: m.aiRecommendation,
+        aiReasoning: CURATED_REASONING[m.archetype],
+        archetype: m.archetype,
+        archetypeScores: m.scores,
+        createdAt: monthsAgo(m.monthsMember + 0.5),
+      },
     });
-    const data = {
-      memberId,
-      fullName: `${m.firstName} ${m.lastName}`,
-      phone: m.phone,
-      city: 'Austin, TX',
-      referredBy: m.referredBy ?? null,
-      consentEmail: true,
-      consentSms: false,
-      status: 'APPROVED' as const,
-      reviewedAt: monthsAgo(m.monthsMember),
-      aiTags: ['__demo', '__demo-tenur'],
-      aiScore: m.aiScore,
-      aiRecommendation: m.aiRecommendation,
-      archetype: m.archetype,
-      archetypeScores: m.scores,
-    };
-    if (existing) {
-      await db.application.update({ where: { id: existing.id }, data });
-    } else {
-      await db.application.create({
-        data: { workspaceId, email: m.email, ...data, createdAt: monthsAgo(m.monthsMember + 0.5) },
-      });
-    }
+    await db.applicationAnswer.createMany({
+      data: buildFullAnswers(
+        {
+          email: m.email,
+          archetype: m.archetype as DemoArchetype,
+          aiScore: m.aiScore,
+          referredBy: m.referredBy ?? null,
+        },
+        i,
+      ).map((a) => ({ applicationId: created.id, questionKey: a.questionKey, answer: a.answer })),
+    });
   }
+
+  // 2b. Standalone PENDING applicants — the live operator review queue.
+  const pendingApps = await seedPendingDemoApplications(db, workspaceId);
 
   // ── 3. Events at Tenur House ──────────────────────────────────────────────
   const ticketedAccess = {
@@ -340,17 +372,18 @@ async function main() {
   }
 
   // ── 6. Report ────────────────────────────────────────────────────────────
-  const [memberCount, eventCount, rsvpCount, appCount] = await Promise.all([
+  const [memberCount, eventCount, rsvpCount, approvedAppCount] = await Promise.all([
     db.member.count({ where: { workspaceId, tags: { hasSome: ['__demo-tenur', '__demo-tenur-attendee'] } } }),
     db.event.count({ where: { workspaceId, slug: { startsWith: 'tenur-' } } }),
     db.rSVP.count({ where: { workspaceId, event: { slug: { startsWith: 'tenur-' } } } }),
     db.application.count({ where: { workspaceId, aiTags: { has: '__demo-tenur' } } }),
   ]);
   console.log('Tenur demo seed complete:');
+  console.log(`  wiped:        ${wiped} stale demo application(s)`);
   console.log(`  members:      ${memberCount} (10 curated + ${POOL_SIZE} attendees)`);
   console.log(`  events:       ${eventCount}`);
   console.log(`  rsvps:        ${rsvpCount}`);
-  console.log(`  applications: ${appCount} (approved, archetype-scored)`);
+  console.log(`  applications: ${approvedAppCount} approved + ${pendingApps} pending (full answers + AI profile)`);
 }
 
 main()
