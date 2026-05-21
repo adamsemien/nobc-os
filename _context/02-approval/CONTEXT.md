@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #4, #16 |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Monitor production; V1.5 will add SMS welcome via Stage 11 |
+| **Next** | Monitor production; V1.5 will add SMS welcome via Stage 11. Detail-panel scroll fixed (bounded height chain) + AI profile now normalizes archetypeScores to 0–100 (`scorePct`) so worth scores/bars render. NOTE: dev-seed apps carry only 3 substantive answers each — enrich if richer demo applications are needed. |
 
 ## Scope
 

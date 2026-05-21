@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #6, #13, #14 (capacity portion), #15, #23 (hero images) |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Polish + iterate based on operator feedback |
+| **Next** | Polish + iterate based on operator feedback. Overview tab now shows a Post-Event Summary card (attendance, check-in rate, captured revenue, no-shows) once an event has passed — via `_stats.checkedInCount` + `_stats.capturedRevenueCents`. |
 
 ## Scope
 
