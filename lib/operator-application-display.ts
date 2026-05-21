@@ -14,20 +14,52 @@ export function labelForQuestionKey(key: string): string {
   return LABEL_BY_KEY[key] ?? key;
 }
 
+// The live /apply form's narrative keys, preferred for the queue preview line.
+// Falls back to the apply-config answer questions for older seed/template data.
+const PREVIEW_KEYS = [
+  'basics.whatYouDo',
+  'personality.workingOn',
+  'about.whatPeopleComeToYouFor',
+  'community.howDoYouKnowGoodCompany',
+] as const;
+
 export function firstAnswerPreview(
   answers: { questionKey: string; answer: string }[],
 ): string {
   const byKey = Object.fromEntries(answers.map(a => [a.questionKey, a.answer]));
+  const clip = (t: string) => (t.length > 80 ? `${t.slice(0, 77)}…` : t);
+  for (const k of PREVIEW_KEYS) {
+    const t = String(byKey[k] ?? '').trim();
+    if (t) return clip(t);
+  }
   for (const q of answerQuestions) {
     if (PREVIEW_SKIP.has(q.key)) continue;
     const t = String(byKey[q.key] ?? '').trim();
     if (!t) continue;
-    return t.length > 80 ? `${t.slice(0, 77)}…` : t;
+    return clip(t);
   }
   return '';
 }
 
 const REFERRER_KEYS = ['referrer2', 'referrer3', 'referrer4'] as const;
+
+/** Parse the live form's basics.referrers value (a JSON 3-slot array, blanks
+ *  included) into clean names. Tolerates a plain non-array string too. */
+function parseBasicsReferrers(raw: string | undefined): string[] {
+  if (!raw) return [];
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((v): v is string => typeof v === 'string' && v.trim() !== '').map(v => v.trim());
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return trimmed ? [trimmed] : [];
+}
 
 export function referrerLines(
   referredBy: string | null | undefined,
@@ -36,6 +68,9 @@ export function referrerLines(
   const lines: string[] = [];
   if (referredBy?.trim()) lines.push(referredBy.trim());
   const byKey = Object.fromEntries(answers.map(a => [a.questionKey, a.answer]));
+  // Live form stores referrers under basics.referrers (JSON array). Earlier
+  // generations used the model `referredBy` + the referrer2/3/4 answer slots.
+  for (const name of parseBasicsReferrers(byKey['basics.referrers'])) lines.push(name);
   for (const k of REFERRER_KEYS) {
     const t = String(byKey[k] ?? '').trim();
     if (t) lines.push(t);

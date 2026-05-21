@@ -44,6 +44,8 @@ export function EventApplicationsTab({ applications, eventId: _eventId }: Props)
     archetype: null,
     archetypeScores: null,
     referredBy: null,
+    consentEmail: false,
+    consentSms: false,
   }));
 
   return <ApplicationsQueue applications={items} />;

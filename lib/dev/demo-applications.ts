@@ -23,7 +23,6 @@
  *  one workspace AND to demo aiTags — it never touches non-demo rows.
  */
 import type { PrismaClient } from '@prisma/client';
-import { answerQuestions } from '@/lib/apply-config';
 
 export type DemoArchetype = 'Connector' | 'Host' | 'Curator' | 'Builder' | 'Maker' | 'Patron';
 export type DemoRec = 'strong_yes' | 'yes' | 'unclear' | 'no' | 'strong_no';
@@ -76,164 +75,211 @@ export function buildArchetypeScores(
   return out;
 }
 
-/** Archetype-flavoured answers for the four "real questions". Two variants each
- *  (selected by index parity) so a roomful of one archetype still reads varied.
- *  Used as fallbacks — a persona's own bespoke answers always win. */
-const REAL_ANSWER_BANK: Record<
-  DemoArchetype,
-  { workingOn: [string, string]; greatEnergy: [string, string]; learnedThisYear: [string, string]; meetPeople: [string, string] }
-> = {
+/** Deterministic pick from a pool, varied by applicant index + a per-field salt
+ *  so two same-archetype applicants don't land on identical short answers. No
+ *  Math.random — re-seeding reproduces the exact same applications. */
+function pick<T>(pool: readonly T[], idx: number, salt: number): T {
+  return pool[(idx * 7 + salt * 13) % pool.length];
+}
+
+/** Archetype-flavoured answers for the live /apply form's narrative questions
+ *  (basics.whatYouDo, personality.*, community.*, taste.*, about.*). One rich
+ *  value per archetype; a persona's bespoke answers override the three most
+ *  visible questions (personality.workingOn, personality.personYouAdmire,
+ *  community.howDoYouKnowGoodCompany). */
+type NarrativeBank = {
+  whatYouDo: string;
+  workingOn: string;
+  obsessedWith: string;
+  personYouAdmire: string;
+  howDoYouKnowGoodCompany: string;
+  connectionOpportunity: string;
+  loyalCommunity: string;
+  whatKindOfPeopleFlowThrough: string;
+  interestingPeople: string;
+  detailsRight: string;
+  trustTaste: string;
+  recommend: string;
+  splurgeVsSave: string;
+  whatPeopleComeToYouFor: string;
+  heavilyInvestedIn: string;
+  genuineExpertIn: string;
+};
+
+const NARRATIVE_BANK: Record<DemoArchetype, NarrativeBank> = {
   Connector: {
-    workingOn: [
-      "I run partnerships for a climate-tech fund and host a quarterly dinner that's quietly become the room where Austin's operators actually meet each other.",
-      'I connect founders with the capital and the people they need. Half my week is introductions, the other half is making sure they actually land.',
-    ],
-    greatEnergy: [
-      "My friend Dre. He walks into a room and somehow everyone leaves having met the one person they needed to meet. I study how he does it.",
-      "A founder I backed early — she remembers everyone's kids' names and means it. Warmth at that scale is genuinely rare.",
-    ],
-    learnedThisYear: [
-      "That a good introduction is only a gift if you've earned both people's trust first. I stopped connecting for volume and started connecting for fit.",
-      'Proximity is not the same as relationship. I learned to go deep with twenty people instead of staying shallow with two hundred.',
-    ],
-    meetPeople: [
-      'I host. Small dinners, the right eight people, and I make the introductions that should have happened years ago.',
-      "Through people I already trust — I'd rather meet one person who's vouched for than ten at a conference.",
-    ],
+    whatYouDo: 'Partnerships lead at a climate-tech fund. I spend most of my week making the introductions that actually move things forward.',
+    workingOn: 'A quarterly dinner series that has quietly become the room where Austin operators meet each other.',
+    obsessedWith: 'The mechanics of a perfect introduction — who, when, and the one sentence that makes it land.',
+    personYouAdmire: 'My friend Dre. He walks into any room and everyone leaves having met the one person they needed to.',
+    howDoYouKnowGoodCompany: "When the conversation keeps going long after the reason for it is over. That's the tell, every time.",
+    connectionOpportunity: 'I introduced a founder to the angel who ended up leading her round. Two texts, one dinner, a company that exists now.',
+    loyalCommunity: 'A monthly operators dinner I have hosted for six years. Same table, rotating faces, a lot of trust.',
+    whatKindOfPeopleFlowThrough: 'Founders, funders, and the occasional artist who keeps them all honest.',
+    interestingPeople: 'A climate scientist, a nightclub owner, and the woman who runs the best supper club in town.',
+    detailsRight: 'A tiny natural-wine bar on the east side — no sign, perfect lighting, the owner remembers your order.',
+    trustTaste: 'My old roommate. She has never once steered me wrong on a restaurant, a book, or a person.',
+    recommend: 'A pocket notebook I buy by the dozen and hand out. People think I am joking until they use one.',
+    splurgeVsSave: 'Splurge on dinners and flights to see people; save on basically everything else.',
+    whatPeopleComeToYouFor: 'An introduction, or a read on whether someone is the real thing. I am usually right.',
+    heavilyInvestedIn: 'Time — I protect a few relationships fiercely and let the rest stay light.',
+    genuineExpertIn: 'Building a network that compounds instead of one that just collects business cards.',
   },
   Host: {
-    workingOn: [
-      "I run a supper-club series — twelve seats, one long table, a menu built around who's coming. It's the most honest work I've done.",
-      'I operate two hospitality spaces and spend most nights making sure strangers leave as friends.',
-    ],
-    greatEnergy: [
-      'My head chef. Calm in chaos, generous with credit, and the whole room feels it before they taste a thing.',
-      'A friend who throws the kind of dinner you cancel other plans for. Presence is her entire craft.',
-    ],
-    learnedThisYear: [
-      'That hospitality is mostly subtraction — quietly removing the small frictions nobody notices until they are gone.',
-      'I learned to host less and host better. Fewer nights, deeper attention, and people remember it for years.',
-    ],
-    meetPeople: [
-      "At my own table. I'd rather feed someone than network with them.",
-      'Slowly, over repeated dinners. The good ones come back, and that is how I know.',
-    ],
+    whatYouDo: 'I run a supper-club series and operate two hospitality spaces. Most nights I am making sure strangers leave as friends.',
+    workingOn: 'A twelve-seat dinner built around who is coming — the menu changes with the guest list.',
+    obsessedWith: 'Lighting and seating charts. Both decide whether a night works long before the food arrives.',
+    personYouAdmire: 'My head chef. Calm in chaos, generous with credit, and the whole room feels it before they taste a thing.',
+    howDoYouKnowGoodCompany: 'When nobody checks their phone and the second bottle opens without anyone deciding to.',
+    connectionOpportunity: 'I sat two regulars next to each other on a hunch. They are opening a restaurant together this fall.',
+    loyalCommunity: 'My Sunday-dinner regulars. Same eight people, five years — more like family now.',
+    whatKindOfPeopleFlowThrough: 'Chefs, winemakers, and the friends-of-friends who turn into regulars.',
+    interestingPeople: 'A sommelier, a documentary editor, and my ninety-year-old neighbour who has the best stories in Austin.',
+    detailsRight: 'A neighbourhood trattoria where the host has known your name since the first visit.',
+    trustTaste: 'My business partner. If she says a place is special, I cancel plans to go.',
+    recommend: 'A set of unbreakable wine glasses that look like crystal. I have converted everyone I know.',
+    splurgeVsSave: 'Splurge on what goes on the table; save on what goes on me.',
+    whatPeopleComeToYouFor: 'Where to eat, who to seat together, and how to make a hard night feel easy.',
+    heavilyInvestedIn: 'The room — the chairs, the playlist, the people. All of it, constantly.',
+    genuineExpertIn: 'Hospitality at the scale where it still feels personal.',
   },
   Curator: {
-    workingOn: [
-      'I curate — restaurants, shows, the occasional residency. I open something, get it exactly right, then step away.',
-      'I run a small editorial brand with a point of view sharp enough that people trust the filter more than the source.',
-    ],
-    greatEnergy: [
-      "A gallerist I work with who can read a room in ten seconds and tell you what's real and what's noise. I trust her eye over mine.",
-      "My oldest friend, a chef. She has taste you can't fake and the discipline to say no to almost everything.",
-    ],
-    learnedThisYear: [
-      'That a clear no is a form of generosity. Curating is mostly about what you leave out.',
-      'I learned to trust the first instinct and then defend it. Taste hesitates itself to death if you let it.',
-    ],
-    meetPeople: [
-      'Through work I admire — I reach out to people whose taste I already respect.',
-      'Sparingly. I would rather know a few people deeply than collect contacts.',
-    ],
+    whatYouDo: 'Creative director and independent curator. I build a point of view sharp enough that people trust the filter.',
+    workingOn: 'A small editorial brand and a residency program for artists nobody is paying attention to yet.',
+    obsessedWith: 'Archival typography and the difference between confident and loud.',
+    personYouAdmire: 'A gallerist I work with who can read a room in ten seconds and tell you what is real and what is noise.',
+    howDoYouKnowGoodCompany: 'When the taste in the room is high enough that I learn something I did not expect to.',
+    connectionOpportunity: 'I put a young photographer in front of an editor I trust. She has a monograph coming out now.',
+    loyalCommunity: 'A reading group that has met for a decade. Smartest two hours of my month.',
+    whatKindOfPeopleFlowThrough: 'Artists, editors, and the rare collector who buys with their eyes and not their ears.',
+    interestingPeople: 'A poet, a perfumer, and a chef who treats a plate like a composition.',
+    detailsRight: 'A members room in an old townhouse — every object earns its place, nothing is accidental.',
+    trustTaste: "My oldest friend, a chef. She has taste you can't fake and the discipline to say no to almost everything.",
+    recommend: 'A specific edition of a specific book. If I am recommending it, I have already bought you a copy.',
+    splurgeVsSave: 'Splurge on objects that last a lifetime; save by owning far less of everything else.',
+    whatPeopleComeToYouFor: 'A second opinion they will actually trust, and the name of the thing they have not heard of yet.',
+    heavilyInvestedIn: 'Editing — what I leave out of my life as much as what I let in.',
+    genuineExpertIn: 'Knowing what is good before the consensus catches up.',
   },
   Builder: {
-    workingOn: [
-      "I'm building payments infrastructure — Series B, small team, the kind of work that's invisible when it's done right.",
-      'Solo founder on a developer-tools startup. I ship, I talk to users, I ship again.',
-    ],
-    greatEnergy: [
-      'My co-founder. Relentless without being loud, and he makes genuinely hard problems feel solvable.',
-      'An engineer on my team who treats every bug like a personal insult. That energy is contagious in the best way.',
-    ],
-    learnedThisYear: [
-      'That speed without taste just gets you to the wrong place faster. I slowed down to pick better problems.',
-      'I learned to build for the user actually in the room, not the user in my head. It rewrote the whole roadmap.',
-    ],
-    meetPeople: [
-      'By building with them — a weekend project tells you more than a year of coffees.',
-      "Through people who've shipped something real. Builders recognize builders fast.",
-    ],
+    whatYouDo: 'Founder of a payments-infrastructure startup — small team, Series B, the kind of work that is invisible when it is done right.',
+    workingOn: 'Shipping a product that makes a genuinely hard problem feel boring for our customers.',
+    obsessedWith: 'Removing steps. The best feature this quarter was the three we deleted.',
+    personYouAdmire: 'My co-founder. Relentless without being loud, and he makes genuinely hard problems feel solvable.',
+    howDoYouKnowGoodCompany: 'When the conversation gets specific fast and nobody is performing.',
+    connectionOpportunity: 'I connected a stuck founder with the engineer who unblocked her in an afternoon. Both still thank me.',
+    loyalCommunity: 'A founders group that has met every other week since our first companies. We have seen each other at our worst.',
+    whatKindOfPeopleFlowThrough: 'Engineers, designers, and operators who have actually shipped something real.',
+    interestingPeople: 'A robotics founder, a former diplomat, and the best recruiter I have ever met.',
+    detailsRight: 'A coffee shop that nails the small stuff — fast wifi, real chairs, nobody rushing you out.',
+    trustTaste: 'A designer on my team. If he winces at something, it is wrong, even when I cannot say why.',
+    recommend: 'A mechanical keyboard I am evangelical about. I have bought four for other people.',
+    splurgeVsSave: 'Splurge on tools and a great chair; save by ignoring almost everything else.',
+    whatPeopleComeToYouFor: 'How to actually build the thing, and an honest read on whether it is worth building.',
+    heavilyInvestedIn: 'The team — hiring slowly and keeping them far too long on purpose.',
+    genuineExpertIn: 'Taking something from an idea to shipped without losing the plot.',
   },
   Maker: {
-    workingOn: [
-      "I'm a ceramicist — functional objects for restaurants, mostly. I make the things you don't notice until they're perfect.",
-      'I paint full time and show with two galleries. The work is the whole life, for better and worse.',
-    ],
-    greatEnergy: [
-      'A woodworker I share a studio with. Quiet, exact, and generous with everything he knows.',
-      'My first collector — he buys with his gut and is somehow never wrong. He taught me to trust the hand.',
-    ],
-    learnedThisYear: [
-      'That the material tells you what it wants if you stop forcing it. Best lesson I have had in a decade.',
-      'I learned to actually finish things. Starting is easy; the last ten percent is the entire craft.',
-    ],
-    meetPeople: [
-      'In studios and at openings — people who make things tend to find each other.',
-      'Through the work. If you have held something I made, we already have something to talk about.',
-    ],
+    whatYouDo: 'Ceramicist making functional objects for restaurants. I make the things you do not notice until they are perfect.',
+    workingOn: 'A dinnerware run for a restaurant opening this spring — three hundred plates, all by hand.',
+    obsessedWith: 'Glaze chemistry. I have ruined a lot of good pots chasing one specific blue.',
+    personYouAdmire: 'A woodworker I share a studio with. Quiet, exact, and generous with everything he knows.',
+    howDoYouKnowGoodCompany: 'When someone notices the thing I made before they notice me.',
+    connectionOpportunity: 'I introduced a chef to a farmer at my market stall. Half their menu comes from that handshake now.',
+    loyalCommunity: 'A studio collective — six makers, one kiln, a decade of arguments and dinners.',
+    whatKindOfPeopleFlowThrough: 'Other makers, the chefs who use my work, and the collectors who actually use what they buy.',
+    interestingPeople: 'A glassblower, a bookbinder, and the farmer who grows the prettiest produce in the county.',
+    detailsRight: 'A restaurant where the plates, the lighting, and the bread all clearly came from someone who cares.',
+    trustTaste: 'My first collector. He buys with his gut and is somehow never wrong.',
+    recommend: 'A particular Japanese hand tool. I will not stop talking about it once you ask.',
+    splurgeVsSave: 'Splurge on materials and tools; save on literally everything else, gladly.',
+    whatPeopleComeToYouFor: 'A made thing that lasts, and an eye on whether something is actually well made.',
+    heavilyInvestedIn: 'The studio — the kiln, the materials, the thousands of hours of practice.',
+    genuineExpertIn: 'My craft, down to the chemistry, and reading the hand behind a good object.',
   },
   Patron: {
-    workingOn: [
-      'I run my family office — we back cultural institutions and emerging artists, quietly and for the long term.',
-      'I am an angel investor focused on the founders and institutions most rooms manage to overlook.',
-    ],
-    greatEnergy: [
-      "A curator I fund who spends the money like it's hers and protects the work like it's sacred.",
-      'A founder I backed who answers every email and remembers every favor. Integrity at that scale is rare.',
-    ],
-    learnedThisYear: [
-      'That the best capital is patient and quiet. I stopped needing to be in the photo.',
-      'I learned to fund people, not decks. The person outlasts the plan every single time.',
-    ],
-    meetPeople: [
-      'Through the people I support — they introduce me to the ones genuinely worth knowing.',
-      'Privately. I would take a dinner over a gala every time.',
-    ],
+    whatYouDo: 'I run my family office. We back cultural institutions and emerging artists, quietly and for the long term.',
+    workingOn: 'A fund for first-time founders and curators most rooms manage to overlook.',
+    obsessedWith: 'The long arc — the institutions still standing in fifty years and who is quietly building them now.',
+    personYouAdmire: "A curator I fund who spends the money like it's hers and protects the work like it's sacred.",
+    howDoYouKnowGoodCompany: 'When the most generous person in the room is also the quietest about it.',
+    connectionOpportunity: 'I put an artist in front of a museum board. Her work is in the permanent collection now.',
+    loyalCommunity: 'A small giving circle I have been part of for fifteen years. We move slowly and we mean it.',
+    whatKindOfPeopleFlowThrough: 'Founders, curators, and the institutions that outlast all of us.',
+    interestingPeople: 'A museum director, a first-time founder I backed, and a poet who refuses to be impressed by money.',
+    detailsRight: 'An old hotel bar that has not changed in forty years and does not need to.',
+    trustTaste: 'A curator I have funded for a decade. Her eye is the best investment I have ever made.',
+    recommend: 'A particular small museum most people walk past. I have bought a lot of memberships as gifts.',
+    splurgeVsSave: 'Splurge on art and the people making it; save by never needing to be in the photo.',
+    whatPeopleComeToYouFor: 'Patient capital, a quiet introduction, and a long view when everyone else is panicking.',
+    heavilyInvestedIn: 'People and institutions — the kind of bets that take a decade to pay off.',
+    genuineExpertIn: 'Backing the right people early and then getting out of their way.',
   },
 };
 
-const FOOD_NOTES = [
-  'Pescatarian — no shellfish, otherwise easy.',
-  'No restrictions. I eat everything and love being surprised.',
-  'Vegetarian.',
-  'Gluten-free, please — celiac, so it matters.',
-  'Allergic to tree nuts; otherwise no notes.',
-  "Dairy-light if it's easy, but I'm not precious about it.",
+// Short-answer pools — realistic, archetype-agnostic, varied by index so a
+// roomful never repeats. Cover the live form's taste-recommendation and
+// rapid-fire fields.
+const TASTE_TRAVEL = ['Mexico City, every chance I get', 'A slow week in Lisbon', 'Northern Japan in the off-season', 'Anywhere in Puglia', 'Oaxaca for the food', 'The Scottish Highlands'];
+const TASTE_FOOD_DRINK = ["Birdie's, still the best in town", 'Suerte for the tortillas', 'Natural wine at LoLo', 'Uchi on a quiet weeknight', 'Nixta Taqueria', 'Comedor for a long lunch'];
+const TASTE_WELLNESS = ["Barry's when I need it", 'Long runs on the lake trail', 'Reformer Pilates twice a week', 'Bouldering at Crux', 'Hot yoga, reluctantly', 'Barton Springs at dawn'];
+const TASTE_FASHION = ['Mostly vintage and a few good basics', "Officine Générale and old Levi's", 'Whatever Maryam Nassir Zadeh is doing', 'The Row for the quiet pieces', 'Local designers and one good coat', 'Lemaire, head to toe'];
+const TASTE_HOME = ['Mid-century, slowly collected', 'A lot of plants and one good chair', 'Vintage lighting is my weakness', 'Hasami porcelain everywhere', 'Books as the main decor', 'Warm minimal — fewer, better things'];
+
+const RAPID_KARAOKE = ['"Motownphilly"', '"Club Can\'t Handle Me", unfortunately', '"Valerie"', '"No Scrubs"', '"September", always', '"Mr. Brightside", like everyone'];
+const RAPID_COFFEE_TABLE = ['A stack of exhibition catalogues', 'Whatever I am half-reading', 'Monocle and a candle', 'A chess set nobody uses', 'Two photo books and a bowl of citrus', 'The New Yorker, piling up'];
+const RAPID_IDEAL_SATURDAY = ['Market, a long lunch, a nap, friends over', 'Studio in the morning, dinner out', 'Trail run, then nothing planned', 'A drive out of town with no agenda', 'Cooking for eight', 'A gallery and a great meal'];
+const RAPID_SUNDAY = ['Slow — coffee, the paper, a walk', 'Long run then pancakes', 'Farmers market and a phone-free morning', 'Cooking something that takes hours', 'Reading in bed far too long', 'A swim and then errands'];
+const RAPID_CONTENT = ['Long video essays on YouTube', 'A good Substack on a Sunday', 'Studio process reels on Instagram', 'Anything on natural wine', 'Architecture accounts', 'Letterboxd reviews, weirdly'];
+const RAPID_EVERYDAY = ["A good chef's knife", 'My fountain pen', 'Noise-cancelling headphones', 'A linen apron', 'A film camera in my bag', 'A great thermos'];
+const RAPID_WORKOUT = ['Running', 'Pilates', 'Climbing', 'Long walks, honestly', 'Lifting three days a week', 'Swimming'];
+const RAPID_LOCAL_BRAND = ['Howler Brothers', 'Maufrais', 'Helm Boots', 'Last Call', 'Joah Brown', 'Esby Apparel'];
+const RAPID_DREAM_BRAND = ['Aesop — the restraint', 'Hermès, obviously', 'Patagonia, for the values', 'A24, for the taste', 'Le Labo', 'Aether'];
+const RAPID_SHOPPING_CART = ['A new film stock and a book', 'Replacement studio tools', 'Two plane tickets', 'A standing rib roast for friends', 'A vintage lamp I do not need', 'Running shoes and coffee beans'];
+const RAPID_SPEND_MORE = ['Dinners out', 'Tools and materials', 'Flights to see people', 'Art', 'Coffee, embarrassingly', 'Books'];
+const RAPID_PODCASTS = ['Acquired, 99% Invisible, Talk Easy', 'The Rest Is History, Conversations', 'Song Exploder, Dish, Throughline', 'Invest Like the Best, Founders', 'The Great Women Artists, Articles of Interest', 'How Long Gone, mostly'];
+
+const FROM_ORIGINALLY = ['Houston, originally', 'Grew up in Ohio', 'Born in Lagos, raised in London', 'A small town in Michigan', 'Mexico City', 'Outside Boston'];
+const AUSTIN_NEIGHBORHOODS = ['East Austin', 'Clarksville', 'Hyde Park', 'Bouldin Creek', 'Mueller', 'Travis Heights'];
+const STREETS = ['E 6th St', 'W Lynn St', 'Annie St', 'Eilers Ave', 'Cherrywood Rd', 'Kenwood Ave'];
+const HOW_HEARD = ['A friend who is already a member', 'Through someone I trust', 'Word of mouth', 'An event I was brought to', 'A member I admire mentioned it'];
+const FOOD_ACCESS = [
+  'Pescatarian, no shellfish. No accessibility needs.',
+  'No restrictions and no needs — I eat everything.',
+  'Vegetarian. A seat near an exit if it is easy.',
+  'Gluten-free (celiac, so it matters). Otherwise nothing to flag.',
+  'Allergic to tree nuts. No accessibility needs, thank you for asking.',
+  'Dairy-light if easy, not precious about it. Nothing else to flag.',
 ];
 
-const ACCESSIBILITY_NOTES = [
-  'Nothing to flag.',
-  'None — thank you for asking.',
-  "A seat near an exit if it's easy, otherwise no needs.",
-  'No accessibility needs.',
-];
-
-/** Optional answer-storage questions a complete application can legitimately
- *  leave blank — the extra-referrer slots ("two or three more if you have
- *  them"). Excluded from the buildFullAnswers coverage check. */
-const OPTIONAL_ANSWER_KEYS = new Set(['referrer2', 'referrer3', 'referrer4']);
-
-/** The bespoke answers a persona already has for the real questions — any
- *  subset; missing ones fall back to the archetype bank. */
+/** The bespoke answers a persona already has for the most visible questions —
+ *  any subset; missing ones fall back to the archetype bank. These map onto the
+ *  live form's keys: workingOn → personality.workingOn, greatEnergy →
+ *  personality.personYouAdmire, meetPeople → community.howDoYouKnowGoodCompany. */
 export type RealAnswers = Partial<{
   workingOn: string;
   greatEnergy: string;
-  learnedThisYear: string;
   meetPeople: string;
 }>;
 
 export interface DemoApplicantContent {
   email: string;
+  fullName?: string;
   archetype: DemoArchetype;
   aiScore: number;
+  city?: string | null;
+  neighborhood?: string | null;
+  /** Full referrer list → basics.referrers (3-slot array, matching the form). */
+  referrers?: string[];
+  /** Legacy single-referrer convenience; folded into `referrers` when present. */
   referredBy?: string | null;
   real?: RealAnswers;
 }
 
 /** Three deterministic picsum portraits for a demo applicant (stable per email
- *  so the same person always renders the same photos). Stored under `_photos`,
- *  the underscore-prefixed system key the operator UI renders as a photo strip. */
+ *  so the same person always renders the same photos). Stored under the live
+ *  form's `photos.urls` answer key (a JSON array), exactly like a genuine
+ *  /apply submission — the operator UI renders these as a photo strip. */
 export function buildPhotos(email: string): string[] {
   const seed = email.split('@')[0];
   return [
@@ -243,45 +289,131 @@ export function buildPhotos(email: string): string[] {
   ];
 }
 
-/** The full standard answer set for one applicant: every answer-storage
- *  question gets a realistic value, plus the `_photos` strip. Bespoke real
- *  answers win; everything else is archetype/index-derived and deterministic. */
+/** Every answer key the live /apply membership form (MembershipForm.tsx) writes
+ *  to ApplicationAnswer. The seed must cover all of these so a demo applicant is
+ *  shaped exactly like a genuine submission. Model fields (fullName, email,
+ *  phone, consentEmail, consentSms) live on Application, not here.
+ *  `basics.referrers` is the one legitimately-optional key (blank when the
+ *  applicant was not referred). */
+const LIVE_ANSWER_KEYS = [
+  'basics.city', 'basics.neighborhood', 'basics.homeAddress', 'basics.fromOriginally',
+  'basics.birthday', 'basics.links', 'basics.whatYouDo', 'basics.howDidYouHear',
+  'personality.workingOn', 'personality.obsessedWith', 'personality.personYouAdmire',
+  'community.howDoYouKnowGoodCompany', 'community.connectionOpportunity',
+  'community.loyalCommunity', 'community.whatKindOfPeopleFlowThrough', 'community.interestingPeople',
+  'taste.detailsRight', 'taste.trustTaste', 'taste.recommend', 'taste.splurgeVsSave',
+  'taste.recommendTravel', 'taste.recommendFoodDrink', 'taste.recommendWellnessFitness',
+  'taste.recommendFashion', 'taste.recommendHomeDesign',
+  'rapid.karaokeS', 'rapid.coffeeTable', 'rapid.idealSaturday', 'rapid.sundayMorning',
+  'rapid.contentStopsScrolling', 'rapid.everydayItem', 'rapid.preferredWorkout',
+  'rapid.localAustinBrand', 'rapid.dreamBrandPartnership', 'rapid.shoppingCart',
+  'rapid.spendMoreThanMost', 'rapid.topPodcasts',
+  'about.whatPeopleComeToYouFor', 'about.heavilyInvestedIn', 'about.genuineExpertIn',
+  'photos.urls', 'photos.foodAccessibility',
+] as const;
+
+/** Deterministic ISO birthday (YYYY-MM-DD), stable per index. */
+function buildBirthday(idx: number): string {
+  const year = 1980 + (idx % 18);
+  const month = String((idx % 12) + 1).padStart(2, '0');
+  const day = String((idx % 27) + 1).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** A links field that alternates between an Instagram handle and a personal
+ *  site, derived from the email local-part — so the operator detail-page URL
+ *  chip lights up just like a real submission. */
+function buildLinks(email: string, idx: number): string {
+  const handle = email.split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase();
+  return idx % 2 === 0 ? `instagram.com/${handle}` : `https://${handle}.com`;
+}
+
+/** The full live-form answer set for one applicant: a realistic,
+ *  archetype-flavoured value for every key the form writes, keyed EXACTLY as a
+ *  genuine /apply submission (dotted `section.field` keys). Bespoke persona
+ *  answers win on the three visible questions; everything else is
+ *  archetype/index-derived and deterministic. Arrays (basics.referrers,
+ *  photos.urls) are JSON-stringified, exactly like the live submit path. */
 export function buildFullAnswers(
   content: DemoApplicantContent,
   idx: number,
 ): { questionKey: string; answer: string }[] {
-  const variant = idx % 2;
-  const bank = REAL_ANSWER_BANK[content.archetype];
+  const bank = NARRATIVE_BANK[content.archetype];
   const real = content.real ?? {};
+  const city = content.city ?? 'Austin';
+  const neighborhood = content.neighborhood ?? pick(AUSTIN_NEIGHBORHOODS, idx, 1);
+  const referrers = content.referrers ?? (content.referredBy ? [content.referredBy] : []);
+  // The live form is a 3-slot referrer array; pad to three, blanks included.
+  const referrerSlots = [referrers[0] ?? '', referrers[1] ?? '', referrers[2] ?? ''];
 
   const out: { questionKey: string; answer: string }[] = [
-    { questionKey: 'workingOn', answer: real.workingOn ?? bank.workingOn[variant] },
-    { questionKey: 'greatEnergy', answer: real.greatEnergy ?? bank.greatEnergy[variant] },
-    { questionKey: 'learnedThisYear', answer: real.learnedThisYear ?? bank.learnedThisYear[variant] },
-    { questionKey: 'meetPeople', answer: real.meetPeople ?? bank.meetPeople[variant] },
-    { questionKey: 'food', answer: FOOD_NOTES[idx % FOOD_NOTES.length] },
-    { questionKey: 'accessibility', answer: ACCESSIBILITY_NOTES[idx % ACCESSIBILITY_NOTES.length] },
-    {
-      questionKey: 'priorEvent',
-      answer: /event|late night/i.test(content.referredBy ?? '') ? 'Yes' : idx % 3 === 0 ? 'Yes' : 'No',
-    },
-    { questionKey: 'consentMembershipRead', answer: 'true' },
-    // Occasional opt-out of photos for realism.
-    { questionKey: 'consentPhotos', answer: idx % 6 === 0 ? 'false' : 'true' },
-    { questionKey: '_photos', answer: JSON.stringify(buildPhotos(content.email)) },
+    // basics
+    { questionKey: 'basics.city', answer: city },
+    { questionKey: 'basics.neighborhood', answer: neighborhood },
+    { questionKey: 'basics.homeAddress', answer: `${100 + idx * 7} ${pick(STREETS, idx, 2)}, ${city}` },
+    { questionKey: 'basics.fromOriginally', answer: pick(FROM_ORIGINALLY, idx, 3) },
+    { questionKey: 'basics.birthday', answer: buildBirthday(idx) },
+    { questionKey: 'basics.links', answer: buildLinks(content.email, idx) },
+    { questionKey: 'basics.whatYouDo', answer: bank.whatYouDo },
+    { questionKey: 'basics.howDidYouHear', answer: referrers[0] ? `${referrers[0]} brought me in` : pick(HOW_HEARD, idx, 4) },
+    // personality
+    { questionKey: 'personality.workingOn', answer: real.workingOn ?? bank.workingOn },
+    { questionKey: 'personality.obsessedWith', answer: bank.obsessedWith },
+    { questionKey: 'personality.personYouAdmire', answer: real.greatEnergy ?? bank.personYouAdmire },
+    // community
+    { questionKey: 'community.howDoYouKnowGoodCompany', answer: real.meetPeople ?? bank.howDoYouKnowGoodCompany },
+    { questionKey: 'community.connectionOpportunity', answer: bank.connectionOpportunity },
+    { questionKey: 'community.loyalCommunity', answer: bank.loyalCommunity },
+    { questionKey: 'community.whatKindOfPeopleFlowThrough', answer: bank.whatKindOfPeopleFlowThrough },
+    { questionKey: 'community.interestingPeople', answer: bank.interestingPeople },
+    // taste
+    { questionKey: 'taste.detailsRight', answer: bank.detailsRight },
+    { questionKey: 'taste.trustTaste', answer: bank.trustTaste },
+    { questionKey: 'taste.recommend', answer: bank.recommend },
+    { questionKey: 'taste.splurgeVsSave', answer: bank.splurgeVsSave },
+    { questionKey: 'taste.recommendTravel', answer: pick(TASTE_TRAVEL, idx, 5) },
+    { questionKey: 'taste.recommendFoodDrink', answer: pick(TASTE_FOOD_DRINK, idx, 6) },
+    { questionKey: 'taste.recommendWellnessFitness', answer: pick(TASTE_WELLNESS, idx, 7) },
+    { questionKey: 'taste.recommendFashion', answer: pick(TASTE_FASHION, idx, 8) },
+    { questionKey: 'taste.recommendHomeDesign', answer: pick(TASTE_HOME, idx, 9) },
+    // rapid fire
+    { questionKey: 'rapid.karaokeS', answer: pick(RAPID_KARAOKE, idx, 10) },
+    { questionKey: 'rapid.coffeeTable', answer: pick(RAPID_COFFEE_TABLE, idx, 11) },
+    { questionKey: 'rapid.idealSaturday', answer: pick(RAPID_IDEAL_SATURDAY, idx, 12) },
+    { questionKey: 'rapid.sundayMorning', answer: pick(RAPID_SUNDAY, idx, 13) },
+    { questionKey: 'rapid.contentStopsScrolling', answer: pick(RAPID_CONTENT, idx, 14) },
+    { questionKey: 'rapid.everydayItem', answer: pick(RAPID_EVERYDAY, idx, 15) },
+    { questionKey: 'rapid.preferredWorkout', answer: pick(RAPID_WORKOUT, idx, 16) },
+    { questionKey: 'rapid.localAustinBrand', answer: pick(RAPID_LOCAL_BRAND, idx, 17) },
+    { questionKey: 'rapid.dreamBrandPartnership', answer: pick(RAPID_DREAM_BRAND, idx, 18) },
+    { questionKey: 'rapid.shoppingCart', answer: pick(RAPID_SHOPPING_CART, idx, 19) },
+    { questionKey: 'rapid.spendMoreThanMost', answer: pick(RAPID_SPEND_MORE, idx, 20) },
+    { questionKey: 'rapid.topPodcasts', answer: pick(RAPID_PODCASTS, idx, 21) },
+    // about
+    { questionKey: 'about.whatPeopleComeToYouFor', answer: bank.whatPeopleComeToYouFor },
+    { questionKey: 'about.heavilyInvestedIn', answer: bank.heavilyInvestedIn },
+    { questionKey: 'about.genuineExpertIn', answer: bank.genuineExpertIn },
+    // photos
+    { questionKey: 'photos.urls', answer: JSON.stringify(buildPhotos(content.email)) },
+    { questionKey: 'photos.foodAccessibility', answer: pick(FOOD_ACCESS, idx, 22) },
   ];
 
-  // Dev safety net: assert we cover every answer-storage question EXCEPT the
-  // genuinely-optional extra-referrer slots (the primary referrer is the
-  // `referredBy` model field; most real applicants leave these blank). This
-  // still catches a future apply-config question the seed forgot about.
+  // basics.referrers only when the applicant actually has one (genuine
+  // submissions leave it blank otherwise). 3-slot array, JSON-stringified.
+  if (referrerSlots.some((r) => r.trim())) {
+    out.push({ questionKey: 'basics.referrers', answer: JSON.stringify(referrerSlots) });
+  }
+
+  // Dev safety net: assert we cover every required live-form answer key
+  // (LIVE_ANSWER_KEYS excludes basics.referrers, the one optional key, which is
+  // pushed above only when present). Catches a future form field the seed
+  // forgot. These are the genuine /apply dotted keys — NOT apply-config's bare
+  // keys (see the _context/01-apply known issue on the schema gap).
   if (process.env.NODE_ENV !== 'production') {
     const covered = new Set(out.map((a) => a.questionKey));
-    const missing = answerQuestions
-      .map((q) => q.key)
-      .filter((k) => !covered.has(k) && !OPTIONAL_ANSWER_KEYS.has(k));
+    const missing = LIVE_ANSWER_KEYS.filter((k) => !covered.has(k));
     if (missing.length) {
-      console.warn(`[demo-applications] answer set missing keys: ${missing.join(', ')}`);
+      console.warn(`[demo-applications] answer set missing live-form keys: ${missing.join(', ')}`);
     }
   }
 
@@ -549,9 +681,11 @@ export async function seedPendingDemoApplications(
         phone: p.phone,
         city: p.city,
         neighborhood: p.neighborhood,
-        referredBy: p.referredBy,
+        // Genuine /apply submissions leave model referredBy null and store the
+        // referrer under the basics.referrers answer — match that exactly.
+        referredBy: null,
         consentEmail: true,
-        consentSms: false,
+        consentSms: idx % 3 === 0,
         status: 'PENDING',
         aiTags: PENDING_TAGS,
         aiScore: p.aiScore,
@@ -563,7 +697,19 @@ export async function seedPendingDemoApplications(
       },
     });
     await db.applicationAnswer.createMany({
-      data: buildFullAnswers(p, idx).map((a) => ({
+      data: buildFullAnswers(
+        {
+          email: p.email,
+          fullName: p.fullName,
+          archetype: p.archetype,
+          aiScore: p.aiScore,
+          city: p.city,
+          neighborhood: p.neighborhood,
+          referrers: p.referredBy ? [p.referredBy] : [],
+          real: p.real,
+        },
+        idx,
+      ).map((a) => ({
         applicationId: app.id,
         questionKey: a.questionKey,
         answer: a.answer,

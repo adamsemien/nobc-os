@@ -11,7 +11,7 @@
 | **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Iterate archetype copy as data comes in; no structural changes. (One-time data fix done 2026-05-21: 20 legacy Application rows had archetypeScores on the 0–1 scale; migrated to 0–100 to match the seed/normalizer fix.) |
+| **Next** | Backlog: reconcile the three competing answer-key generations (see Known issues). No structural form changes. (2026-05-21: demo seed rewritten to emit the live form's real dotted keys; one-time archetypeScores 0–1 → 0–100 migration done.) |
 
 ## Scope
 
@@ -116,6 +116,16 @@ Triggered by "still with us?" at bottom of reveal. Canvas game:
 - S Congress Ave labeled on median
 - Death: "got got on soco."
 - Win: "you made it. welcome to austin."
+
+## Known issues / backlog
+
+**Three competing answer-key generations** — needs a dedicated cleanup pass (backlog, do not fix piecemeal):
+
+1. **Live form (authoritative):** `MembershipForm.tsx` writes dotted `section.field` keys to `ApplicationAnswer` — `basics.*`, `personality.*`, `community.*`, `taste.*`, `rapid.*`, `about.*`, `photos.*`. This is what a genuine `/apply` submission actually produces. The operator UI resolves labels for these via `lib/legacy-answer-labels.ts`.
+2. **`lib/apply-config.ts` (drifted):** uses bare camelCase keys that **do not exist in the live form** — `greatEnergy`, `learnedThisYear`, `meetPeople`, `priorEvent`, `referrer2/3/4`, `food`, `accessibility`, `consentMembershipRead`, `consentPhotos`. It's still the source for the queue's answer ordering and some labels, so it silently no-ops on real submissions.
+3. **`lib/question-key-map.ts` (legacy bridge):** maps canonical `QuestionDefinition.stableKey` values (`real_working_on`, `world_connected_people`, …) to the **older** `real.*` / `world.*` dotted keys — **not** the live form's current `personality.*` / `community.*` keys. So question-agnostic scoring pairs definitions against keys the live form no longer writes → a **latent coverage gap on real submissions**.
+
+Net: three key vocabularies (`personality.*` live → `real.*` legacy → `real_working_on` canonical) describe overlapping questions, and nothing fully reconciles them. The demo seed (`lib/dev/demo-applications.ts`) now emits generation #1 (the real live-form keys) so demo data matches production, but the apply-config/question-key-map drift remains. **Flag: dedicated reconciliation pass before relying on question-agnostic scoring for live applicants.**
 
 ## What this stage does NOT own
 

@@ -60,6 +60,8 @@ export async function GET(req: NextRequest) {
     phone: app.phone,
     submittedAt: app.createdAt.toISOString(),
     status: app.status,
+    consentEmail: app.consentEmail,
+    consentSms: app.consentSms,
     firstAnswerPreview: firstAnswerPreview(app.answers),
     referrerCount: referrerCount(app.referredBy, app.answers),
     aiTags: app.aiTags,

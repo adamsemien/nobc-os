@@ -35,6 +35,8 @@ export type ApplicationsQueueItem = {
   archetype: string | null;
   archetypeScores: Record<string, number> | null;
   referredBy: string | null;
+  consentEmail: boolean;
+  consentSms: boolean;
 };
 
 const ANSWER_ORDER = new Map(
@@ -126,10 +128,22 @@ function isSystemKey(key: string): boolean {
   return key.startsWith('_');
 }
 
-/** Parse the JSON-encoded photo array stored under the `_photos` answer key.
- *  Returns up to 5 valid http(s) URLs, or [] if absent/malformed. */
+/** Keys that have their own UI section (photo strip, referrers chip, consents)
+ *  and must never leak into the Q&A answers list as raw JSON/booleans. */
+const HIDDEN_ANSWER_KEYS = new Set([
+  'photos.urls',
+  'basics.referrers',
+  'consentMembershipRead',
+  'consentPhotos',
+  'consentEmail',
+  'consentSms',
+]);
+
+/** Parse the JSON-encoded photo array. The live form stores it under
+ *  `photos.urls`; older seed rows used the synthetic `_photos` key. Returns up
+ *  to 5 valid http(s) URLs, or [] if absent/malformed. */
 function readPhotos(answers: Record<string, string>): string[] {
-  const raw = answers._photos;
+  const raw = answers['photos.urls'] ?? answers._photos;
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -158,6 +172,12 @@ function parseReferrer(v: string): string {
 function getReferrers(app: ApplicationsQueueItem): string[] {
   const result: string[] = [];
   if (app.referredBy?.trim()) result.push(app.referredBy.trim());
+  // Live form stores referrers as a JSON array under basics.referrers.
+  const basicsReferrers = app.answers['basics.referrers'];
+  if (basicsReferrers) {
+    const cleaned = parseReferrer(basicsReferrers);
+    if (cleaned.trim()) result.push(...cleaned.split(', ').filter(Boolean));
+  }
   for (const key of ['referrer2', 'referrer3', 'referrer4']) {
     const v = String(app.answers[key] ?? '').trim();
     if (v) result.push(parseReferrer(v));
@@ -821,9 +841,12 @@ function DetailPanel({
 }) {
   const { theme } = useTheme();
   const approveBtnRef = useRef<HTMLButtonElement>(null);
-  // Hide system-metadata keys (e.g. `_photos`) so they never leak as raw JSON
-  // into the Q&A list — they're rendered as a photo strip instead.
-  const entries = orderedAnswerEntries(app.answers).filter(([k]) => !isSystemKey(k));
+  // Hide system-metadata keys (`_photos`) and keys with their own UI section
+  // (photo strip, referrers chip, consents) so they never leak as raw JSON or
+  // booleans into the Q&A list.
+  const entries = orderedAnswerEntries(app.answers).filter(
+    ([k]) => !isSystemKey(k) && !HIDDEN_ANSWER_KEYS.has(k),
+  );
   const photos = readPhotos(app.answers);
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
@@ -1151,6 +1174,28 @@ function DetailPanel({
             </p>
           )}
         </div>
+      </section>
+
+      <section className="mt-8 border-t border-border pt-6">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Consents</h3>
+        <ul className="mt-3 space-y-2">
+          {([
+            { label: 'Email me about programming', checked: app.consentEmail },
+            { label: 'Text me for urgent event coordination', checked: app.consentSms },
+          ] as const).map(({ label, checked }) => (
+            <li key={label} className="flex items-center gap-2 text-sm">
+              <span
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${
+                  checked ? 'border-primary bg-primary' : 'border-border'
+                }`}
+                aria-hidden
+              >
+                {checked && <Check className="h-3 w-3" strokeWidth={3} style={{ color: 'var(--on-primary)' }} />}
+              </span>
+              <span className={checked ? 'text-text-primary' : 'text-text-muted'}>{label}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <div className="mt-4">

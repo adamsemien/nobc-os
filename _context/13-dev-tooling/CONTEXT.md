@@ -11,7 +11,7 @@
 | **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Iterate QA judge accuracy; expand persona archetype coverage; polish DevToolbar surface. (2026-05-21: demo applicants made complete + reviewed — full standard answer set, deterministic 0–100 archetypeScores, aiReasoning — via shared `lib/dev/demo-applications.ts`; both `npm run seed:demo` and the dev seed route now wipe-and-reseed cleanly.) |
+| **Next** | Iterate QA judge accuracy; expand persona archetype coverage; polish DevToolbar surface. (2026-05-21: demo seed rewritten to emit the live `/apply` form's REAL dotted answer keys — `basics.*`/`personality.*`/`community.*`/`taste.*`/`rapid.*`/`about.*`/`photos.urls` (42–43 rows), not apply-config bare keys — so demo applicants are byte-shaped like genuine submissions; deterministic 0–100 archetypeScores + aiReasoning retained. Verify: `tsx scripts/verify-demo-applications.ts` → 30/30.) |
 
 ## Scope
 

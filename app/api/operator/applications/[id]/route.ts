@@ -29,20 +29,25 @@ export async function GET(
   }
 
   const consentKeys = new Set(['consentMembershipRead', 'consentPhotos']);
-  const referrerKeys = new Set(['referrer2', 'referrer3', 'referrer4']);
+  // Referrers (live form: basics.referrers JSON array; older: referrer2/3/4)
+  // render in the Referrers section, not as Q&A rows.
+  const referrerKeys = new Set(['referrer2', 'referrer3', 'referrer4', 'basics.referrers']);
+  // Photos render as a strip, not a Q&A row (live form: photos.urls JSON array).
+  const photoKeys = new Set(['photos.urls']);
   // Anything underscore-prefixed is system metadata (e.g. `_photos`), not Q&A.
   const isSystemKey = (k: string) => k.startsWith('_');
 
   // Render the answer rows that actually exist on this application, keyed by
   // each row's own questionKey — NOT a fixed allow-list. Matching against a
   // fixed key list dropped every row whose key didn't match (seed snake_case,
-  // older dotted keys) to an empty "—". Consents and referrers have their own
-  // sections, so they're excluded here.
+  // older dotted keys) to an empty "—". Consents, referrers, and photos have
+  // their own sections, so they're excluded here.
   const substantiveAnswers = app.answers
     .filter(
       a =>
         !consentKeys.has(a.questionKey) &&
         !referrerKeys.has(a.questionKey) &&
+        !photoKeys.has(a.questionKey) &&
         !isSystemKey(a.questionKey) &&
         typeof a.answer === 'string' &&
         a.answer.trim() !== '',
@@ -69,10 +74,12 @@ export async function GET(
       };
     });
 
-  // `_photos` is a synthetic answer holding a JSON array of portrait URLs.
-  // The detail UI renders up to 5 in a strip.
+  // Portrait URLs: the live form stores a JSON array under `photos.urls`; older
+  // seed rows used the synthetic `_photos` key. The detail UI renders up to 5.
   let photos: string[] = [];
-  const photoRow = app.answers.find((a) => a.questionKey === '_photos');
+  const photoRow =
+    app.answers.find((a) => a.questionKey === 'photos.urls') ??
+    app.answers.find((a) => a.questionKey === '_photos');
   if (photoRow) {
     try {
       const parsed = JSON.parse(photoRow.answer) as unknown;

@@ -64,7 +64,19 @@ type DetailPayload = {
   };
 };
 
-const SCORE_DIMENSIONS = ['influence', 'contribution', 'activation', 'taste'] as const;
+// archetypeScores is keyed by the six archetype names (0–100). The old
+// influence/contribution/activation/taste keys never existed on the object, so
+// the bars rendered empty — iterate the real archetype names instead.
+const ARCHETYPE_NAMES = ['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'] as const;
+
+/** archetypeScores are stored 0–100; some legacy rows used 0–1 fractions.
+ *  Coerce either form to a clamped 0–100 integer (mirror of the split-view's
+ *  scorePct) so bars fill correctly and never render a raw float. */
+function scorePct(raw: number | undefined | null): number {
+  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
+  const scaled = n > 0 && n <= 1 ? n * 100 : n;
+  return Math.round(Math.min(100, Math.max(0, scaled)));
+}
 
 function scoreOutOfTen(score: number | null): string {
   if (typeof score !== 'number') return '—';
@@ -286,17 +298,15 @@ export default async function OperatorApplicationDetailPage({
                 )}
                 {app.archetypeScores && (
                   <div className="mt-4 space-y-2">
-                    {SCORE_DIMENSIONS.map((dim) => {
-                      const v = app.archetypeScores?.[dim];
-                      if (typeof v !== 'number') return null;
-                      const pct = Math.round(v * 100);
+                    {ARCHETYPE_NAMES.map((name) => {
+                      const pct = scorePct(app.archetypeScores?.[name]);
                       return (
-                        <div key={dim} className="flex items-center gap-3">
+                        <div key={name} className="flex items-center gap-3">
                           <span
                             className="w-24 text-[11px] uppercase tracking-[0.12em]"
                             style={{ color: 'var(--text-secondary)' }}
                           >
-                            {dim}
+                            {name}
                           </span>
                           <div
                             className="h-1.5 flex-1 overflow-hidden rounded-full"

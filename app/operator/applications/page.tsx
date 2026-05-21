@@ -21,6 +21,8 @@ type ApiApplication = {
   phone: string | null;
   submittedAt: string;
   status: string;
+  consentEmail: boolean;
+  consentSms: boolean;
   aiTags: string[];
   aiScore: number | null;
   aiRecommendation: string | null;
@@ -54,6 +56,8 @@ function toQueueItem(row: ApiApplication): ApplicationsQueueItem {
     city: row.city,
     phone: row.phone,
     submittedAt: row.submittedAt,
+    consentEmail: row.consentEmail ?? false,
+    consentSms: row.consentSms ?? false,
     aiTags: row.aiTags ?? [],
     aiScore: row.aiScore,
     aiReasoning: row.aiReasoning,

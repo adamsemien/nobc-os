@@ -214,9 +214,11 @@ async function main() {
         fullName: `${m.firstName} ${m.lastName}`,
         phone: m.phone,
         city: 'Austin, TX',
-        referredBy: m.referredBy ?? null,
+        // Genuine /apply submissions leave model referredBy null and store the
+        // referrer under the basics.referrers answer — match that exactly.
+        referredBy: null,
         consentEmail: true,
-        consentSms: false,
+        consentSms: i % 3 === 0,
         status: 'APPROVED' as const,
         reviewedAt: monthsAgo(m.monthsMember),
         aiTags: ['__demo', '__demo-tenur'],
@@ -232,9 +234,11 @@ async function main() {
       data: buildFullAnswers(
         {
           email: m.email,
+          fullName: `${m.firstName} ${m.lastName}`,
           archetype: m.archetype as DemoArchetype,
           aiScore: m.aiScore,
-          referredBy: m.referredBy ?? null,
+          city: 'Austin',
+          referrers: m.referredBy ? [m.referredBy] : [],
         },
         i,
       ).map((a) => ({ applicationId: created.id, questionKey: a.questionKey, answer: a.answer })),
