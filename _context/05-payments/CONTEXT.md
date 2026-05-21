@@ -8,7 +8,7 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #9, #10, #21 (comp tickets — payment-side bookkeeping), #25 (compliance pages) |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Compliance pages legal review |
 | **Next** | Verify compliance pages are live + legally reviewed before flipping to live Stripe keys |
@@ -79,3 +79,8 @@ lib/stripe/idempotency.ts                       ← idempotency key generation
 - Wallet pass generation/revocation → `06-wallet-checkin/`
 - Check-in trigger → `06-wallet-checkin/`
 - Operator refund UI → `07-operator-dashboard/`
+
+## Backlog (V1.5)
+
+- **Door sales flow** — staff-facing one-screen checkout on `/check-in/[slug]`. Name + phone/email, Apple Pay or Stripe tap-to-pay, instant QR via SMS or on-screen. Under 30 seconds per transaction. *(SMS delivery must route through the House Phone / Runtype — never Twilio directly, per the Absolute Rules.)* **V1.5.**
+- **Ticket tier cutoffs** — a tier auto-closes when its cutoff time passes OR sold quantity hits its limit. Critical for early bird pricing. **Schema check (done):** `TicketTier` already carries the needed fields — `startsAt` / `endsAt` (DateTime?) for the time window and `quantity` + `soldCount` for the inventory cap, plus `manuallyOpened` / `manuallyClosed` and `autoOpenTrigger` for progression. **No `cutoffAt` column is needed** (`endsAt` is the cutoff time, `startsAt` the open time). What's missing is the *enforcement logic* that closes a tier when `endsAt` passes or `soldCount >= quantity`. **V1.5.**
