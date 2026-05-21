@@ -16,6 +16,7 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { PrismaNeon } from '@prisma/adapter-neon';
+import { randomUUID } from 'node:crypto';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -280,10 +281,13 @@ async function main() {
   const idAt = (i: number) => memberIdByEmail.get(orderedEmails[i])!;
 
   type RsvpRow = {
+    id: string;
     workspaceId: string; eventId: string; memberId: string;
     status: 'CONFIRMED' | 'WAITLISTED' | 'DECLINED'; ticketStatus: string;
     checkedIn: boolean; checkedInAt: Date | null;
-    paymentStatus: string | null; amountCents: number | null; origin: string;
+    paymentStatus: string | null; capturedAt: Date | null;
+    stripePaymentIntentId: string | null;
+    amountCents: number | null; origin: string;
   };
   const rsvps: RsvpRow[] = [];
   const attended = new Map<string, Date>(); // memberId -> latest attended event date
@@ -292,13 +296,21 @@ async function main() {
     const eventId = eventIdBySlug.get(slug)!;
     for (let i = 0; i < count; i++) {
       const memberId = idAt(i);
+      const id = randomUUID();
       rsvps.push({
+        id,
         workspaceId, eventId, memberId,
         status: 'CONFIRMED',
-        ticketStatus: opts.ticketed ? 'paid' : 'confirmed',
+        // Both ticketed and members-only RSVPs are 'confirmed'. Operator stats
+        // (Overview, Check-in) key on ticketStatus 'confirmed' and CAPTURED
+        // payments, so ticketed rows must carry a captured PaymentIntent to
+        // surface confirmed counts, revenue, and check-in totals.
+        ticketStatus: 'confirmed',
         checkedIn: opts.checkedIn,
         checkedInAt: opts.checkedIn ? new Date(opts.at.getTime() + i * 60_000) : null,
-        paymentStatus: opts.ticketed ? 'paid' : null,
+        paymentStatus: opts.ticketed ? 'CAPTURED' : null,
+        capturedAt: opts.ticketed ? opts.at : null,
+        stripePaymentIntentId: opts.ticketed ? `pi_demo_${id}` : null,
         amountCents: opts.ticketed ? 2500 : null,
         origin: 'demo',
       });
