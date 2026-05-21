@@ -1,3 +1,6 @@
+// AI scoring (archetype, score, aiRecommendation) only runs on applications
+// submitted through /apply. Seed-generated applications have no AI data —
+// aiScore will be null and the AI profile section will be empty. This is expected.
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';

@@ -5,6 +5,23 @@ import { requireWorkspaceId } from '@/lib/auth';
 import { answerQuestions } from '@/lib/apply-config';
 import { referrerLines } from '@/lib/operator-application-display';
 
+const QUESTION_LABELS = new Map(answerQuestions.map(q => [q.key, q.label]));
+const QUESTION_ORDER = new Map(answerQuestions.map((q, i) => [q.key, i]));
+
+/** Question keys span generations: bare camelCase from the current /apply form,
+ *  dotted `section.field` from older forms, and snake_case from the seed
+ *  generator. Resolve a human label from the current config, else prettify the
+ *  raw key so the panel never shows a bare DB key. */
+function prettyKey(key: string): string {
+  const cleaned = key.replace(/^_+/, '').replace(/[._]+/g, ' ').trim();
+  if (!cleaned) return key;
+  const lower = cleaned.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+function answerLabel(key: string): string {
+  return QUESTION_LABELS.get(key) ?? prettyKey(key);
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -26,19 +43,34 @@ export async function GET(
   }
 
   const consentKeys = new Set(['consentMembershipRead', 'consentPhotos']);
-  const skipRight = new Set(['referrer2', 'referrer3', 'referrer4']);
+  const referrerKeys = new Set(['referrer2', 'referrer3', 'referrer4']);
   // Anything underscore-prefixed is system metadata (e.g. `_photos`), not Q&A.
   const isSystemKey = (k: string) => k.startsWith('_');
-  const substantiveAnswers = answerQuestions
-    .filter(q => !consentKeys.has(q.key) && !skipRight.has(q.key) && !isSystemKey(q.key))
-    .map(q => {
-      const row = app.answers.find(a => a.questionKey === q.key);
-      return {
-        questionKey: q.key,
-        label: q.label,
-        answer: row?.answer ?? '',
-      };
-    });
+
+  // Render the answer rows that actually exist on this application, keyed by
+  // each row's own questionKey — NOT a fixed allow-list. Matching against a
+  // fixed key list dropped every row whose key didn't match (seed snake_case,
+  // older dotted keys) to an empty "—". Consents and referrers have their own
+  // sections, so they're excluded here.
+  const substantiveAnswers = app.answers
+    .filter(
+      a =>
+        !consentKeys.has(a.questionKey) &&
+        !referrerKeys.has(a.questionKey) &&
+        !isSystemKey(a.questionKey) &&
+        typeof a.answer === 'string' &&
+        a.answer.trim() !== '',
+    )
+    .sort(
+      (x, y) =>
+        (QUESTION_ORDER.get(x.questionKey) ?? Number.MAX_SAFE_INTEGER) -
+        (QUESTION_ORDER.get(y.questionKey) ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map(a => ({
+      questionKey: a.questionKey,
+      label: answerLabel(a.questionKey),
+      answer: a.answer,
+    }));
 
   const consentAnswers = answerQuestions
     .filter(q => consentKeys.has(q.key))

@@ -1,3 +1,8 @@
+// Full-page application detail — the canonical, deep-linkable record for ONE
+// application. Distinct from the /operator/applications split-view (a fast
+// keyboard-driven triage queue): this page is the permalink target from the
+// Intelligence funnel and global/dev search, and it's the only surface that
+// shows the operator comment thread and consent records. Not redundant — keep both.
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
