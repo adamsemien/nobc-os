@@ -1,20 +1,19 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Cake, History } from 'lucide-react';
+import { Activity, ArrowRight, Calendar, CalendarDays, MoonStar, TrendingUp } from 'lucide-react';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
-import { StatColumn } from './_components/dashboard/StatColumn';
+import { Avatar } from './_components/Avatar';
+import { GlassPanel } from './_components/dashboard/GlassPanel';
+import { StatFigure } from './_components/dashboard/StatFigure';
 import { SectionHeader } from './_components/dashboard/SectionHeader';
 import { CapacityBar } from './_components/dashboard/CapacityBar';
 import { ActivityRow } from './_components/dashboard/ActivityRow';
 import { TonightPanel } from './_components/dashboard/TonightPanel';
-import {
-  actionLabel,
-  fmtDay,
-  fmtTime,
-  fmtWeekday,
-} from './_components/dashboard/format';
+import { DeskClock } from './_components/dashboard/DeskClock';
+import { LiquidAmbient } from './_components/dashboard/LiquidAmbient';
+import { fmtDate, fmtTime } from './_components/dashboard/format';
 
 function startOfToday(): Date {
   const d = new Date();
@@ -132,6 +131,10 @@ export default async function OperatorDashboardPage() {
   const today1 = endOfToday();
   const week1 = plusDays(7);
 
+  // NOTE: data fetching is unchanged from the prior dashboard — the Promise.all
+  // queries below are byte-identical. The liquid-editorial layout surfaces the
+  // first eight results; birthdays/throwbacks are still fetched (last two) but
+  // are not rendered in this view.
   const [
     pendingCount,
     pendingApps,
@@ -141,8 +144,6 @@ export default async function OperatorDashboardPage() {
     checkedInToday,
     upcomingEventsFull,
     recentAudit,
-    birthdays,
-    throwbacks,
   ] = await Promise.all([
     db.application.count({ where: { workspaceId, status: 'PENDING' } }),
     db.application.findMany({
@@ -204,307 +205,290 @@ export default async function OperatorDashboardPage() {
   for (const c of upcomingCounts) confirmedByEvent.set(c.eventId, c._count._all);
 
   const today = new Date();
-  const dateLine = today
-    .toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    .toUpperCase();
+  const weekday = today.toLocaleDateString('en-US', { weekday: 'short' });
+  const monthShort = today.toLocaleDateString('en-US', { month: 'short' });
+  const dateLine = `${weekday} ${today.getDate()} ${monthShort} ${today.getFullYear()}`;
+  const clockSub = todaysEvents.length > 0 ? 'doors soon' : 'all quiet';
+
+  const tonight = todaysEvents.map((e) => ({
+    ...e,
+    confirmed: confirmedByEvent.get(e.id) ?? 0,
+  }));
 
   return (
-    <div className="px-6 pb-24 pt-16 lg:px-12 lg:pt-20">
-      <div className="mx-auto w-full max-w-[1200px]">
-        {/* MASTHEAD */}
-        <header className="editorial-fade-in editorial-stagger-1">
-          <div
-            className="text-[10px] font-medium uppercase tracking-[0.28em]"
-            style={{ color: 'var(--text-tertiary)' }}
+    <>
+      <LiquidAmbient />
+      <div className="relative z-10 px-6 pb-20 pt-[38px] lg:px-14">
+        <div className="mx-auto w-full max-w-[1180px]">
+          {/* MASTHEAD */}
+          <header
+            className="op-rise flex flex-wrap items-end justify-between gap-10 border-b pb-[22px]"
+            style={{ borderColor: 'var(--border)', animationDelay: '0.05s' }}
           >
-            {dateLine}
-          </div>
-          <h1
-            className="mt-6 text-5xl leading-[1.05] tracking-tight md:text-6xl"
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 400,
-              color: 'var(--text-primary)',
-            }}
-          >
-            Tonight, tomorrow, this week.
-          </h1>
-          <p
-            className="mt-4 max-w-xl text-base"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Everything you need to run No Bad Company.
-          </p>
-          <hr className="mt-10" style={{ borderColor: 'var(--border)' }} />
-        </header>
-
-        {/* THE FOUR NUMERALS */}
-        <section
-          className="editorial-fade-in editorial-stagger-2 grid grid-cols-2 md:grid-cols-4"
-          aria-label="At a glance"
-        >
-          <StatColumn
-            label="Pending Applications"
-            value={pendingCount}
-            href="/operator/applications"
-            actionLabel="Review"
-            accent={pendingCount > 0}
-          />
-          <StatColumn
-            label="Members"
-            value={memberCount}
-            href="/operator/members"
-            actionLabel="Directory"
-            className="md:border-l"
-          />
-          <StatColumn
-            label="Upcoming This Week"
-            value={upcomingThisWeek}
-            href="/operator/events"
-            actionLabel="Events"
-            className="md:border-l"
-          />
-          <StatColumn
-            label="Checked In Today"
-            value={checkedInToday}
-            href="/operator/check-in"
-            actionLabel="Check In"
-            className="md:border-l"
-          />
-        </section>
-
-        {/* TONIGHT */}
-        {(todaysEvents.length > 0 || pendingApps.length > 0) ? (
-          <div className="editorial-fade-in editorial-stagger-3 mt-12">
-            <TonightPanel todaysEvents={todaysEvents} pendingApps={pendingApps} />
-          </div>
-        ) : null}
-
-        {/* THE JOURNAL — Upcoming + Lately */}
-        <div className="editorial-fade-in editorial-stagger-4 mt-16 grid gap-12 lg:grid-cols-[1.4fr_1fr]">
-          {/* What's coming */}
-          <section>
-            <SectionHeader
-              title="What's coming"
-              action={
-                <Link
-                  href="/operator/events"
-                  className="text-[11px] uppercase tracking-[0.18em] transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--primary)' }}
-                >
-                  All events →
-                </Link>
-              }
-            />
-            {upcomingEventsFull.length === 0 ? (
-              <div className="py-10">
-                <p
-                  className="italic"
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  No upcoming events.
-                </p>
-                <Link
-                  href="/operator/events/new"
-                  className="mt-3 inline-flex items-center gap-1 text-sm"
-                  style={{ color: 'var(--primary)' }}
-                >
-                  Create one →
-                </Link>
+            <div className="min-w-0">
+              <div
+                className="mb-[18px] text-[11px] uppercase tracking-[0.2em]"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                The operator&rsquo;s desk ·{' '}
+                <b style={{ color: 'var(--primary)', fontWeight: 600 }}>{dateLine}</b>
               </div>
-            ) : (
-              <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                {upcomingEventsFull.map((e) => {
-                  const confirmed = confirmedByEvent.get(e.id) ?? 0;
-                  return (
-                    <article key={e.id} className="flex gap-6 py-7">
-                      <div className="flex w-14 shrink-0 flex-col items-start gap-1">
-                        <span
-                          className="text-[10px] tracking-[0.18em]"
-                          style={{ color: 'var(--text-tertiary)' }}
-                        >
-                          {fmtWeekday(e.startAt)}
-                        </span>
-                        <span
-                          className="text-4xl leading-none tabular-nums"
-                          style={{
-                            fontFamily: 'var(--font-display)',
-                            fontWeight: 400,
-                            color: 'var(--text-primary)',
-                          }}
-                        >
-                          {fmtDay(e.startAt)}
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline justify-between gap-3">
-                          <Link
-                            href={`/operator/events/${e.id}`}
-                            className="text-xl leading-tight transition-opacity hover:opacity-80"
-                            style={{
-                              fontFamily: 'var(--font-display)',
-                              fontWeight: 400,
-                              color: 'var(--text-primary)',
-                            }}
-                          >
-                            {e.title}
-                          </Link>
-                          <div
-                            className="text-xs"
-                            style={{ color: 'var(--text-tertiary)' }}
-                          >
-                            {fmtTime(e.startAt)}
-                            {e.location ? ` · ${e.location}` : ''}
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <CapacityBar confirmed={confirmed} capacity={e.capacity} />
-                        </div>
-                        <div className="mt-4 flex items-center gap-5 text-[11px] uppercase tracking-[0.18em]">
-                          <a
-                            href={`/check-in/${e.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="transition-opacity hover:opacity-70"
-                            style={{ color: 'var(--text-secondary)' }}
-                          >
-                            Check In
-                          </a>
-                          <Link
-                            href={`/operator/events/${e.id}/room`}
-                            className="transition-opacity hover:opacity-70"
-                            style={{ color: 'var(--primary)' }}
-                          >
-                            The Room →
-                          </Link>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Lately */}
-          <section>
-            <SectionHeader
-              title="Lately"
-              action={
-                <Link
-                  href="/operator/audit"
-                  className="text-[11px] uppercase tracking-[0.18em] transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--primary)' }}
-                >
-                  Full log →
-                </Link>
-              }
-            />
-            {recentAudit.length === 0 ? (
-              <p
-                className="py-6 italic"
+              <h1
+                className="text-[clamp(3.4rem,6.4vw,6rem)] leading-[0.92]"
                 style={{
                   fontFamily: 'var(--font-display)',
+                  fontWeight: 360,
+                  letterSpacing: '-0.022em',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Tonight, tomorrow,
+                <br />
+                this week<span style={{ color: 'var(--primary)' }}>.</span>
+              </h1>
+              <div
+                className="mt-[14px] text-[18px] italic"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 400,
                   color: 'var(--text-secondary)',
                 }}
               >
-                Nothing has happened yet.
-              </p>
-            ) : (
-              <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                {recentAudit.map((e) => (
-                  <ActivityRow
-                    key={e.id}
-                    action={e.action}
-                    entityType={e.entityType}
-                    createdAt={e.createdAt}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
+                Everything you need to run the night.
+              </div>
+            </div>
+            <DeskClock sub={clockSub} />
+          </header>
 
-        {/* MARGINALIA */}
-        {(birthdays.length > 0 || throwbacks.length > 0) ? (
-          <section
-            className="editorial-fade-in editorial-stagger-5 mt-20 grid gap-12 border-t pt-12 lg:grid-cols-2"
-            style={{ borderColor: 'var(--border)' }}
-            aria-label="Marginalia"
-          >
-            {birthdays.length > 0 ? (
-              <div>
-                <div
-                  className="mb-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em]"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  <Cake className="h-3 w-3" aria-hidden />
-                  Birthdays this week
-                </div>
-                <ul>
-                  {birthdays.map((b) => (
-                    <li key={b.memberId}>
-                      <Link
-                        href={`/operator/members/${b.memberId}`}
-                        className="flex items-center justify-between py-2 text-sm transition-opacity hover:opacity-70"
-                      >
-                        <span style={{ color: 'var(--text-primary)' }}>{b.name}</span>
+          {/* FIGURES — asymmetric */}
+          <section className="mt-[34px] grid grid-cols-1 gap-[18px] md:grid-cols-2 lg:grid-cols-[1.42fr_1fr_1fr]">
+            <StatFigure
+              variant="lead"
+              eyebrow="Pending applications"
+              value={pendingCount}
+              accentValue
+              className="op-rise md:col-span-2 lg:col-span-1 lg:row-span-2"
+              footer={
+                <>
+                  <div
+                    className="mt-1 text-[17px] italic"
+                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
+                  >
+                    awaiting your decision
+                  </div>
+                  {pendingApps.length > 0 ? (
+                    <div className="mt-auto flex pt-6">
+                      {pendingApps.slice(0, 3).map((a, i) => (
                         <span
-                          className="text-[11px] uppercase tracking-[0.18em]"
+                          key={a.id}
+                          className={`inline-flex rounded-full ${i > 0 ? '-ml-[9px]' : ''}`}
+                          style={{ boxShadow: '0 0 0 2px var(--surface)' }}
+                        >
+                          <Avatar name={a.fullName} email={a.email} size={36} />
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <Link
+                    href="/operator/applications"
+                    className="mt-[22px] inline-flex items-center gap-2 self-start rounded-[30px] px-5 py-[11px] text-[13px] font-semibold transition-opacity hover:opacity-90"
+                    style={{ background: 'var(--primary)', color: 'var(--on-primary)' }}
+                  >
+                    Review the queue
+                    <ArrowRight className="h-4 w-4" aria-hidden />
+                  </Link>
+                </>
+              }
+            />
+
+            <StatFigure
+              variant="sm"
+              eyebrow="Members"
+              value={memberCount}
+              className="op-rise"
+              footer={
+                <div
+                  className="mt-2 flex items-center gap-[5px] text-[12.5px]"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <TrendingUp className="h-4 w-4" style={{ color: 'var(--success)' }} aria-hidden />
+                  the room, growing
+                </div>
+              }
+            />
+
+            <StatFigure
+              variant="sm"
+              eyebrow="Upcoming this week"
+              value={upcomingThisWeek}
+              className="op-rise"
+              footer={
+                <div
+                  className="mt-2 flex items-center gap-[5px] text-[12.5px]"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <Calendar className="h-4 w-4" aria-hidden />
+                  on the schedule
+                </div>
+              }
+            />
+
+            <StatFigure
+              variant="wide"
+              eyebrow="Checked in today"
+              value={checkedInToday}
+              className="op-rise md:col-span-2 lg:col-span-2"
+              aside={
+                <div className="text-right text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
+                  <b
+                    className="block text-[13px]"
+                    style={{ color: 'var(--text-primary)', fontWeight: 600 }}
+                  >
+                    {checkedInToday > 0 ? 'Counting tonight' : "Doors haven't opened"}
+                  </b>
+                  {checkedInToday > 0 ? 'live at the door' : 'first scan starts the clock'}
+                </div>
+              }
+            />
+          </section>
+
+          {/* TONIGHT */}
+          {tonight.length > 0 ? (
+            <div className="mt-[42px]">
+              <div className="op-rise" style={{ animationDelay: '0.36s' }}>
+                <SectionHeader icon={<MoonStar className="h-[15px] w-[15px]" />} title="Tonight" />
+              </div>
+              <div className="op-rise" style={{ animationDelay: '0.4s' }}>
+                <TonightPanel events={tonight} />
+              </div>
+            </div>
+          ) : null}
+
+          {/* LOWER — asymmetric: events + activity */}
+          <div className="mt-[42px] grid grid-cols-1 gap-[18px] lg:grid-cols-[1.62fr_1fr] lg:items-start">
+            <div className="op-rise" style={{ animationDelay: '0.46s' }}>
+              <SectionHeader
+                icon={<CalendarDays className="h-[15px] w-[15px]" />}
+                title="Upcoming events"
+                action={
+                  <Link
+                    href="/operator/events"
+                    className="text-[12px] font-semibold"
+                    style={{ color: 'var(--primary)' }}
+                  >
+                    All events →
+                  </Link>
+                }
+              />
+              {upcomingEventsFull.length === 0 ? (
+                <GlassPanel className="px-[26px] py-10">
+                  <p
+                    className="italic"
+                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
+                  >
+                    No upcoming events.
+                  </p>
+                  <Link
+                    href="/operator/events/new"
+                    className="mt-3 inline-block text-sm"
+                    style={{ color: 'var(--primary)' }}
+                  >
+                    Create one →
+                  </Link>
+                </GlassPanel>
+              ) : (
+                <GlassPanel className="px-[26px] pb-[18px] pt-2">
+                  {upcomingEventsFull.map((e, i) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center gap-[22px] py-[22px]"
+                      style={
+                        i < upcomingEventsFull.length - 1
+                          ? { borderBottom: '1px solid var(--border)' }
+                          : undefined
+                      }
+                    >
+                      <div
+                        className="w-6 shrink-0 text-[15px] italic"
+                        style={{ fontFamily: 'var(--font-display)', color: 'var(--text-tertiary)' }}
+                      >
+                        {String(i + 1).padStart(2, '0')}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4
+                          className="text-[21px]"
                           style={{
-                            color:
-                              b.days === 0 ? 'var(--primary)' : 'var(--text-tertiary)',
+                            fontFamily: 'var(--font-display)',
+                            fontWeight: 400,
+                            letterSpacing: '-0.01em',
+                            color: 'var(--text-primary)',
                           }}
                         >
-                          {b.label}
-                        </span>
+                          {e.title}
+                        </h4>
+                        <div
+                          className="mt-[3px] text-[12.5px]"
+                          style={{ color: 'var(--text-secondary)' }}
+                        >
+                          {fmtDate(e.startAt)} · {fmtTime(e.startAt)}
+                          {e.location ? ` · ${e.location}` : ''}
+                        </div>
+                        <div className="mt-[11px]">
+                          <CapacityBar
+                            confirmed={confirmedByEvent.get(e.id) ?? 0}
+                            capacity={e.capacity}
+                          />
+                        </div>
+                      </div>
+                      <Link href={`/operator/events/${e.id}`} className="op-btn shrink-0">
+                        Open
+                        <ArrowRight className="h-4 w-4" aria-hidden />
                       </Link>
-                    </li>
+                    </div>
                   ))}
-                </ul>
-              </div>
-            ) : null}
+                </GlassPanel>
+              )}
+            </div>
 
-            {throwbacks.length > 0 ? (
-              <div>
-                <div
-                  className="mb-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em]"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  <History className="h-3 w-3" aria-hidden />
-                  On this day
-                </div>
-                <ul>
-                  {throwbacks.map((t) => (
-                    <li key={t.period} className="flex items-baseline gap-4 py-2">
-                      <span
-                        className="w-[92px] shrink-0 text-[11px] uppercase tracking-[0.18em]"
-                        style={{ color: 'var(--text-tertiary)' }}
-                      >
-                        {t.period}
-                      </span>
-                      <span
-                        className="min-w-0 flex-1 text-sm"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {actionLabel(t.action)}
-                      </span>
-                    </li>
+            <div className="op-rise" style={{ animationDelay: '0.56s' }}>
+              <SectionHeader
+                icon={<Activity className="h-[15px] w-[15px]" />}
+                title="Recent activity"
+                action={
+                  <Link
+                    href="/operator/audit"
+                    className="text-[12px] font-semibold"
+                    style={{ color: 'var(--primary)' }}
+                  >
+                    Full log →
+                  </Link>
+                }
+              />
+              {recentAudit.length === 0 ? (
+                <GlassPanel className="px-6 py-6">
+                  <p
+                    className="italic"
+                    style={{ fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}
+                  >
+                    Nothing has happened yet.
+                  </p>
+                </GlassPanel>
+              ) : (
+                <GlassPanel className="px-6 pb-[14px] pt-2">
+                  {recentAudit.map((e, i) => (
+                    <ActivityRow
+                      key={e.id}
+                      action={e.action}
+                      createdAt={e.createdAt}
+                      last={i === recentAudit.length - 1}
+                    />
                   ))}
-                </ul>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
+                </GlassPanel>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

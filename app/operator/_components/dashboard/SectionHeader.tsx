@@ -1,42 +1,32 @@
 import type { ReactNode } from 'react';
 
 /**
- * Editorial section heading. Two variants:
- *  - `eyebrow` (default): tracked-wide uppercase label in tertiary text
- *  - `display`: larger heading set in `var(--font-display)` for major editorial sections
- *
- * `action` is a right-aligned slot for "All events →" style links.
+ * Editorial section label: a `--primary` icon, a tracked-out uppercase title, a
+ * hairline rule that fills the remaining width, and an optional action link.
  */
 export function SectionHeader({
+  icon,
   title,
   action,
-  as = 'eyebrow',
 }: {
+  icon?: ReactNode;
   title: string;
   action?: ReactNode;
-  as?: 'eyebrow' | 'display';
 }) {
   return (
-    <div className="mb-5 flex items-baseline justify-between gap-4">
-      {as === 'display' ? (
-        <h2
-          className="text-2xl leading-tight"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 400,
-            color: 'var(--text-primary)',
-          }}
-        >
-          {title}
-        </h2>
-      ) : (
-        <h2
-          className="text-[10px] font-medium uppercase tracking-[0.22em]"
-          style={{ color: 'var(--text-tertiary)' }}
-        >
-          {title}
-        </h2>
-      )}
+    <div className="mb-[18px] flex items-center gap-4">
+      {icon ? (
+        <span className="flex items-center" style={{ color: 'var(--primary)' }}>
+          {icon}
+        </span>
+      ) : null}
+      <span
+        className="text-[11.5px] font-semibold uppercase tracking-[0.2em]"
+        style={{ color: 'var(--text-secondary)' }}
+      >
+        {title}
+      </span>
+      <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
       {action}
     </div>
   );

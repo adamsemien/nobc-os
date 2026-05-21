@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NoBC — Operator Dashboard · Editorial Liquid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/@tabler/icons-webfont/2.47.0/tabler-icons.min.css" />
+<style>
+  :root{
+    --ivory:#F1ECE2; --ivory-2:#F8F4EC;
+    --ink:#1E1A16; --ink-2:#6E655A; --ink-3:#938979;
+    --red:#AC2E1F; --red-deep:#7C2014;
+    --glass:rgba(252,250,245,0.60);
+    --glass-strong:rgba(252,250,245,0.80);
+    --hair:rgba(30,26,22,0.13);
+    --serif:'Fraunces',Georgia,serif;
+    --sans:'Hanken Grotesk',system-ui,sans-serif;
+    --green:#3B6D2E; --gold:#9A6B14;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:var(--sans);
+    background:var(--ivory);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* ---- ambient liquid field ---- */
+  .ambient{position:fixed;inset:0;z-index:0;overflow:hidden;filter:blur(8px);}
+  .blob{position:absolute;border-radius:50%;opacity:.62;mix-blend-mode:multiply;}
+  .b1{width:46vw;height:46vw;left:-8vw;top:-12vw;
+    background:radial-gradient(circle at 35% 35%,#F0C6A0,transparent 68%);
+    animation:drift1 30s ease-in-out infinite;}
+  .b2{width:40vw;height:40vw;right:-6vw;top:8vh;
+    background:radial-gradient(circle at 50% 50%,#E7A293,transparent 66%);
+    animation:drift2 36s ease-in-out infinite;}
+  .b3{width:38vw;height:38vw;left:24vw;bottom:-16vw;
+    background:radial-gradient(circle at 50% 40%,#EAD49C,transparent 67%);
+    animation:drift3 27s ease-in-out infinite;}
+  @keyframes drift1{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(7vw,6vh) scale(1.14);}}
+  @keyframes drift2{0%,100%{transform:translate(0,0) scale(1.05);}50%{transform:translate(-6vw,8vh) scale(.9);}}
+  @keyframes drift3{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(5vw,-7vh) scale(1.16);}}
+
+  /* ---- shell ---- */
+  .shell{position:relative;z-index:1;display:flex;min-height:100vh;}
+
+  /* ---- sidebar rail ---- */
+  .rail{
+    width:236px;flex-shrink:0;padding:30px 20px 26px;
+    display:flex;flex-direction:column;gap:4px;
+    background:var(--glass);backdrop-filter:blur(22px) saturate(1.5);
+    -webkit-backdrop-filter:blur(22px) saturate(1.5);
+    border-right:1px solid rgba(255,255,255,0.5);
+  }
+  .wordmark{font-family:var(--serif);font-size:21px;font-weight:400;
+    line-height:1.05;letter-spacing:-.01em;color:var(--ink);padding:4px 10px 22px;}
+  .wordmark em{font-style:italic;color:var(--red);}
+  .nav-eyebrow{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ink-3);padding:0 10px 9px;}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 10px;
+    border-radius:11px;color:var(--ink-2);font-size:14px;font-weight:500;
+    text-decoration:none;transition:.22s;position:relative;}
+  .nav-item i{font-size:18px;}
+  .nav-item:hover{background:rgba(255,255,255,0.55);color:var(--ink);}
+  .nav-item.on{background:rgba(255,255,255,0.85);color:var(--ink);}
+  .nav-item.on::before{content:"";position:absolute;left:-20px;top:50%;
+    transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;
+    background:var(--red);}
+  .nav-item .count{margin-left:auto;background:var(--red);color:#fff;
+    font-size:11px;font-weight:600;min-width:19px;height:19px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;padding:0 5px;}
+  .rail-spacer{flex:1;}
+  .op-chip{display:flex;align-items:center;gap:10px;padding:9px 10px;
+    border-radius:12px;background:rgba(255,255,255,0.55);}
+  .op-chip .disc{width:32px;height:32px;border-radius:50%;flex-shrink:0;
+    background:var(--ink);color:var(--ivory-2);font-size:12px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;font-family:var(--sans);}
+  .op-chip .nm{font-size:13px;font-weight:600;line-height:1.2;}
+  .op-chip .rl{font-size:11px;color:var(--ink-3);}
+
+  /* ---- content ---- */
+  .content{flex:1;padding:38px 56px 64px;min-width:0;}
+
+  .rise{animation:rise .95s cubic-bezier(.16,.7,.2,1) both;}
+  @keyframes rise{from{opacity:0;transform:translateY(26px);}to{opacity:1;transform:translateY(0);}}
+
+  /* ---- masthead ---- */
+  .masthead{display:flex;justify-content:space-between;align-items:flex-end;
+    gap:40px;padding-bottom:22px;border-bottom:1px solid var(--hair);}
+  .dateline{font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-3);margin-bottom:18px;}
+  .dateline b{color:var(--red);font-weight:600;}
+  h1{font-family:var(--serif);font-weight:360;
+    font-size:clamp(3.4rem,6.4vw,6rem);line-height:.92;letter-spacing:-.022em;
+    font-optical-sizing:auto;}
+  h1 .period{color:var(--red);}
+  .standfirst{font-family:var(--serif);font-style:italic;font-weight:340;
+    font-size:18px;color:var(--ink-2);margin-top:14px;}
+  .clock{text-align:right;flex-shrink:0;}
+  .clock .big{font-family:var(--serif);font-size:54px;font-weight:330;
+    line-height:.9;letter-spacing:-.02em;}
+  .clock .sub{font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ink-3);margin-top:8px;}
+
+  /* ---- glass primitive ---- */
+  .glass{background:var(--glass);backdrop-filter:blur(26px) saturate(1.5);
+    -webkit-backdrop-filter:blur(26px) saturate(1.5);
+    border:1px solid rgba(255,255,255,0.55);border-radius:22px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.75),
+      0 26px 52px -30px rgba(46,30,20,0.4);
+    position:relative;overflow:hidden;transition:.4s cubic-bezier(.2,.7,.2,1);}
+  .glass::after{content:"";position:absolute;inset:0;border-radius:22px;
+    background:linear-gradient(120deg,rgba(255,255,255,0.5) 0%,
+      rgba(255,255,255,0) 32%);opacity:0;transition:.5s;pointer-events:none;}
+  .glass:hover{transform:translateY(-4px);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.85),
+      0 34px 60px -28px rgba(46,30,20,0.46);}
+  .glass:hover::after{opacity:1;}
+
+  /* ---- figures (asymmetric) ---- */
+  .figures{margin-top:34px;display:grid;
+    grid-template-columns:1.42fr 1fr 1fr;grid-template-rows:auto auto;
+    gap:18px;}
+  .fig{padding:26px 28px;}
+  .fig .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ink-3);}
+  .numeral{font-family:var(--serif);font-weight:330;line-height:.86;
+    letter-spacing:-.03em;color:var(--ink);}
+
+  .fig-lead{grid-row:1 / span 2;display:flex;flex-direction:column;
+    background:var(--glass-strong);}
+  .fig-lead .numeral{font-size:clamp(5rem,9vw,8.4rem);margin:6px 0 2px;}
+  .fig-lead .numeral em{font-style:normal;color:var(--red);}
+  .fig-lead .note{font-family:var(--serif);font-style:italic;font-size:17px;
+    color:var(--ink-2);}
+  .fig-lead .faces{display:flex;margin-top:auto;padding-top:24px;}
+  .fig-lead .faces .disc{width:36px;height:36px;border-radius:50%;
+    margin-right:-9px;border:2px solid var(--ivory-2);
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:600;color:var(--ivory-2);background:var(--ink);}
+  .fig-lead .faces .disc:nth-child(2){background:#8A5A3C;}
+  .fig-lead .faces .disc:nth-child(3){background:var(--red-deep);}
+  .review{margin-top:22px;align-self:flex-start;display:inline-flex;
+    align-items:center;gap:8px;background:var(--red);color:#fff;
+    font-size:13px;font-weight:600;padding:11px 20px;border-radius:30px;
+    cursor:pointer;transition:.25s;font-family:var(--sans);}
+  .review:hover{background:var(--red-deep);}
+
+  .fig-sm .numeral{font-size:clamp(3rem,4.6vw,4.4rem);margin-top:10px;}
+  .fig-sm .delta{font-size:12.5px;color:var(--ink-2);margin-top:8px;
+    display:flex;align-items:center;gap:5px;}
+  .fig-wide{grid-column:2 / span 2;display:flex;align-items:center;
+    justify-content:space-between;gap:24px;}
+  .fig-wide .numeral{font-size:clamp(2.8rem,4vw,3.8rem);}
+  .fig-wide .doors{font-size:12.5px;color:var(--ink-2);text-align:right;}
+  .fig-wide .doors b{display:block;font-size:13px;color:var(--ink);
+    font-weight:600;}
+
+  /* ---- section label ---- */
+  .seclabel{display:flex;align-items:center;gap:16px;
+    margin:42px 0 18px;}
+  .seclabel span{font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-2);font-weight:600;}
+  .seclabel .ti{font-size:15px;color:var(--red);}
+  .seclabel .line{flex:1;height:1px;background:var(--hair);}
+  .seclabel a{font-size:12px;color:var(--red);text-decoration:none;
+    font-weight:600;}
+
+  /* ---- tonight band ---- */
+  .tonight{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;}
+  .gig{padding:30px 32px;}
+  .gig + .gig{border-left:1px solid var(--hair);}
+  .gig .when{font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--red);font-weight:600;}
+  .gig h3{font-family:var(--serif);font-weight:370;font-size:30px;
+    line-height:1.04;letter-spacing:-.02em;margin:12px 0 6px;}
+  .gig .meta{font-size:13px;color:var(--ink-2);
+    display:flex;align-items:center;gap:7px;}
+  .cap{margin:20px 0 22px;}
+  .cap .track{height:3px;border-radius:3px;background:var(--hair);
+    overflow:hidden;}
+  .cap .fill{height:100%;background:var(--red);border-radius:3px;}
+  .cap .txt{font-size:11.5px;color:var(--ink-3);margin-top:7px;
+    display:flex;justify-content:space-between;}
+  .gig-actions{display:flex;gap:10px;}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:600;
+    padding:9px 17px;border-radius:24px;cursor:pointer;transition:.22s;
+    border:1px solid var(--hair);background:rgba(255,255,255,0.5);
+    color:var(--ink);display:inline-flex;align-items:center;gap:6px;}
+  .btn:hover{background:rgba(255,255,255,0.9);}
+  .btn.primary{background:var(--ink);color:var(--ivory-2);border-color:var(--ink);}
+  .btn.primary:hover{background:#000;}
+
+  /* ---- lower asymmetric ---- */
+  .lower{display:grid;grid-template-columns:1.62fr 1fr;gap:18px;
+    align-items:start;}
+  .panel{padding:8px 26px 18px;}
+  .ev{display:flex;align-items:center;gap:22px;padding:22px 0;
+    border-bottom:1px solid var(--hair);}
+  .ev:last-child{border-bottom:none;}
+  .ev .idx{font-family:var(--serif);font-size:15px;font-style:italic;
+    color:var(--ink-3);width:24px;flex-shrink:0;}
+  .ev .body{flex:1;min-width:0;}
+  .ev .body h4{font-family:var(--serif);font-weight:380;font-size:21px;
+    letter-spacing:-.01em;}
+  .ev .body .sub{font-size:12.5px;color:var(--ink-2);margin-top:3px;}
+  .ev .cap{margin:11px 0 0;width:100%;}
+  .ev .go{flex-shrink:0;}
+
+  .feed{padding:8px 24px 14px;}
+  .act{display:flex;gap:13px;padding:14px 0;
+    border-bottom:1px solid var(--hair);}
+  .act:last-child{border-bottom:none;}
+  .act .tick{width:7px;height:7px;border-radius:50%;margin-top:6px;
+    flex-shrink:0;background:var(--ink-3);}
+  .act .tick.red{background:var(--red);}
+  .act .tick.green{background:var(--green);}
+  .act .tick.gold{background:var(--gold);}
+  .act .txt{flex:1;font-size:13.5px;}
+  .act .txt b{font-weight:600;}
+  .act .txt .when{font-size:11.5px;color:var(--ink-3);margin-top:2px;}
+
+  @media(max-width:1080px){
+    .figures{grid-template-columns:1fr 1fr;}
+    .fig-lead{grid-row:auto;grid-column:1 / span 2;}
+    .fig-wide{grid-column:1 / span 2;}
+    .lower,.tonight{grid-template-columns:1fr;}
+    .gig + .gig{border-left:none;border-top:1px solid var(--hair);}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .rise{animation:none;}.blob{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient" aria-hidden="true">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+</div>
+
+<div class="shell">
+
+  <aside class="rail">
+    <div class="wordmark">No Bad<br><em>Company</em></div>
+    <div class="nav-eyebrow">Operator</div>
+    <a class="nav-item on"><i class="ti ti-layout-dashboard"></i>Dashboard</a>
+    <a class="nav-item"><i class="ti ti-mail-opened"></i>Applications<span class="count">3</span></a>
+    <a class="nav-item"><i class="ti ti-calendar-event"></i>Events</a>
+    <a class="nav-item"><i class="ti ti-qrcode"></i>Check-in</a>
+    <a class="nav-item"><i class="ti ti-users"></i>Members</a>
+    <a class="nav-item"><i class="ti ti-list-check"></i>Lists</a>
+    <a class="nav-item"><i class="ti ti-chart-bar"></i>Intelligence</a>
+    <a class="nav-item"><i class="ti ti-activity"></i>Activity</a>
+    <div class="rail-spacer"></div>
+    <a class="nav-item"><i class="ti ti-settings"></i>Settings</a>
+    <div class="op-chip">
+      <div class="disc">AS</div>
+      <div><div class="nm">Adam Semien</div><div class="rl">Operator</div></div>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <header class="masthead rise" style="animation-delay:.05s">
+      <div>
+        <div class="dateline">The operator's desk · <b>Thu 21 May 2026</b></div>
+        <h1>Tonight, tomorrow,<br>this week<span class="period">.</span></h1>
+        <div class="standfirst">Everything you need to run the night.</div>
+      </div>
+      <div class="clock">
+        <div class="big">21h<span style="color:var(--red)">.</span>02</div>
+        <div class="sub">Austin · doors soon</div>
+      </div>
+    </header>
+
+    <section class="figures">
+      <div class="fig fig-lead glass rise" style="animation-delay:.12s">
+        <div class="eyebrow">Pending applications</div>
+        <div class="numeral"><em data-count="3">0</em></div>
+        <div class="note">awaiting your decision</div>
+        <div class="faces">
+          <div class="disc">JM</div><div class="disc">JM</div><div class="disc">MV</div>
+        </div>
+        <div class="review">Review the queue <i class="ti ti-arrow-right"></i></div>
+      </div>
+
+      <div class="fig fig-sm glass rise" style="animation-delay:.18s">
+        <div class="eyebrow">Members</div>
+        <div class="numeral" data-count="4">0</div>
+        <div class="delta"><i class="ti ti-trending-up" style="color:var(--green)"></i>the room, growing</div>
+      </div>
+
+      <div class="fig fig-sm glass rise" style="animation-delay:.24s">
+        <div class="eyebrow">Upcoming this week</div>
+        <div class="numeral" data-count="2">0</div>
+        <div class="delta"><i class="ti ti-calendar"></i>both tonight</div>
+      </div>
+
+      <div class="fig fig-wide glass rise" style="animation-delay:.3s">
+        <div>
+          <div class="eyebrow">Checked in today</div>
+          <div class="numeral" data-count="0">0</div>
+        </div>
+        <div class="doors">
+          <b>Doors haven't opened</b>
+          first scan starts the clock
+        </div>
+      </div>
+    </section>
+
+    <div class="seclabel rise" style="animation-delay:.36s">
+      <i class="ti ti-moon-stars"></i><span>Tonight</span>
+      <div class="line"></div>
+    </div>
+
+    <section class="tonight glass rise" style="animation-delay:.4s">
+      <div class="gig">
+        <div class="when">Tonight · 1:00 AM</div>
+        <h3>The Good Time Society</h3>
+        <div class="meta"><i class="ti ti-map-pin" style="font-size:14px"></i>Tenur House</div>
+        <div class="cap">
+          <div class="track"><div class="fill" style="width:0%"></div></div>
+          <div class="txt"><span>0 confirmed</span><span>75 capacity</span></div>
+        </div>
+        <div class="gig-actions">
+          <div class="btn"><i class="ti ti-qrcode"></i>Check in</div>
+          <div class="btn primary">The Room <i class="ti ti-arrow-right"></i></div>
+        </div>
+      </div>
+      <div class="gig">
+        <div class="when">Tonight · 1:00 AM</div>
+        <h3>Members Only: An Evening of Connection</h3>
+        <div class="meta"><i class="ti ti-map-pin" style="font-size:14px"></i>Tenur House</div>
+        <div class="cap">
+          <div class="track"><div class="fill" style="width:0%"></div></div>
+          <div class="txt"><span>0 confirmed</span><span>application · approval</span></div>
+        </div>
+        <div class="gig-actions">
+          <div class="btn"><i class="ti ti-qrcode"></i>Check in</div>
+          <div class="btn primary">The Room <i class="ti ti-arrow-right"></i></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="lower">
+      <div>
+        <div class="seclabel rise" style="animation-delay:.46s">
+          <i class="ti ti-calendar-event"></i><span>Upcoming events</span>
+          <div class="line"></div><a>All events →</a>
+        </div>
+        <div class="panel glass rise" style="animation-delay:.5s">
+          <div class="ev">
+            <div class="idx">01</div>
+            <div class="body">
+              <h4>The Good Time Society</h4>
+              <div class="sub">Thu, May 21 · 1:00 AM · Tenur House</div>
+              <div class="cap">
+                <div class="track"><div class="fill" style="width:0%"></div></div>
+                <div class="txt"><span>0 / 75 confirmed</span><span>Ticketed</span></div>
+              </div>
+            </div>
+            <div class="go btn">Open <i class="ti ti-arrow-right"></i></div>
+          </div>
+          <div class="ev">
+            <div class="idx">02</div>
+            <div class="body">
+              <h4>Members Only: An Evening of Connection</h4>
+              <div class="sub">Thu, May 21 · 1:00 AM · Tenur House</div>
+              <div class="cap">
+                <div class="track"><div class="fill" style="width:0%"></div></div>
+                <div class="txt"><span>0 confirmed</span><span>Ticketed · approval required</span></div>
+              </div>
+            </div>
+            <div class="go btn">Open <i class="ti ti-arrow-right"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="seclabel rise" style="animation-delay:.56s">
+          <i class="ti ti-activity"></i><span>Recent activity</span>
+          <div class="line"></div><a>Full log →</a>
+        </div>
+        <div class="feed glass rise" style="animation-delay:.6s">
+          <div class="act"><div class="tick red"></div><div class="txt"><b>Application rejected</b><div class="when">14h ago</div></div></div>
+          <div class="act"><div class="tick"></div><div class="txt"><b>Member created</b><div class="when">14h ago</div></div></div>
+          <div class="act"><div class="tick green"></div><div class="txt"><b>Application approved</b><div class="when">14h ago</div></div></div>
+          <div class="act"><div class="tick"></div><div class="txt"><b>Member created</b><div class="when">21h ago</div></div></div>
+          <div class="act"><div class="tick green"></div><div class="txt"><b>Application approved</b><div class="when">21h ago</div></div></div>
+          <div class="act"><div class="tick gold"></div><div class="txt"><b>Event created</b><div class="when">22h ago</div></div></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  function countUp(el){
+    const target = +el.dataset.count, dur = 1500, start = performance.now();
+    function tick(now){
+      const p = Math.min((now - start) / dur, 1);
+      el.textContent = Math.round(ease(p) * target);
+      if(p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  window.addEventListener('load', () => {
+    setTimeout(() => document.querySelectorAll('[data-count]').forEach(countUp), 550);
+    setTimeout(() => {
+      document.querySelectorAll('.cap .fill').forEach(f => {
+        f.style.transition = 'width 1.1s cubic-bezier(.2,.7,.2,1)';
+      });
+    }, 700);
+  });
+</script>
+</body>
+</html>

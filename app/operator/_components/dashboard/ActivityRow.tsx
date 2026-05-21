@@ -1,38 +1,37 @@
 import { actionColor, actionLabel, formatRelativeTime } from './format';
 
 /**
- * A single editorial row in the "Lately" audit-log feed.
- *
- * The leading 2px vertical rule (color from `actionColor`) replaces the dot pattern —
- * it reads as a magazine accent rather than a notification badge.
+ * A row in the "Recent activity" feed: a small colored tick (from `actionColor`),
+ * the bold action label, and the relative time. Dividers are drawn by the parent
+ * feed except after the last row (`last`).
  */
 export function ActivityRow({
   action,
-  entityType,
   createdAt,
+  last = false,
 }: {
   action: string;
-  entityType: string;
   createdAt: Date;
+  last?: boolean;
 }) {
   return (
-    <li className="flex items-start gap-4 py-3">
+    <div
+      className="flex gap-[13px] py-[14px]"
+      style={last ? undefined : { borderBottom: '1px solid var(--border)' }}
+    >
       <span
         aria-hidden
-        className="mt-1.5 inline-block h-3 w-[2px] shrink-0"
+        className="mt-[6px] h-[7px] w-[7px] shrink-0 rounded-full"
         style={{ background: actionColor(action) }}
       />
-      <div className="min-w-0 flex-1">
-        <div
-          className="truncate text-sm leading-snug"
-          style={{ color: 'var(--text-primary)' }}
-        >
+      <div className="min-w-0 flex-1 text-[13.5px]">
+        <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
           {actionLabel(action)}
         </div>
-        <div className="mt-0.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-          {entityType.toLowerCase()} · {formatRelativeTime(createdAt)}
+        <div className="mt-[2px] text-[11.5px]" style={{ color: 'var(--text-tertiary)' }}>
+          {formatRelativeTime(createdAt)}
         </div>
       </div>
-    </li>
+    </div>
   );
 }

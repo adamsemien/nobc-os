@@ -2151,25 +2151,188 @@ button:not(:disabled):active,
 }
 
 /* ============================================================
-   Editorial entrance — operator home dashboard
-   Subtle fade + 8px rise, staggered across the major sections.
-   Honors prefers-reduced-motion.
+   Liquid editorial — operator home dashboard
+   Frosted-glass material, faint drifting ambient, staggered rise.
+   Tokens are scoped to .operator-scope so they never leak to member
+   pages, and resolve per-theme because they color-mix the live
+   --surface / --primary / --warning / --success of the active theme.
    ============================================================ */
-@keyframes editorial-fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+.operator-scope {
+  --glass: color-mix(in srgb, var(--surface) 70%, transparent);
+  --glass-strong: color-mix(in srgb, var(--surface) 86%, transparent);
+  --glass-edge: color-mix(in srgb, white 55%, transparent);
+  --glass-highlight: color-mix(in srgb, white 72%, transparent);
+  --glass-shadow: color-mix(in srgb, var(--text-primary) 22%, transparent);
+  --glass-sheen: color-mix(in srgb, white 50%, transparent);
+  --ambient-1: color-mix(in srgb, var(--primary) 15%, transparent);
+  --ambient-2: color-mix(in srgb, var(--warning) 13%, transparent);
+  --ambient-3: color-mix(in srgb, var(--success) 12%, transparent);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .editorial-fade-in {
-    opacity: 0;
-    transform: translateY(8px);
-    animation: editorial-fade-in 500ms ease-out forwards;
+/* Dark themes: denser glass, faint light edges, real drop shadow,
+   accent-glow ambient over the dark canvas. */
+[data-theme="midnight"] .operator-scope,
+[data-theme="obsidian"] .operator-scope,
+[data-theme="void"] .operator-scope,
+[data-theme="ember"] .operator-scope {
+  --glass: color-mix(in srgb, var(--surface) 64%, transparent);
+  --glass-strong: color-mix(in srgb, var(--surface) 80%, transparent);
+  --glass-edge: color-mix(in srgb, white 12%, transparent);
+  --glass-highlight: color-mix(in srgb, white 14%, transparent);
+  --glass-shadow: color-mix(in srgb, black 55%, transparent);
+  --glass-sheen: color-mix(in srgb, white 16%, transparent);
+  --ambient-1: color-mix(in srgb, var(--primary) 18%, transparent);
+  --ambient-2: color-mix(in srgb, var(--accent) 15%, transparent);
+  --ambient-3: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+/* High-chroma novelty themes: keep glass nearly opaque so text stays
+   fully legible over their busy palettes. */
+[data-theme="y2k"] .operator-scope,
+[data-theme="aim"] .operator-scope,
+[data-theme="myspace"] .operator-scope {
+  --glass: color-mix(in srgb, var(--surface) 90%, transparent);
+  --glass-strong: color-mix(in srgb, var(--surface) 96%, transparent);
+}
+
+/* ---- glass primitive ---- */
+.op-glass,
+.op-glass-strong {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  background: var(--glass);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 26px 52px -30px var(--glass-shadow);
+  transition:
+    transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.op-glass-strong {
+  background: var(--glass-strong);
+}
+@supports (backdrop-filter: blur(1px)) {
+  .op-glass,
+  .op-glass-strong {
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
   }
-  .editorial-stagger-1 { animation-delay:   0ms; }
-  .editorial-stagger-2 { animation-delay:  80ms; }
-  .editorial-stagger-3 { animation-delay: 160ms; }
-  .editorial-stagger-4 { animation-delay: 240ms; }
-  .editorial-stagger-5 { animation-delay: 320ms; }
+}
+.op-glass::after,
+.op-glass-strong::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(120deg, var(--glass-sheen) 0%, transparent 34%);
+  transition: opacity 0.5s ease;
+}
+.op-glass:hover,
+.op-glass-strong:hover {
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 34px 60px -28px var(--glass-shadow);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .op-glass:hover,
+  .op-glass-strong:hover {
+    transform: translateY(-4px);
+  }
+  .op-glass:hover::after,
+  .op-glass-strong:hover::after {
+    opacity: 1;
+  }
+}
+
+/* ---- pill buttons (ink primary, never red) ---- */
+.op-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 17px;
+  border-radius: 24px;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  color: var(--text-primary);
+  transition: background-color 0.22s ease, opacity 0.22s ease;
+}
+.op-btn:hover {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+.op-btn-primary {
+  background: var(--text-primary);
+  color: var(--bg);
+  border-color: var(--text-primary);
+}
+.op-btn-primary:hover {
+  background: var(--text-primary);
+  opacity: 0.9;
+}
+
+/* ---- ambient liquid field (dialed way down — a faint warm wash) ---- */
+.op-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  filter: blur(10px);
+}
+.op-blob {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.14;
+}
+.op-blob-1 {
+  width: 46vw;
+  height: 46vw;
+  left: -8vw;
+  top: -12vw;
+  background: radial-gradient(circle at 35% 35%, var(--ambient-1), transparent 68%);
+}
+.op-blob-2 {
+  width: 40vw;
+  height: 40vw;
+  right: -6vw;
+  top: 8vh;
+  background: radial-gradient(circle at 50% 50%, var(--ambient-2), transparent 66%);
+}
+.op-blob-3 {
+  width: 38vw;
+  height: 38vw;
+  left: 24vw;
+  bottom: -16vw;
+  background: radial-gradient(circle at 50% 40%, var(--ambient-3), transparent 67%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .op-blob-1 { animation: op-drift1 30s ease-in-out infinite; }
+  .op-blob-2 { animation: op-drift2 36s ease-in-out infinite; }
+  .op-blob-3 { animation: op-drift3 27s ease-in-out infinite; }
+}
+@keyframes op-drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(7vw,6vh) scale(1.14); } }
+@keyframes op-drift2 { 0%,100% { transform: translate(0,0) scale(1.05); } 50% { transform: translate(-6vw,8vh) scale(0.9); } }
+@keyframes op-drift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(5vw,-7vh) scale(1.16); } }
+
+/* ---- staggered rise entrance ----
+   opacity:0 is applied ONLY under no-preference so reduced-motion
+   users never see invisible content. */
+@keyframes op-rise {
+  from { opacity: 0; transform: translateY(26px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .op-rise {
+    opacity: 0;
+    animation: op-rise 0.9s cubic-bezier(0.16, 0.7, 0.2, 1) both;
+  }
 }
 

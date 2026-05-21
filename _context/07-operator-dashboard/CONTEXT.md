@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #20 (audit_events portion), #22 (7-theme system), #24 (operator bulk delete), #28 (roles & permissions — Roles & Permissions section lives in root CLAUDE.md) |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Roll the editorial dashboard treatment outward — apply the same hairline + display-numeral language to `/operator/applications` and `/operator/events` index pages |
+| **Next** | Build the Editorial (riso) theme as an alternate look (separate task); optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx` |
 
 ## Scope
 
@@ -35,17 +35,24 @@ app/operator/members/[id]/page.tsx                       ← member detail
 app/operator/audit/page.tsx                              ← audit log viewer
 app/operator/settings/                                   ← workspace settings (entire directory)
 app/operator/_help/                                      ← in-app help / onboarding (entire directory)
-app/operator/_components/dashboard/StatColumn.tsx        ← oversized display-font numeral with eyebrow + soft CTA
-app/operator/_components/dashboard/SectionHeader.tsx     ← editorial section eyebrow (or display-font heading) with optional action slot
-app/operator/_components/dashboard/CapacityBar.tsx       ← 1px hairline capacity indicator for events
-app/operator/_components/dashboard/ActivityRow.tsx       ← single audit-row with colored leading rule
-app/operator/_components/dashboard/TonightPanel.tsx      ← "Tonight" feature block: today's events + waiting-on-you list
-app/operator/_components/dashboard/format.ts             ← shared date/action formatters used across the dashboard components
+app/operator/_components/dashboard/GlassPanel.tsx        ← frosted-glass primitive (.op-glass / .op-glass-strong); the reusable panel material
+app/operator/_components/dashboard/StatFigure.tsx        ← asymmetric stat figure (lead | sm | wide); composes GlassPanel + CountUp
+app/operator/_components/dashboard/CountUp.tsx           ← (client) numeral that counts up on load; reduced-motion → final value
+app/operator/_components/dashboard/DeskClock.tsx         ← (client) masthead live HH·MM clock + contextual sub
+app/operator/_components/dashboard/LiquidAmbient.tsx     ← faint drifting warm-wash blobs behind the page (decorative)
+app/operator/_components/dashboard/SectionHeader.tsx     ← seclabel: --primary icon + tracked title + hairline + optional action
+app/operator/_components/dashboard/CapacityBar.tsx       ← (client) 3px capacity track, --primary fill, animates width on mount
+app/operator/_components/dashboard/ActivityRow.tsx       ← activity-feed row: colored tick + bold label + relative time
+app/operator/_components/dashboard/TonightPanel.tsx      ← glass "Tonight" band: a gig per event today, ink "The Room" button
+app/operator/_components/dashboard/format.ts             ← shared date/action formatters; actionColor → theme tokens
+_context/07-operator-dashboard/glass-reference.html      ← the liquid-editorial visual target (mockup)
 lib/theme.ts                                             ← active theme resolution (10-theme system + per-workspace override)
 lib/permissions.ts                                       ← role → action matrix used by every operator API route
 lib/audit.ts                                             ← AuditEvent write + query helpers (single module)
-app/globals.css                                          ← `.editorial-fade-in` + `.editorial-stagger-{1..5}` entrance keyframes (honor prefers-reduced-motion)
+app/globals.css                                          ← glass tokens (.operator-scope), .op-glass material, .op-btn, .op-ambient + drift, .op-rise entrance (all honor prefers-reduced-motion)
 ```
+
+Replaced in this redesign: `StatColumn.tsx` → `StatFigure.tsx`. The `.editorial-fade-in`/`.editorial-stagger-*` CSS was removed in favor of `.op-rise` + the glass material.
 
 ## Inputs
 
@@ -70,16 +77,21 @@ app/globals.css                                          ← `.editorial-fade-in
 - **AccessToken**: operator API tokens (when present)
 - Indexes: (workspaceId, createdAt DESC), (resourceType, resourceId)
 
-## Dashboard home — editorial language
+## Dashboard home — liquid editorial (DEFAULT look)
 
-The operator home (`app/operator/page.tsx`) is a luxury-magazine read of the workspace, not a fintech panel. The visual contract:
+The operator home (`app/operator/page.tsx`) is editorial typography on translucent frosted-glass panels over a calm, faintly drifting warm wash. Visual target: `glass-reference.html` in this folder. The contract:
 
-- **Five sections, top → bottom:** masthead (date + display-font headline + thin rule) → four-column numerals (giant `var(--font-display)` numbers separated by vertical hairlines) → "Tonight" (the only urgent moment) → "What's coming" + "Lately" two-column journal → marginalia (birthdays + on-this-day) under a single top hairline.
-- **One accent moment.** `var(--primary)` only flips a body element when something demands action — the Pending Applications numeral when count > 0, and `The Room →` as the only filled `--primary` button on the page (lives inside Tonight). Everything else stays in text-primary/secondary/tertiary.
-- **Hairlines, not cards.** Surfaces are separated by 1px `var(--border)` rules instead of bordered card backgrounds. Capacity is a 1px line, not a rounded pill.
-- **Display font for numerals + section titles.** All large numerals and event titles use `var(--font-display)` directly so per-theme pairings (Obsidian → Cormorant, Parchment → Fraunces, Rose → Playfair, etc.) inherit automatically. Never hardcode `"PP Editorial New"` or any other family name in components.
-- **Staggered entrance.** Each major section uses `.editorial-fade-in .editorial-stagger-{n}`; cascade is 80ms per step, gated behind `prefers-reduced-motion: no-preference`.
-- **Reusable dashboard components live under `app/operator/_components/dashboard/`** — extracting from `page.tsx` (rather than building inline JSX) is the default when adding a new editorial surface in this stage.
+- **Full-bleed, asymmetric magazine grid** — NOT a centered column. Section order: masthead → four figures (asymmetric) → Tonight band → Upcoming events + Recent activity (asymmetric lower grid).
+- **Masthead:** dateline ("The operator's desk · {date}", date in `--primary`) → large serif headline with the period in `--primary` → italic serif standfirst. A live `DeskClock` sits at the right.
+- **Figures grid** (`1.42fr 1fr 1fr`, two rows): **Pending applications** is the dominant tall `--glass-strong` panel with a **red** count-up numeral, avatar faces, and the red "Review the queue" pill — this is the single dominant red moment. Members + Upcoming are small figures; Checked-in-today is a wide figure spanning the bottom-right.
+- **One accent moment.** Red = the lead figure (numeral + pill). Everywhere else red is punctuation-scale only (the headline period, the dateline date, 3px capacity fills, 7px activity ticks, section icons, "Tonight" eyebrows). **Primary CTA buttons are ink (`.op-btn-primary`), never red.**
+- **Glass material — token-driven.** Use `GlassPanel` / `.op-glass` (or `.op-glass-strong`). The material reads only theme tokens: `--glass`, `--glass-strong`, `--glass-edge`, `--glass-highlight`, `--glass-shadow`, `--glass-sheen`. These are defined on `.operator-scope` via `color-mix` on the live `--surface`, so they retheme automatically; dark themes (midnight/obsidian/void/ember) get denser glass + faint light edges + a real drop shadow; high-chroma themes (y2k/aim/myspace) get near-opaque glass for legibility. **Readability is the gate** — if a theme's `--glass` ever drops text below AA, raise its opacity.
+- **Ambient stays quiet.** `--ambient-1/2/3` tint three blurred `.op-blob`s at ~0.14 opacity (the "liquid" feeling comes from the glass + motion, not loud clouds).
+- **Display font everywhere large.** All numerals, headline, event titles, gig titles use `var(--font-display)` directly so per-theme pairings inherit (Obsidian → Cormorant, Parchment → Fraunces, etc.). Never hardcode a family name.
+- **Motion (all gated by `prefers-reduced-motion`):** numerals count up (`CountUp`), capacity bars grow on mount (`CapacityBar`), sections rise in staggered (`.op-rise` + inline `animation-delay`), glass panels lift + sheen-sweep on hover, ambient drifts continuously.
+- **Reusable dashboard components live under `app/operator/_components/dashboard/`** — extracting from `page.tsx` (rather than inline JSX) is the default when adding an editorial surface here.
+
+> Data note: `page.tsx`'s `Promise.all` is unchanged (byte-identical). It still fetches birthdays/throwbacks (last two results) which the liquid layout no longer renders — trim later if desired.
 
 ## Rules — DO NOT VIOLATE
 
