@@ -638,13 +638,15 @@ export async function POST() {
           aiRecommendation: app.aiRecommendation,
           aiReasoning: app.aiReasoning,
           archetype: app.archetype,
+          // archetypeScores are 0–100 (see lib/scoring.ts) — the operator AI
+          // profile (worth scores, spectrum bars) reads them on that scale.
           archetypeScores: {
-            Connector: app.archetype === 'Connector' ? app.aiScore : Math.random() * 0.4 + 0.2,
-            Host:      app.archetype === 'Host'      ? app.aiScore : Math.random() * 0.4 + 0.2,
-            Curator:   app.archetype === 'Curator'   ? app.aiScore : Math.random() * 0.4 + 0.2,
-            Builder:   app.archetype === 'Builder'   ? app.aiScore : Math.random() * 0.4 + 0.2,
-            Maker:     app.archetype === 'Maker'     ? app.aiScore : Math.random() * 0.4 + 0.2,
-            Patron:    app.archetype === 'Patron'    ? app.aiScore : Math.random() * 0.4 + 0.2,
+            Connector: app.archetype === 'Connector' ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
+            Host:      app.archetype === 'Host'      ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
+            Curator:   app.archetype === 'Curator'   ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
+            Builder:   app.archetype === 'Builder'   ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
+            Maker:     app.archetype === 'Maker'     ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
+            Patron:    app.archetype === 'Patron'    ? Math.round(app.aiScore * 100) : Math.round(Math.random() * 40 + 20),
           },
           createdAt: daysAgo(Math.floor(Math.random() * 7 + 1)),
         },

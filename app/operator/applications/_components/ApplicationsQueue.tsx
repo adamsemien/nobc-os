@@ -467,7 +467,7 @@ export function ApplicationsQueue({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:min-h-[calc(100vh-10rem)]">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:h-[calc(100vh-10rem)] lg:flex-none">
       {voidInverted && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
@@ -498,7 +498,7 @@ export function ApplicationsQueue({
         </div>
       ) : null}
 
-      <div className="grid min-h-0 min-w-0 flex-1 gap-5 overflow-hidden lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] lg:gap-8">
+      <div className="grid min-h-0 min-w-0 flex-1 gap-5 overflow-hidden lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-8">
         <div className="flex min-h-0 min-w-0 flex-col overflow-hidden border-border lg:border-r lg:pr-1">
           {selectedIds.size > 0 && (
             <div
@@ -768,8 +768,18 @@ export function ApplicationsQueue({
   );
 }
 
+/** Archetype scores are stored 0–100 (see lib/scoring.ts). Some dev-seed rows
+ *  stored them as 0–1 fractions; coerce either form to a 0–100 integer so the
+ *  UI never renders a raw float and bars fill correctly. Values in (0,1] are
+ *  read as fractions. */
+function scorePct(raw: number | undefined | null): number {
+  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
+  const scaled = n > 0 && n <= 1 ? n * 100 : n;
+  return Math.round(Math.min(100, Math.max(0, scaled)));
+}
+
 function memberWorthScores(scores: Record<string, number>): { influence: number; contribution: number; activation: number; total: number } {
-  const get = (k: string) => Math.min(100, Math.max(0, scores[k] ?? 0));
+  const get = (k: string) => scorePct(scores[k]);
   const influence = Math.round((get('Connector') + get('Curator')) / 20);
   const contribution = Math.round((get('Builder') + get('Maker')) / 20);
   const activation = Math.round((get('Host') + get('Patron')) / 20);
@@ -1072,20 +1082,23 @@ function DetailPanel({
                 </div>
 
                 <div className="mt-3 space-y-1.5">
-                  {['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'].map(name => (
-                    <div key={name} className="flex items-center gap-2">
-                      <span className="w-20 shrink-0 text-[10px] text-text-muted">{name}</span>
-                      <div className="flex-1 overflow-hidden rounded-full bg-border" style={{ height: 4 }}>
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${app.archetypeScores![name] ?? 0}%` }}
-                        />
+                  {['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'].map(name => {
+                    const v = scorePct(app.archetypeScores![name]);
+                    return (
+                      <div key={name} className="flex items-center gap-2">
+                        <span className="w-20 shrink-0 text-[10px] text-text-muted">{name}</span>
+                        <div className="flex-1 overflow-hidden rounded-full bg-border" style={{ height: 4 }}>
+                          <div
+                            className="h-full rounded-full bg-primary transition-[width]"
+                            style={{ width: `${v}%` }}
+                          />
+                        </div>
+                        <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-text-muted">
+                          {v}%
+                        </span>
                       </div>
-                      <span className="w-6 shrink-0 text-right text-[10px] tabular-nums text-text-muted">
-                        {app.archetypeScores![name] ?? 0}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             );
