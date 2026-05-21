@@ -1149,7 +1149,7 @@ function DetailPanel({
         />
       </div>
 
-      <div className="mt-auto flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:gap-4">
+      <div className="sticky bottom-0 z-10 mt-auto flex flex-col gap-3 border-t border-border bg-surface-elevated pt-6 sm:flex-row sm:gap-4">
         <div className="relative flex-1">
           <button
             ref={approveBtnRef}
