@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🔶 Partial |
+| **State** | ✅ Shipped (V1) |
 | **V1 item** | #17 |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Build out lib/mcp/ layer with full tool surface (route handler is live, library is thin) |
+| **Next** | Wire the Runtype master agent to the live `/api/mcp` endpoint. Add `payments.refund` + `wallet.revoke` tools once Stripe capture / wallet revocation land. Extract approve/checkin write logic into a shared service layer (currently lives in the tool modules). |
 
 ## Scope
 
@@ -25,23 +25,39 @@ A single MCP server at `nobc.thenobadcompany.com/mcp` (route: `/api/mcp`) that e
 - Audit log queries
 - Workspace settings reads
 
-OAuth 2.0 authentication, workspace-scoped tokens.
+**Auth (V1, shipped):** bearer-token, verified with **Clerk's backend SDK** (`@clerk/backend` `verifyToken`). Every request must carry `Authorization: Bearer <Clerk session token>`; an active Clerk browser session is also accepted as a fallback (in-app / Claude Desktop). The **workspace is derived from the authenticated identity** (`requireWorkspaceId`), never from the request body — that is the cross-tenant boundary. Unauthenticated / invalid-token requests get `401` + `WWW-Authenticate: Bearer`. (This supersedes the earlier custom OAuth-2.0 `authorize`/`token` sketch — Clerk owns identity, so a parallel OAuth server is unnecessary for V1. A standalone OAuth surface for non-Clerk integrators is a V1.5 option.)
+
+**Protocol (V1, shipped):** Model Context Protocol over **JSON-RPC 2.0** (Streamable HTTP, stateless) at `POST /api/mcp` — methods `initialize`, `tools/list`, `tools/call`, `ping`, and `notifications/*`. `GET /api/mcp` returns a JSON manifest of the authenticated tool surface. Tool input contracts are Zod schemas surfaced to clients as JSON Schema.
 
 ## Files in play
 
 ```
-app/api/mcp/route.ts                            ← MCP HTTP handler
-app/api/mcp/oauth/authorize/route.ts            ← OAuth authorize
-app/api/mcp/oauth/token/route.ts                ← OAuth token exchange
-lib/mcp/server.ts                               ← MCP server instance
-lib/mcp/tools/applications.ts                   ← application tool definitions
-lib/mcp/tools/members.ts                        ← member tool definitions
-lib/mcp/tools/events.ts                         ← event tool definitions
-lib/mcp/tools/rsvps.ts                          ← RSVP tool definitions
-lib/mcp/tools/payments.ts                       ← payment tool definitions
-lib/mcp/tools/audit.ts                          ← audit query tools
-lib/mcp/auth.ts                                 ← OAuth token validation, workspace scoping
+app/api/mcp/route.ts            ← thin JSON-RPC entry: auth-gate → dispatch (POST) + manifest (GET)
+lib/mcp/auth.ts                 ← bearer (Clerk verifyToken) + session fallback → { userId, workspaceId }
+lib/mcp/types.ts                ← McpContext, McpTool
+lib/mcp/server.ts               ← JSON-RPC dispatcher (initialize / tools.list / tools.call / ping)
+lib/mcp/registry.ts             ← aggregates all tools; Zod→JSON-Schema; validate + call
+lib/mcp/tools/members.ts        ← nobc_get_members, nobc_get_member, nobc_tag_member
+lib/mcp/tools/applications.ts   ← nobc_get_applications, nobc_get_application, approve / reject / waitlist
+lib/mcp/tools/events.ts         ← nobc_get_events, nobc_get_event, create / update / publish / cancel
+lib/mcp/tools/rsvps.ts          ← nobc_get_rsvps, nobc_get_rsvp, approve / reject / cancel
+lib/mcp/tools/checkin.ts        ← nobc_get_checkin_status, nobc_check_in
+lib/mcp/legacy-tools.ts         ← preserved surface: intelligence.* (auto-registered), ticketing.*, series.*, tag.*, comp/redlist/waitlist
 ```
+
+### V1 tool surface (shipped)
+
+```
+Reads:  nobc_get_members, nobc_get_member, nobc_get_applications, nobc_get_application,
+        nobc_get_events, nobc_get_event, nobc_get_rsvps, nobc_get_rsvp, nobc_get_checkin_status
+Writes: nobc_tag_member, nobc_approve_application, nobc_reject_application, nobc_waitlist_application,
+        nobc_create_event, nobc_update_event, nobc_publish_event, nobc_cancel_event,
+        nobc_approve_rsvp, nobc_reject_rsvp, nobc_cancel_rsvp, nobc_check_in
+Plus:   intelligence.* (every mcpExposed metric + intelligence.compose), ticketing.tier.*,
+        series.*, tag.*, issue_comp_ticket, promote_from_waitlist, add_to_red_list
+```
+
+Every write tool sets `destructive: true` (surfaced to clients as `destructiveHint`) and writes an `AuditEvent` with `actorType = 'AGENT'`.
 
 ## Inputs
 
