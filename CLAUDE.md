@@ -28,7 +28,7 @@ Methodology: see the `nobc-icm` skill.
 - **Auth:** Clerk with Organizations (org = workspace = tenant)
 - **Email:** Resend (transactional only)
 - **Payments:** Stripe (authorize/capture)
-- **AI:** Claude Sonnet 4.6 via Vercel AI SDK
+- **AI:** `claude-sonnet-4-20250514` via Vercel AI SDK (the locked model — see Locked Decisions)
 - **Agent runtime:** Runtype (V1.5)
 - **Deploy:** Vercel
 

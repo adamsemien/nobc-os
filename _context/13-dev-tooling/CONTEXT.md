@@ -51,6 +51,8 @@ lib/dev/persona-types.ts                            ← persona schema for gener
 lib/dev/demo-applications.ts                        ← shared demo-app content: full answer set + 0–100 archetypeScores + wipe/seed helpers
 prisma/seed-demo.ts                                 ← `npm run seed:demo` — Tenur-call demo (members, events, RSVPs, complete applications)
 scripts/verify-demo-applications.ts                 ← read-only check: every demo app has full answers + AI profile
+scripts/survey-non-demo-data.ts                     ← read-only inventory of non-demo rows in the NoBC workspace
+scripts/cleanup-non-demo-data.ts                    ← deletes ALL non-demo data (apps/members/events + deps), workspace-scoped, dry-run default (--write to execute)
 ```
 
 ## Inputs
