@@ -149,6 +149,8 @@ If you report task completion without performing this checklist, the task is inc
 | 12 | `_context/12-intelligence/` | ✅ Shipped (base) / 🔶 sponsor-facing partial | #27 |
 | 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) | — |
 
+> **#18 (Stage 09 — AI chat panel):** direct Vercel AI SDK + MCP tool registry (`lib/mcp/`). Runtype orchestration deferred to V1.5.
+
 ---
 
 ## Environment Variables (always-required)
