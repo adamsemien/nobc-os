@@ -180,6 +180,26 @@ If you report task completion without performing this checklist, the task is inc
 
 ---
 
+## Working Principles (how to approach every task)
+
+These govern *how* you work. They are general guidance, not hard constants — the **Absolute Rules (and Locked Decisions) above win on any conflict.** When a principle here pushes one way and a rule above pushes the other, the rule wins, every time.
+
+### 1. Think before coding
+Don't assume, don't hide confusion, surface tradeoffs. If a request is ambiguous, state the interpretations and ask — don't pick one silently. If a simpler approach exists, say so before implementing. If something is unclear, name it and stop rather than guess.
+
+### 2. Simplicity first
+Ship the minimum code that solves the problem. No speculative features, no abstractions for single-use code, no configurability nobody asked for, no error handling for impossible scenarios. The test: would a senior engineer call this overcomplicated? If yes, simplify. Do not add dependencies, tooling, or test infrastructure as a side effect of an unrelated task — if a task genuinely needs new infrastructure, flag it and ask first.
+
+### 3. Surgical changes
+Touch only what the request requires. Don't improve adjacent code, don't refactor what isn't broken, match existing style even where you'd do it differently. Remove imports or variables your own changes orphaned — but never delete pre-existing dead code without asking. Every changed line should trace directly to the request. This holds with extra force in the sensitive areas this file already flags — `/apply`, archetype config, legal copy — and anywhere governed by the Absolute Rules.
+
+### 4. Goal-driven execution
+Define success criteria before coding, then loop until verified. Here, "verified" means: `tsc` typechecks with no new errors, `next build` succeeds, and relevant automated tests pass — E2E via Playwright, unit via Vitest. For schema changes, `prisma generate` runs clean and the diff is shown for manual review before any push (never auto-push — Producer shares the Postgres instance). For multi-step tasks, state a brief numbered plan with a verification check per step before starting.
+
+> These principles bias toward caution over speed. For trivial changes — typo fixes, obvious one-liners — use judgment and skip the full rigor.
+
+---
+
 ## Stage map
 
 | # | Stage | State | V1 items |
