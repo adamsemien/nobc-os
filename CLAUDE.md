@@ -157,7 +157,7 @@ Phase J details:
 ### No Twilio — except the House Phone inbox
 NoBC OS never calls Twilio directly **anywhere except the House Phone operator SMS inbox** (`app/operator/house-phone`, `app/api/sms/*`). For every other feature the rule stands: all SMS flows through Runtype's Communications sub-agent — if a feature needs SMS, trigger Runtype; if Runtype is unavailable, degrade gracefully to email or queue for retry. Do not add the Twilio SDK or `TWILIO_*` env vars to any other feature.
 
-> **Override — 2026-05-22 (Adam, explicit):** The House Phone live-event inbox calls Twilio directly (inbound webhook + REST sends) via the `twilio` SDK and `TWILIO_*` env vars. This reverses the prior blanket ban **for this feature only**. Rationale: a shared, real-time, multi-operator SMS inbox for live events needs synchronous send/receive that the Runtype-mediated path does not provide. The AI model lock still holds — House Phone AI replies use `claude-sonnet-4-20250514`, not a cheaper model. (Note: this "House Phone" is a distinct web inbox; the Runtype "House Phone" sub-agent in the Architecture diagram is a separate thing that shares the name.)
+> **Override — 2026-05-22 (Adam, explicit):** The House Phone shared operator SMS inbox uses Twilio directly via the `twilio` SDK and `TWILIO_*` env vars. This reverses the prior blanket ban **for this feature only**. Split of responsibilities: a separate **Railway** service handles **inbound** SMS (Twilio webhook → writes `SmsMessage`/`SmsConversation` to the shared Postgres, runs the AI auto-reply). **nobc-os** owns the operator-facing inbox: list conversations, toggle per-conversation `aiEnabled`, and send **outbound** replies via the Twilio REST API (`POST /api/sms/reply`). The AI model lock still holds wherever AI runs (Railway auto-reply uses `claude-sonnet-4-20250514`, not a cheaper model). (Note: this "House Phone" is a distinct web inbox; the Runtype "House Phone" sub-agent in the Architecture diagram is a separate thing that shares the name.)
 
 ### Workspace scoping is the security boundary
 Every read and every write is workspace-scoped. `workspaceId` is on every user-data table, indexed, and checked on every query. No exceptions.
@@ -238,7 +238,8 @@ Define success criteria before coding, then loop until verified. Here, "verified
 - `PASSNINJA_ACCOUNT_ID` — wallet passes (#11). Required alongside the API key.
 - `PASSNINJA_PASS_TYPE` — wallet pass-type slug (defaults `nobc.member`). NOTE: the code reads `PASSNINJA_PASS_TYPE`, not `PASSNINJA_TEMPLATE_ID`.
 - `SVIX_API_KEY` — outbound operator webhooks (#20). `getSvix()` returns null until set.
-- `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` — House Phone SMS inbox (`app/api/sms/*`). Direct Twilio REST sends + inbound-webhook signature validation. See the Twilio override note in Absolute Rules. SMS AI replies use the locked `claude-sonnet-4-20250514` + `ANTHROPIC_API_KEY`.
+- `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` — House Phone outbound reply sends from nobc-os (`POST /api/sms/reply`). See the Twilio override note in Absolute Rules.
+- `HOUSE_PHONE_WORKSPACE_ID` — the workspace that owns the House Phone SMS inbox. Used to scope conversations where there is no Clerk session (the Railway inbound service; reserved for any nobc-os SMS path that lacks a session).
 
 Stage-specific env vars live in each stage's `CONTEXT.md`.
 
