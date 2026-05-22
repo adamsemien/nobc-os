@@ -13,6 +13,7 @@ import {
   BarChart3,
   Activity,
   ScanLine,
+  MessageSquare,
   Settings,
   ExternalLink,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ const PRIMARY_ITEMS: NavItem[] = [
   { href: '/operator/applications',    label: 'Applications',  match: '/operator/applications',                 Icon: Inbox },
   { href: '/operator/events',          label: 'Events',        match: '/operator/events',                       Icon: CalendarDays },
   { href: '/operator/check-in',        label: 'Check-in',      match: '/operator/check-in',                     Icon: ScanLine },
+  { href: '/operator/house-phone',     label: 'House Phone',   match: '/operator/house-phone',                  Icon: MessageSquare },
   { href: '/operator/members',         label: 'Members',       match: '/operator/members',                      Icon: Users },
   { href: '/operator/settings/lists',  label: 'Lists',         match: '/operator/settings/lists',               Icon: ListChecks },
   { href: '/operator/intelligence',    label: 'Intelligence',  match: '/operator/intelligence',                 Icon: BarChart3 },
