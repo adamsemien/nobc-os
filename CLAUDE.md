@@ -219,6 +219,7 @@ Define success criteria before coding, then loop until verified. Here, "verified
 | 11 | `_context/11-producer-integration/` | ✅ Shipped | #20, #26, House Phone trigger (V1.5) |
 | 12 | `_context/12-intelligence/` | ✅ Shipped (base) / 🔶 sponsor-facing partial | #27 |
 | 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) | — |
+| 14 | `_context/14-house-phone/` | 🟡 In progress | House Phone SMS inbox (post-V1) |
 
 > **#18 (Stage 09 — AI chat panel):** direct Vercel AI SDK + MCP tool registry (`lib/mcp/`). Runtype orchestration deferred to V1.5.
 
