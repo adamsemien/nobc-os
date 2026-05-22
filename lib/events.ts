@@ -13,7 +13,6 @@ const listSelect = {
   runOfShow: true,
   template: true,
   accessMode: true,
-  applyMode: true,
   approvalRequired: true,
   capacity: true,
   showCapacity: true,
