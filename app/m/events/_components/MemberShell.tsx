@@ -34,8 +34,7 @@ export function MemberShellNav({
             : 'text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-ref-ink sm:text-[0.7rem] sm:tracking-[0.16em]'
         }
       >
-        <span>THE </span>
-        <span className={dark ? 'text-events-warm-accent' : 'text-events-ref-accent'}>NO BAD </span>
+        <span className="text-nobc-red">NO BAD </span>
         <span>COMPANY</span>
       </Link>
       <div className="flex items-center gap-6 sm:gap-8">
@@ -90,8 +89,7 @@ export function MemberShellFooter({
                 : 'text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-ref-ink sm:text-[0.7rem] sm:tracking-[0.16em]'
             }
           >
-            <span>THE </span>
-            <span className={dark ? 'text-events-warm-accent' : 'text-events-ref-accent'}>NO BAD </span>
+            <span className="text-nobc-red">NO BAD </span>
             <span>COMPANY</span>
           </p>
         </div>
@@ -133,8 +131,7 @@ export function MemberShellFooter({
               : 'text-[0.6rem] font-normal uppercase tracking-[0.14em] text-events-ref-muted'
           }
         >
-          <span>The </span>
-          <span className={dark ? 'text-events-warm-accent' : 'text-events-ref-accent'}>No Bad </span>
+          <span className="text-nobc-red">No Bad </span>
           <span>Company · By application</span>
         </p>
       </div>
