@@ -59,14 +59,9 @@ export async function POST(
       })
     : null;
 
-  // Membership gate: authenticated users without an approved Application cannot register.
-  if (userId && (!member || member.status !== 'APPROVED')) {
-    return NextResponse.json(
-      { error: 'Membership required to register for events.', code: 'membership_required' },
-      { status: 403 },
-    );
-  }
-
+  // Access is enforced by viewer resolution below: a signed-in non-member resolves to the
+  // guest path (and registers as a guest where Guest Access is enabled), or to a "closed"
+  // result for member-only events. Only approved members ever reach the member path.
   const viewer = resolveViewer(member, userId);
   const ctx = await loadAccessContext(workspaceId, evt.id, viewer);
   if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
