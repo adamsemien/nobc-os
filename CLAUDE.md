@@ -154,10 +154,8 @@ Phase J details:
 
 ## Absolute Rules (apply to every stage)
 
-### No Twilio — except the House Phone inbox
-NoBC OS never calls Twilio directly **anywhere except the House Phone operator SMS inbox** (`app/operator/house-phone`, `app/api/sms/*`). For every other feature the rule stands: all SMS flows through Runtype's Communications sub-agent — if a feature needs SMS, trigger Runtype; if Runtype is unavailable, degrade gracefully to email or queue for retry. Do not add the Twilio SDK or `TWILIO_*` env vars to any other feature.
-
-> **Override — 2026-05-22 (Adam, explicit):** The House Phone shared operator SMS inbox uses Twilio directly via the `twilio` SDK and `TWILIO_*` env vars. This reverses the prior blanket ban **for this feature only**. Split of responsibilities: a separate **Railway** service handles **inbound** SMS (Twilio webhook → writes `SmsMessage`/`SmsConversation` to the shared Postgres, runs the AI auto-reply). **nobc-os** owns the operator-facing inbox: list conversations, toggle per-conversation `aiEnabled`, and send **outbound** replies via the Twilio REST API (`POST /api/sms/reply`). The AI model lock still holds wherever AI runs (Railway auto-reply uses `claude-sonnet-4-20250514`, not a cheaper model). (Note: this "House Phone" is a distinct web inbox; the Runtype "House Phone" sub-agent in the Architecture diagram is a separate thing that shares the name.)
+### Twilio — House Phone SMS only
+Twilio is approved for the House Phone SMS feature only (`lib/twilio.ts` + `/api/sms/reply`). Do not add Twilio to any other feature without explicit approval.
 
 ### Workspace scoping is the security boundary
 Every read and every write is workspace-scoped. `workspaceId` is on every user-data table, indexed, and checked on every query. No exceptions.
