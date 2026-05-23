@@ -1,4 +1,5 @@
 import { db } from "./db"
+import { generateMemberQrCode } from "./member-qr"
 import {
   parseEventAccess,
   resolveAccessForViewer,
@@ -116,6 +117,7 @@ export async function findOrCreateGuestMember(
       lastName,
       status: "GUEST",
       approved: false,
+      memberQrCode: generateMemberQrCode(),
     },
     select: { id: true, email: true, firstName: true, lastName: true, memberQrCode: true },
   })
