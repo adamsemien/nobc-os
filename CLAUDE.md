@@ -154,8 +154,8 @@ Phase J details:
 
 ## Absolute Rules (apply to every stage)
 
-### No Twilio. Ever.
-NoBC OS never calls Twilio directly. All SMS flows through the House Phone (Communications sub-agent in Runtype). If a feature needs SMS: trigger Runtype. If Runtype is unavailable: degrade gracefully to email or queue for retry. Do not add the Twilio SDK. Do not add a Twilio env var.
+### Twilio — House Phone SMS only
+Twilio is approved for the House Phone SMS feature only (`lib/twilio.ts` + `/api/sms/reply`). Do not add Twilio to any other feature without explicit approval.
 
 ### Workspace scoping is the security boundary
 Every read and every write is workspace-scoped. `workspaceId` is on every user-data table, indexed, and checked on every query. No exceptions.
@@ -217,6 +217,7 @@ Define success criteria before coding, then loop until verified. Here, "verified
 | 11 | `_context/11-producer-integration/` | ✅ Shipped | #20, #26, House Phone trigger (V1.5) |
 | 12 | `_context/12-intelligence/` | ✅ Shipped (base) / 🔶 sponsor-facing partial | #27 |
 | 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) | — |
+| 14 | `_context/14-house-phone/` | 🟡 In progress | House Phone SMS inbox (post-V1) |
 
 > **#18 (Stage 09 — AI chat panel):** direct Vercel AI SDK + MCP tool registry (`lib/mcp/`). Runtype orchestration deferred to V1.5.
 
@@ -236,6 +237,8 @@ Define success criteria before coding, then loop until verified. Here, "verified
 - `PASSNINJA_ACCOUNT_ID` — wallet passes (#11). Required alongside the API key.
 - `PASSNINJA_PASS_TYPE` — wallet pass-type slug (defaults `nobc.member`). NOTE: the code reads `PASSNINJA_PASS_TYPE`, not `PASSNINJA_TEMPLATE_ID`.
 - `SVIX_API_KEY` — outbound operator webhooks (#20). `getSvix()` returns null until set.
+- `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` — House Phone outbound reply sends from nobc-os (`POST /api/sms/reply`). See the Twilio override note in Absolute Rules.
+- `HOUSE_PHONE_WORKSPACE_ID` — the workspace that owns the House Phone SMS inbox. Used to scope conversations where there is no Clerk session (the Railway inbound service; reserved for any nobc-os SMS path that lacks a session).
 
 Stage-specific env vars live in each stage's `CONTEXT.md`.
 

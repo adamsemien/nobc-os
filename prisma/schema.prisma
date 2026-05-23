@@ -56,6 +56,7 @@ model Workspace {
   operatorNotifications OperatorNotification[]
   qaMissions           QAMission[]
   membershipTiers      MembershipTier[]
+  smsConversations     SmsConversation[]
 
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
@@ -313,6 +314,7 @@ model Event {
   promoCodes      PromoCode[]
   ticketHolds     TicketHold[]
   workflow        EventWorkflow?
+  smsConversations SmsConversation[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -1194,4 +1196,41 @@ model MembershipTier {
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId, order])
+}
+
+// House Phone — shared multi-operator SMS inbox for live events.
+// Direct Twilio send/receive (see the Twilio override note in CLAUDE.md, 2026-05-22).
+enum SmsDirection {
+  INBOUND
+  OUTBOUND
+}
+
+model SmsConversation {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  phone       String
+  name        String?
+  eventId     String?
+  event       Event?    @relation(fields: [eventId], references: [id])
+  aiEnabled   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  messages SmsMessage[]
+
+  @@unique([workspaceId, phone])
+  @@index([workspaceId])
+}
+
+model SmsMessage {
+  id             String          @id @default(cuid())
+  conversationId String
+  conversation   SmsConversation @relation(fields: [conversationId], references: [id])
+  direction      SmsDirection
+  body           String          @db.Text
+  aiGenerated    Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+
+  @@index([conversationId, createdAt])
 }

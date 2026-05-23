@@ -38,6 +38,7 @@ Claude Code reads only that stage's `CONTEXT.md` plus the root `CLAUDE.md`. Othe
 | 11 | `11-producer-integration/` | Phase J webhook + Svix outbound + House Phone trigger (V1.5) |
 | 12 | `12-intelligence/` | Intelligence metric registry + sponsor-facing surface (moat product) |
 | 13 | `13-dev-tooling/` | Internal-only: QA Missions, persona generator, seed/reset, apply-flow tester |
+| 14 | `14-house-phone/` | Shared multi-operator SMS inbox for live events (outbound replies via Twilio; inbound on Railway) |
 
 ## The `nobc-icm` skill
 

@@ -173,7 +173,22 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
           amountCents?: number;
           error?: string;
           code?: string;
+          comp?: boolean;
+          ticketStatus?: string;
+          memberQrCode?: string | null;
         };
+        // Operator bypass: payment-intent returned a complimentary confirmation (no Stripe).
+        if (data.comp) {
+          setState((s) => ({ ...s, submitting: false }));
+          setResult({
+            ticketStatus: data.ticketStatus ?? 'confirmed',
+            paid: false,
+            memberQrCode: data.memberQrCode ?? null,
+            waitlisted: false,
+            position: null,
+          });
+          return;
+        }
         if (!res.ok || !data.clientSecret) {
           if (data.code === 'membership_required') {
             window.location.href = `/apply?return=${encodeURIComponent(`/m/events/${event.slug}`)}`;

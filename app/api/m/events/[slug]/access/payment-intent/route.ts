@@ -9,6 +9,7 @@ import {
   loadAccessContext,
   priceForResolved,
   findOrCreateGuestMember,
+  findOrCreateOperatorMember,
   hasCapacity,
 } from '@/lib/event-access-submit';
 
@@ -26,7 +27,10 @@ export async function POST(
   const { slug } = await params;
   const { userId } = await auth();
 
-  let workspaceId: string | null = userId ? await getMemberWorkspaceId(userId) : null;
+  // operatorWorkspaceId (resolved from Clerk org membership) doubles as the "is operator
+  // of this workspace" signal used by the operator bypass below.
+  const operatorWorkspaceId = userId ? await getMemberWorkspaceId(userId) : null;
+  let workspaceId: string | null = operatorWorkspaceId;
   if (!workspaceId) {
     const evt = await db.event.findFirst({
       where: { slug, status: 'PUBLISHED' },
@@ -58,14 +62,84 @@ export async function POST(
       })
     : null;
 
-  // Access is enforced by viewer resolution below: a signed-in non-member resolves to the
-  // guest path (and registers as a guest where Guest Access is enabled), or to a "closed"
-  // result for member-only events. Only approved members ever reach the member path.
-  const viewer = resolveViewer(member, userId);
-  const ctx = await loadAccessContext(workspaceId, evt.id, viewer);
+  // Access is enforced by viewer resolution: a signed-in non-member resolves to the guest
+  // path or to "closed" for member-only events. Only approved members reach the member path.
+  const isOperator = operatorWorkspaceId != null && operatorWorkspaceId === workspaceId;
+  let viewer = resolveViewer(member, userId);
+  let ctx = await loadAccessContext(workspaceId, evt.id, viewer);
+  // Operator bypass: an operator of this workspace can register as a member to test/preview
+  // even when the event would otherwise be closed to them.
+  if (!ctx.ok && ctx.status === 403 && isOperator) {
+    viewer = 'member';
+    ctx = await loadAccessContext(workspaceId, evt.id, viewer);
+  }
   if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const { resolved, event } = ctx;
+
+  // Operator bypass (paid path): operators of this workspace complete a paid RSVP WITHOUT a
+  // Stripe charge so they can test/preview the full flow end-to-end. This mints a
+  // COMPLIMENTARY ticket — it is an operator-only test/preview path, NOT a public free tier;
+  // real attendees still go through payment below.
+  if (isOperator) {
+    const owner = member ?? (userId ? await findOrCreateOperatorMember(workspaceId, userId) : null);
+    if (!owner) return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
+    if (!(await hasCapacity(workspaceId, evt.id, event.capacity))) {
+      return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+    }
+    const existingComp = await db.rSVP.findFirst({
+      where: { workspaceId, eventId: evt.id, memberId: owner.id },
+      select: { id: true },
+    });
+    const rsvp = existingComp
+      ? await db.rSVP.update({
+          where: { id: existingComp.id },
+          data: {
+            status: 'CONFIRMED',
+            ticketStatus: 'confirmed',
+            isComp: true,
+            origin: 'comp',
+            compType: 'Staff',
+            paymentStatus: 'COMP',
+            amountCents: 0,
+            stripePaymentIntentId: null,
+            tierId: body.tierId ?? null,
+            customAnswers: body.customAnswers ?? undefined,
+          },
+        })
+      : await db.rSVP.create({
+          data: {
+            workspaceId,
+            eventId: evt.id,
+            memberId: owner.id,
+            status: 'CONFIRMED',
+            ticketStatus: 'confirmed',
+            isComp: true,
+            origin: 'comp',
+            compType: 'Staff',
+            paymentStatus: 'COMP',
+            amountCents: 0,
+            tierId: body.tierId ?? null,
+            customAnswers: body.customAnswers ?? undefined,
+          },
+        });
+    await db.auditEvent.create({
+      data: {
+        workspaceId,
+        actorId: userId ?? 'operator',
+        action: 'rsvp.operator_comp',
+        entityType: 'RSVP',
+        entityId: rsvp.id,
+        metadata: { flow: resolved.flow, operatorBypass: true },
+      },
+    });
+    return NextResponse.json({
+      comp: true,
+      rsvpId: rsvp.id,
+      ticketStatus: 'confirmed',
+      memberQrCode: owner.memberQrCode,
+    });
+  }
 
   // Tier-based pricing: if a tierId is provided, use the tier price.
   let amountCents: number;

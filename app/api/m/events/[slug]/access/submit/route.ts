@@ -8,6 +8,7 @@ import {
   loadAccessContext,
   priceForResolved,
   findOrCreateGuestMember,
+  findOrCreateOperatorMember,
   hasCapacity,
 } from '@/lib/event-access-submit';
 import { emitEvent } from '@/lib/emit-event';
@@ -27,7 +28,10 @@ export async function POST(
   const { userId } = await auth();
 
   // Resolve workspace: prefer member workspace; otherwise look up by slug for guest access.
-  let workspaceId: string | null = userId ? await getMemberWorkspaceId(userId) : null;
+  // operatorWorkspaceId (resolved from Clerk org membership) doubles as the "is operator
+  // of this workspace" signal used by the operator bypass below.
+  const operatorWorkspaceId = userId ? await getMemberWorkspaceId(userId) : null;
+  let workspaceId: string | null = operatorWorkspaceId;
   if (!workspaceId) {
     const evt = await db.event.findFirst({
       where: { slug, status: 'PUBLISHED' },
@@ -59,11 +63,18 @@ export async function POST(
       })
     : null;
 
-  // Access is enforced by viewer resolution below: a signed-in non-member resolves to the
-  // guest path (and registers as a guest where Guest Access is enabled), or to a "closed"
-  // result for member-only events. Only approved members ever reach the member path.
-  const viewer = resolveViewer(member, userId);
-  const ctx = await loadAccessContext(workspaceId, evt.id, viewer);
+  // Access is enforced by viewer resolution: a signed-in non-member resolves to the guest
+  // path (registers as a guest where Guest Access is on) or to "closed" for member-only
+  // events. Only approved members reach the member path.
+  const isOperator = operatorWorkspaceId != null && operatorWorkspaceId === workspaceId;
+  let viewer = resolveViewer(member, userId);
+  let ctx = await loadAccessContext(workspaceId, evt.id, viewer);
+  // Operator bypass: an operator of this workspace can register as a member to test/preview
+  // even when the event would otherwise be closed to them (e.g. member-only, no Member row).
+  if (!ctx.ok && ctx.status === 403 && isOperator) {
+    viewer = 'member';
+    ctx = await loadAccessContext(workspaceId, evt.id, viewer);
+  }
   if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const { resolved, event } = ctx;
@@ -84,8 +95,14 @@ export async function POST(
     const guest = await findOrCreateGuestMember(workspaceId, body.guestEmail, body.guestName);
     rsvpMember = { id: guest.id, memberQrCode: guest.memberQrCode };
   } else {
-    if (!member) return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
-    rsvpMember = { id: member.id, memberQrCode: member.memberQrCode };
+    // Member path. An operator without a club Member row gets one minted so their
+    // test/preview RSVP has an owner (see findOrCreateOperatorMember).
+    let ownerMember: { id: string; memberQrCode: string | null } | null = member;
+    if (!ownerMember && isOperator && userId) {
+      ownerMember = await findOrCreateOperatorMember(workspaceId, userId);
+    }
+    if (!ownerMember) return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
+    rsvpMember = { id: ownerMember.id, memberQrCode: ownerMember.memberQrCode };
   }
 
   // Capacity check (skipped for approval gates — they create pending requests, not held seats).

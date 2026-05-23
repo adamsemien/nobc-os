@@ -1,4 +1,6 @@
+import { clerkClient } from "@clerk/nextjs/server"
 import { db } from "./db"
+import { generateMemberQrCode } from "./member-qr"
 import {
   parseEventAccess,
   resolveAccessForViewer,
@@ -116,10 +118,50 @@ export async function findOrCreateGuestMember(
       lastName,
       status: "GUEST",
       approved: false,
+      memberQrCode: generateMemberQrCode(),
     },
     select: { id: true, email: true, firstName: true, lastName: true, memberQrCode: true },
   })
   return created
+}
+
+/** Find or create the Member row that owns an operator's RSVP. Operators are Clerk
+ *  org members without a club Member row; minting a GUEST-status row keyed on their
+ *  Clerk ID lets them test/preview the member RSVP flow without inflating the
+ *  approved-members list. */
+export async function findOrCreateOperatorMember(
+  workspaceId: string,
+  clerkUserId: string,
+): Promise<{ id: string; memberQrCode: string | null }> {
+  const existing = await db.member.findFirst({
+    where: { workspaceId, clerkUserId },
+    select: { id: true, memberQrCode: true },
+  })
+  if (existing) return existing
+
+  const client = await clerkClient()
+  const user = await client.users.getUser(clerkUserId)
+  const email = (
+    user.primaryEmailAddress?.emailAddress ??
+    user.emailAddresses[0]?.emailAddress ??
+    `operator+${clerkUserId}@thenobadcompany.com`
+  )
+    .trim()
+    .toLowerCase()
+
+  return db.member.create({
+    data: {
+      workspaceId,
+      clerkUserId,
+      email,
+      firstName: user.firstName ?? "Operator",
+      lastName: user.lastName ?? "",
+      status: "GUEST",
+      approved: false,
+      memberQrCode: generateMemberQrCode(),
+    },
+    select: { id: true, memberQrCode: true },
+  })
 }
 
 /** Capacity check; returns false if event is full. */

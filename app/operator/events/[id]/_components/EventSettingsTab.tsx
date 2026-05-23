@@ -372,6 +372,11 @@ export function EventSettingsTab({ event }: Props) {
         />
       </div>
 
+      {/* Ticket tiers — pricing belongs with the access/gates config, not at the page bottom */}
+      <div className="border-t border-border pt-6">
+        <TierManager eventId={event.id} />
+      </div>
+
       {/* Toggles */}
       <div className="space-y-3 rounded-lg border border-border p-4" style={{ borderRadius: '8px' }}>
         <label className="flex cursor-pointer items-center gap-3 text-sm text-text-primary">
@@ -496,8 +501,6 @@ export function EventSettingsTab({ event }: Props) {
       </div>
       {toast && <FlowToast message={toast} />}
       </form>
-
-      <TierManager eventId={event.id} />
     </div>
   );
 }
