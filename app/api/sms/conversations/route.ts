@@ -1,19 +1,16 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { getMemberWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
 
-// Shared multi-operator House Phone inbox feed. Any operator in the workspace
-// can read it (workspace membership is the boundary — no role gate, per spec).
+// Shared multi-operator House Phone inbox feed. Requires STAFF or above.
 // The UI polls this endpoint for near-real-time updates; each conversation
 // carries its recent thread so no separate per-conversation messages route is
 // needed.
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await getMemberWorkspaceId(userId);
-  if (!workspaceId) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { workspaceId } = gate;
 
   const conversations = await db.smsConversation.findMany({
     where: { workspaceId },
