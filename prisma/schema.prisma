@@ -57,6 +57,7 @@ model Workspace {
   qaMissions           QAMission[]
   membershipTiers      MembershipTier[]
   smsConversations     SmsConversation[]
+  workspaceMembers     WorkspaceMember[]
 
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
@@ -66,6 +67,33 @@ model Workspace {
   // Editable tier labels for the 0-100 score. null = use defaults (Resident/Member/Considering).
   // Shape: { top: string, mid: string, low: string }.
   tierNames            Json?
+}
+
+/// Operator role within a workspace. Hierarchy: ADMIN > STAFF > READ_ONLY.
+enum OperatorRole {
+  ADMIN
+  STAFF
+  READ_ONLY
+}
+
+/// A person with operator access to a workspace. Operators are Clerk org
+/// members; this row carries their role (and supports email invites that
+/// have no clerkUserId yet — V2 sends the email, for now we just store it).
+model WorkspaceMember {
+  id          String       @id @default(cuid())
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clerkUserId String?
+  email       String
+  firstName   String?
+  lastName    String?
+  role        OperatorRole @default(STAFF)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([workspaceId, email])
+  @@index([workspaceId])
+  @@index([clerkUserId])
 }
 
 model EmailTemplate {
