@@ -9,7 +9,7 @@
  *  /api/sms/conversation/[id]. No client-side hex — semantic CSS vars only. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, Send, MessageSquare } from 'lucide-react';
+import { Sparkles, Send, MessageSquare, Pencil, Check } from 'lucide-react';
 
 type Direction = 'INBOUND' | 'OUTBOUND';
 
@@ -56,7 +56,13 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
+  // Inline contact-name editing in the thread header (tap-to-edit).
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameSaved, setNameSaved] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -146,6 +152,38 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
       ),
     );
     patchConversation(selected.id, { eventId: value });
+  }
+
+  // Drop any in-progress name edit when the active conversation changes so a
+  // draft never bleeds from one thread into another.
+  useEffect(() => {
+    setEditingName(false);
+    setNameSaved(false);
+  }, [selectedId]);
+
+  function startEditingName() {
+    if (!selected) return;
+    setNameSaved(false);
+    setNameDraft(selected.name ?? '');
+    setEditingName(true);
+  }
+
+  // Commit on Enter/blur. Empty input clears the name (reverts to the phone
+  // number). Skips the PATCH when nothing changed.
+  function commitName() {
+    if (!selected || !editingName) return;
+    setEditingName(false);
+    const next = nameDraft.trim() ? nameDraft.trim() : null;
+    if (next === (selected.name ?? null)) return;
+
+    setConversations((prev) =>
+      prev.map((c) => (c.id === selected.id ? { ...c, name: next } : c)),
+    );
+    patchConversation(selected.id, { name: next });
+
+    setNameSaved(true);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setNameSaved(false), 1800);
   }
 
   return (
@@ -244,10 +282,58 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
               style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
             >
               <div className="min-w-0">
-                <h2 className="truncate text-[15px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                  {selected.name || selected.phone}
-                </h2>
-                {selected.name ? (
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onBlur={commitName}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commitName();
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setEditingName(false);
+                      }
+                    }}
+                    placeholder={selected.phone}
+                    aria-label="Contact name"
+                    className="w-full max-w-[260px] rounded-[6px] border px-2 py-1 text-[15px] font-semibold leading-tight outline-none"
+                    style={{
+                      borderColor: 'var(--primary)',
+                      background: 'var(--bg)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startEditingName}
+                    className="group -mx-1 flex max-w-full items-center gap-1.5 rounded-[6px] px-1 py-0.5 text-left transition-colors hover:bg-[var(--card)]"
+                    title="Edit name"
+                  >
+                    <span
+                      className="truncate text-[15px] font-semibold leading-tight"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {selected.name || selected.phone}
+                    </span>
+                    <Pencil
+                      className="h-[12px] w-[12px] shrink-0 opacity-0 transition-opacity group-hover:opacity-50"
+                      style={{ color: 'var(--text-tertiary)' }}
+                    />
+                    {nameSaved ? (
+                      <span
+                        className="flex shrink-0 items-center gap-0.5 text-[11px] font-medium"
+                        style={{ color: 'var(--primary)' }}
+                      >
+                        <Check className="h-[11px] w-[11px]" /> Saved
+                      </span>
+                    ) : null}
+                  </button>
+                )}
+                {!editingName && selected.name ? (
                   <p className="text-[12px]" style={{ color: 'var(--text-tertiary)' }}>
                     {selected.phone}
                   </p>
