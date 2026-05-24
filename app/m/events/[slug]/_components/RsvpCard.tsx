@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 
@@ -8,6 +9,8 @@ import { UserPlus, X } from 'lucide-react';
 
 import type { EventDetailDTO } from './EventDetail';
 import { EventAccessFlow } from './EventAccessFlow';
+import { useMemberApplyHref } from '../../_components/MemberShell';
+import { warmClosedCopy } from './event-format';
 import { formatGateCTA, accessTypeLabel } from '@/lib/event-access';
 
 function QrDisplay({ code }: { code: string }) {
@@ -31,7 +34,7 @@ function QrDisplay({ code }: { code: string }) {
   }, [code]);
 
   if (!svg) {
-    return <div className="h-[200px] w-[200px] animate-pulse rounded-sm bg-[#F9F7F2]" />;
+    return <div className="h-[200px] w-[200px] animate-pulse rounded-sm bg-events-paper" />;
   }
   return (
     <div
@@ -218,7 +221,29 @@ function PlusOneSection({
   );
 }
 
+/** Refined capacity indicator — slim progress bar + remaining count. */
+function CapacityMeter({ used, capacity }: { used: number; capacity: number }) {
+  const remaining = Math.max(0, capacity - used);
+  const pct = Math.min(100, Math.max(0, Math.round((used / capacity) * 100)));
+  return (
+    <div className="mt-4">
+      <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--apply-rule)]">
+        <div
+          className="h-full rounded-full bg-[var(--nobc-red)] transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-2 text-[11px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        {remaining > 0
+          ? `${remaining} spot${remaining === 1 ? '' : 's'} remaining`
+          : 'At capacity'}
+      </p>
+    </div>
+  );
+}
+
 export function RsvpCard({ event, variant = 'card' }: Props) {
+  const applyHref = useMemberApplyHref();
   const searchParams = useSearchParams();
   const successFromUrl = searchParams.get('rsvp') === 'success';
 
@@ -260,40 +285,34 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
 
   const cardWrapper =
     variant === 'card'
-      ? 'rounded-sm border border-[var(--apply-rule)] bg-[#FFFCF6] p-6 shadow-[0_1px_2px_rgba(28,16,8,0.04)]'
+      ? 'rounded-md border border-[var(--apply-rule)] bg-events-paper-card p-6 shadow-[0_2px_12px_rgba(28,16,8,0.05)]'
       : 'p-0';
-
-  const remaining =
-    event.showCapacity && event.capacity
-      ? event.capacity - event.capacityUsedCount
-      : null;
 
   const resolved = event.resolved;
   const isClosed = resolved.kind === 'closed';
   const ctaLabel = isClosed ? 'Closed' : formatGateCTA(resolved);
+  const showCapacityMeter =
+    event.showCapacity && event.capacity != null && rsvpState === 'idle' && !isClosed;
 
   return (
     <div className={cardWrapper}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-block rounded-sm border border-[var(--apply-rule)] px-2 py-1 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-          {accessTypeLabel(event.resolved)}
-        </span>
-        {remaining != null && remaining > 0 ? (
-          <span className="text-[11px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            {remaining} spot{remaining === 1 ? '' : 's'} remaining
-          </span>
-        ) : null}
-      </div>
+      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        {accessTypeLabel(event.resolved)}
+      </p>
+
+      {showCapacityMeter ? (
+        <CapacityMeter used={event.capacityUsedCount} capacity={event.capacity!} />
+      ) : null}
 
       <div className="my-5 h-px w-full bg-[var(--apply-rule)]" />
 
       {rsvpState === 'confirmed' ? (
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-            ✓ You&rsquo;re on the list
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+            You&rsquo;re on the list
           </p>
-          <p className="mt-2 text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-            {event.title}
+          <p className="mt-1.5 text-[22px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+            We&rsquo;ll see you there.
           </p>
           {qrCode ? (
             <div className="mt-5 flex flex-col items-start gap-2">
@@ -309,33 +328,59 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
         </div>
       ) : rsvpState === 'pending_approval' ? (
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
             Request received
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-            The operator will review your request. You&rsquo;ll hear back shortly.
+          <p className="mt-2 text-[15px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+            Your request is in — we&rsquo;ll be in touch shortly.
           </p>
         </div>
       ) : rsvpState === 'waitlisted' ? (
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
             On the waitlist
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+          <p className="mt-2 text-[15px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
             {waitlistPosition ? `You're #${waitlistPosition}. ` : ''}
-            We&rsquo;ll notify you if a spot opens.
+            We&rsquo;ll let you know the moment a spot opens.
           </p>
         </div>
-      ) : isClosed ? (
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            {resolved.reason}
-          </p>
-        </div>
+      ) : resolved.kind === 'closed' ? (
+        (() => {
+          const c = warmClosedCopy(resolved);
+          return (
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                {c.eyebrow}
+              </p>
+              <p className="mt-2 text-[18px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+                {c.body}
+              </p>
+              {c.showApply ? (
+                <div className="mt-5">
+                  {c.invite ? (
+                    <p className="text-[13px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                      {c.invite}
+                    </p>
+                  ) : null}
+                  <Link
+                    href={applyHref}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[var(--apply-rule)] px-5 py-2.5 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:bg-[var(--nobc-red)] hover:text-[var(--nobc-on-red)] font-[family-name:var(--font-dm-sans)]"
+                  >
+                    Apply to attend →
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          );
+        })()
       ) : isFull ? (
-        <div className="space-y-3">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            Sold Out
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            At capacity
+          </p>
+          <p className="mt-2 text-[18px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+            This gathering is full.
           </p>
         </div>
       ) : (
@@ -343,7 +388,7 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
           <button
             type="button"
             onClick={() => setFlowOpen(true)}
-            className="w-full rounded-sm bg-[var(--nobc-red)] px-5 py-3 text-center text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-colors hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] font-[family-name:var(--font-dm-sans)]"
+            className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
           >
             {ctaLabel}
           </button>
