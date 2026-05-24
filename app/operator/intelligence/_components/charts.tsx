@@ -151,6 +151,39 @@ export function Funnel({ stages }: { stages: { label: string; value: number }[] 
   );
 }
 
+export function VBars({
+  items,
+  height = 120,
+  color = 'var(--accent)',
+}: {
+  items: { label: string; value: number }[];
+  height?: number;
+  color?: string;
+}) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <div className="flex items-end gap-[3px]" style={{ height }}>
+      {items.map((it, i) => (
+        <div
+          key={i}
+          className="flex flex-1 items-end justify-center"
+          style={{ height: '100%' }}
+          title={`${it.label}: ${it.value}`}
+        >
+          <div
+            className="w-full rounded-t-[3px]"
+            style={{
+              height: `${(it.value / max) * 100}%`,
+              minHeight: it.value > 0 ? 3 : 1,
+              background: it.value > 0 ? color : 'var(--raised)',
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Sparkline({
   points,
   color = 'var(--accent)',
