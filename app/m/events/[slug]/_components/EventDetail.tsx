@@ -128,11 +128,11 @@ function ViewToggle({
   onChange: (v: PreviewViewer) => void;
 }) {
   return (
-    <div className="fixed right-3 top-3 z-40 flex items-center gap-2 rounded-sm border border-[var(--apply-rule)] bg-[#FFFCF6]/95 px-2 py-1.5 shadow-[0_1px_4px_rgba(28,16,8,0.12)] backdrop-blur">
+    <div className="fixed right-3 top-3 z-40 flex items-center gap-2 rounded-sm border border-[var(--apply-rule)] bg-events-paper-card/95 px-2 py-1.5 shadow-[0_1px_4px_rgba(28,16,8,0.12)] backdrop-blur">
       <span className="pl-1 text-[9px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
         Preview
       </span>
-      <div className="flex items-center rounded-sm bg-[#F1ECE2] p-0.5">
+      <div className="flex items-center rounded-sm bg-events-paper p-0.5">
         {(['guest', 'member'] as const).map((v) => (
           <button
             key={v}
