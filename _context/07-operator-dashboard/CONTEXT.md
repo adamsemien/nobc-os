@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #20 (audit_events portion), #22 (7-theme system), #24 (operator bulk delete), #28 (roles & permissions — Roles & Permissions section lives in root CLAUDE.md) |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-05-24 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Editorial (riso) theme shipped as the 11th theme. Member-facing brand polish (apply form + event pages) is tracked in `04-access/`. Optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx`. |
+| **Next** | Manual member creation shipped (Add Member slide-over on the directory → `POST /api/operator/members/create`, duplicate-email checked, optimistic insert). Two follow-ups: (1) the create route is **unprotected** (auth + workspace only) pending the `lib/permissions.ts` RBAC work — see the `TODO(#28 RBAC)` in the route; (2) a GUEST created here shows optimistically but is filtered out of the directory on refresh, since `GET /api/operator/members` excludes `status: GUEST`. |
 
 ## Scope
 
@@ -30,7 +30,10 @@ Feature-specific operator UIs (applications review, event editor, RSVP manager, 
 ```
 app/operator/layout.tsx                                  ← shell + nav
 app/operator/page.tsx                                    ← editorial dashboard home (masthead → numerals → tonight → journal → marginalia)
-app/operator/members/page.tsx                            ← directory
+app/operator/members/page.tsx                            ← directory (server: fetch → MembersView)
+app/operator/members/_components/MembersView.tsx         ← (client) directory shell: optimistic list state + header Add Member action + success toast
+app/operator/members/_components/AddMemberDrawer.tsx     ← (client) Add Member slide-over (DetailDrawer); manual create form
+app/api/operator/members/create/route.ts                 ← POST manual member create (validation + duplicate-email check); unprotected pending RBAC
 app/operator/members/[id]/page.tsx                       ← member detail
 app/operator/audit/page.tsx                              ← audit log viewer
 app/operator/settings/                                   ← workspace settings (entire directory)
