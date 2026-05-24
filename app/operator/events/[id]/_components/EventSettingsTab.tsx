@@ -15,6 +15,7 @@ import {
   toApiQuestion,
 } from '@/lib/registration-fields';
 import { TierManager } from './TierManager';
+import { HeroImageUpload } from '../../_components/HeroImageUpload';
 
 type EventFull = {
   id: string;
@@ -332,17 +333,20 @@ export function EventSettingsTab({ event }: Props) {
         />
       </div>
 
-      {/* Hero image URL */}
+      {/* Hero image — paste a URL or upload a file; swappable any time */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-text-secondary">Hero image URL</label>
+        <label className="mb-1 block text-sm font-medium text-text-secondary">Hero image</label>
         <input
           type="url"
           className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
           style={{ borderRadius: '6px' }}
-          placeholder="https://..."
+          placeholder="Paste an image URL, or upload below…"
           value={heroImageAssetId}
           onChange={e => setHeroImageAssetId(e.target.value)}
         />
+        <div className="mt-3">
+          <HeroImageUpload value={heroImageAssetId} onChange={setHeroImageAssetId} compact />
+        </div>
       </div>
 
       {/* Capacity */}

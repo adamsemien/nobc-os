@@ -452,6 +452,9 @@
   --events-ref-rule: oklch(0.88 0.012 72);
   --events-ref-placeholder-a: oklch(0.94 0.022 78);
   --events-ref-placeholder-b: oklch(0.9 0.028 72);
+  /* Editorial event pages — warm cream paper + raised card surfaces */
+  --events-paper: oklch(0.97 0.008 78);
+  --events-paper-card: oklch(0.99 0.006 85);
 
   --font-display: 'PP Editorial New', Georgia, serif;
   --font-body: 'Neue Haas Grotesk Display Pro', system-ui, sans-serif;
@@ -564,6 +567,8 @@
   --color-events-ref-rule: var(--events-ref-rule);
   --color-events-ref-placeholder-a: var(--events-ref-placeholder-a);
   --color-events-ref-placeholder-b: var(--events-ref-placeholder-b);
+  --color-events-paper: var(--events-paper);
+  --color-events-paper-card: var(--events-paper-card);
   --color-nobc-red: var(--nobc-red);
   --color-nobc-red-hover: var(--nobc-red-hover);
   --color-nobc-on-red: var(--nobc-on-red);
@@ -786,6 +791,25 @@ button:not(:disabled):active,
     var(--events-ref-placeholder-a),
     var(--events-ref-placeholder-b)
   );
+}
+
+/* Event detail — one orchestrated page-load reveal (staggered children) */
+@keyframes ev-reveal {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ev-stagger > * {
+    animation: ev-reveal 560ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+  .ev-stagger > *:nth-child(1) { animation-delay:   0ms; }
+  .ev-stagger > *:nth-child(2) { animation-delay:  70ms; }
+  .ev-stagger > *:nth-child(3) { animation-delay: 140ms; }
+  .ev-stagger > *:nth-child(4) { animation-delay: 210ms; }
+  .ev-stagger > *:nth-child(5) { animation-delay: 280ms; }
+  .ev-stagger > *:nth-child(6) { animation-delay: 350ms; }
+  .ev-stagger > *:nth-child(7) { animation-delay: 420ms; }
+  .ev-stagger > *:nth-child(8) { animation-delay: 490ms; }
 }
 
 /* ============================================================

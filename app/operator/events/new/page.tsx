@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Check, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 
-import { HeroImageUpload } from './_components/HeroImageUpload';
+import { HeroImageUpload } from '../_components/HeroImageUpload';
 import { AccessGroupsCard } from './_components/AccessGroupsCard';
 import { TemplatePicker, type TemplateKey } from './_components/TemplatePicker';
 import {
