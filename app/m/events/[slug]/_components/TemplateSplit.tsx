@@ -1,31 +1,19 @@
 'use client';
 
-import { MemberShellFooter, MemberShellNav, useMemberApplyHref } from '../../_components/MemberShell';
+import { MemberShellNav, useMemberApplyHref } from '../../_components/MemberShell';
 import { RsvpCard } from './RsvpCard';
 import { WorkflowPathsCard } from './WorkflowPathsCard';
+import { EventHeroFallback } from './EventHeroFallback';
+import { parseDate, formatDateLine, formatTimeLine } from './event-format';
 import type { EventDetailDTO } from './EventDetail';
 import { accessTypeLabel } from '@/lib/event-access';
 
-function parseDate(value: string | Date): Date {
-  return typeof value === 'string' ? new Date(value) : value;
-}
-
-function formatDateLine(d: Date): string {
-  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short' })
-    .format(d)
-    .toUpperCase();
-  const dayNum = d.getDate();
-  const mon = new Intl.DateTimeFormat('en-GB', { month: 'short' })
-    .format(d)
-    .toUpperCase();
-  return `${weekday} · ${dayNum} ${mon}`;
-}
-
-function formatTimeLine(d: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(d);
+function MetaTag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-sm border border-[var(--apply-rule)] px-3 py-1 text-[11px] uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+      {children}
+    </span>
+  );
 }
 
 export function TemplateSplit({ event }: { event: EventDetailDTO }) {
@@ -33,60 +21,45 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   const start = parseDate(event.startAt);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F9F7F2] text-[var(--apply-ink)] lg:h-screen lg:flex-row lg:overflow-hidden">
-      {/* Left: image (or solid red w/ pattern) */}
-      <div className="relative lg:h-screen lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-events-paper text-[var(--apply-ink)] lg:h-screen lg:flex-row lg:overflow-hidden">
+      {/* Left: full-bleed hero — or the deep-red NoBC mark panel. 45% on desktop,
+          full-bleed on top for mobile. */}
+      <div className="relative lg:h-screen lg:w-[45%] lg:shrink-0 lg:overflow-hidden">
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={event.heroImageUrl}
             alt=""
-            className="h-[45vh] w-full object-cover lg:h-full"
+            className="h-[42vh] w-full object-cover sm:h-[52vh] lg:h-full"
           />
         ) : (
-          <div
-            aria-hidden
-            className="h-[45vh] w-full lg:h-full"
-            style={{
-              backgroundColor: 'var(--nobc-red)',
-              backgroundImage:
-                'repeating-linear-gradient(135deg, rgba(255,255,255,0.06) 0 2px, transparent 2px 14px)',
-            }}
-          />
+          <EventHeroFallback className="h-[42vh] w-full sm:h-[52vh] lg:h-full" />
         )}
       </div>
 
-      {/* Right: content */}
-      <div className="flex flex-1 flex-col lg:h-screen lg:w-1/2 lg:overflow-y-auto">
+      {/* Right: content — 55% on desktop, scrolls independently. */}
+      <div className="flex flex-1 flex-col lg:h-screen lg:w-[55%] lg:overflow-y-auto">
         <MemberShellNav applyHref={applyHref} />
 
-        <div className="flex flex-1 flex-col px-6 pb-16 pt-6 sm:px-10 sm:pt-10">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+        <div className="ev-stagger flex flex-1 flex-col px-6 pb-14 pt-8 sm:px-12 sm:pt-12">
+          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
             {accessTypeLabel(event.resolved)}
           </p>
 
-          <h1 className="mt-4 max-w-2xl text-[clamp(2.25rem,4.2vw,3.5rem)] leading-[1.05] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <h1 className="mt-5 max-w-2xl text-[clamp(2.5rem,4.6vw,3.75rem)] leading-[1.04] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
             {event.title}
           </h1>
 
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            <span className="rounded-sm border border-[var(--apply-rule)] px-3 py-1 text-[11px] uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-              {formatDateLine(start)}
-            </span>
-            <span className="rounded-sm border border-[var(--apply-rule)] px-3 py-1 text-[11px] uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-              {formatTimeLine(start)}
-            </span>
-            {event.location ? (
-              <span className="rounded-sm border border-[var(--apply-rule)] px-3 py-1 text-[11px] uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-                {event.location}
-              </span>
-            ) : null}
+          <div className="mt-7 flex flex-wrap items-center gap-2">
+            <MetaTag>{formatDateLine(start, { year: false })}</MetaTag>
+            <MetaTag>{formatTimeLine(start)}</MetaTag>
+            {event.location ? <MetaTag>{event.location}</MetaTag> : null}
           </div>
 
           <div className="my-8 h-px w-full bg-[var(--apply-rule)]" />
 
           {event.description ? (
-            <p className="max-w-2xl whitespace-pre-wrap text-[16px] leading-[1.75] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+            <p className="max-w-2xl whitespace-pre-wrap text-[17px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
               {event.description}
             </p>
           ) : null}
@@ -101,9 +74,20 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
             </div>
           ) : null}
 
-          <div className="mt-auto">
-            <MemberShellFooter applyHref={applyHref} />
-          </div>
+          <footer className="mt-auto border-t border-[var(--apply-rule)] pt-8">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[0.65rem] font-normal uppercase tracking-[0.16em] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+                <span className="text-[var(--nobc-red)]">NO BAD </span>
+                <span>COMPANY</span>
+              </p>
+              <a
+                href="mailto:team@thenobadcompany.com"
+                className="text-[13px] text-[var(--apply-muted)] underline-offset-4 transition-colors hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
+              >
+                team@thenobadcompany.com
+              </a>
+            </div>
+          </footer>
         </div>
       </div>
     </div>
