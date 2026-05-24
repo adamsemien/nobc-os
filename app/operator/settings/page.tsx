@@ -8,6 +8,7 @@ import {
   Activity,
   Mail,
   Trophy,
+  Users,
 } from 'lucide-react';
 import { PageHeader } from '../_components/PageHeader';
 
@@ -60,6 +61,12 @@ const CARDS: Card[] = [
     title: 'Webhooks',
     description: 'Connect external services to NoBC events.',
     Icon: Webhook,
+  },
+  {
+    href: '/operator/team',
+    title: 'Team',
+    description: 'Manage operator access and roles.',
+    Icon: Users,
   },
   {
     href: '/operator/audit',

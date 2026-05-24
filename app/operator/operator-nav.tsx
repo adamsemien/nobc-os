@@ -15,6 +15,7 @@ import {
   ScanLine,
   MessageSquare,
   Settings,
+  ShieldCheck,
   ExternalLink,
 } from 'lucide-react';
 
@@ -33,6 +34,7 @@ const PRIMARY_ITEMS: NavItem[] = [
   { href: '/operator/check-in',        label: 'Check-in',      match: '/operator/check-in',                     Icon: ScanLine },
   { href: '/operator/house-phone',     label: 'House Phone',   match: '/operator/house-phone',                  Icon: MessageSquare },
   { href: '/operator/members',         label: 'Members',       match: '/operator/members',                      Icon: Users },
+  { href: '/operator/team',            label: 'Team',          match: '/operator/team',                         Icon: ShieldCheck },
   { href: '/operator/settings/lists',  label: 'Lists',         match: '/operator/settings/lists',               Icon: ListChecks },
   { href: '/operator/intelligence',    label: 'Intelligence',  match: '/operator/intelligence',                 Icon: BarChart3 },
   { href: '/operator/audit',           label: 'Activity',      match: '/operator/audit',                        Icon: Activity },
