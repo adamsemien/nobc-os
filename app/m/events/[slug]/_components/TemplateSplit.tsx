@@ -2,6 +2,7 @@
 
 import { MemberShellFooter, MemberShellNav, useMemberApplyHref } from '../../_components/MemberShell';
 import { RsvpCard } from './RsvpCard';
+import { WorkflowPathsCard } from './WorkflowPathsCard';
 import type { EventDetailDTO } from './EventDetail';
 import { accessTypeLabel } from '@/lib/event-access';
 
@@ -93,6 +94,12 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           <div className="mt-10 max-w-md">
             <RsvpCard event={event} />
           </div>
+
+          {event.workflowPaths?.length ? (
+            <div className="mt-10 max-w-md">
+              <WorkflowPathsCard paths={event.workflowPaths} />
+            </div>
+          ) : null}
 
           <div className="mt-auto">
             <MemberShellFooter applyHref={applyHref} />

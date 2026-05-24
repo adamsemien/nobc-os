@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { RsvpCard } from './RsvpCard';
+import { WorkflowPathsCard } from './WorkflowPathsCard';
 import type { EventDetailDTO } from './EventDetail';
 import { accessTypeLabel } from '@/lib/event-access';
 
@@ -92,6 +93,12 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
         <div className="mx-auto max-w-sm text-left">
           <RsvpCard event={event} variant="borderless" />
         </div>
+
+        {event.workflowPaths?.length ? (
+          <div className="mx-auto mt-10 max-w-md text-left">
+            <WorkflowPathsCard paths={event.workflowPaths} />
+          </div>
+        ) : null}
 
         <div className="my-10 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
 

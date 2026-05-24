@@ -2,6 +2,7 @@
 
 import { MemberShellFooter, MemberShellNav, useMemberApplyHref } from '../../_components/MemberShell';
 import { RsvpCard } from './RsvpCard';
+import { WorkflowPathsCard } from './WorkflowPathsCard';
 import type { EventDetailDTO } from './EventDetail';
 
 function parseDate(value: string | Date): Date {
@@ -95,6 +96,12 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
             <RsvpCard event={event} />
           </aside>
         </div>
+
+        {event.workflowPaths?.length ? (
+          <div className="mt-12 lg:max-w-[60%]">
+            <WorkflowPathsCard paths={event.workflowPaths} />
+          </div>
+        ) : null}
       </div>
 
       <MemberShellFooter applyHref={applyHref} />

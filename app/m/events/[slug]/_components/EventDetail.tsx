@@ -8,7 +8,6 @@ import type { WorkflowPath } from '@/lib/workflows/types';
 import { TemplateEditorial } from './TemplateEditorial';
 import { TemplateSplit } from './TemplateSplit';
 import { TemplateMinimal } from './TemplateMinimal';
-import { WorkflowPathsCard } from './WorkflowPathsCard';
 
 export type TicketTierDTO = {
   id: string;
@@ -80,24 +79,14 @@ function deriveForViewer(event: EventDetailDTO, viewer: PreviewViewer): EventDet
 }
 
 function renderTemplate(event: EventDetailDTO) {
-  const tpl =
-    event.template === 'split' ? (
-      <TemplateSplit event={event} />
-    ) : event.template === 'minimal' ? (
-      <TemplateMinimal event={event} />
-    ) : (
-      <TemplateEditorial event={event} />
-    );
-
-  if (!event.workflowPaths || event.workflowPaths.length === 0) return tpl;
-
-  return (
-    <>
-      {tpl}
-      <div className="mx-auto max-w-4xl px-5 sm:px-8 pb-10">
-        <WorkflowPathsCard paths={event.workflowPaths} />
-      </div>
-    </>
+  // Each template now places the "How to attend" card within its own content
+  // flow (it reads event.workflowPaths directly), so no bottom append here.
+  return event.template === 'split' ? (
+    <TemplateSplit event={event} />
+  ) : event.template === 'minimal' ? (
+    <TemplateMinimal event={event} />
+  ) : (
+    <TemplateEditorial event={event} />
   );
 }
 
