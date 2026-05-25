@@ -1,8 +1,5 @@
-import Link from 'next/link';
-import { Users } from 'lucide-react';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
-import { PageHeader, EmptyState } from '@/components/ui';
-import { MembersBulkActions } from './_components/MembersBulkActions';
+import { MembersView } from './_components/MembersView';
 
 type MemberRow = {
   id: string;
@@ -32,41 +29,20 @@ export default async function MembersPage() {
   return (
     <div className="px-6 pb-16 pt-8 lg:px-10">
       <div className="mx-auto w-full max-w-[1280px]">
-        <PageHeader
-          title="Members"
-          subtitle={`${members.length} approved · sorted by most recently added`}
+        <MembersView
+          initialMembers={members.map((m) => ({
+            id: m.id,
+            fullName: m.fullName,
+            email: m.email,
+            archetype: m.archetype,
+            aiScore: m.aiScore,
+            totalEventsAttended: m.totalEventsAttended,
+            lastAttendedDate: m.lastAttendedDate,
+            createdAt: m.createdAt,
+            isVip: m.isVip,
+            isBlocked: m.isBlocked,
+          }))}
         />
-
-        {members.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title="No members yet"
-            subtitle="Members appear here after their application is approved."
-            action={
-              <Link
-                href="/operator/applications"
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                Review applications →
-              </Link>
-            }
-          />
-        ) : (
-          <MembersBulkActions
-            members={members.map((m) => ({
-              id: m.id,
-              fullName: m.fullName,
-              email: m.email,
-              archetype: m.archetype,
-              aiScore: m.aiScore,
-              totalEventsAttended: m.totalEventsAttended,
-              lastAttendedDate: m.lastAttendedDate,
-              createdAt: m.createdAt,
-              isVip: m.isVip,
-              isBlocked: m.isBlocked,
-            }))}
-          />
-        )}
       </div>
     </div>
   );
