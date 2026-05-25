@@ -1,19 +1,16 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { getMemberWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
 import { sendSms } from '@/lib/twilio';
 
-// Operator manual reply from the shared inbox. Any operator in the workspace
-// can reply (workspace membership is the boundary). Sends via the Twilio REST
-// API, then records the OUTBOUND message so the thread only reflects messages
-// Twilio actually accepted.
+// Operator manual reply from the shared inbox. Requires STAFF or above. Sends
+// via the Twilio REST API, then records the OUTBOUND message so the thread only
+// reflects messages Twilio actually accepted.
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await getMemberWorkspaceId(userId);
-  if (!workspaceId) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { workspaceId } = gate;
 
   let body: { conversationId?: string; body?: string };
   try {

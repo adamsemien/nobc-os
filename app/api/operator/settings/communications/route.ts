@@ -1,8 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
 import { ensureCommunicationsSeed } from '@/lib/ensure-communications';
 
 export async function GET() {
@@ -48,9 +50,9 @@ const TemplatePatchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.ADMIN);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
 
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Bad request' }, { status: 400 }); }
