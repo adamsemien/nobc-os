@@ -31,13 +31,15 @@ Methodology: see the `nobc-icm` skill.
 - **AI:** `claude-sonnet-4-20250514` via Vercel AI SDK (the locked model — see Locked Decisions)
 - **Agent runtime:** Runtype (V1.5)
 - **Deploy:** Vercel
+- **Testing:** Vitest (unit) + Playwright (E2E). Unit harness added 2026-05-22 (`npm run test:unit`).
 
 ---
 
 ## Current Build State
 
-**As of 2026-05-21 — V1 is functionally complete.**
+**As of 2026-05-25 — V1 is functionally complete.**
 17/20 V1 items are DONE in code. 2 are PARTIAL (credentials only, not code). 0 are NOT STARTED.
+A May-2026 session added the House Phone SMS inbox, the member-QR rollout, the editorial event-page redesign, operator roles, and the House Phone Intelligence tab — see "What shipped beyond V1 scope" below.
 
 ### V1 scope status (items 1–20)
 
@@ -71,7 +73,8 @@ Methodology: see the `nobc-icm` skill.
 - Set `PASSNINJA_API_KEY` + `PASSNINJA_ACCOUNT_ID` + `PASSNINJA_PASS_TYPE` in Vercel (wallet passes go live)
 - Set `SVIX_API_KEY` in Vercel (outbound webhooks go live)
 - Verify application review QA bugs — could not reproduce in code, needs live confirmation
-- Enforce roles/permissions on operator API routes (any workspace member can currently hit any route)
+- Finish operator RBAC coverage — roles now exist and gate settings/team/bulk/House-Phone routes, but approve/reject/refund/comp/bulk-delete, `/api/intelligence/*`, `/api/agent/*`, and the `/api/mcp` write path are still ungated (see Roles & Permissions below)
+- Set `TWILIO_*` + `HOUSE_PHONE_WORKSPACE_ID` in Vercel and deploy the Railway inbound service to take House Phone live end-to-end
 
 ### What shipped beyond V1 scope (already live)
 
@@ -81,6 +84,16 @@ Methodology: see the `nobc-icm` skill.
 - Cmd+K palette, event room/vibe, model switcher
 - Internal QA/persona/seed dev tooling
 
+**May-2026 session (PRs #4 / #5 / #6 open at time of writing — documented here ahead of merge; #1–#3 already merged to main):**
+- **House Phone** — shared multi-operator SMS inbox. Outbound replies + inbox UI in nobc-os (`/api/sms/*`, `/operator/house-phone`); inbound on a separate Railway service (`nobc-house-phone`). Stage 14.
+- **Member QR rollout** — `lib/member-qr.ts` `generateMemberQrCode()` is now the single mint path for every production Member-creation route, so non-member ticket buyers get a scannable QR (fixes the paid-purchase email + door scan). Stages 02/05/06.
+- **Operator RSVP bypass + guest-flow fix** — signed-in non-members can complete the guest flow; operators can bypass the access flow (free + paid) and preview it. Stage 04.
+- **Event-page editorial redesign** — all three member event-detail templates (Split, Editorial, Minimal), cream paper tokens, warm access copy, hero **upload** in event settings. Stage 03. (PR #3, merged to main.)
+- **Operator roles** — `OperatorRole` (ADMIN/STAFF/READ_ONLY) + `WorkspaceMember` + `lib/operator-role.ts`, Team settings UI. Stage 07. (PR #5.)
+- **House Phone Intelligence tab** — `GET /api/sms/analytics` + `GET /api/sms/categorize` + `SmsMessage.category`, surfaced in the Intelligence dashboard. Stages 12/14. (PR #6.)
+- **Vitest unit harness** + `toScoreDisplay` tests. Stage 13.
+- **Add Member (manual member creation)** — `POST /api/operator/members/create` + Add Member slide-over. **In progress — PR #4 open, NOT yet merged.** Stage 07.
+
 ---
 
 ## Locked Decisions (NEVER override)
@@ -89,6 +102,7 @@ These are hard constants. Any agent that violates them is broken.
 
 - **Email `from` address:** `team@thenobadcompany.com` — always, every transactional email, every welcome, every notification
 - **AI model:** `claude-sonnet-4-20250514` — every Anthropic call. Do not substitute a different model, do not "upgrade" to a newer version, do not swap to a cheaper one. Adam decides model bumps explicitly.
+  - **Authorized exception — House Phone SMS only:** `claude-haiku-4-5-20251001` is used for House Phone inbound triage (the Railway service) and SMS topic categorization (`GET /api/sms/categorize`). This is an explicit, Adam-authorized exception for cheap high-volume SMS classification — it does NOT relax the lock anywhere else. Any other model choice still requires Adam's sign-off.
 - **Never modify legal copy** in /apply screen 7 (waiver). Pending attorney review. Any change requires Adam's explicit sign-off.
 - **Never break /apply, archetype config (config/archetypes.ts), or the AI scoring system.** These are shipped and live. Changes require explicit task authorization.
 
@@ -115,18 +129,19 @@ When writing any UI copy, audit against this list. If a label doesn't match, fix
 
 ## Roles & Permissions
 
-Five operator roles. Permissions are enforced at the API layer; UI hide/disable is for UX, not security.
+Operator access is role-gated per workspace. The shipped model (2026-05-25, PR #5) is **three roles**, stored on `WorkspaceMember.role` (`OperatorRole` enum) and enforced server-side via `lib/operator-role.ts`:
 
-- **owner** — full access including workspace settings and billing
-- **admin** — full access except billing and workspace deletion
-- **manager** — approve/reject applications, create/publish events, view intelligence, issue comps
-- **staff** — check-in PWA only
-- **readonly** — view applications, events, intelligence; no writes
+- **ADMIN** — full access (workspace settings, team management, billing surfaces).
+- **STAFF** — operational access (approvals, create/publish events, comps, check-in, House Phone). Default for a new `WorkspaceMember`.
+- **READ_ONLY** — view-only, no writes. Also the implicit floor for any Clerk-org member with no explicit `WorkspaceMember` row, so adding a gate never hard-locks an existing org member out of read surfaces.
+
+Hierarchy: `ADMIN > STAFF > READ_ONLY`. Guards: `requireRole(minRole)` (route handlers → 401/403), `requireRolePage(minRole)` (server components → redirect), plus `getOperatorRole` / `isAdmin` / `isStaff`.
 
 Rules:
-1. Every operator API route is permission-gated. 403 on failure.
-2. Every permission check writes an AuditEvent.
-3. UI hides or disables unauthorized actions but the API is the real security boundary.
+1. UI hide/disable is UX only; the `requireRole` check is the real security boundary.
+2. **Enforcement is partial today.** `requireRole` gates settings (`/api/operator/settings/*`), team management (`/api/operator/team*`), member bulk actions (`/api/operator/members/bulk`), and House Phone (`/api/sms/*`). The approve/reject/refund/comp/bulk-delete routes, `/api/intelligence/*`, `/api/agent/*`, and the `/api/mcp` write path are **not yet gated** — still auth + workspace only. Closing those is the next RBAC step (see `_context/07-operator-dashboard` → authorization gap).
+
+> An earlier draft of this section described five roles (owner/admin/manager/staff/readonly) "enforced on every route." That was aspirational and never built — the three roles above are what shipped. Update this section, not your memory, if the model changes.
 
 ---
 
@@ -150,6 +165,8 @@ Phase J details:
 - Fire-and-forget pattern, one retry, queue on failure
 - Env vars: `PRODUCER_WEBHOOK_URL`, `PRODUCER_WEBHOOK_SECRET`
 
+**House Phone (the shared SMS inbox) is shipped in two halves on the same Postgres:** **inbound** SMS runs on a separate Railway service (`nobc-house-phone`, its own repo — Twilio webhook receipt, signature validation, contact lookup, AI auto-reply) that writes `SmsConversation`/`SmsMessage`; **outbound** replies + the operator inbox UI live in nobc-os (`/api/sms/*`, `/operator/house-phone`). This is a different thing from the Runtype "House Phone" sub-agent in the diagram above (same name). See `_context/14-house-phone`.
+
 ---
 
 ## Absolute Rules (apply to every stage)
@@ -165,6 +182,9 @@ All colors are CSS variables. Semantic tokens only: `bg-primary`, `text-text-pri
 
 ### Schema changes: generate then push manually
 Run `prisma generate` first. Show the diff. Never auto-push. Producer is on the same Postgres instance — schema changes are production-affecting.
+
+### Debugging & observability
+Error boundaries must **log** the errors they catch — never silently swallow them (fixed 2026-05-22, `baf3031`: the app error boundary now logs caught errors instead of discarding them, so production failures surface in logs). Any new catch block or boundary you add must log with enough context to trace the failure.
 
 ### Mandatory closing checklist (every task)
 
@@ -210,14 +230,14 @@ Define success criteria before coding, then loop until verified. Here, "verified
 | 04 | `_context/04-access/` | ✅ Shipped | #7, #8, #21 |
 | 05 | `_context/05-payments/` | ✅ Shipped | #9, #10, #21, #25 |
 | 06 | `_context/06-wallet-checkin/` | 🔶 Partial | #11, #12 |
-| 07 | `_context/07-operator-dashboard/` | ✅ Shipped | #20, #22, #24, #28 |
+| 07 | `_context/07-operator-dashboard/` | ✅ Shipped + 🟡 RBAC partial (#28 roles shipped, coverage incomplete; Add Member PR #4 open) | #20, #22, #24, #28 |
 | 08 | `_context/08-mcp-server/` | 🔶 Partial | #17 |
 | 09 | `_context/09-ai-chat/` | ✅ Shipped | #18 |
 | 10 | `_context/10-ai-event-builder/` | 🔶 Partial | #19 |
 | 11 | `_context/11-producer-integration/` | ✅ Shipped | #20, #26, House Phone trigger (V1.5) |
-| 12 | `_context/12-intelligence/` | ✅ Shipped (base) / 🔶 sponsor-facing partial | #27 |
+| 12 | `_context/12-intelligence/` | ✅ Shipped (base + House Phone tab) / 🔶 sponsor-facing partial | #27 |
 | 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) | — |
-| 14 | `_context/14-house-phone/` | 🟡 In progress | House Phone SMS inbox (post-V1) |
+| 14 | `_context/14-house-phone/` | 🟡 In progress (inbox UI + analytics shipped; awaiting `TWILIO_*` + Railway deploy) | House Phone SMS inbox + Intelligence tab (post-V1) |
 
 > **#18 (Stage 09 — AI chat panel):** direct Vercel AI SDK + MCP tool registry (`lib/mcp/`). Runtype orchestration deferred to V1.5.
 

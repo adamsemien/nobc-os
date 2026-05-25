@@ -8,9 +8,9 @@
 |---|---|
 | **State** | 🟡 In progress |
 | **V1 item** | Post-V1 / V1.5 comms (not in items #1–20) |
-| **Last updated** | 2026-05-24 |
+| **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
-| **Blocked on** | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` + `HOUSE_PHONE_WORKSPACE_ID` not yet set in Vercel; the **Railway** inbound-SMS service (external) must be deployed and pointed at the Twilio number. (Analytics tab: nothing — code-complete.) |
+| **Blocked on** | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` + `HOUSE_PHONE_WORKSPACE_ID` not yet set in Vercel; the **Railway** inbound-SMS service (external, `nobc-house-phone`) is built and security-hardened (see "Railway inbound service" below) but must be deployed and pointed at the Twilio number. (Analytics tab: nothing — code-complete.) |
 | **Next** | The House Phone Intelligence tab is code-complete (`/operator/intelligence?category=house-phone`; see Files in play). For the inbox itself: set the four env vars in Vercel, deploy/point the Railway inbound webhook at the Twilio number, then verify the inbound → Postgres → polled-UI → reply round trip end to end. |
 
 ## Scope
@@ -74,6 +74,17 @@ app/operator/intelligence/_components/IntelligenceView.tsx ← House Phone tab r
 - **General SMS-via-Runtype for non-House-Phone features** → still banned in nobc-os (root `CLAUDE.md`, "No Twilio — except the House Phone inbox").
 - **Events / publishing** → `_context/03-events/` (this stage only reads published events for the selector).
 - **The Runtype "House Phone" Communications sub-agent** → a separate, identically-named thing in the Architecture diagram; unrelated to this web inbox.
+
+## Railway inbound service (external — `nobc-house-phone`, separate repo)
+
+Not owned here (its code lives in its own repo, not this tree), but documented for the full picture. It receives Twilio inbound webhooks and writes `SmsConversation`/`SmsMessage` rows this stage reads. Security hardening applied (2026-05-22 → 24):
+
+- **Twilio signature validation** is enforced on `POST /inbound` (invalid signature → 403); the temporary debug probe was removed.
+- **Per-phone rate limiting** — in-memory, 10 inbound msgs/phone/hour → 429 before any DB write, AI call, or reply.
+- **Contact lookup chain** before AI triage: Member (by phone) → RSVP guest (by attendee phone, joins Event for `eventName`) → unknown. The resolved context (`member` / `guest` / `unknown` + name/status/history) is passed to `triage()` so replies are personalized; a red-listed contact is logged as a private operator note only — it does **not** change AI behavior.
+- **Name capture heuristic** — a short reply (1–3 words, no `?`, no event keyword) is saved as the contact name, with a greetings/filler **blocklist** (`hey/hi/hello/yo/sup/nothing/ok/yes/no/thanks/...`) so greetings never become names.
+- **AI persona guardrails** (`lib/ai.js`) — the system prompt forbids inventing a persona name (never "Ollie/Iris/Dante"); it identifies only as "the House Phone for No Bad Company," and treats all patron message content as untrusted data (prompt-injection hardening).
+- **Model:** triage uses `claude-haiku-4-5-20251001` (same authorized SMS exception as the in-nobc-os categorizer — see Rule 2).
 
 ## Schema fields
 

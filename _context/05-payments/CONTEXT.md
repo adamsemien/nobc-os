@@ -11,7 +11,7 @@
 | **Last updated** | 2026-05-21 |
 | **Owner** | Adam |
 | **Blocked on** | Compliance pages legal review |
-| **Next** | Verify compliance pages are live + legally reviewed before flipping to live Stripe keys |
+| **Next** | Verify compliance pages are live + legally reviewed before flipping to live Stripe keys. (2026-05-21: the link-only confirmation email now embeds a scannable QR — see Audit findings → "The gap". Test a full purchase in Stripe test mode to confirm the QR arrives + scans.) |
 
 ## Scope
 
@@ -20,16 +20,17 @@ All Stripe interactions. Authorize-on-RSVP, capture-on-check-in (or scheduled), 
 ## Files in play
 
 ```
-app/api/stripe/authorize/route.ts               ← create PaymentIntent, authorize-only
+app/api/stripe/create-payment-intent/route.ts   ← create PaymentIntent, authorize-only (capture_method: manual). [was listed as stripe/authorize — that path does not exist]
+app/api/stripe/checkout/route.ts                 ← hosted Stripe Checkout Session path (alternative to inline Elements)
 app/api/stripe/capture/route.ts                 ← capture authorized payment
 app/api/stripe/refund/route.ts                  ← operator-triggered refund
-app/api/stripe/webhook/route.ts                 ← Stripe webhook receiver
+app/api/webhooks/nobc/stripe/route.ts           ← canonical Stripe webhook receiver (status flips + confirmation email + Svix). [was listed as app/api/stripe/webhook — that path does not exist]
+app/api/webhooks/stripe/route.ts                ← flat re-export of the canonical handler above
 app/api/cron/capture-payments/route.ts          ← scheduled capture for confirmed events (no-shows / post-event)
 app/legal/terms/page.tsx                        ← compliance page
 app/legal/privacy/page.tsx                      ← compliance page
 app/legal/refund-policy/page.tsx                ← compliance page
-lib/stripe/client.ts                            ← Stripe SDK singleton
-lib/stripe/idempotency.ts                       ← idempotency key generation
+lib/email-templates.ts                          ← rsvpConfirmedEmail (purchase, link-only) + compTicketEmail (comp, QR embedded)
 ```
 
 ## Schema models owned
@@ -72,12 +73,31 @@ lib/stripe/idempotency.ts                       ← idempotency key generation
 - `STRIPE_WEBHOOK_SECRET` — for webhook signature verification
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — client-side for Stripe Elements
 
+## Audit findings — purchase → confirmation pipeline (2026-05-21, code-verified, read-only)
+
+End-to-end traced. Two parallel pay paths feed one webhook; both end at a link-only email.
+
+**Pipeline (file:line):**
+1. Buyer clicks Get Ticket → either `app/api/stripe/checkout/route.ts:74-102` (hosted, RSVP `ticketStatus:'held'` + Checkout Session, `rsvpId/workspaceId/memberId/eventId` in metadata) **or** `app/api/stripe/create-payment-intent/route.ts:98-129` (inline Elements, `capture_method:'manual'`).
+2. Stripe fires → webhook `app/api/webhooks/nobc/stripe/route.ts`:
+   - `checkout.session.completed` (`:25`) → RSVP `ticketStatus:'confirmed', status:'CONFIRMED'` (`:43-46`)
+   - `payment_intent.amount_capturable_updated` (`:93`) → `+ paymentStatus:'AUTHORIZED'` (`:101-104`)
+   - `payment_intent.succeeded` (`:158`) → `paymentStatus:'CAPTURED', capturedAt` (`:166-169`)
+   - Each writes an `AuditEvent` + emits Svix `rsvp.confirmed`.
+3. Confirmation email sent inline via `resend.emails.send` (`:82-87` / `:149-151`), `from: NoBC <team@thenobadcompany.com>` ✅, template `rsvpConfirmedEmail` (`lib/email-templates.ts:10-40`).
+4. Email body = **a text link only** (`lib/email-templates.ts:35-36`) to `/m/events/[slug]/confirmed?rsvpId=…`. The QR is rendered live on that authenticated page, **not in the email**.
+
+**Models written on payment:** only `RSVP` + `AuditEvent`. The `Ticket` model (`schema.prisma:450-472`) is **never created** (`db.ticket.create` exists only in the dev reset's `deleteMany`) — the RSVP *is* the ticket. The `Order`/`Payment` models this CONTEXT lists as "owned" are **defined but unwritten** in the purchase path (`ticketing.order.create` is a stub, `lib/mcp/legacy-tools.ts:456`); buyer identity rides on `RSVP.memberId` + `RSVP.stripePaymentIntentId`.
+
+**The gap (the main ask) — FIXED 2026-05-21:** the webhook now computes `QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 })` at both send sites (added `memberQrCode` to the member `select`) and passes it to `rsvpConfirmedEmail`, which embeds the QR `<img>` (mirrors `compTicketEmail`) while keeping the confirmed-page link as a fallback. The QR encodes the buyer's `memberQrCode`, which is exactly what the door scanner matches — see `06-wallet-checkin` → "Fix applied" for the Member-QR minting change (new buyers now always have a `memberQrCode`) and the wallet-button removal.
+
 ## What this stage does NOT own
 
 - Access (RSVP) creation logic → `04-access/`
 - Capacity enforcement → `04-access/`
 - Wallet pass generation/revocation → `06-wallet-checkin/`
 - Check-in trigger → `06-wallet-checkin/`
+- QR generation + delivery-to-buyer mechanics (the email *send* is here; the QR *content* gap is tracked in `06-wallet-checkin`)
 - Operator refund UI → `07-operator-dashboard/`
 
 ## Backlog (V1.5)

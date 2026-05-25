@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped (V1) |
 | **V1 item** | #17 |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
-| **Blocked on** | Nothing |
-| **Next** | Wire the Runtype master agent to the live `/api/mcp` endpoint. Add `payments.refund` + `wallet.revoke` tools once Stripe capture / wallet revocation land. Extract approve/checkin write logic into a shared service layer (currently lives in the tool modules). |
+| **Blocked on** | Authorization: `/api/mcp` is gated by Clerk auth + workspace ONLY, no operator role — any user in the workspace's Clerk org can call every write tool. The RBAC helper now exists as of 2026-05-25 (`lib/operator-role.ts` / `requireRole`, PR #5 — see `07-operator-dashboard`), but the MCP write path was **not** included in the first coverage pass; gating it is now a wiring task, not a missing-helper one. |
+| **Next** | Gate the MCP write tools with `requireRole` (helper now shipped, PR #5). Wire the Runtype master agent to the live `/api/mcp` endpoint. Add `payments.refund` + `wallet.revoke` tools once Stripe capture / wallet revocation land. Extract approve/checkin write logic into a shared service layer (currently lives in the tool modules). |
 
 ## Scope
 
@@ -91,6 +91,12 @@ wallet.revoke
 audit.query
 workspace.settings.read
 ```
+
+## Audit findings — authorization (2026-05-21, code-verified, read-only)
+
+`app/api/mcp/route.ts` → `lib/mcp/auth.ts:21-32` verifies a Clerk bearer token / session → `userId` → `requireWorkspaceId` (`:26`). That is the **only** check: authentication + workspace derivation. **No operator role is verified.** So any Clerk user who belongs to the workspace's org can call every write tool (`nobc_approve_application`, `nobc_cancel_event`, `add_to_red_list`, `issue_comp_ticket`, etc.). This is the same unenforced-RBAC gap analyzed in full in `07-operator-dashboard` (Audit findings — authorization gap).
+
+Caveat on Rule #5 below ("Destructive tools require explicit operator approval"): that human-in-the-loop gate lives in the **Runtype master agent**, not in this server — the MCP endpoint itself will execute a destructive `tools/call` for any authenticated org member without a server-side approval or role check. When the Stage 07 RBAC fix lands, gate the MCP write path on it too.
 
 ## What this stage does NOT own
 

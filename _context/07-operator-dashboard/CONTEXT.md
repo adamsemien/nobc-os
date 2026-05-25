@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped |
-| **V1 item** | #20 (audit_events portion), #22 (7-theme system), #24 (operator bulk delete), #28 (roles & permissions — Roles & Permissions section lives in root CLAUDE.md) |
-| **Last updated** | 2026-05-24 |
+| **State** | ✅ Shipped (UI) / 🟡 RBAC (#28) shipped but coverage incomplete |
+| **V1 item** | #20 (audit_events portion), #22 (7-theme system), #24 (operator bulk delete), #28 (roles & permissions — base shipped 2026-05-25 PR #5; see "Update 2026-05-25" below) |
+| **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
-| **Blocked on** | Nothing |
-| **Next** | Manual member creation shipped (Add Member slide-over on the directory → `POST /api/operator/members/create`, duplicate-email checked, optimistic insert). Two follow-ups: (1) the create route is **unprotected** (auth + workspace only) pending the `lib/permissions.ts` RBAC work — see the `TODO(#28 RBAC)` in the route; (2) a GUEST created here shows optimistically but is filtered out of the directory on refresh, since `GET /api/operator/members` excludes `status: GUEST`. |
+| **Blocked on** | Nothing hard. RBAC base is shipped (3 roles via `WorkspaceMember` + `lib/operator-role.ts`, PR #5) but only a subset of routes are gated — extending `requireRole` to approve/reject/refund/comp/bulk-delete + `/api/intelligence/*` + `/api/agent/*` + `/api/mcp` is the remaining work. |
+| **Next** | Extend `requireRole` coverage to the still-ungated mutation routes (above). Add Member (manual member creation, `POST /api/operator/members/create` + slide-over) shipped (PR #4 merged) — its create route is **not yet role-gated**, and a GUEST created there is filtered out of the directory on refresh (`GET /api/operator/members` excludes `status: GUEST`). Optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx`. (Audit 2026-05-21: the only "Open The Room" entry on this dashboard is gated to today-only events (`page.tsx:170`) — see Audit findings below.) |
 
 ## Scope
 
@@ -30,13 +30,17 @@ Feature-specific operator UIs (applications review, event editor, RSVP manager, 
 ```
 app/operator/layout.tsx                                  ← shell + nav
 app/operator/page.tsx                                    ← editorial dashboard home (masthead → numerals → tonight → journal → marginalia)
-app/operator/members/page.tsx                            ← directory (server: fetch → MembersView)
-app/operator/members/_components/MembersView.tsx         ← (client) directory shell: optimistic list state + header Add Member action + success toast
-app/operator/members/_components/AddMemberDrawer.tsx     ← (client) Add Member slide-over (DetailDrawer); manual create form
-app/api/operator/members/create/route.ts                 ← POST manual member create (validation + duplicate-email check); unprotected pending RBAC
+app/operator/members/page.tsx                            ← directory
 app/operator/members/[id]/page.tsx                       ← member detail
+app/operator/members/_components/AddMemberDrawer.tsx     ← Add Member slide-over (manual create) — PR #4 merged
+app/operator/members/_components/MembersView.tsx         ← directory shell w/ optimistic insert + toast — PR #4 merged
+app/api/operator/members/create/route.ts                 ← POST manual member create + duplicate-email check (not yet role-gated) — PR #4 merged
+app/operator/team/page.tsx                               ← Team settings (operators + roles) — gated requireRolePage(ADMIN)
+app/operator/team/_components/TeamManager.tsx            ← team roster + role assignment UI
+app/api/operator/team/route.ts                           ← list/invite WorkspaceMember — requireRole(ADMIN)
+app/api/operator/team/[id]/route.ts                      ← update/remove WorkspaceMember role — requireRole(ADMIN)
 app/operator/audit/page.tsx                              ← audit log viewer
-app/operator/settings/                                   ← workspace settings (entire directory)
+app/operator/settings/                                   ← workspace settings (entire directory; routes gated requireRole)
 app/operator/_help/                                      ← in-app help / onboarding (entire directory)
 app/operator/_components/dashboard/GlassPanel.tsx        ← frosted-glass primitive (.op-glass / .op-glass-strong); the reusable panel material
 app/operator/_components/dashboard/StatFigure.tsx        ← asymmetric stat figure (lead | sm | wide); composes GlassPanel + CountUp
@@ -51,7 +55,8 @@ app/operator/_components/dashboard/format.ts             ← shared date/action 
 _context/07-operator-dashboard/glass-reference.html      ← the liquid-editorial (default) visual target (mockup)
 _context/07-operator-dashboard/riso-reference.html       ← the editorial/riso-print visual target (mockup)
 lib/theme.ts                                             ← active theme resolution (11-theme system, incl. editorial + per-workspace override)
-lib/permissions.ts                                       ← role → action matrix used by every operator API route
+lib/operator-role.ts                                     ← RBAC (PR #5): OperatorRole hierarchy + getOperatorRole / isAdmin / isStaff / requireRole / requireRolePage. (Replaced the never-built `lib/permissions.ts` name from the 05-21 audit.)
+lib/auth.ts                                              ← getOrCreateWorkspaceForUser / requireWorkspaceId / getMemberWorkspaceId — resolves workspace from Clerk org membership; role now comes from lib/operator-role.ts (WorkspaceMember row)
 lib/audit.ts                                             ← AuditEvent write + query helpers (single module)
 app/globals.css                                          ← glass tokens (.operator-scope), .op-glass material, .op-btn, .op-ambient + drift, .op-rise entrance (all honor prefers-reduced-motion)
 ```
@@ -118,11 +123,84 @@ Selecting the **Editorial** theme (`data-theme="editorial"`, the 11th theme in `
 5. **No hex literals.** Operator dashboard uses CSS variables so white-label theming works per-tenant.
 6. **Audit log is read-only.** No edit, no delete. Even by admins.
 
+## Audit findings — "The Room" entry gate (2026-05-21, code-verified, read-only)
+
+"The Room" is the per-event live check-in board. **The button does not appear on the demo dashboard because the only dashboard entry point is gated to today-only events.**
+
+- The "Tonight" band (`app/operator/_components/dashboard/TonightPanel.tsx:58`) renders the **"Open The Room"** link, but `TonightPanel` returns `null` when its `events[]` is empty (`:23`).
+- That array comes from `app/operator/page.tsx:170`: `db.event.findMany({ where: { workspaceId, status:'PUBLISHED', startAt: { gte: startOfToday, lte: endOfToday } } })` (`startOfToday`/`endOfToday` defined `:18-27`). **Strictly today only.**
+- Both demo seeds create events that are strictly past or strictly future — none start *today* — so `todaysEvents` is empty → no button. (Details + smallest fix in `13-dev-tooling`.)
+- **Second, always-available entry point:** the event-detail action bar `app/operator/events/[id]/_components/EventActionBar.tsx:53-59` ("The Room →"), ungated by date. This is the fastest way to reach The Room for QA today — open any event with checked-in RSVPs and click it.
+- The Room route/query itself (`app/api/operator/events/[id]/room/route.ts`, `RoomDashboard.tsx`) is owned by `06-wallet-checkin` (it's the live check-in board). The member directory on *this* stage rebuilds applicant↔member identity by **lowercased-email join** (`app/api/operator/members/route.ts:44-58`), not by FK — see the contact-model map in `02-approval`.
+
+## Update 2026-05-25 — RBAC base shipped (PR #5)
+
+The 05-21 audit below documented a *fully unenforced* RBAC gap. PR #5 closed the base of it; the audit stays for context but the current state is:
+
+- **Roles exist in code.** `OperatorRole` enum (**ADMIN > STAFF > READ_ONLY**) on `WorkspaceMember.role` (default STAFF). Helpers in `lib/operator-role.ts`: `requireRole(minRole)` (route → 401/403), `requireRolePage(minRole)` (page → redirect), `getOperatorRole` / `isAdmin` / `isStaff`. A resolved org member with no `WorkspaceMember` row is treated as **READ_ONLY** (floor). Adam + Chloe seeded ADMIN.
+- **Gated today:** `/api/operator/settings/*`, `/api/operator/team*`, `/api/operator/members/bulk`, `/api/sms/*` (House Phone), plus the `/operator/settings` + `/operator/team` pages.
+- **Still ungated (auth + workspace only):** the approve/reject/refund/comp/bulk-delete mutation routes, `/api/intelligence/*`, `/api/agent/*`, and the `/api/mcp` write path. Extending `requireRole` to these is the remaining RBAC work — and it supersedes the "five roles" model in the 05-21 table below (shipped model is the three roles above).
+
+---
+
+## Audit findings — authorization gap / unenforced RBAC (2026-05-21, code-verified, read-only)
+
+> Superseded in part by "Update 2026-05-25" above — roles now exist; the route-coverage gap is what remains.
+
+**VERDICT: a CONTAINED internal gap today — NOT a member-facing data leak / hard launch blocker — but it becomes launch-blocking the moment any non-owner operator (staff / readonly) is onboarded, and the control that contains it is fragile and implicit.**
+
+### Q1 — The linchpin: do members share the operators' workspace/Clerk org? NO (today, by accident not design)
+- Both members and operators resolve `workspaceId` through the **same** function — `getOrCreateWorkspaceForUser` (`lib/auth.ts:4`) — which derives the workspace from `memberships.data[0].organization` (`:12`), the user's first **Clerk Organization** membership. It reads **no role**.
+- Operators differ from members only in that operators are provisioned into the NoBC Clerk org **out-of-band** (Clerk dashboard). **No code anywhere adds a member to a Clerk org, creates an org, or sets role metadata** — verified: zero hits for `createOrganization` / `organizationMembership` / `publicMetadata` / `has({…})` across `app/` + `lib/`.
+- So a regular club member has **no** Clerk org → `requireWorkspaceId(memberUserId)` **throws** (`lib/auth.ts:8-9`) and `getMemberWorkspaceId` returns `null` (`:47`). A plain member hitting an operator API does **not** resolve into the operators' workspace — they error out / get the member gate. **Members and operators are the same Clerk user pool with one ClerkProvider; the only wall is "do you have an org membership," enforced solely by the absence of member-org-provisioning code.**
+
+### Q2 — What gates operator routes: authentication + workspace-scoping ONLY, never role
+- `middleware.ts:3-13`: `auth.protect()` on page prefixes `/m`, `/operator`, `/check-in`, `/qa-panel` = **logged-in only**. `/api/operator/*`, `/api/intelligence/*`, `/api/mcp`, `/api/agent/*` are **not** in the protected matcher — they rely on each handler's own `if (!userId) return 401` + `requireWorkspaceId`.
+- `app/operator/layout.tsx:22-23`: `getMemberWorkspaceId(userId) ?? ''` — **no role check**; a logged-in no-org user renders the operator shell with empty data (no redirect).
+- Every operator API is the uniform shape `auth() → 401-if-anon → requireWorkspaceId(userId) → real work`. None imports a permissions module (none exists).
+
+### Q3 — Exposure
+- **Regular member (no org):** operator pages render an empty shell; operator/intelligence APIs throw on `requireWorkspaceId` → error, **no data**. No PII / applications / Red List / intelligence / audit leak to members.
+- **Any user IN the operators' Clerk org (i.e., any operator regardless of intended role):** full read **and** write — member PII, applications + AI scores, intelligence, audit log, plus approve/reject/refund/comp/bulk-delete/AI-agent. The only 403s in the codebase are cross-**workspace** resource access and dev-tooling env-allowlist (`DEV_USER_IDS`) — **never** an under-privileged role.
+
+### Q4 — Roles: documented, not built
+- No role enum/field in `prisma/schema.prisma` (Member `:111-143` has `status MemberStatus`, no `role`). `lib/permissions.ts` **does not exist**. The strings owner/admin/manager/staff/readonly appear nowhere as role values.
+- The only Clerk role ever read is `m.role` at `app/api/operator/operators/route.ts:29` — returned for @-mention display, **never used in a guard**.
+- Reconciliation vs root CLAUDE.md "Roles & Permissions":
+
+  | CLAUDE.md claim | Reality |
+  |---|---|
+  | Five operator roles exist | **FALSE** — no role enum/constant anywhere |
+  | Permissions enforced at API layer / "403 on failure" | **FALSE** — auth + workspace only; role never examined |
+  | Every permission check writes an AuditEvent | **N/A** — no permission checks exist (AuditEvents fire on business mutations, not authz decisions) |
+
+  This matches CLAUDE.md's own contradicting note: *"any workspace member can currently hit any route."* That note is the accurate one.
+
+### Q5 — Route → gate map (operator-only surfaces)
+
+| Surface | Middleware | Per-route role guard | Workspace-scoped |
+|---|---|---|---|
+| `/operator/*` pages incl. `/operator/audit`, `/operator/intelligence` | auth-only | **None** | layout/page only |
+| `/api/operator/*` (members, applications + [id]/approve\|reject\|hold\|waitlist, events, rsvps/[id]/approve\|reject\|refund, comp, bulk-delete, settings, lists, comments, series, notifications) | not matched → in-handler 401 | **None** (403 only cross-workspace) | Yes |
+| `/api/intelligence/compose`, `/api/intelligence/reports` | not matched → in-handler 401 | **None** | Yes |
+| `/api/agent/*` (run, confirm, cancel) | not matched → in-handler 401 | **None** | Yes |
+| `/api/mcp` (MCP server, all write tools) | not matched → in-handler 401 (Clerk bearer/session) | **None** | Yes (from identity) |
+| `/api/operator/operators` | in-handler 401 | reads `m.role` for **display only** | via Clerk `orgId` |
+
+### Smallest correct fix (NOT implemented — outline only)
+1. Add one server-side authz helper (the missing `lib/permissions.ts` + e.g. `requireOperator(userId)` / `requirePermission(userId, action)`) that resolves the workspace **and** asserts the caller's Clerk **org role** (`auth().orgRole` / `has({ role })` — already available; `operators/route.ts:29` proves the data is present). **Deny by default.**
+2. Map Clerk org roles → the five documented roles + an action matrix (owner/admin = full; manager = approve/publish/comp; staff = check-in only; readonly = GET only).
+3. Call it at the top of every `/api/operator/*`, `/api/intelligence/*`, `/api/agent/*`, the `/api/mcp` write path, and the `/operator` layout — replacing the bare `requireWorkspaceId` where a privileged action is performed. Coarse first cut: require *any* recognized operator role for all operator routes (closes intra-tenant escalation immediately); refine per-action next.
+4. Emit an AuditEvent on denials (satisfies the CLAUDE.md "audit every permission check" claim).
+5. Defense-in-depth, outside code: confirm Clerk dashboard disables "users can create organizations" / auto-personal-org, so org membership only ever comes from an explicit operator invite — and never treat "has any org membership" as sufficient authority.
+
 ## What this stage does NOT own
 
 - Application review UI → `02-approval/`
 - Event editor → `03-events/`
 - Access (RSVP) manager → `04-access/`
 - Refund button + payment ops → `05-payments/`
-- Check-in dashboard → `06-wallet-checkin/`
+- Check-in dashboard + The Room route/query → `06-wallet-checkin/`
+- MCP tool authorization (same gap, server-side) → `08-mcp-server/`
+- Intelligence API authorization (same gap) → `12-intelligence/`
 - AI chat panel → `09-ai-chat/`
