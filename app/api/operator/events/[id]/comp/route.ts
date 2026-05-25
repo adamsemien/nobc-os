@@ -1,10 +1,10 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
+import { OperatorRole } from '@prisma/client';
 import { findOrCreateGuestMember } from '@/lib/event-access-submit';
 
 const COMP_TYPES = ['Sponsor', 'Vendor', 'Staff', 'Press', 'Partner', 'Other'] as const;
@@ -21,10 +21,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
   const { id: eventId } = await params;
 
   const event = await db.event.findFirst({

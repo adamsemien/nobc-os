@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
+import { OperatorRole } from '@prisma/client';
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
@@ -46,9 +48,9 @@ const PostSchema = z.object({
 );
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
 
   let body: unknown;
   try { body = await req.json(); }

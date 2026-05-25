@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { getMemberWorkspaceId } from '@/lib/auth';
+import { isAdmin } from '@/lib/operator-role';
 import { db } from '@/lib/db';
 import { OperatorNav } from './operator-nav';
 import { AgentPanel } from './_components/AgentPanel';
@@ -21,6 +22,7 @@ export default async function OperatorLayout({
 }>) {
   const { userId } = await auth();
   const workspaceId = (await getMemberWorkspaceId(userId)) ?? '';
+  const operatorIsAdmin = await isAdmin(userId, workspaceId);
 
   // Events feed the Cmd+K palette — workspace-scoped, soonest first.
   // Member count feeds the onboarding-tour empty-state check.
@@ -53,7 +55,7 @@ export default async function OperatorLayout({
         className="operator-scope flex min-h-screen"
         style={{ background: 'var(--page-bg)' }}
       >
-        <OperatorNav pendingApplicationCount={pendingApplicationCount} />
+        <OperatorNav pendingApplicationCount={pendingApplicationCount} isAdmin={operatorIsAdmin} />
         <main className="flex min-h-screen min-w-0 flex-1 flex-col">{children}</main>
         {/* Cmd+K is owned by CommandPaletteProvider — AgentPanel binds Cmd+Shift+Option+A. */}
         <AgentPanel />

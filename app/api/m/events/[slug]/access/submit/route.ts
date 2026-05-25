@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
+import { isStaff } from '@/lib/operator-role';
 import { resolveViewer, flowNeedsApproval } from '@/lib/event-access';
 import {
   loadAccessContext,
@@ -66,7 +67,11 @@ export async function POST(
   // Access is enforced by viewer resolution: a signed-in non-member resolves to the guest
   // path (registers as a guest where Guest Access is on) or to "closed" for member-only
   // events. Only approved members reach the member path.
-  const isOperator = operatorWorkspaceId != null && operatorWorkspaceId === workspaceId;
+  // Bypass is a STAFF+ privilege: a READ_ONLY org member must not preview/mint via bypass.
+  const isOperator =
+    operatorWorkspaceId != null &&
+    operatorWorkspaceId === workspaceId &&
+    (await isStaff(userId, workspaceId));
   let viewer = resolveViewer(member, userId);
   let ctx = await loadAccessContext(workspaceId, evt.id, viewer);
   // Operator bypass: an operator of this workspace can register as a member to test/preview

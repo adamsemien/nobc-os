@@ -1,9 +1,8 @@
 import { randomUUID } from 'crypto';
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { MemberStatus } from '@prisma/client';
+import { MemberStatus, OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
 import { generateMemberQrCode } from '@/lib/member-qr';
 import { emitEvent } from '@/lib/emit-event';
 
@@ -16,14 +15,11 @@ const ALLOWED_STATUSES: MemberStatus[] = [
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-// TODO(#28 RBAC): gate this to admin/owner once `lib/permissions.ts` exists.
-// Today — like every other /api/operator/* route — this is auth + workspace
-// scoped only; no role guard exists yet (see _context/07-operator-dashboard).
+// Manual member creation is a STAFF+ action (READ_ONLY operators cannot write).
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== 'object') {

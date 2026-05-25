@@ -1,17 +1,16 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
+import { OperatorRole } from '@prisma/client';
 import { stripe } from '@/lib/stripe';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.ADMIN);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
   const { id } = await params;
 
   const rsvp = await db.rSVP.findFirst({

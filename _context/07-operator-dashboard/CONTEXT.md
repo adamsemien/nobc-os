@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped (UI) / 🟡 RBAC (#28) shipped but coverage incomplete |
+| **State** | ✅ Shipped (UI) / ✅ RBAC (#28) — every `/api/operator/*` write gated (STAFF; refunds ADMIN); only `/api/agent`, `/api/mcp` write, `/api/intelligence` APIs remain deferred |
 | **V1 item** | #20 (audit_events portion), #22 (7-theme system), #24 (operator bulk delete), #28 (roles & permissions — base shipped 2026-05-25 PR #5; see "Update 2026-05-25" below) |
 | **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
-| **Blocked on** | Nothing hard. RBAC base is shipped (3 roles via `WorkspaceMember` + `lib/operator-role.ts`, PR #5) but only a subset of routes are gated — extending `requireRole` to approve/reject/refund/comp/bulk-delete + `/api/intelligence/*` + `/api/agent/*` + `/api/mcp` is the remaining work. |
-| **Next** | Extend `requireRole` coverage to the still-ungated mutation routes (above). Add Member (manual member creation, `POST /api/operator/members/create` + slide-over) shipped (PR #4 merged) — its create route is **not yet role-gated**, and a GUEST created there is filtered out of the directory on refresh (`GET /api/operator/members` excludes `status: GUEST`). Optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx`. (Audit 2026-05-21: the only "Open The Room" entry on this dashboard is gated to today-only events (`page.tsx:170`) — see Audit findings below.) |
+| **Blocked on** | Nothing hard. RBAC now gates every `/api/operator/*` write (STAFF; refunds ADMIN), the operator RSVP-bypass branch in `/api/m/.../access/*` (STAFF), `/api/stripe/refund` (ADMIN), and the Sponsor Intelligence page (ADMIN). Remaining (deferred): `/api/intelligence/*` mutation routes, `/api/agent/*`, and the `/api/mcp` write path — still auth + workspace only. `/api/check-in/*` is intentionally excluded (it authenticates via `CHECKIN_SECRET` bearer, not a Clerk session — `requireRole` is inapplicable there). |
+| **Next** | Gate the remaining deferred surfaces — `/api/agent/*`, the `/api/mcp` write path, and `/api/intelligence/*` mutation routes (`POST` compose/reports) — to fully close intra-tenant escalation. (Add Member create is now `requireRole(STAFF)` and its button is hidden for READ_ONLY via `MembersView canAddMembers`; the GUEST-filtered-from-directory note still stands — `GET /api/operator/members` excludes `status: GUEST`.) Optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx`. (Audit 2026-05-21: the only "Open The Room" entry on this dashboard is gated to today-only events (`page.tsx:170`) — see Audit findings below.) |
 
 ## Scope
 
@@ -28,13 +28,14 @@ Feature-specific operator UIs (applications review, event editor, RSVP manager, 
 ## Files in play
 
 ```
-app/operator/layout.tsx                                  ← shell + nav
+app/operator/layout.tsx                                  ← shell + nav; resolves isAdmin and passes to OperatorNav
+app/operator/operator-nav.tsx                            ← sidebar nav; adminOnly items hidden for non-ADMIN (Sponsors → /operator/intelligence/sponsor)
 app/operator/page.tsx                                    ← editorial dashboard home (masthead → numerals → tonight → journal → marginalia)
 app/operator/members/page.tsx                            ← directory
 app/operator/members/[id]/page.tsx                       ← member detail
 app/operator/members/_components/AddMemberDrawer.tsx     ← Add Member slide-over (manual create) — PR #4 merged
 app/operator/members/_components/MembersView.tsx         ← directory shell w/ optimistic insert + toast — PR #4 merged
-app/api/operator/members/create/route.ts                 ← POST manual member create + duplicate-email check (not yet role-gated) — PR #4 merged
+app/api/operator/members/create/route.ts                 ← POST manual member create + duplicate-email check — requireRole(STAFF) (PR #4 merged; gated 2026-05-25)
 app/operator/team/page.tsx                               ← Team settings (operators + roles) — gated requireRolePage(ADMIN)
 app/operator/team/_components/TeamManager.tsx            ← team roster + role assignment UI
 app/api/operator/team/route.ts                           ← list/invite WorkspaceMember — requireRole(ADMIN)
@@ -140,6 +141,17 @@ The 05-21 audit below documented a *fully unenforced* RBAC gap. PR #5 closed the
 - **Roles exist in code.** `OperatorRole` enum (**ADMIN > STAFF > READ_ONLY**) on `WorkspaceMember.role` (default STAFF). Helpers in `lib/operator-role.ts`: `requireRole(minRole)` (route → 401/403), `requireRolePage(minRole)` (page → redirect), `getOperatorRole` / `isAdmin` / `isStaff`. A resolved org member with no `WorkspaceMember` row is treated as **READ_ONLY** (floor). Adam + Chloe seeded ADMIN.
 - **Gated today:** `/api/operator/settings/*`, `/api/operator/team*`, `/api/operator/members/bulk`, `/api/sms/*` (House Phone), plus the `/operator/settings` + `/operator/team` pages.
 - **Still ungated (auth + workspace only):** the approve/reject/refund/comp/bulk-delete mutation routes, `/api/intelligence/*`, `/api/agent/*`, and the `/api/mcp` write path. Extending `requireRole` to these is the remaining RBAC work — and it supersedes the "five roles" model in the 05-21 table below (shipped model is the three roles above).
+
+## Update 2026-05-25 (later) — route-coverage audit + extension
+
+Route-protection audit closed the operator-route half of the gap above. Every `/api/operator/*` **write** handler (POST/PUT/PATCH/DELETE) now calls `requireRole`:
+
+- **STAFF** (the operational floor — READ_ONLY may only GET): applications approve/reject/hold/waitlist + bulk, rsvps approve/reject/cancel, events create/edit/comp/promote-waitlist/bulk-delete, comments, lists, notifications, series (+generate), ticket-tiers, tiers (+reorder/seed), and **Add Member** (`members/create`).
+- **ADMIN** (sensitive): refunds (`rsvps/[id]/refund` **and** `/api/stripe/refund`), plus the already-gated member bulk/Red-List, team/role changes, and workspace settings.
+- **Cross-cutting (not under `/api/operator`):** the operator **RSVP-bypass** branch inside `/api/m/events/[slug]/access/{submit,payment-intent}` is now STAFF-gated (the `isOperator` signal requires `isStaff`, so a READ_ONLY org member can no longer mint a preview/comp RSVP). The **Sponsor Intelligence** page (`/operator/intelligence/sponsor`) is `requireRolePage(ADMIN)`, and its nav entry ("Sponsors") is hidden for non-ADMIN (`OperatorNav isAdmin`).
+- **Intentionally excluded:** `/api/check-in/*` authenticates via a `CHECKIN_SECRET` bearer token (offline check-in PWA, #12), not a Clerk session — `requireRole` would break door check-in and is inapplicable. Its own token boundary stands.
+- **GET handlers left open** to READ_ONLY by design ("READ_ONLY: GET routes only").
+- **Still deferred** (next RBAC step): `/api/agent/*`, the `/api/mcp` write path, and `/api/intelligence/*` mutation routes.
 
 ---
 

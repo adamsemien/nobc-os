@@ -1,7 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireWorkspaceId } from '@/lib/auth';
+import { requireRolePage } from '@/lib/operator-role';
 import { getAudienceNarrative } from './actions';
 import { SentimentPanel } from './_components/SentimentPanel';
 import { SponsorBriefBar } from './_components/SponsorBriefBar';
@@ -334,9 +333,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 // ============================================================
 
 export default async function SponsorIntelligencePage() {
-  const { userId } = await auth();
-  if (!userId) redirect('/');
-  const workspaceId = await requireWorkspaceId(userId);
+  const { workspaceId } = await requireRolePage(OperatorRole.ADMIN);
 
   const approvedCount = await db.member.count({ where: { workspaceId, status: 'APPROVED' } });
 

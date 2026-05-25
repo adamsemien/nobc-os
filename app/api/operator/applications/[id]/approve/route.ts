@@ -1,16 +1,15 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
-import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
+import { OperatorRole } from '@prisma/client';
 import { approveApplication } from '@/lib/applications/approve';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
   const { id } = await params;
 
   let reviewNote: string | undefined;

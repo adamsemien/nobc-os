@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
+import { OperatorRole } from '@prisma/client';
 import { notifyMentions, maybeFireSlack } from '@/lib/comments-notify';
 
 const ENTITY_TYPES = ['application', 'member', 'event', 'rsvp'] as const;
@@ -33,9 +35,9 @@ const PostSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
 
   let payload: unknown;
   try { payload = await req.json(); }
