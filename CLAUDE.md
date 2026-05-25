@@ -102,7 +102,9 @@ These are hard constants. Any agent that violates them is broken.
 
 - **Email `from` address:** `team@thenobadcompany.com` — always, every transactional email, every welcome, every notification
 - **AI model:** `claude-sonnet-4-20250514` — every Anthropic call. Do not substitute a different model, do not "upgrade" to a newer version, do not swap to a cheaper one. Adam decides model bumps explicitly.
-  - **Authorized exception — House Phone SMS only:** `claude-haiku-4-5-20251001` is used for House Phone inbound triage (the Railway service) and SMS topic categorization (`GET /api/sms/categorize`). This is an explicit, Adam-authorized exception for cheap high-volume SMS classification — it does NOT relax the lock anywhere else. Any other model choice still requires Adam's sign-off.
+  - **Authorized Haiku exceptions** (`claude-haiku-4-5-20251001`) — explicit, Adam-authorized uses for cheap, high-volume or non-critical editorial summarization. These do NOT relax the lock anywhere else; any other model choice still requires Adam's sign-off:
+    1. **House Phone SMS** — inbound triage (the Railway service) and SMS topic categorization (`GET /api/sms/categorize`). Cheap high-volume SMS classification.
+    2. **Sponsor Intelligence narrative** — the Sentiment & Alignment narrative on `/operator/intelligence/sponsor` (`app/operator/intelligence/sponsor/actions.ts`). Authorized 2026-05-25 for editorial sponsor-briefing summarization.
 - **Never modify legal copy** in /apply screen 7 (waiver). Pending attorney review. Any change requires Adam's explicit sign-off.
 - **Never break /apply, archetype config (config/archetypes.ts), or the AI scoring system.** These are shipped and live. Changes require explicit task authorization.
 

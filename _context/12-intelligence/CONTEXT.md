@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped (base) — 🔶 Partial (sponsor-facing surface) |
+| **State** | ✅ Shipped (base + sponsor dashboard v1) — 🔶 Partial (sponsor-facing surface: one-sheeter export deferred to V1.5) |
 | **V1 item** | #27 (Intelligence system) |
 | **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
 | **Blocked on** | Sponsor pilot definition. Also: `/api/intelligence/*` is gated by auth + workspace only, no operator role — same RBAC gap as `07-operator-dashboard` (the `requireRole` helper now exists, PR #5; these routes are not yet gated on it). |
-| **Next** | Surface the new referral/engagement data layer in the dashboard (network-capital tile + engagement timeline), then build the sponsor-facing dashboard per NoBC Intelligence pilot spec. Apply `requireRole` (Stage 07, PR #5) to `/api/intelligence/compose` + `/reports` + the House Phone analytics routes. (2026-05-25, PR #6: shipped the **House Phone tab** — inbound-SMS analytics + AI topic categorization, surfaced in `IntelligenceView`. 2026-05-25: added the **referral/engagement data layer** — `MemberEngagementEvent` log + `Member.networkCapitalScore`/`referredByMemberId` + sponsor-intelligence fields, scored by `lib/network-capital.ts` and written fire-and-forget by `lib/engagement.ts`; not yet surfaced in the dashboard. Run `scripts/backfill-referrals.ts` to populate referral links from `Application.referredBy`.) |
+| **Next** | Surface the new referral/engagement data layer in the dashboard (network-capital tile + engagement timeline), then build the sponsor-facing dashboard per NoBC Intelligence pilot spec. Apply `requireRole` (Stage 07, PR #5) to `/api/intelligence/compose` + `/reports` + the House Phone analytics routes. (2026-05-25, PR #6: shipped the **House Phone tab** — inbound-SMS analytics + AI topic categorization, surfaced in `IntelligenceView`. 2026-05-25: added the **referral/engagement data layer** — `MemberEngagementEvent` log + `Member.networkCapitalScore`/`referredByMemberId` + sponsor-intelligence fields, scored by `lib/network-capital.ts` and written fire-and-forget by `lib/engagement.ts`; not yet surfaced in the dashboard. Run `scripts/backfill-referrals.ts` to populate referral links from `Application.referredBy`. 2026-05-25: shipped the **Sponsor Intelligence dashboard** at `/operator/intelligence/sponsor` — Network Capital + Retention & Velocity panels (server, parallel queries, per-panel isolation) + an AI-narrated Sentiment & Alignment panel. Remaining: wire the "Generate One-Sheeter" export (toasts "coming in V1.5"), and apply `requireRole` here once it lands.) |
 
 ## Scope
 
@@ -56,6 +56,10 @@ lib/demo-data.ts                                                    ← syntheti
 lib/network-capital.ts                                              ← network-capital scoring (referral graph → Member.networkCapitalScore); compute(memberId) + refreshAll(workspaceId)
 lib/engagement.ts                                                   ← fire-and-forget MemberEngagementEvent writer (logEngagementEvent); wired into RSVP-confirm, waitlist-join, check-in
 scripts/backfill-referrals.ts                                       ← one-time backfill: Application.referredBy (name) → Member.referredByMemberId
+app/operator/intelligence/sponsor/page.tsx                          ← Sponsor Intelligence dashboard (server; parallel loaders + per-panel isolation + empty state)
+app/operator/intelligence/sponsor/actions.ts                        ← 'use server' getAudienceNarrative (unstable_cache 1h) + regenerate; AI narrative via @ai-sdk/anthropic (Haiku — Adam-authorized per-feature, see note)
+app/operator/intelligence/sponsor/_components/SentimentPanel.tsx    ← Panel 3 (client) — AI narrative + Regenerate
+app/operator/intelligence/sponsor/_components/SponsorBriefBar.tsx   ← bottom bar (client) — "Generate One-Sheeter" → V1.5 toast
 ```
 
 ## Inputs
@@ -87,7 +91,7 @@ scripts/backfill-referrals.ts                                       ← one-time
 2. **Workspace-scoped end-to-end.** Every metric runner builds its context via `buildContext(workspaceId, filters)` — no global aggregates, no cross-tenant reads.
 3. **Demo mode is a UI flag, never a data substitute in production paths.** `?demo=true` swaps the source via `lib/demo-data.ts`; never branch on demo inside a metric runner.
 4. **Empty states are first-class.** Every tile and view must have a defined empty state (see ApplicationFunnel's "No signals yet" pattern). Sponsor decks read better with honest empties than fabricated numbers.
-5. **AI narration is bounded.** `insight-generator.ts` uses claude-sonnet-4-20250514, no model substitution. Narratives are short (1–2 sentences) and never invent numbers — only describe what the metric returned. (Exception: the House Phone SMS **categorizer** in `/api/sms/categorize` uses `claude-haiku-4-5-20251001` — an explicit Adam-authorized exception for cheap high-volume SMS classification, documented in root CLAUDE.md → Locked Decisions. It does not relax the lock on the registry/narrator.)
+5. **AI narration is bounded.** `insight-generator.ts` uses claude-sonnet-4-20250514, no model substitution. Narratives are short (1–2 sentences) and never invent numbers — only describe what the metric returned. (Exception: the House Phone SMS **categorizer** in `/api/sms/categorize` uses `claude-haiku-4-5-20251001` — an explicit Adam-authorized exception for cheap high-volume SMS classification, documented in root CLAUDE.md → Locked Decisions. It does not relax the lock on the registry/narrator.) (2026-05-25: the **Sponsor dashboard's** Sentiment & Alignment narrative — `app/operator/intelligence/sponsor/actions.ts` — also uses `claude-haiku-4-5-20251001` — now a documented authorized Haiku exception #2 in root CLAUDE.md → Locked Decisions, alongside House Phone SMS.)
 6. **Sponsor-scoped surface (when shipped) cannot expose individual member PII.** Aggregates and segments only. Member detail stays in `07-operator-dashboard/`.
 
 ## Audit findings — authorization (2026-05-21, code-verified, read-only)
