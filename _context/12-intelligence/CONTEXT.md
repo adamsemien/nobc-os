@@ -11,7 +11,7 @@
 | **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
 | **Blocked on** | Sponsor pilot definition. Also: `/api/intelligence/*` is gated by auth + workspace only, no operator role — same RBAC gap as `07-operator-dashboard` (the `requireRole` helper now exists, PR #5; these routes are not yet gated on it). |
-| **Next** | Build sponsor-facing dashboard per NoBC Intelligence pilot spec. Apply `requireRole` (Stage 07, PR #5) to `/api/intelligence/compose` + `/reports` + the House Phone analytics routes. (2026-05-25, PR #6: shipped the **House Phone tab** — inbound-SMS analytics + AI topic categorization, surfaced in `IntelligenceView`.) |
+| **Next** | Surface the new referral/engagement data layer in the dashboard (network-capital tile + engagement timeline), then build the sponsor-facing dashboard per NoBC Intelligence pilot spec. Apply `requireRole` (Stage 07, PR #5) to `/api/intelligence/compose` + `/reports` + the House Phone analytics routes. (2026-05-25, PR #6: shipped the **House Phone tab** — inbound-SMS analytics + AI topic categorization, surfaced in `IntelligenceView`. 2026-05-25: added the **referral/engagement data layer** — `MemberEngagementEvent` log + `Member.networkCapitalScore`/`referredByMemberId` + sponsor-intelligence fields, scored by `lib/network-capital.ts` and written fire-and-forget by `lib/engagement.ts`; not yet surfaced in the dashboard. Run `scripts/backfill-referrals.ts` to populate referral links from `Application.referredBy`.) |
 
 ## Scope
 
@@ -53,6 +53,9 @@ lib/intelligence/types.ts                                           ← Metric /
 lib/intelligence/metrics/                                           ← per-metric runners (pipeline, community, etc.)
 lib/intelligence/BACKLOG.md                                         ← metric ideas not yet in registry
 lib/demo-data.ts                                                    ← synthetic dataset for the demo flag
+lib/network-capital.ts                                              ← network-capital scoring (referral graph → Member.networkCapitalScore); compute(memberId) + refreshAll(workspaceId)
+lib/engagement.ts                                                   ← fire-and-forget MemberEngagementEvent writer (logEngagementEvent); wired into RSVP-confirm, waitlist-join, check-in
+scripts/backfill-referrals.ts                                       ← one-time backfill: Application.referredBy (name) → Member.referredByMemberId
 ```
 
 ## Inputs
@@ -75,6 +78,8 @@ lib/demo-data.ts                                                    ← syntheti
 - **IntelligenceInsight**: workspaceId, metricId, narrative, delta (JSON), generatedAt, acknowledged
 - **SavedReport**: workspaceId, name, question, metricIds (String[]), filters (JSON), createdById, createdAt, lastRunAt
 - **SponsorBrandProfile**: sponsor metadata used by `lib/intelligence/sponsor-targets.ts` for segment matching
+- **MemberEngagementEvent** (2026-05-25): append-only engagement log — workspaceId, memberId, eventType (`MemberEngagementEventType` enum), eventId?, metadata (JSON), occurredAt. Raw signal feed for future engagement/network metrics.
+- **Member** intelligence fields (2026-05-25): `referredByMemberId` (self-relation → referral graph), `networkCapitalScore` (Float, from `lib/network-capital.ts`), and sponsor-intelligence fields `industry` / `jobFunction` / `seniority` / `companySize` / `ageRange` / `householdIncome`. (Distinct from the pre-existing `networkValueScore Int`.)
 
 ## Rules — DO NOT VIOLATE
 
