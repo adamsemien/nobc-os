@@ -1,6 +1,7 @@
 import { clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { getOrCreateMemberFromClerk, type ClerkMemberRow } from '@/lib/clerk-member';
+import { logEngagementEvent } from '@/lib/engagement';
 
 export type RsvpSubmitBody = {
   eventId: string;
@@ -147,6 +148,13 @@ export async function submitMemberRsvp(
           position,
         },
       });
+      // Fire-and-forget engagement signal — must not block or fail the join.
+      logEngagementEvent({
+        workspaceId,
+        memberId: member.id,
+        eventType: 'waitlist_joined',
+        eventId,
+      });
       return { ok: true, waitlisted: true, position };
     }
   }
@@ -179,6 +187,16 @@ export async function submitMemberRsvp(
       metadata: { ticketStatus },
     },
   });
+
+  if (ticketStatus === 'confirmed') {
+    // Fire-and-forget engagement signal — must not block or fail the RSVP.
+    logEngagementEvent({
+      workspaceId,
+      memberId: member.id,
+      eventType: 'rsvp_confirmed',
+      eventId,
+    });
+  }
 
   if (ticketStatus === 'confirmed' && process.env.RESEND_API_KEY) {
     const eventRecord = await db.event.findUnique({

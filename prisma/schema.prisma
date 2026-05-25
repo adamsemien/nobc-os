@@ -58,6 +58,7 @@ model Workspace {
   membershipTiers      MembershipTier[]
   smsConversations     SmsConversation[]
   workspaceMembers     WorkspaceMember[]
+  memberEngagementEvents MemberEngagementEvent[]
 
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
@@ -159,6 +160,19 @@ model Member {
   passIssuedAt      DateTime?
   totalEventsAttended Int        @default(0)
   lastAttendedDate  DateTime?
+
+  // Referral linkage + network-effect scoring
+  referredByMemberId  String?
+  networkCapitalScore Float?
+
+  // Sponsor intelligence — self-reported / enriched demographic + firmographic fields
+  industry          String?
+  jobFunction       String?
+  seniority         String?
+  companySize       String?
+  ageRange          String?
+  householdIncome   String?
+
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -166,9 +180,15 @@ model Member {
   tickets         Ticket[]
   waitlistEntries WaitlistEntry[]
 
+  // Self-relation: who referred this member, and who they referred.
+  referredByMember Member?  @relation("MemberReferrals", fields: [referredByMemberId], references: [id])
+  referredMembers  Member[] @relation("MemberReferrals")
+  engagementEvents MemberEngagementEvent[]
+
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
   @@index([workspaceId])
+  @@index([referredByMemberId])
 }
 
 enum ApplicationStatus {
@@ -1264,4 +1284,34 @@ model SmsMessage {
   createdAt      DateTime        @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// Append-only log of member engagement signals. Feeds network-capital scoring,
+// intelligence, and sponsor reporting. Fire-and-forget writes (lib/engagement.ts).
+model MemberEngagementEvent {
+  id          String   @id @default(cuid())
+  workspaceId String
+  memberId    String
+  eventType   MemberEngagementEventType
+  eventId     String?
+  metadata    Json?
+  occurredAt  DateTime @default(now())
+
+  member      Member    @relation(fields: [memberId], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([memberId])
+  @@index([occurredAt])
+}
+
+enum MemberEngagementEventType {
+  rsvp_confirmed
+  rsvp_cancelled
+  checked_in
+  waitlist_joined
+  waitlist_promoted
+  application_submitted
+  newsletter_opened
+  sponsor_perk_clicked
 }

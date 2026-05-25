@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { logEngagementEvent } from '@/lib/engagement';
 
 // Idempotent check-in endpoint — safe to call multiple times offline/online
 export async function POST(
@@ -15,7 +16,7 @@ export async function POST(
 
   const rsvp = await db.rSVP.findUnique({
     where: { id: rsvpId },
-    select: { id: true, workspaceId: true, memberId: true, checkedIn: true, ticketStatus: true },
+    select: { id: true, workspaceId: true, memberId: true, eventId: true, checkedIn: true, ticketStatus: true },
   });
   if (!rsvp) return NextResponse.json({ error: 'RSVP not found' }, { status: 404 });
   if (!['confirmed', 'held'].includes(rsvp.ticketStatus)) {
@@ -51,6 +52,14 @@ export async function POST(
       },
     }),
   ]);
+
+  // Fire-and-forget engagement signal — must not block or fail the check-in.
+  logEngagementEvent({
+    workspaceId: rsvp.workspaceId,
+    memberId: rsvp.memberId,
+    eventType: 'checked_in',
+    eventId: rsvp.eventId,
+  });
 
   return NextResponse.json({ ok: true, alreadyCheckedIn: false, checkedInAt: now.toISOString() });
 }
