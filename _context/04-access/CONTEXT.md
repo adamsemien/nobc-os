@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #7, #8, #14 (waitlist auto-promote portion), #21 (comp tickets — issuance + member-facing flow) |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Polish + V1.5 enhancements. (2026-05-21: member events **calendar** `app/m/events/_components/MemberEventsExplorer.tsx` brought onto the ivory editorial brand system — warm ivory canvas, ink type, NoBC Red access badge, full-bleed grid — to match the already-ivory event detail page. Access-mode badge now shows display labels ("Open"/"Ticketed"), never the raw enum. Visual only; RSVP/access flow untouched.) |
+| **Next** | Polish + V1.5 enhancements. (2026-05-23: **operator access bypass + preview** — an operator can complete the access flow on behalf of a guest and preview it, for both **free** and **paid** events (`app/api/m/events/[slug]/access/{submit,payment-intent}/route.ts` + `EventAccessFlow.tsx` + `lib/event-access-submit.ts`). 2026-05-22: **guest-flow fix** — a signed-in non-member is no longer blocked from the guest flow; the over-restrictive member check was removed from both access routes. Non-member buyers now also mint a `memberQrCode` so the door scan works — see `06-wallet-checkin`. 2026-05-21: member events **calendar** `app/m/events/_components/MemberEventsExplorer.tsx` brought onto the ivory editorial brand system; the warm access-state copy in `RsvpCard.tsx` is part of the 2026-05-24 event-page redesign (Stage 03). Access-mode badge shows display labels ("Open"/"Ticketed"), never the raw enum.) |
 
 > **Architecture note (2026-05-20):** `apply_or_pay` was removed as a standalone `AccessMode` enum value. It was not a real third mode — it is now expressed as `TICKETED` + `approvalRequired: true`. Migration `20260520000000_remove_apply_or_pay` applied. The `applyMode` column and `EventApplyMode` enum were dropped entirely. Workflow template key renamed `apply_or_pay` → `ticketed_approval`.
 
@@ -30,6 +30,10 @@ Everything from a member clicking "RSVP" on an event to a confirmed RSVP row. Ha
 
 ```
 app/m/events/[slug]/rsvp/page.tsx               ← RSVP flow UI
+app/m/events/[slug]/_components/EventAccessFlow.tsx ← member/guest access flow UI (+ operator bypass/preview entry)
+app/api/m/events/[slug]/access/submit/route.ts  ← access submit (free path; guest-flow fix + operator bypass)
+app/api/m/events/[slug]/access/payment-intent/route.ts ← paid access PaymentIntent (guest-flow fix + operator paid bypass)
+lib/event-access-submit.ts                      ← shared access-submit logic; findOrCreateGuestMember mints memberQrCode
 app/api/rsvp/route.ts                           ← create RSVP
 app/api/rsvp/[id]/route.ts                      ← read/cancel
 app/api/rsvp/[id]/approve/route.ts              ← operator approve (if required)

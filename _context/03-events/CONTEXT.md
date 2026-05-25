@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #6, #13, #14 (capacity portion), #15, #23 (hero images) |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Polish + iterate based on operator feedback. Overview tab now shows a Post-Event Summary card (attendance, check-in rate, captured revenue, no-shows) once an event has passed — via `_stats.checkedInCount` + `_stats.capturedRevenueCents`. |
+| **Next** | Polish + iterate based on operator feedback. Overview tab now shows a Post-Event Summary card (attendance, check-in rate, captured revenue, no-shows) once an event has passed — via `_stats.checkedInCount` + `_stats.capturedRevenueCents`. (2026-05-24, PR #3: member event-detail pages redesigned to the editorial-luxury brand across all three layout templates — **Split** (45/55, mobile hero, mark fallback), **Editorial** (Cormorant, dramatic hero), **Minimal** — on cream paper tokens with a reveal animation and warm access copy; the "How to Attend" card was elevated and relocated into the templates. 2026-05-23: operator event settings now supports **hero image upload** (drag/drop or click → `/api/media/upload`) alongside URL paste, via the shared `HeroImageUpload`; and **ticket tiers were moved up beside the access gates** in `EventSettingsTab`.) |
 
 ## Scope
 
@@ -26,9 +26,17 @@ Event lifecycle from operator creation → publishing → member-facing display.
 
 ```
 app/m/events/page.tsx                           ← public calendar
-app/m/events/[slug]/page.tsx                    ← event detail
+app/m/events/[slug]/page.tsx                    ← event detail (selects a template below)
+app/m/events/[slug]/_components/EventDetail.tsx ← detail shell; picks Split/Editorial/Minimal
+app/m/events/[slug]/_components/TemplateSplit.tsx     ← 45/55 layout, mobile hero, mark fallback
+app/m/events/[slug]/_components/TemplateEditorial.tsx ← Cormorant display, dramatic hero
+app/m/events/[slug]/_components/TemplateMinimal.tsx   ← minimal layout
+app/m/events/[slug]/_components/EventHeroFallback.tsx ← branded fallback when no hero image
+app/m/events/[slug]/_components/event-format.ts ← shared date/format + warm access-copy helpers
 app/operator/events/page.tsx                    ← operator event list
 app/operator/events/[id]/edit/page.tsx          ← operator edit UI
+app/operator/events/[id]/_components/EventSettingsTab.tsx ← hero upload (URL + file) + ticket tiers beside access gates
+app/operator/events/_components/HeroImageUpload.tsx ← shared hero upload (new-event flow + settings)
 app/api/events/route.ts                         ← list/create
 app/api/events/[id]/route.ts                    ← read/update/delete
 app/api/events/[id]/publish/route.ts            ← publish (fires Phase J)
