@@ -7,7 +7,13 @@ import { PageHeader, EmptyState } from '@/components/ui';
 import { MembersBulkActions, type MembersBulkMember } from './MembersBulkActions';
 import { AddMemberDrawer, type CreatedMember } from './AddMemberDrawer';
 
-export function MembersView({ initialMembers }: { initialMembers: MembersBulkMember[] }) {
+export function MembersView({
+  initialMembers,
+  canAddMembers,
+}: {
+  initialMembers: MembersBulkMember[];
+  canAddMembers: boolean;
+}) {
   const [members, setMembers] = useState<MembersBulkMember[]>(initialMembers);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -42,7 +48,7 @@ export function MembersView({ initialMembers }: { initialMembers: MembersBulkMem
       <PageHeader
         title="Members"
         subtitle={`${members.length} approved · sorted by most recently added`}
-        action={<AddMemberDrawer onCreated={handleCreated} />}
+        action={canAddMembers ? <AddMemberDrawer onCreated={handleCreated} /> : undefined}
       />
 
       {members.length === 0 ? (

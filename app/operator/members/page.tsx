@@ -1,4 +1,7 @@
+import { auth } from '@clerk/nextjs/server';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
+import { getMemberWorkspaceId } from '@/lib/auth';
+import { isStaff } from '@/lib/operator-role';
 import { MembersView } from './_components/MembersView';
 
 type MemberRow = {
@@ -16,6 +19,10 @@ type MemberRow = {
 };
 
 export default async function MembersPage() {
+  const { userId } = await auth();
+  const workspaceId = await getMemberWorkspaceId(userId);
+  const canAddMembers = await isStaff(userId, workspaceId);
+
   const res = await operatorServerFetch('/api/operator/members');
   if (!res.ok) {
     return (
@@ -30,6 +37,7 @@ export default async function MembersPage() {
     <div className="px-6 pb-16 pt-8 lg:px-10">
       <div className="mx-auto w-full max-w-[1280px]">
         <MembersView
+          canAddMembers={canAddMembers}
           initialMembers={members.map((m) => ({
             id: m.id,
             fullName: m.fullName,

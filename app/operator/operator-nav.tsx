@@ -11,6 +11,7 @@ import {
   Users,
   ListChecks,
   BarChart3,
+  Sparkles,
   Activity,
   ScanLine,
   MessageSquare,
@@ -24,6 +25,7 @@ type NavItem = {
   label: string;
   match: string;
   exact?: boolean;
+  adminOnly?: boolean;
   Icon: typeof Home;
 };
 
@@ -36,7 +38,8 @@ const PRIMARY_ITEMS: NavItem[] = [
   { href: '/operator/members',         label: 'Members',       match: '/operator/members',                      Icon: Users },
   { href: '/operator/team',            label: 'Team',          match: '/operator/team',                         Icon: ShieldCheck },
   { href: '/operator/settings/lists',  label: 'Lists',         match: '/operator/settings/lists',               Icon: ListChecks },
-  { href: '/operator/intelligence',    label: 'Intelligence',  match: '/operator/intelligence',                 Icon: BarChart3 },
+  { href: '/operator/intelligence',    label: 'Intelligence',  match: '/operator/intelligence',     exact: true, Icon: BarChart3 },
+  { href: '/operator/intelligence/sponsor', label: 'Sponsors', match: '/operator/intelligence/sponsor', adminOnly: true, Icon: Sparkles },
   { href: '/operator/audit',           label: 'Activity',      match: '/operator/audit',                        Icon: Activity },
 ];
 
@@ -54,8 +57,10 @@ const EXTERNAL_LINKS = [
 
 export function OperatorNav({
   pendingApplicationCount = 0,
+  isAdmin = false,
 }: {
   pendingApplicationCount?: number;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const { counts } = useCounts();
@@ -141,7 +146,7 @@ export function OperatorNav({
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-2 py-3 md:px-3">
-        {PRIMARY_ITEMS.map(renderItem)}
+        {PRIMARY_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(renderItem)}
 
         <div className="my-1.5 mx-1 border-t" style={{ borderColor: 'var(--border)' }} />
 

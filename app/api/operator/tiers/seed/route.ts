@@ -1,7 +1,7 @@
-import { auth } from '@clerk/nextjs/server';
+import { OperatorRole } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
 
 /**
  * Seed sensible default tiers for a member club. Idempotent — only seeds
@@ -17,9 +17,9 @@ const DEFAULT_TIERS: { name: string; order: number; minScore: number | null }[] 
 ];
 
 export async function POST() {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { workspaceId } = gate;
 
   const existing = await db.membershipTier.count({
     where: { workspaceId, deletedAt: null },

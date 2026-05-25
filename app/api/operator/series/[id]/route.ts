@@ -1,6 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
+import { OperatorRole } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
 import { db } from '@/lib/db';
 import { deleteEventSeries, updateEventSeries, SeriesError, seriesErrorStatus } from '@/lib/series';
 import { UpdateSeriesSchema, toUpdateSeriesInput } from '@/lib/series-schema';
@@ -33,10 +35,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
   const { id } = await params;
 
   let body: unknown;
@@ -65,10 +66,9 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
   const { id } = await params;
 
   try {
