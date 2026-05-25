@@ -10,6 +10,7 @@ import { InsightCard, type InsightRecord } from './InsightCard';
 import { InsightComposer } from '@/components/intelligence/InsightComposer';
 import { MemberConstellation, type ConstellationMember } from './MemberConstellation';
 import { ApplicationFunnel, type FunnelSnapshot } from './ApplicationFunnel';
+import { HousePhonePanel } from './HousePhonePanel';
 
 const CATEGORIES: { key: string; label: string }[] = [
   { key: 'pipeline', label: 'Pipeline' },
@@ -18,6 +19,7 @@ const CATEGORIES: { key: string; label: string }[] = [
   { key: 'taste', label: 'Taste' },
   { key: 'sponsors', label: 'Sponsors' },
   { key: 'revenue', label: 'Revenue' },
+  { key: 'house-phone', label: 'House Phone' },
   { key: 'insights', label: 'Insights' },
 ];
 
@@ -64,6 +66,7 @@ export function IntelligenceView({
   };
 
   const isInsights = filters.category === 'insights';
+  const isHousePhone = filters.category === 'house-phone';
 
   return (
     <div className="min-h-screen px-6 py-6 md:px-10" style={{ color: 'var(--text-primary)' }}>
@@ -107,9 +110,11 @@ export function IntelligenceView({
         ))}
       </div>
 
-      {!isInsights && <FilterBar filters={filters} />}
+      {!isInsights && !isHousePhone && <FilterBar filters={filters} />}
 
-      {isInsights ? (
+      {isHousePhone ? (
+        <HousePhonePanel />
+      ) : isInsights ? (
         insights.length > 0 ? (
           <div className="flex flex-col gap-3">
             {insights.map((i) => (

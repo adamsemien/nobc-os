@@ -8,10 +8,10 @@
 |---|---|
 | **State** | 🟡 In progress |
 | **V1 item** | Post-V1 / V1.5 comms (not in items #1–20) |
-| **Last updated** | 2026-05-22 |
+| **Last updated** | 2026-05-24 |
 | **Owner** | Adam |
-| **Blocked on** | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` + `HOUSE_PHONE_WORKSPACE_ID` not yet set in Vercel; the **Railway** inbound-SMS service (external) must be deployed and pointed at the Twilio number. |
-| **Next** | Set the four env vars in Vercel, deploy/point the Railway inbound webhook at the Twilio number, then verify the inbound → Postgres → polled-UI → reply round trip end to end. |
+| **Blocked on** | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` + `HOUSE_PHONE_WORKSPACE_ID` not yet set in Vercel; the **Railway** inbound-SMS service (external) must be deployed and pointed at the Twilio number. (Analytics tab: nothing — code-complete.) |
+| **Next** | The House Phone Intelligence tab is code-complete (`/operator/intelligence?category=house-phone`; see Files in play). For the inbox itself: set the four env vars in Vercel, deploy/point the Railway inbound webhook at the Twilio number, then verify the inbound → Postgres → polled-UI → reply round trip end to end. |
 
 ## Scope
 
@@ -21,6 +21,7 @@ The operator-facing side of House Phone, hosted in nobc-os:
 - **Outbound replies** — operator types a reply; nobc-os sends it via the Twilio REST API and records the `OUTBOUND` message.
 - **Per-conversation controls** — toggle AI auto-reply (`aiEnabled`, consumed by the Railway inbound service), associate a published event, correct the patron name.
 - **The UI** — `/operator/house-phone`, a two-pane inbox open to any workspace member.
+- **Analytics** — the *House Phone* tab in the operator Intelligence dashboard (`/operator/intelligence?category=house-phone`) reads these SMS rows for volume, AI-categorized topics, contact insights, and response stats. Backed by `/api/sms/analytics` and `/api/sms/categorize`; the tab UI lives in the Intelligence stage (`_context/12-intelligence/`).
 
 Responsibility ends at the database boundary. **Inbound** SMS handling (Twilio webhook receipt, signature validation, AI auto-reply generation) lives in a **separate Railway service**, not here — it writes `SmsConversation`/`SmsMessage` rows to the same Postgres, which this stage then reads.
 
@@ -36,6 +37,14 @@ app/api/sms/reply/route.ts                        ← POST — send via Twilio, 
 app/operator/house-phone/page.tsx                 ← server: resolve workspace + published events
 app/operator/house-phone/HousePhoneClient.tsx     ← client: two-pane inbox, 4s polling
 app/operator/operator-nav.tsx                     ← House Phone nav link (MessageSquare icon)
+
+# House Phone Intelligence tab (analytics)
+prisma/migrations/20260524000000_add_sms_message_category/ ← additive migration (SmsMessage.category)
+app/api/sms/analytics/route.ts                    ← GET — analytics payload (volume/topics/contacts/response)
+app/api/sms/categorize/route.ts                   ← GET — AI topic categorization (Haiku) for inbound msgs
+app/operator/intelligence/_components/HousePhonePanel.tsx   ← client: the House Phone Intelligence tab
+app/operator/intelligence/_components/charts.tsx           ← + VBars (vertical bar chart) for by-day volume
+app/operator/intelligence/_components/IntelligenceView.tsx ← House Phone tab registration
 ```
 
 ## Inputs
@@ -54,7 +63,7 @@ app/operator/operator-nav.tsx                     ← House Phone nav link (Mess
 ## Rules — DO NOT VIOLATE
 
 1. **Twilio is allowed here only because of the explicit 2026-05-22 override in root `CLAUDE.md`.** nobc-os does **outbound** sends only; never add an inbound Twilio webhook or signature handling here — that is Railway's job.
-2. **No Anthropic call in this stage.** AI auto-reply runs on Railway. If AI is ever added here, it must use the locked `claude-sonnet-4-20250514`.
+2. **AI auto-reply runs on Railway, not here.** The one in-stage Anthropic call is the analytics topic-categorization job (`GET /api/sms/categorize`), which uses `claude-haiku-4-5-20251001` — an explicit Adam-authorized exception (2026-05-24) to the locked sonnet model, scoped to cheap high-volume SMS classification only. Any **other** AI added to this stage must use the locked `claude-sonnet-4-20250514`.
 3. Every read and write is workspace-scoped (the conversation must belong to the caller's workspace before any mutation or send).
 4. Record `OUTBOUND` messages only after Twilio accepts the send, so the thread never shows undelivered messages as sent.
 5. Any operator in the workspace may use the inbox — no owner/role gate (it's a shared live-event tool).
@@ -79,7 +88,9 @@ model SmsConversation {
 
 model SmsMessage {
   id, conversationId (FK), direction (SmsDirection),
-  body @db.Text, aiGenerated @default(false), createdAt
+  body @db.Text, aiGenerated @default(false),
+  category?,  // AI topic label for inbound msgs (analytics); null until categorized
+  createdAt
   @@index([conversationId, createdAt])
 }
 ```
@@ -91,7 +102,10 @@ model SmsMessage {
 | GET | `/api/sms/conversations` | Workspace-scoped inbox feed (each conversation + recent thread + unread). |
 | PATCH | `/api/sms/conversation/[id]` | Toggle `aiEnabled`; optionally set `name` / `eventId`. |
 | POST | `/api/sms/reply` | Send a reply via Twilio REST, then record the `OUTBOUND` message. |
+| GET | `/api/sms/analytics` | House Phone analytics: volume, topics, contacts, response stats (workspace-scoped). |
+| GET | `/api/sms/categorize` | Categorize uncategorized inbound messages into topic labels (Haiku); called on tab load, debounced. |
 | — (page) | `/operator/house-phone` | Two-pane shared inbox UI; polls the feed every 4s. |
+| — (tab) | `/operator/intelligence?category=house-phone` | House Phone Intelligence tab (analytics dashboard). |
 
 ## Edge cases
 
