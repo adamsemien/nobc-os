@@ -299,7 +299,7 @@ async function main() {
       startAt: e.startAt, endAt: new Date(e.startAt.getTime() + e.endHours * 3600_000),
       location: 'Tenur House', capacity: e.capacity, accessMode: e.accessMode,
       approvalRequired: e.approvalRequired, priceInCents: e.priceInCents,
-      status: 'PUBLISHED' as const, visibility: 'public' as const, template: 'editorial',
+      status: 'PUBLISHED' as const, visibility: 'public' as const, template: 'split',
       showCapacity: true, eventAccess: e.eventAccess,
     };
     const row = await db.event.upsert({

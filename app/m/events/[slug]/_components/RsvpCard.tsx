@@ -47,6 +47,12 @@ function QrDisplay({ code }: { code: string }) {
 type Props = {
   event: EventDetailDTO;
   variant?: 'card' | 'borderless';
+  /** Hide the access-type label + capacity meter + top divider (when the page
+   *  already shows them, e.g. the Split template). */
+  hideHeader?: boolean;
+  /** On mobile, hide the inline card in the CTA state and pin the CTA to the
+   *  bottom of the viewport instead. Shares the same access flow. */
+  mobileSticky?: boolean;
 };
 
 function PlusOneSection({
@@ -242,7 +248,7 @@ function CapacityMeter({ used, capacity }: { used: number; capacity: number }) {
   );
 }
 
-export function RsvpCard({ event, variant = 'card' }: Props) {
+export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSticky = false }: Props) {
   const applyHref = useMemberApplyHref();
   const searchParams = useSearchParams();
   const successFromUrl = searchParams.get('rsvp') === 'success';
@@ -292,19 +298,27 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
   const isClosed = resolved.kind === 'closed';
   const ctaLabel = isClosed ? 'Closed' : formatGateCTA(resolved);
   const showCapacityMeter =
+    !hideHeader &&
     event.showCapacity && event.capacity != null && rsvpState === 'idle' && !isClosed;
+  // The only state with an actionable button — drives the mobile sticky CTA.
+  const isCtaState = rsvpState === 'idle' && !isClosed && !isFull;
 
   return (
-    <div className={cardWrapper}>
-      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-        {accessTypeLabel(event.resolved)}
-      </p>
+    <>
+    <div className={`${cardWrapper}${mobileSticky && isCtaState ? ' max-lg:hidden' : ''}`}>
+      {!hideHeader ? (
+        <>
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            {accessTypeLabel(event.resolved)}
+          </p>
 
-      {showCapacityMeter ? (
-        <CapacityMeter used={event.capacityUsedCount} capacity={event.capacity!} />
+          {showCapacityMeter ? (
+            <CapacityMeter used={event.capacityUsedCount} capacity={event.capacity!} />
+          ) : null}
+
+          <div className="my-5 h-px w-full bg-[var(--apply-rule)]" />
+        </>
       ) : null}
-
-      <div className="my-5 h-px w-full bg-[var(--apply-rule)]" />
 
       {rsvpState === 'confirmed' ? (
         <div>
@@ -400,12 +414,26 @@ export function RsvpCard({ event, variant = 'card' }: Props) {
         </div>
       )}
 
+    </div>
+
+      {mobileSticky && isCtaState ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--apply-rule)] bg-events-paper-card/95 px-5 py-4 backdrop-blur lg:hidden">
+          <button
+            type="button"
+            onClick={() => setFlowOpen(true)}
+            className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
+          >
+            {ctaLabel}
+          </button>
+        </div>
+      ) : null}
+
       <EventAccessFlow
         event={event}
         open={flowOpen}
         onClose={() => setFlowOpen(false)}
         onComplete={handleFlowComplete}
       />
-    </div>
+    </>
   );
 }
