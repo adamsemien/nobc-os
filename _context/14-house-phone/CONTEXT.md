@@ -8,10 +8,10 @@
 |---|---|
 | **State** | 🟡 In progress |
 | **V1 item** | Post-V1 / V1.5 comms (not in items #1–20) |
-| **Last updated** | 2026-05-25 |
+| **Last updated** | 2026-05-26 |
 | **Owner** | Adam |
 | **Blocked on** | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` + `HOUSE_PHONE_WORKSPACE_ID` not yet set in Vercel; the **Railway** inbound-SMS service (external, `nobc-house-phone`) is built and security-hardened (see "Railway inbound service" below) but must be deployed and pointed at the Twilio number. (Analytics tab: nothing — code-complete.) |
-| **Next** | The House Phone Intelligence tab is code-complete (`/operator/intelligence?category=house-phone`; see Files in play). For the inbox itself: set the four env vars in Vercel, deploy/point the Railway inbound webhook at the Twilio number, then verify the inbound → Postgres → polled-UI → reply round trip end to end. |
+| **Next** | _Inbox access bug fixed 2026-05-26 — the three `/api/sms` routes now authorize by Clerk org membership (Rule 5), so a Clerk org admin with no `WorkspaceMember` row sees the inbox; confirmed working in prod._ The House Phone Intelligence tab is code-complete (`/operator/intelligence?category=house-phone`; see Files in play). For the inbox itself: set the four env vars in Vercel, deploy/point the Railway inbound webhook at the Twilio number, then verify the inbound → Postgres → polled-UI → reply round trip end to end. |
 
 ## Scope
 
@@ -66,7 +66,7 @@ app/operator/intelligence/_components/IntelligenceView.tsx ← House Phone tab r
 2. **AI auto-reply runs on Railway, not here.** The one in-stage Anthropic call is the analytics topic-categorization job (`GET /api/sms/categorize`), which uses `claude-haiku-4-5-20251001` — an explicit Adam-authorized exception (2026-05-24) to the locked sonnet model, scoped to cheap high-volume SMS classification only. Any **other** AI added to this stage must use the locked `claude-sonnet-4-20250514`.
 3. Every read and write is workspace-scoped (the conversation must belong to the caller's workspace before any mutation or send).
 4. Record `OUTBOUND` messages only after Twilio accepts the send, so the thread never shows undelivered messages as sent.
-5. Any operator in the workspace may use the inbox — no owner/role gate (it's a shared live-event tool).
+5. Any operator in the workspace may use the inbox — no owner/role gate (it's a shared live-event tool). Enforced by **Clerk org membership** (`auth()` + `getMemberWorkspaceId`), **not** `requireRole`/`WorkspaceMember`. (Fixed 2026-05-26: `requireRole(STAFF)` had drifted onto `/api/sms/conversations`, `/reply`, and `/conversation/[id]`, 403'ing a legitimate Clerk org admin with no `WorkspaceMember` row and blanking the inbox; realigned with the `/api/sms/analytics` pattern.)
 
 ## What this stage does NOT own
 
