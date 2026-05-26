@@ -2,17 +2,16 @@
  *  (randomUUID/randomBytes/createHash) and qrcode, which Edge cannot provide. */
 export const runtime = 'nodejs';
 
-import { auth } from '@clerk/nextjs/server';
-import { requireWorkspaceId } from '@/lib/auth';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/operator-role';
 import { checkAgentRateLimit } from '@/lib/agent/lib/rate-limit';
 import { streamAgentTurn } from '@/lib/agent/lib/loop';
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
   if (!checkAgentRateLimit(workspaceId)) {
     return Response.json(
       { error: 'Too many agent requests — wait a moment and try again.' },
