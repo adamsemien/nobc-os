@@ -921,7 +921,7 @@ function DetailPanel({
     // child can actually grow to fill and then clip — without it the scroll silently
     // breaks and the bottom of the answer list disappears under the action footer.
     <div
-      className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface-elevated p-4 sm:p-6"
+      className="@container flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface-elevated p-4 sm:p-6"
       style={{ borderRadius: '8px' }}
     >
       {showEasterEgg && (
@@ -981,7 +981,7 @@ function DetailPanel({
         </div>
       ) : null}
 
-      <dl className="mt-6 space-y-3 text-sm text-text-secondary">
+      <dl className="mt-6 flex flex-col gap-3 text-sm text-text-secondary @lg:flex-row @lg:flex-wrap @lg:items-start @lg:gap-x-10 @lg:gap-y-3">
         <div className="flex items-start gap-2">
           <Mail className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" aria-hidden />
           <div>
@@ -1104,7 +1104,7 @@ function DetailPanel({
                   <span className={`text-sm font-semibold ${tier.className}`}>· {tier.label}</span>
                 </div>
 
-                <div className="mt-3 space-y-1.5">
+                <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 @2xl:grid-cols-2">
                   {['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'].map(name => {
                     const v = scorePct(app.archetypeScores![name]);
                     return (
@@ -1138,14 +1138,14 @@ function DetailPanel({
       {photos.length > 0 && (
         <section className="mt-6 border-t border-border pt-6">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Photos</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-3">
             {photos.map((url, i) => (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={url}
                 src={url}
                 alt={`${app.fullName} photo ${i + 1}`}
-                className="h-24 w-24 rounded-md object-cover"
+                className="h-28 w-28 rounded-md object-cover @xl:h-36 @xl:w-36"
                 style={{ border: '1px solid var(--border)' }}
               />
             ))}
@@ -1155,21 +1155,27 @@ function DetailPanel({
 
       <section className="mt-8 border-t border-border pt-6">
         <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Answers</h3>
-        <div className="mt-4 space-y-6">
+        <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-6 @xl:grid-cols-2">
           {entries
             .filter(([, v]) => v.trim())
-            .map(([key, value]) => (
-              <div key={key} className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
-                  {labelForKey(key)}
-                </p>
-                <p className="mt-2 whitespace-pre-wrap break-words text-[15px] font-medium leading-relaxed text-text-primary">
-                  {displayAnswerValue(value)}
-                </p>
-              </div>
-            ))}
+            .map(([key, value]) => {
+              const display = displayAnswerValue(value);
+              // Long-form prose spans the full panel width; short fields (City,
+              // Neighborhood, …) flow two-up so the wide panel isn't half-empty.
+              const isLong = display.includes('\n') || display.length > 60;
+              return (
+                <div key={key} className={`min-w-0${isLong ? ' @xl:col-span-2' : ''}`}>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    {labelForKey(key)}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-[15px] font-medium leading-relaxed text-text-primary">
+                    {display}
+                  </p>
+                </div>
+              );
+            })}
           {entries.filter(([, v]) => v.trim()).length === 0 && (
-            <p className="text-sm italic text-text-muted">
+            <p className="text-sm italic text-text-muted @xl:col-span-2">
               No answers recorded for this application.
             </p>
           )}
