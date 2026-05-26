@@ -60,6 +60,12 @@ model Workspace {
   workspaceMembers     WorkspaceMember[]
   memberEngagementEvents MemberEngagementEvent[]
 
+  // Digital Asset Manager (Stage 15)
+  assets         Asset[]
+  mediaFolders   MediaFolder[]
+  shareLinks     ShareLink[]
+  assetDownloads AssetDownload[]
+
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
   // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
@@ -68,6 +74,9 @@ model Workspace {
   // Editable tier labels for the 0-100 score. null = use defaults (Resident/Member/Considering).
   // Shape: { top: string, mid: string, low: string }.
   tierNames            Json?
+
+  // DAM total stored bytes; +on upload, -on permanent delete (Stage 15)
+  storageBytes         BigInt   @default(0)
 }
 
 /// Operator role within a workspace. Hierarchy: ADMIN > STAFF > READ_ONLY.
@@ -1314,4 +1323,127 @@ enum MemberEngagementEventType {
   application_submitted
   newsletter_opened
   sponsor_perk_clicked
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Digital Asset Manager (Stage 15) — operator media library + share surfaces.
+// All assets live PRIVATE in R2; the app mints signed URLs at render time.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum AssetFileType {
+  PHOTO
+  VIDEO
+}
+
+enum MediaFolderType {
+  FULL_GALLERY
+  SELECTS
+  VIDEO
+  SPONSOR
+  BRAND
+}
+
+enum ShareLinkMode {
+  SPONSOR
+  MEMBER_GALLERY
+}
+
+model Asset {
+  id            String        @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id])
+  filename      String
+  url           String // R2 object key for the private full-res original
+  thumbnailUrl  String // R2 object key for the 800px thumbnail
+  blurhash      String?
+  fileType      AssetFileType
+  size          Int // bytes (per-asset; workspace total tracked as BigInt)
+  width         Int?
+  height        Int?
+  duration      Float? // seconds, video only
+  shootDate     DateTime? // EXIF DateTimeOriginal; default sort key, falls back to createdAt
+  tags          String[]      @default([]) // manual
+  aiTags        String[]      @default([]) // AI auto-tags (separate from manual)
+  qualityScore  Float? // heuristic overall (Phase 1)
+  qualityScores Json? // breakdown { sharpness, exposure, ... }
+  energyLevel   String? // low | medium | high (inferred from scene labels)
+  shooterCredit String? // photographer credit
+  isSelect      Boolean       @default(false)
+  sortOrder     Int           @default(0) // manual ordering
+  folderId      String?
+  folder        MediaFolder?  @relation(fields: [folderId], references: [id])
+  eventId       String? // plain string + index, NO FK (mirrors Event.heroImageAssetId)
+  sponsorName   String?
+  uploadedBy    String // Clerk userId
+  deletedAt     DateTime? // soft delete; null = live, set = trashed (30-day recover)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  downloads AssetDownload[]
+
+  @@index([workspaceId])
+  @@index([folderId])
+  @@index([eventId])
+  @@index([deletedAt])
+}
+
+model MediaFolder {
+  id                String          @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id])
+  name              String
+  type              MediaFolderType
+  eventId           String? // plain string + index, no FK
+  parentId          String?
+  parent            MediaFolder?    @relation("FolderTree", fields: [parentId], references: [id])
+  children          MediaFolder[]   @relation("FolderTree")
+  usageRightsExpiry DateTime?
+  sortOrder         Int             @default(0)
+  deletedAt         DateTime? // soft delete (folders)
+  createdAt         DateTime        @default(now())
+
+  assets     Asset[]
+  shareLinks ShareLink[]
+
+  @@index([workspaceId])
+  @@index([eventId])
+  @@index([parentId])
+}
+
+model ShareLink {
+  id               String        @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id])
+  token            String        @unique
+  folderId         String
+  folder           MediaFolder   @relation(fields: [folderId], references: [id])
+  mode             ShareLinkMode
+  password         String? // bcrypt hash, optional
+  expiresAt        DateTime?
+  firstAccessedAt  DateTime? // set on first access → triggers operator email
+  lastAccessedAt   DateTime?
+  accessCount      Int           @default(0)
+  brandingOverride Json? // { logo, primaryColor, companyName }
+  customDomain     String?       @unique
+  createdAt        DateTime      @default(now())
+
+  downloads AssetDownload[]
+
+  @@index([workspaceId])
+  @@index([folderId])
+}
+
+model AssetDownload {
+  id           String     @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id])
+  assetId      String
+  asset        Asset      @relation(fields: [assetId], references: [id])
+  shareLinkId  String?
+  shareLink    ShareLink? @relation(fields: [shareLinkId], references: [id])
+  downloadedAt DateTime   @default(now())
+
+  @@index([workspaceId])
+  @@index([assetId])
+  @@index([shareLinkId])
 }
