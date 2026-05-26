@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { redirect } from 'next/navigation';
 import { OperatorRole } from '@prisma/client';
@@ -32,20 +32,81 @@ export async function getOperatorRole(
   return row?.role ?? null;
 }
 
-/** True when the user holds an explicit ADMIN role in the workspace. */
+// Clerk org admin role strings. Tolerant of both the current `org:admin` and the
+// legacy `admin` some Clerk versions return from the backend membership API.
+const CLERK_ADMIN_ROLES = new Set(['org:admin', 'admin']);
+
+/**
+ * Role floor derived from the caller's Clerk org membership for the workspace's
+ * org, so a Clerk org admin is never locked out of their own workspace merely
+ * because no WorkspaceMember row exists (that table drifts out of sync with
+ * Clerk). Returns ADMIN for a Clerk org admin, READ_ONLY for a plain org member,
+ * and null when the caller is not a member of the workspace's org (no floor).
+ */
+async function clerkOrgFloor(
+  clerkUserId: string,
+  workspaceId: string,
+): Promise<OperatorRole | null> {
+  const ws = await db.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { clerkOrgId: true },
+  });
+  if (!ws?.clerkOrgId) return null;
+
+  let orgRole: string | null = null;
+  try {
+    const { orgId, orgRole: activeOrgRole } = await auth();
+    if (orgId === ws.clerkOrgId) {
+      // Fast path: the workspace's org is the active org — role is on the session,
+      // no extra Clerk call.
+      orgRole = activeOrgRole ?? null;
+    } else {
+      // Active org differs or is unset — look up the membership in this org.
+      const client = await clerkClient();
+      const memberships = await client.users.getOrganizationMembershipList({ userId: clerkUserId });
+      orgRole = memberships.data.find((m) => m.organization.id === ws.clerkOrgId)?.role ?? null;
+    }
+  } catch {
+    return null; // non-request context (script/webhook) — no Clerk floor
+  }
+  if (!orgRole) return null;
+  return CLERK_ADMIN_ROLES.has(orgRole) ? OperatorRole.ADMIN : OperatorRole.READ_ONLY;
+}
+
+/**
+ * Effective operator role = the higher of the explicit WorkspaceMember grant and
+ * the Clerk-org floor. An explicit STAFF/ADMIN grant still elevates a plain org
+ * member; a Clerk org admin is never below ADMIN even with no row. Returns null
+ * only when the caller has neither a WorkspaceMember row nor org membership.
+ */
+export async function getEffectiveRole(
+  clerkUserId: string | null | undefined,
+  workspaceId: string | null | undefined,
+): Promise<OperatorRole | null> {
+  if (!clerkUserId || !workspaceId) return null;
+  const [explicit, floor] = await Promise.all([
+    getOperatorRole(clerkUserId, workspaceId),
+    clerkOrgFloor(clerkUserId, workspaceId),
+  ]);
+  if (explicit == null) return floor;
+  if (floor == null) return explicit;
+  return RANK[explicit] >= RANK[floor] ? explicit : floor;
+}
+
+/** True when the caller's effective role is ADMIN in the workspace. */
 export async function isAdmin(
   clerkUserId: string | null | undefined,
   workspaceId: string | null | undefined,
 ): Promise<boolean> {
-  return roleAtLeast(await getOperatorRole(clerkUserId, workspaceId), OperatorRole.ADMIN);
+  return roleAtLeast(await getEffectiveRole(clerkUserId, workspaceId), OperatorRole.ADMIN);
 }
 
-/** True when the user holds STAFF or ADMIN in the workspace. */
+/** True when the caller's effective role is STAFF or ADMIN in the workspace. */
 export async function isStaff(
   clerkUserId: string | null | undefined,
   workspaceId: string | null | undefined,
 ): Promise<boolean> {
-  return roleAtLeast(await getOperatorRole(clerkUserId, workspaceId), OperatorRole.STAFF);
+  return roleAtLeast(await getEffectiveRole(clerkUserId, workspaceId), OperatorRole.STAFF);
 }
 
 export type RoleGate =
@@ -57,10 +118,10 @@ export type RoleGate =
  * pattern as the rest of /api/operator) and checks they are at least `minRole`.
  * Returns the resolved context, or a ready-to-return 401/403 response.
  *
- * A resolved workspace operator (valid Clerk org member) with no explicit
- * WorkspaceMember row is treated as READ_ONLY, so adding gates never hard-locks
- * existing org members out of read surfaces — elevated actions still require an
- * explicit STAFF/ADMIN grant.
+ * Role is the higher of any explicit WorkspaceMember grant and the Clerk-org
+ * floor (org admin → ADMIN, plain org member → READ_ONLY), so a Clerk org admin
+ * is never locked out of their own workspace and explicit grants still elevate a
+ * plain member. See getEffectiveRole.
  *
  *   const gate = await requireRole(OperatorRole.ADMIN);
  *   if (!gate.ok) return gate.response;
@@ -75,7 +136,7 @@ export async function requireRole(minRole: OperatorRole): Promise<RoleGate> {
   if (!workspaceId) {
     return { ok: false, response: NextResponse.json({ error: 'No workspace' }, { status: 403 }) };
   }
-  const role = (await getOperatorRole(userId, workspaceId)) ?? OperatorRole.READ_ONLY;
+  const role = (await getEffectiveRole(userId, workspaceId)) ?? OperatorRole.READ_ONLY;
   if (!roleAtLeast(role, minRole)) {
     return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
@@ -95,7 +156,7 @@ export async function requireRolePage(
   if (!userId) redirect('/');
   const workspaceId = await getMemberWorkspaceId(userId);
   if (!workspaceId) redirect(redirectTo);
-  const role = (await getOperatorRole(userId, workspaceId)) ?? OperatorRole.READ_ONLY;
+  const role = (await getEffectiveRole(userId, workspaceId)) ?? OperatorRole.READ_ONLY;
   if (!roleAtLeast(role, minRole)) redirect(redirectTo);
   return { userId, workspaceId, role };
 }
