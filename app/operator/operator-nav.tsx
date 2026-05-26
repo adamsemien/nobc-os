@@ -39,7 +39,7 @@ const PRIMARY_ITEMS: NavItem[] = [
   { href: '/operator/team',            label: 'Team',          match: '/operator/team',                         Icon: ShieldCheck },
   { href: '/operator/settings/lists',  label: 'Lists',         match: '/operator/settings/lists',               Icon: ListChecks },
   { href: '/operator/intelligence',    label: 'Intelligence',  match: '/operator/intelligence',     exact: true, Icon: BarChart3 },
-  { href: '/operator/intelligence/sponsor', label: 'Sponsors', match: '/operator/intelligence/sponsor', adminOnly: true, Icon: Sparkles },
+  { href: '/operator/intelligence/sponsor', label: 'Sponsors', match: '/operator/intelligence/sponsor', Icon: Sparkles },
   { href: '/operator/audit',           label: 'Activity',      match: '/operator/audit',                        Icon: Activity },
 ];
 

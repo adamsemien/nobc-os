@@ -1,6 +1,7 @@
-import { OperatorRole } from '@prisma/client';
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { requireRolePage } from '@/lib/operator-role';
+import { getMemberWorkspaceId } from '@/lib/auth';
 import { getAudienceNarrative } from './actions';
 import { SentimentPanel } from './_components/SentimentPanel';
 import { SponsorBriefBar } from './_components/SponsorBriefBar';
@@ -333,7 +334,15 @@ function Stat({ label, value }: { label: string; value: string }) {
 // ============================================================
 
 export default async function SponsorIntelligencePage() {
-  const { workspaceId } = await requireRolePage(OperatorRole.ADMIN);
+  // Authorize by Clerk org membership, not WorkspaceMember role: any member of
+  // the resolved workspace's Clerk org may view this dashboard. Mirrors the
+  // House Phone fix (PR #15) — the old requireRolePage(ADMIN) gate silently
+  // redirected a Clerk org admin who had no WorkspaceMember row. Workspace
+  // scoping is unchanged; every query below filters by this workspaceId.
+  const { userId } = await auth();
+  if (!userId) redirect('/');
+  const workspaceId = await getMemberWorkspaceId(userId);
+  if (!workspaceId) redirect('/operator');
 
   const approvedCount = await db.member.count({ where: { workspaceId, status: 'APPROVED' } });
 
