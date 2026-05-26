@@ -6,19 +6,19 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — Phase 1 (foundation) shipped; Phases 2–6 not started |
+| **State** | 🟡 In progress — Phase 1 + Phase 2a (grid foundation) shipped; Phase 2b next |
 | **V1 item** | Post-V1 (new capability, not in items #1–#28) |
 | **Last updated** | 2026-05-26 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing for Phase 1. AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
-| **Next** | Phase 2 — operator grid UI at `/operator/media`: justified-layout grid, BlurHash placeholders, hover + selection + bulk bar, FLIP sort, sort/filter/full-text search, folder tree, preview modal, batch upload, density toggle, soft-delete/trash, Top Picks filter, nav item. |
+| **Next** | Phase 2b — interaction layer: selection + bulk action bar (incl. bulk tag) + FLIP sort animations + full-screen preview modal + batch upload + soft-delete/trash restore/purge + Top Picks filter + manual drag-reorder. |
 
 ## Scope
 
 The operator-facing Digital Asset Manager and its external share surfaces. Delivered in 6 phased PRs (build order = dependency order):
 
 1. ✅ **Foundation** — Prisma schema, R2 private storage, image processing (800px thumbnail / BlurHash / EXIF `shootDate`), async AI tagging + Sharp heuristic scoring, upload API.
-2. ⚪ **Operator grid UI** at `/operator/media`.
+2. 🟡 **Operator grid** at `/operator/media` — **2a ✅ shipped** (justified grid, BlurHash placeholders, signed-URL thumbnails, sort/filter/FTS, folder tree, density toggle, nav); **2b ⚪** (selection, bulk bar, FLIP, preview modal, batch upload, trash actions, Top Picks).
 3. ⚪ **Timeline / Moment Map** view (single-event, `shootDate`-plotted).
 4. ⚪ **Share modes** (`/assets/[token]` sponsor, `/gallery/[slug]` member) + white-label branding + link analytics/notifications.
 5. ⚪ **MCP tools** at `/api/mcp` (9 tools).
@@ -34,7 +34,17 @@ lib/dam/image.ts                         ← Sharp: 800px WebP thumbnail, BlurHa
 lib/dam/tagging.ts                       ← tagImage(url) provider switch (cloudflare impl; hf/openai stubs); inferEnergyLevel
 app/api/media/dam/upload/route.ts        ← STAFF-gated R2 upload → Asset row → storageBytes bump → fire-and-forget tagging trigger
 app/api/media/dam/tag/[assetId]/route.ts ← async AI tag + heuristic score (runs after the upload response; optional DAM_TAG_SECRET guard)
-prisma/schema.prisma                     ← Asset, MediaFolder, ShareLink, AssetDownload models + 3 enums + Workspace.storageBytes
+prisma/schema.prisma                     ← Asset, MediaFolder, ShareLink, AssetDownload models + 3 enums + Workspace.storageBytes + Asset.searchVector (FTS)
+prisma/sql/dam-search-vector.sql         ← FTS trigger + GIN index (applied via `prisma db execute`)
+lib/dam/search.ts                        ← FTS/list query builder: parseAssetQuery + buildAssetWhere + ASSET_SORTS (Phase 2a)
+app/api/media/dam/assets/route.ts        ← GET grid list — filter/sort/FTS/pagination, READ_ONLY+ (2a)
+app/api/media/dam/folders/route.ts       ← GET folder tree + asset/trash counts (2a)
+app/api/media/dam/asset/[id]/thumb/route.ts ← GET thumbnail — 302 to signed URL, private (2a)
+app/operator/media/page.tsx              ← server shell — role gate + filter options (2a)
+app/operator/media/_components/          ← MediaWorkspace, MediaGrid, MediaTile, BlurhashCanvas, FolderTree, MediaToolbar, FilterPanel, useDensity (2a)
+app/operator/operator-nav.tsx            ← Media nav item (2a)
+app/globals.css                          ← --dam-folder-tree evergreen token (2a)
+types/justified-layout.d.ts              ← ambient types for the grid layout engine (2a)
 ```
 
 ## Inputs
