@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #6, #13, #14 (capacity portion), #15, #23 (hero images) |
-| **Last updated** | 2026-05-25 |
+| **Last updated** | 2026-05-26 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Polish + iterate based on operator feedback. Overview tab now shows a Post-Event Summary card (attendance, check-in rate, captured revenue, no-shows) once an event has passed — via `_stats.checkedInCount` + `_stats.capturedRevenueCents`. (2026-05-24, PR #3: member event-detail pages redesigned to the editorial-luxury brand across all three layout templates — **Split** (45/55, mobile hero, mark fallback), **Editorial** (Cormorant, dramatic hero), **Minimal** — on cream paper tokens with a reveal animation and warm access copy; the "How to Attend" card was elevated and relocated into the templates. 2026-05-23: operator event settings now supports **hero image upload** (drag/drop or click → `/api/media/upload`) alongside URL paste, via the shared `HeroImageUpload`; and **ticket tiers were moved up beside the access gates** in `EventSettingsTab`.) |
+| **Next** | **2026-05-26: Split template overhaul + hero-upload discoverability fix.** Rebuilt `TemplateSplit` to a true 50/50 (full-height `object-cover` hero left, content right) with a tightened hierarchy — category tag → serif title → `date · time · venue` (location wired in) → hairline → distinct "Limited to X spots" capacity callout → full-width CTA ticket card → short (3-sentence) teaser → borderless "How to attend" steps → full description. Mobile: ~40vh full-bleed hero, left-aligned, **sticky bottom CTA** (`RsvpCard` gained `mobileSticky` + `hideHeader` props; the sticky bar shares the same access flow). "How to attend" gained a `variant='bare'` (no box). Seeded demo events switched to `template: 'split'` (and live rows synced via `scripts/set-demo-event-template.ts`) so the redesign is what renders; **Editorial/Minimal untouched**. CTA copy stays canonical (`formatGateCTA` — never literal "RSVP"). Bug fix: `HeroImageUpload` now shows an **always-visible "Replace photo" pencil** affordance (the replace/remove flow existed but was hover-only and easy to miss) and the `#1C1008` scrim hex was replaced with a `color-mix(var(--apply-ink))` token. Not yet visually verified in-browser (member pages are Clerk-gated). — Earlier: Polish + iterate based on operator feedback. Overview tab now shows a Post-Event Summary card (attendance, check-in rate, captured revenue, no-shows) once an event has passed — via `_stats.checkedInCount` + `_stats.capturedRevenueCents`. (2026-05-24, PR #3: member event-detail pages redesigned to the editorial-luxury brand across all three layout templates — **Split** (45/55, mobile hero, mark fallback), **Editorial** (Cormorant, dramatic hero), **Minimal** — on cream paper tokens with a reveal animation and warm access copy; the "How to Attend" card was elevated and relocated into the templates. 2026-05-23: operator event settings now supports **hero image upload** (drag/drop or click → `/api/media/upload`) alongside URL paste, via the shared `HeroImageUpload`; and **ticket tiers were moved up beside the access gates** in `EventSettingsTab`.) |
 
 ## Scope
 
@@ -36,7 +36,8 @@ app/m/events/[slug]/_components/event-format.ts ← shared date/format + warm ac
 app/operator/events/page.tsx                    ← operator event list
 app/operator/events/[id]/edit/page.tsx          ← operator edit UI
 app/operator/events/[id]/_components/EventSettingsTab.tsx ← hero upload (URL + file) + ticket tiers beside access gates
-app/operator/events/_components/HeroImageUpload.tsx ← shared hero upload (new-event flow + settings)
+app/operator/events/_components/HeroImageUpload.tsx ← shared hero upload (new-event flow + settings); always-visible "Replace photo" affordance + hover overlay
+scripts/set-demo-event-template.ts              ← one-off: point seeded demo events at a member-page template (default split; reversible)
 app/api/events/route.ts                         ← list/create
 app/api/events/[id]/route.ts                    ← read/update/delete
 app/api/events/[id]/publish/route.ts            ← publish (fires Phase J)

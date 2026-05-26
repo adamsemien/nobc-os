@@ -7,11 +7,23 @@ import { renderPathSummary } from '@/lib/workflows/render';
  *  card — the ways a guest can get in, previewed before they click into the
  *  flow (which lives in EventAccessFlow). Cream paper surface so it reads as
  *  part of the page, not a dark drawer. Read-only. */
-export function WorkflowPathsCard({ paths }: { paths: WorkflowPath[] }) {
+export function WorkflowPathsCard({
+  paths,
+  variant = 'card',
+}: {
+  paths: WorkflowPath[];
+  /** 'bare' drops the box/border/shadow — just the label + clean numbered steps. */
+  variant?: 'card' | 'bare';
+}) {
   if (!paths || paths.length === 0) return null;
 
+  const wrapper =
+    variant === 'bare'
+      ? ''
+      : 'rounded-md border border-[var(--apply-rule)] bg-events-paper-card p-6 shadow-[0_2px_12px_rgba(28,16,8,0.05)] sm:p-8';
+
   return (
-    <section className="rounded-md border border-[var(--apply-rule)] bg-events-paper-card p-6 shadow-[0_2px_12px_rgba(28,16,8,0.05)] sm:p-8">
+    <section className={wrapper}>
       <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
         How to attend
       </p>

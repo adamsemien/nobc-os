@@ -8,69 +8,105 @@ import { parseDate, formatDateLine, formatTimeLine } from './event-format';
 import type { EventDetailDTO } from './EventDetail';
 import { accessTypeLabel } from '@/lib/event-access';
 
-function MetaTag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-sm border border-[var(--apply-rule)] px-3 py-1 text-[11px] uppercase tracking-widest text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-      {children}
-    </span>
-  );
+/** First `n` sentences of a description — the above-the-fold teaser. Falls back
+ *  to the whole string if it can't find sentence boundaries. */
+function firstSentences(text: string, n: number): string {
+  const parts = text.match(/[^.!?]+[.!?]+(\s|$)/g);
+  if (!parts) return text.trim();
+  const lead = parts.slice(0, n).join('').trim();
+  return lead || text.trim();
 }
 
 export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   const applyHref = useMemberApplyHref();
   const start = parseDate(event.startAt);
 
+  // 3 — date · time · venue on a single line (location wired in from the model).
+  const metaLine = [formatDateLine(start, { year: false }), formatTimeLine(start), event.location]
+    .filter(Boolean)
+    .join('  ·  ');
+
+  const showCapacity = event.showCapacity && event.capacity != null;
+
+  const fullDescription = event.description?.trim() ?? '';
+  const shortDescription = fullDescription ? firstSentences(fullDescription, 3) : '';
+  const hasMoreDescription = fullDescription.length > shortDescription.length;
+
   return (
     <div className="flex min-h-screen flex-col bg-events-paper text-[var(--apply-ink)] lg:h-screen lg:flex-row lg:overflow-hidden">
-      {/* Left: full-bleed hero — or the deep-red NoBC mark panel. 45% on desktop,
-          full-bleed on top for mobile. */}
-      <div className="relative lg:h-screen lg:w-[45%] lg:shrink-0 lg:overflow-hidden">
+      {/* Left: full-height hero — true 50/50 on desktop, ~40vh full-bleed on mobile.
+          Deep-red NoBC mark panel when there's no hero image. */}
+      <div className="relative w-full lg:h-screen lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={event.heroImageUrl}
             alt=""
-            className="h-[42vh] w-full object-cover sm:h-[52vh] lg:h-full"
+            className="h-[40vh] w-full object-cover sm:h-[44vh] lg:h-full"
           />
         ) : (
-          <EventHeroFallback className="h-[42vh] w-full sm:h-[52vh] lg:h-full" />
+          <EventHeroFallback className="h-[40vh] w-full sm:h-[44vh] lg:h-full" />
         )}
       </div>
 
-      {/* Right: content — 55% on desktop, scrolls independently. */}
-      <div className="flex flex-1 flex-col lg:h-screen lg:w-[55%] lg:overflow-y-auto">
+      {/* Right: content — true 50/50; scrolls independently on desktop. Left-aligned
+          throughout. pb-28 on mobile clears the sticky CTA bar. */}
+      <div className="flex flex-1 flex-col lg:h-screen lg:w-1/2 lg:overflow-y-auto">
         <MemberShellNav applyHref={applyHref} />
 
-        <div className="ev-stagger flex flex-1 flex-col px-6 pb-14 pt-8 sm:px-12 sm:pt-12">
-          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+        <div className="ev-stagger flex flex-1 flex-col px-6 pb-28 pt-8 text-left sm:px-12 sm:pt-12 lg:pb-14">
+          {/* 1 — category tag */}
+          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
             {accessTypeLabel(event.resolved)}
           </p>
 
-          <h1 className="mt-5 max-w-2xl text-[clamp(2.5rem,4.6vw,3.75rem)] leading-[1.04] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          {/* 2 — title */}
+          <h1 className="mt-4 max-w-2xl text-[clamp(2.75rem,5vw,4.25rem)] font-medium leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
             {event.title}
           </h1>
 
-          <div className="mt-7 flex flex-wrap items-center gap-2">
-            <MetaTag>{formatDateLine(start, { year: false })}</MetaTag>
-            <MetaTag>{formatTimeLine(start)}</MetaTag>
-            {event.location ? <MetaTag>{event.location}</MetaTag> : null}
-          </div>
+          {/* 3 — date · time · venue */}
+          <p className="mt-5 text-[13px] uppercase tracking-[0.14em] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+            {metaLine}
+          </p>
 
-          <div className="my-8 h-px w-full bg-[var(--apply-rule)]" />
+          {/* 4 — thin rule */}
+          <div className="my-7 h-px w-full bg-[var(--apply-rule)]" />
 
-          {event.description ? (
-            <p className="max-w-2xl whitespace-pre-wrap text-[17px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-              {event.description}
+          {/* 5 — capacity callout (distinct, not buried) */}
+          {showCapacity ? (
+            <p className="mb-7 inline-flex w-fit items-center gap-2 text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--nobc-red)]" aria-hidden />
+              Limited to {event.capacity} spots
             </p>
           ) : null}
 
-          <div className="mt-10 max-w-md">
-            <RsvpCard event={event} />
-          </div>
+          {/* 6 — CTA / ticket card, full width of the right panel + sticky on mobile */}
+          <RsvpCard event={event} hideHeader mobileSticky />
 
+          {/* 7 — short description (above the fold) */}
+          {shortDescription ? (
+            <p className="mt-8 max-w-2xl whitespace-pre-wrap text-[17px] leading-[1.7] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+              {shortDescription}
+            </p>
+          ) : null}
+
+          {/* 8 — how to attend (borderless, numbered steps) */}
           {event.workflowPaths?.length ? (
-            <div className="mt-10 max-w-md">
-              <WorkflowPathsCard paths={event.workflowPaths} />
+            <div className="mt-10">
+              <WorkflowPathsCard paths={event.workflowPaths} variant="bare" />
+            </div>
+          ) : null}
+
+          {/* 9 — full description */}
+          {hasMoreDescription ? (
+            <div className="mt-10 border-t border-[var(--apply-rule)] pt-8">
+              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                About this gathering
+              </p>
+              <p className="mt-4 max-w-2xl whitespace-pre-wrap text-[16px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+                {fullDescription}
+              </p>
             </div>
           ) : null}
 

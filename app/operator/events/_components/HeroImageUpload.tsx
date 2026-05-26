@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Sparkles, Upload, X } from 'lucide-react';
+import { Loader2, Pencil, Sparkles, Upload, X } from 'lucide-react';
 
 type Props = {
   value: string;
@@ -87,14 +87,32 @@ export function HeroImageUpload({ value, onChange, compact = false }: Props) {
         <div className={`group relative w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card ${compact ? 'h-[180px]' : 'aspect-video'}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="Hero preview" className="h-full w-full object-cover" />
-          <div className="absolute inset-0 hidden items-center justify-center gap-3 bg-[#1C1008]/40 group-hover:flex">
+
+          {/* Always-visible affordance so it's obvious the photo can be changed —
+              the hover-only overlay below was too easy to miss. */}
+          <button
+            type="button"
+            onClick={handlePick}
+            disabled={uploading}
+            aria-label="Replace photo"
+            className="absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-[var(--nobc-red)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--apply-ink) 62%, transparent)' }}
+          >
+            <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden />
+            {uploading ? 'Replacing…' : 'Replace photo'}
+          </button>
+
+          <div
+            className="absolute inset-0 hidden items-center justify-center gap-3 group-hover:flex"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--apply-ink) 40%, transparent)' }}
+          >
             <button
               type="button"
               onClick={handlePick}
               disabled={uploading}
               className="rounded-sm border border-white/80 bg-transparent px-4 py-2 text-[11px] font-medium uppercase tracking-widest text-white transition-colors hover:border-[var(--nobc-red)] hover:bg-[var(--nobc-red)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
             >
-              {uploading ? 'Replacing…' : 'Replace'}
+              {uploading ? 'Replacing…' : 'Replace photo'}
             </button>
             <button
               type="button"
