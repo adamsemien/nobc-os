@@ -61,55 +61,62 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
         </div>
       </section>
 
-      {/* Body */}
-      <div className="mx-auto w-full max-w-6xl flex-1 px-6 pb-16 pt-12 sm:px-10 sm:pt-16">
-        <div className="grid gap-12 lg:grid-cols-[3fr_2fr]">
-          <div className="ev-stagger">
-            {event.description ? (
-              <p className="whitespace-pre-wrap text-[19px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-                {event.description}
-              </p>
-            ) : null}
+      {/* Body — single-column hierarchy: description → access card → detail →
+          bottom anchor. The full-width hero above is unchanged. */}
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-16 pt-12 sm:px-10 sm:pt-16">
+        <div className="ev-stagger">
+          {/* description — the guest reads what the event is before the access card */}
+          {event.description ? (
+            <p className="max-w-2xl whitespace-pre-wrap text-[19px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+              {event.description}
+            </p>
+          ) : null}
 
-            {event.runOfShow ? (
-              <div className="mt-10 border-t border-[var(--apply-rule)] pt-8">
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-                  Run of show
-                </p>
-                <pre className="mt-3 whitespace-pre-wrap text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-                  {event.runOfShow}
-                </pre>
-              </div>
-            ) : null}
-
-            {event.workflowPaths?.length ? (
-              <div className="mt-10">
-                <WorkflowPathsCard paths={event.workflowPaths} />
-              </div>
-            ) : null}
+          {/* access / ticket card — capped + left-aligned (was a full-width sticky aside) */}
+          <div className="mt-8 w-full max-w-[400px]">
+            <RsvpCard event={event} />
           </div>
 
-          <aside className="lg:sticky lg:top-8 lg:self-start lg:max-w-sm">
-            <RsvpCard event={event} />
-          </aside>
+          {event.runOfShow ? (
+            <div className="mt-10 max-w-2xl border-t border-[var(--apply-rule)] pt-8">
+              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                Run of show
+              </p>
+              <pre className="mt-3 whitespace-pre-wrap text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+                {event.runOfShow}
+              </pre>
+            </div>
+          ) : null}
+
+          {event.workflowPaths?.length ? (
+            <div className="mt-10 max-w-2xl">
+              <WorkflowPathsCard paths={event.workflowPaths} />
+            </div>
+          ) : null}
+        </div>
+
+        {/* bottom brand anchor — hairline + muted wordmark + location; fills the
+            lower panel intentionally on short-copy events (same as Split). */}
+        <div className="mt-auto pt-20">
+          <div className="h-px w-full bg-[var(--apply-rule)]" />
+          <div className="flex items-end justify-between gap-6 pt-6">
+            <div>
+              <p className="text-[clamp(1.5rem,2.6vw,2.25rem)] italic leading-none text-[var(--apply-muted)] font-[family-name:var(--font-cormorant)]">
+                No Bad Company
+              </p>
+              <p className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                {event.location ? `${event.location} · Austin` : 'Austin'}
+              </p>
+            </div>
+            <a
+              href="mailto:team@thenobadcompany.com"
+              className="shrink-0 text-[13px] text-[var(--apply-muted)] underline-offset-4 transition-colors hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
+            >
+              team@thenobadcompany.com
+            </a>
+          </div>
         </div>
       </div>
-
-      {/* Footer — minimal mark + email */}
-      <footer className="border-t border-[var(--apply-rule)]">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-10 sm:px-10">
-          <p className="text-[0.65rem] font-normal uppercase tracking-[0.16em] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
-            <span className="text-[var(--nobc-red)]">NO BAD </span>
-            <span>COMPANY</span>
-          </p>
-          <a
-            href="mailto:team@thenobadcompany.com"
-            className="text-[13px] text-[var(--apply-muted)] underline-offset-4 transition-colors hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
-          >
-            team@thenobadcompany.com
-          </a>
-        </div>
-      </footer>
     </div>
   );
 }
