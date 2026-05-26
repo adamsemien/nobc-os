@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped (UI) / ✅ RBAC (#28) — every `/api/operator/*` write gated (STAFF; refunds ADMIN); only `/api/agent`, `/api/mcp` write, `/api/intelligence` APIs remain deferred |
+| **State** | ✅ Shipped (UI) / ✅ RBAC (#28) — every `/api/operator/*` write gated (STAFF; refunds/settings/team ADMIN), plus `/api/agent/*` + `/api/intelligence/{compose,reports}` POST (STAFF, 2026-05-26); only the `/api/mcp` write path remains deferred. A Clerk-org role floor (`getEffectiveRole`) keeps org admins from being locked out. |
 | **V1 item** | #20 (audit_events portion), #22 (7-theme system), #24 (operator bulk delete), #28 (roles & permissions — base shipped 2026-05-25 PR #5; see "Update 2026-05-25" below) |
-| **Last updated** | 2026-05-25 |
+| **Last updated** | 2026-05-26 |
 | **Owner** | Adam |
-| **Blocked on** | Nothing hard. RBAC now gates every `/api/operator/*` write (STAFF; refunds ADMIN), the operator RSVP-bypass branch in `/api/m/.../access/*` (STAFF), `/api/stripe/refund` (ADMIN), and the Sponsor Intelligence page (ADMIN). Remaining (deferred): `/api/intelligence/*` mutation routes, `/api/agent/*`, and the `/api/mcp` write path — still auth + workspace only. `/api/check-in/*` is intentionally excluded (it authenticates via `CHECKIN_SECRET` bearer, not a Clerk session — `requireRole` is inapplicable there). |
-| **Next** | Gate the remaining deferred surfaces — `/api/agent/*`, the `/api/mcp` write path, and `/api/intelligence/*` mutation routes (`POST` compose/reports) — to fully close intra-tenant escalation. (Add Member create is now `requireRole(STAFF)` and its button is hidden for READ_ONLY via `MembersView canAddMembers`; the GUEST-filtered-from-directory note still stands — `GET /api/operator/members` excludes `status: GUEST`.) Optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx`. (Audit 2026-05-21: the only "Open The Room" entry on this dashboard is gated to today-only events (`page.tsx:170`) — see Audit findings below.) |
+| **Blocked on** | Nothing hard. RBAC gates every `/api/operator/*` write (STAFF; refunds/settings/team ADMIN), the operator RSVP-bypass branch in `/api/m/.../access/*` (STAFF), `/api/stripe/refund` (ADMIN), and now `/api/agent/*` + `/api/intelligence/{compose,reports}` POST (STAFF, 2026-05-26). A Clerk-org floor (`getEffectiveRole`) means a Clerk org admin with no `WorkspaceMember` row is treated as ADMIN (never locked out). Remaining (deferred): only the `/api/mcp` write path (Bearer-authed — needs its own design). `/api/check-in/*` is intentionally excluded (`CHECKIN_SECRET` bearer, not a Clerk session). |
+| **Next** | Only the `/api/mcp` write path remains ungated (Bearer-authed external clients — design a dedicated check before applying a gate; `/api/agent/*` and `/api/intelligence/{compose,reports}` were gated STAFF on 2026-05-26). (Add Member create is now `requireRole(STAFF)` and its button is hidden for READ_ONLY via `MembersView canAddMembers`; the GUEST-filtered-from-directory note still stands — `GET /api/operator/members` excludes `status: GUEST`.) Optionally trim the now-unused birthdays/throwbacks fetch from `page.tsx`. (Audit 2026-05-21: the only "Open The Room" entry on this dashboard is gated to today-only events (`page.tsx:170`) — see Audit findings below.) |
 
 ## Scope
 

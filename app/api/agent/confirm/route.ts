@@ -2,18 +2,16 @@
  *  resumes the agent loop so the model can respond to the result. */
 export const runtime = 'nodejs';
 
-import { auth } from '@clerk/nextjs/server';
-import { Prisma } from '@prisma/client';
-import { requireWorkspaceId } from '@/lib/auth';
+import { OperatorRole, Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/operator-role';
 import { executeTool } from '@/lib/agent/registry';
 import { streamAgentTurn } from '@/lib/agent/lib/loop';
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
 
   let body: { turnId?: unknown };
   try {

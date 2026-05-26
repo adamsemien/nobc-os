@@ -73,7 +73,7 @@ A May-2026 session added the House Phone SMS inbox, the member-QR rollout, the e
 - Set `PASSNINJA_API_KEY` + `PASSNINJA_ACCOUNT_ID` + `PASSNINJA_PASS_TYPE` in Vercel (wallet passes go live)
 - Set `SVIX_API_KEY` in Vercel (outbound webhooks go live)
 - Verify application review QA bugs — could not reproduce in code, needs live confirmation
-- Finish operator RBAC coverage — roles now exist and gate settings/team/bulk routes, but approve/reject/refund/comp/bulk-delete, `/api/intelligence/*`, `/api/agent/*`, and the `/api/mcp` write path are still ungated (see Roles & Permissions below). (House Phone `/api/sms/*` is intentionally Clerk-org-membership-gated, not `requireRole` — see Roles & Permissions.)
+- Operator RBAC coverage is essentially complete — every `/api/operator/*` write, `/api/stripe/refund`, `/api/agent/*`, and `/api/intelligence/{compose,reports}` are `requireRole`-gated, and a Clerk-org floor keeps org admins from being locked out. Only the `/api/mcp` write path remains ungated (it uses `Bearer` auth — needs its own design). (House Phone `/api/sms/*` is intentionally Clerk-org-membership-gated and `/api/check-in/*` uses `CHECKIN_SECRET` — both by design. See Roles & Permissions.)
 - Set `TWILIO_*` + `HOUSE_PHONE_WORKSPACE_ID` in Vercel and deploy the Railway inbound service to take House Phone live end-to-end
 
 ### What shipped beyond V1 scope (already live)
@@ -135,13 +135,17 @@ Operator access is role-gated per workspace. The shipped model (2026-05-25, PR #
 
 - **ADMIN** — full access (workspace settings, team management, billing surfaces).
 - **STAFF** — operational access (approvals, create/publish events, comps, check-in). Default for a new `WorkspaceMember`.
-- **READ_ONLY** — view-only, no writes. Also the implicit floor for any Clerk-org member with no explicit `WorkspaceMember` row, so adding a gate never hard-locks an existing org member out of read surfaces.
+- **READ_ONLY** — view-only, no writes. Also the floor for a plain (non-admin) Clerk-org member with no explicit `WorkspaceMember` row, so adding a gate never hard-locks an existing org member out of read surfaces.
 
-Hierarchy: `ADMIN > STAFF > READ_ONLY`. Guards: `requireRole(minRole)` (route handlers → 401/403), `requireRolePage(minRole)` (server components → redirect), plus `getOperatorRole` / `isAdmin` / `isStaff`.
+Hierarchy: `ADMIN > STAFF > READ_ONLY`. Guards: `requireRole(minRole)` (route handlers → 401/403), `requireRolePage(minRole)` (server components → redirect), plus `getEffectiveRole` / `getOperatorRole` / `isAdmin` / `isStaff`.
+
+**Effective role** (`getEffectiveRole`, used by every guard) = the higher of any explicit `WorkspaceMember` grant and a **Clerk-org floor** — Clerk org admin → ADMIN, plain Clerk org member → READ_ONLY. A Clerk org admin is therefore never locked out of their own workspace even with no `WorkspaceMember` row, and explicit STAFF/ADMIN grants still elevate a plain member (fixed 2026-05-26 — this `WorkspaceMember`-vs-Clerk drift had hidden the Sponsors nav and could 403 legitimate admins; same class as the House Phone fix). `getOperatorRole` stays the pure `WorkspaceMember` lookup.
+
+> **Demotion caveat:** because the floor overrides explicit grants, a **Clerk org admin cannot be demoted via the Team UI** — to reduce an org admin's access, change their role in **Clerk** (org:admin → org:member). Add new non-founder staff to Clerk as **org:member** so the Team UI can manage their role.
 
 Rules:
 1. UI hide/disable is UX only; the `requireRole` check is the real security boundary.
-2. **Enforcement is partial today.** `requireRole` gates settings (`/api/operator/settings/*`), team management (`/api/operator/team*`), and member bulk actions (`/api/operator/members/bulk`). The approve/reject/refund/comp/bulk-delete routes, `/api/intelligence/*`, `/api/agent/*`, and the `/api/mcp` write path are **not yet gated** — still auth + workspace only. Closing those is the next RBAC step (see `_context/07-operator-dashboard` → authorization gap).
+2. **Coverage (audited 2026-05-26).** `requireRole` gates **every `/api/operator/*` write** — STAFF for operational writes (applications approve/reject/hold/waitlist, events CRUD + comp + promote-waitlist + bulk-delete, rsvps approve/cancel/reject, tiers, series, comments, lists, notifications, members/create), ADMIN for sensitive ones (settings/*, team/*, members/bulk) — plus `/api/stripe/refund` (ADMIN), the `requireRolePage(ADMIN)` settings pages, and `/api/agent/*` + `/api/intelligence/{compose,reports}` POST (STAFF). **Still ungated:** the `/api/mcp` write path (external clients authenticate via `Bearer`, not a Clerk session — needs its own design) and `/api/check-in/*` (intentionally on a `CHECKIN_SECRET` bearer, not a Clerk session). GET/read routes stay open to any resolved member.
 3. **House Phone (`/api/sms/*`) is intentionally NOT `requireRole`-gated.** It authorizes by Clerk org membership (`auth()` + `getMemberWorkspaceId`): any member of the resolved workspace's Clerk org may view + reply + toggle AI; no `WorkspaceMember` row required. Fixed 2026-05-26 — `requireRole(STAFF)` had drifted onto three of the routes (`/api/sms/conversations`, `/reply`, `/conversation/[id]`) and 403'd a legitimate Clerk org admin who had no `WorkspaceMember` row, blanking the inbox. Clerk org membership is the single source of truth for this shared live-event tool (avoids `WorkspaceMember`-vs-Clerk drift); workspace scoping on the data is unchanged.
 
 > An earlier draft of this section described five roles (owner/admin/manager/staff/readonly) "enforced on every route." That was aspirational and never built — the three roles above are what shipped. Update this section, not your memory, if the model changes.

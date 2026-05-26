@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { requireWorkspaceId } from '@/lib/auth';
+import { OperatorRole } from '@prisma/client';
+import { requireRole } from '@/lib/operator-role';
 import '@/lib/intelligence'; // registers every metric
 import { buildContext, DEFAULT_FILTER_STATE, type IntelligenceFilterState } from '@/lib/intelligence/filters';
 import { composeInsight } from '@/lib/intelligence/composer';
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { workspaceId } = gate;
 
   let body: { question?: unknown; filters?: Partial<IntelligenceFilterState> };
   try {

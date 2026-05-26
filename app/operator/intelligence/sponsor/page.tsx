@@ -1,7 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { getMemberWorkspaceId } from '@/lib/auth';
+import { requireRolePage } from '@/lib/operator-role';
 import { getAudienceNarrative } from './actions';
 import { SentimentPanel } from './_components/SentimentPanel';
 import { SponsorBriefBar } from './_components/SponsorBriefBar';
@@ -334,15 +333,12 @@ function Stat({ label, value }: { label: string; value: string }) {
 // ============================================================
 
 export default async function SponsorIntelligencePage() {
-  // Authorize by Clerk org membership, not WorkspaceMember role: any member of
-  // the resolved workspace's Clerk org may view this dashboard. Mirrors the
-  // House Phone fix (PR #15) — the old requireRolePage(ADMIN) gate silently
-  // redirected a Clerk org admin who had no WorkspaceMember row. Workspace
-  // scoping is unchanged; every query below filters by this workspaceId.
-  const { userId } = await auth();
-  if (!userId) redirect('/');
-  const workspaceId = await getMemberWorkspaceId(userId);
-  if (!workspaceId) redirect('/operator');
+  // ADMIN-only, matching the adminOnly "Sponsors" nav item. Safe now that
+  // getEffectiveRole treats a Clerk org admin as ADMIN even with no
+  // WorkspaceMember row — the lockout that 48ceff7 worked around is fixed at the
+  // source (lib/operator-role.ts). Workspace scoping unchanged; every query below
+  // filters by this workspaceId.
+  const { workspaceId } = await requireRolePage(OperatorRole.ADMIN);
 
   const approvedCount = await db.member.count({ where: { workspaceId, status: 'APPROVED' } });
 
