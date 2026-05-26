@@ -5,7 +5,7 @@ import { DEMO_FUNNEL } from '@/lib/intelligence/demo-data';
 
 function insightFor(approved: number, firstRsvp: number): string {
   const rate = approved > 0 ? Math.round((firstRsvp / approved) * 100) : 0;
-  return `${rate}% of approved members RSVP within the period; the gap between approval and first event is your activation problem if this is under 60%.`;
+  return `${rate}% of approved applicants RSVP within the period; the gap between approval and first event is your activation problem if this is under 60%.`;
 }
 
 async function query(ctx: MetricContext): Promise<MetricResult> {
@@ -26,20 +26,33 @@ async function query(ctx: MetricContext): Promise<MetricResult> {
 
   const { workspaceId, dateRange } = ctx;
   const range = dateRange ? { gte: dateRange.from, lte: dateRange.to } : undefined;
+  const appWhere = { workspaceId, ...(range ? { createdAt: range } : {}) };
 
-  const [submitted, approved, members] = await Promise.all([
-    db.application.count({ where: { workspaceId, ...(range ? { createdAt: range } : {}) } }),
-    db.application.count({
-      where: { workspaceId, status: 'APPROVED', ...(range ? { createdAt: range } : {}) },
-    }),
-    db.member.findMany({
-      where: { workspaceId, status: 'APPROVED' },
-      select: { id: true, _count: { select: { rsvps: true } } },
+  const [submitted, approved, approvedApplicantRows] = await Promise.all([
+    db.application.count({ where: appWhere }),
+    db.application.count({ where: { ...appWhere, status: 'APPROVED' } }),
+    db.application.findMany({
+      where: { ...appWhere, status: 'APPROVED', memberId: { not: null } },
+      select: { memberId: true },
     }),
   ]);
 
-  const firstRsvp = members.filter((m) => m._count.rsvps >= 1).length;
-  const repeat = members.filter((m) => m._count.rsvps >= 2).length;
+  // First RSVP / Repeat must be a nested subset of Approved, so count RSVP activity
+  // over approved APPLICANTS only — the members linked to an approved application —
+  // not over every approved member. Counting all approved members let people approved
+  // outside the application flow inflate later stages past 100% (First RSVP 115 of an
+  // Approved of 11 → 1045%).
+  const applicantMemberIds = approvedApplicantRows
+    .map((a) => a.memberId)
+    .filter((id): id is string => id !== null);
+  const applicantMembers = applicantMemberIds.length
+    ? await db.member.findMany({
+        where: { workspaceId, id: { in: applicantMemberIds } },
+        select: { _count: { select: { rsvps: true } } },
+      })
+    : [];
+  const firstRsvp = applicantMembers.filter((m) => m._count.rsvps >= 1).length;
+  const repeat = applicantMembers.filter((m) => m._count.rsvps >= 2).length;
 
   return {
     value: [
