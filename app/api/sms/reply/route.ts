@@ -1,16 +1,20 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
+import { getMemberWorkspaceId } from '@/lib/auth';
 import { sendSms } from '@/lib/twilio';
 
-// Operator manual reply from the shared inbox. Requires STAFF or above. Sends
-// via the Twilio REST API, then records the OUTBOUND message so the thread only
-// reflects messages Twilio actually accepted.
+// Operator manual reply from the shared inbox. Authorized by Clerk org
+// membership: any member of the resolved workspace's Clerk org may reply (no
+// separate WorkspaceMember/role row required — workspace membership is the
+// boundary, as in the original House Phone spec). Sends via the Twilio REST
+// API, then records the OUTBOUND message so the thread only reflects messages
+// Twilio actually accepted.
 export async function POST(req: NextRequest) {
-  const gate = await requireRole(OperatorRole.STAFF);
-  if (!gate.ok) return gate.response;
-  const { workspaceId } = gate;
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const workspaceId = await getMemberWorkspaceId(userId);
+  if (!workspaceId) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
 
   let body: { conversationId?: string; body?: string };
   try {

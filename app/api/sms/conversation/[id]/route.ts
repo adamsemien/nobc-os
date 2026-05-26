@@ -1,20 +1,22 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
+import { getMemberWorkspaceId } from '@/lib/auth';
 
 // Update a single conversation. Primary use is the per-conversation AI
 // auto-reply toggle (`aiEnabled`), which the Railway inbound service reads to
 // decide whether to auto-respond. Also accepts `name` (correct the patron's
 // name) and `eventId` (associate the conversation with a published event) so
-// the inbox needs no extra endpoints. Workspace-scoped on every field.
+// the inbox needs no extra endpoints. Authorized by Clerk org membership (no
+// separate WorkspaceMember/role row required); workspace-scoped on every field.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireRole(OperatorRole.STAFF);
-  if (!gate.ok) return gate.response;
-  const { workspaceId } = gate;
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const workspaceId = await getMemberWorkspaceId(userId);
+  if (!workspaceId) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
 
   const { id } = await params;
 
