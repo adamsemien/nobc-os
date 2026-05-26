@@ -332,6 +332,15 @@ function Stat({ label, value }: { label: string; value: string }) {
 // Page
 // ============================================================
 
+/** Unwrap an allSettled panel result, logging (never silently swallowing) a
+ *  rejection so a failing panel is traceable in production logs instead of just
+ *  showing "could not be loaded" with no clue why. */
+function panelValue<T>(settled: PromiseSettledResult<T>, label: string): T | null {
+  if (settled.status === 'fulfilled') return settled.value;
+  console.error(`[sponsor-intelligence] ${label} failed to load:`, settled.reason);
+  return null;
+}
+
 export default async function SponsorIntelligencePage() {
   // ADMIN-only, matching the adminOnly "Sponsors" nav item. Safe now that
   // getEffectiveRole treats a Clerk org admin as ADMIN even with no
@@ -364,9 +373,9 @@ export default async function SponsorIntelligencePage() {
     getAudienceNarrative(workspaceId),
   ]);
 
-  const network = networkSettled.status === 'fulfilled' ? networkSettled.value : null;
-  const retention = retentionSettled.status === 'fulfilled' ? retentionSettled.value : null;
-  const initialNarrative = narrativeSettled.status === 'fulfilled' ? narrativeSettled.value : null;
+  const network = panelValue(networkSettled, 'Network Capital');
+  const retention = panelValue(retentionSettled, 'Retention & Velocity');
+  const initialNarrative = panelValue(narrativeSettled, 'Sentiment narrative');
 
   return (
     <div className="min-h-screen px-6 py-10 md:px-12" style={{ background: 'var(--bg)', color: 'var(--text-primary)' }}>
