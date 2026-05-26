@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Search, Grid3x3, Grid2x2, Square } from 'lucide-react';
+import { Search, Grid3x3, Grid2x2, Square, Sparkles } from 'lucide-react';
 import { useDensity, type Density } from './useDensity';
 
 const SORTS: { value: string; label: string }[] = [
@@ -76,6 +76,24 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
           </option>
         ))}
       </select>
+      <button
+        type="button"
+        aria-pressed={!!sp.get('minQuality')}
+        onClick={() => {
+          const next = new URLSearchParams(sp.toString());
+          if (sp.get('minQuality')) next.delete('minQuality');
+          else next.set('minQuality', '75');
+          router.push(`${pathname}?${next.toString()}`);
+        }}
+        className="flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[13px]"
+        style={{
+          borderColor: 'var(--border)',
+          background: sp.get('minQuality') ? 'var(--primary)' : 'var(--card)',
+          color: sp.get('minQuality') ? '#fff' : undefined,
+        }}
+      >
+        <Sparkles className="h-4 w-4" /> Top Picks
+      </button>
       <div className="flex gap-1">
         {DENSITY_ICON.map(([d, Icon]) => (
           <button

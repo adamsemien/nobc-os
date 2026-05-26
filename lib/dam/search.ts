@@ -22,6 +22,7 @@ export interface AssetQuery {
   q?: string;
   from?: string; // ISO date
   to?: string; // ISO date
+  minQuality?: number; // Top Picks filter — qualityScore >=
   cursor?: string;
 }
 
@@ -43,6 +44,8 @@ export function parseAssetQuery(sp: URLSearchParams): AssetQuery {
     : 'date';
   const view: AssetView = sp.get('view') === 'trash' ? 'trash' : 'active';
   const ft = sp.get('fileType');
+  const mq = sp.get('minQuality');
+  const minQuality = mq && Number.isFinite(Number(mq)) ? Number(mq) : undefined;
   return {
     sort,
     view,
@@ -55,6 +58,7 @@ export function parseAssetQuery(sp: URLSearchParams): AssetQuery {
     q: sp.get('q')?.trim() || undefined,
     from: sp.get('from') || undefined,
     to: sp.get('to') || undefined,
+    minQuality,
     cursor: sp.get('cursor') || undefined,
   };
 }
@@ -83,6 +87,7 @@ export function buildAssetWhere(
   if (p.tag) clauses.push(Prisma.sql`(${p.tag} = ANY("tags") OR ${p.tag} = ANY("aiTags"))`);
   if (p.from) clauses.push(Prisma.sql`"shootDate" >= ${new Date(p.from)}`);
   if (p.to) clauses.push(Prisma.sql`"shootDate" <= ${new Date(p.to)}`);
+  if (p.minQuality != null) clauses.push(Prisma.sql`"qualityScore" >= ${p.minQuality}`);
   if (p.q) {
     const eventMatch = matchingEventIds.length
       ? Prisma.sql`OR "eventId" IN (${Prisma.join(matchingEventIds)})`
