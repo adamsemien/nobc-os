@@ -28,18 +28,32 @@ export function SentimentPanel({
   };
 
   return (
-    <section className="py-16">
-      <p
-        className="text-[11px] uppercase"
-        style={{ letterSpacing: '0.22em', color: 'var(--text-secondary)' }}
-      >
-        Sentiment &amp; Alignment
-      </p>
-      <p className="mt-2 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
-        Generated from member intelligence signals · refreshes hourly
-      </p>
+    <section className="grid grid-cols-1 gap-x-16 gap-y-10 py-16 lg:grid-cols-12">
+      {/* Left — identity + control */}
+      <div className="lg:col-span-5">
+        <p
+          className="text-[11px] uppercase"
+          style={{ letterSpacing: '0.22em', color: 'var(--text-secondary)' }}
+        >
+          Sentiment &amp; Alignment
+        </p>
+        <p className="mt-2 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
+          Generated from member intelligence signals · refreshes hourly
+        </p>
 
-      <div className="mt-8 max-w-3xl">
+        <button
+          type="button"
+          onClick={regenerate}
+          disabled={pending}
+          className="mt-6 text-[11px] uppercase disabled:opacity-50"
+          style={{ letterSpacing: '0.2em', color: 'var(--accent)' }}
+        >
+          Regenerate
+        </button>
+      </div>
+
+      {/* Right — narrative */}
+      <div className="lg:col-span-7">
         {pending ? (
           <p
             className="text-2xl italic"
@@ -69,16 +83,6 @@ export function SentimentPanel({
           </p>
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={regenerate}
-        disabled={pending}
-        className="mt-6 text-[11px] uppercase disabled:opacity-50"
-        style={{ letterSpacing: '0.2em', color: 'var(--accent)' }}
-      >
-        Regenerate
-      </button>
     </section>
   );
 }
