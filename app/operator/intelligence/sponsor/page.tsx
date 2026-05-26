@@ -142,7 +142,7 @@ async function loadRetention(workspaceId: string): Promise<Retention> {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] uppercase" style={{ letterSpacing: '0.22em', color: 'var(--text-secondary)' }}>
+    <p className="text-[12px] uppercase" style={{ letterSpacing: '0.26em', color: 'var(--text-secondary)' }}>
       {children}
     </p>
   );
@@ -158,10 +158,10 @@ function ProportionBar({ label, value, total }: { label: string; value: number; 
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between">
-        <span className="text-[13px]" style={{ color: 'var(--text-primary)' }}>
+        <span className="text-[15px]" style={{ color: 'var(--text-primary)' }}>
           {label}
         </span>
-        <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-tertiary)' }}>
+        <span className="text-[14px] tabular-nums" style={{ color: 'var(--text-tertiary)' }}>
           {value}
         </span>
       </div>
@@ -177,7 +177,7 @@ function FreqBar({ label, value, max }: { label: string; value: number; max: num
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <div>
-      <div className="mb-1.5 text-[13px]" style={{ color: 'var(--text-primary)' }}>
+      <div className="mb-1.5 text-[15px]" style={{ color: 'var(--text-primary)' }}>
         {label}
       </div>
       <div className="h-2 w-full" style={{ background: 'var(--raised)' }}>
@@ -227,39 +227,41 @@ function NetworkCapitalPanel({ data }: { data: NetworkCapital }) {
     .filter((t) => t.label !== 'Building History')
     .reduce((sum, t) => sum + t.count, 0);
   const hasMultiplierData = scoredMembers > 0;
+  const hasComposition = data.topTags.length > 0;
+  const hasArchetype = data.archetypeAverages.length > 0;
 
   return (
-    <section className="grid grid-cols-1 gap-x-16 gap-y-12 py-16 lg:grid-cols-12">
-      {/* Left — identity: label, hero stat, referral, editorial pull quote */}
-      <div className="lg:col-span-5">
-        <SectionLabel>Network Capital</SectionLabel>
+    <section className="space-y-16 py-16">
+      {/* Row 1 — hero + quote (left) balanced against the multiplier tiers (right).
+          Both columns are short, so they pair without leaving a void. */}
+      <div className="grid grid-cols-1 gap-x-16 gap-y-12 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <SectionLabel>Network Capital</SectionLabel>
 
-        <div className="mt-6">
-          <div className="text-6xl leading-none" style={{ fontFamily: DISPLAY, fontWeight: 200, color: 'var(--text-primary)' }}>
-            {data.approvedCount}
+          <div className="mt-6">
+            <div className="text-6xl leading-none" style={{ fontFamily: DISPLAY, fontWeight: 200, color: 'var(--text-primary)' }}>
+              {data.approvedCount}
+            </div>
+            <div className="mt-1 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
+              approved members
+            </div>
           </div>
-          <div className="mt-1 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
-            approved members
-          </div>
+
+          {data.referralPct > 0 && (
+            <p className="mt-10 text-[15px]" style={{ color: 'var(--text-secondary)' }}>
+              <span style={{ fontFamily: DISPLAY, fontSize: '1.5rem', color: 'var(--text-primary)' }}>
+                {data.referralPct}%
+              </span>{' '}
+              arrived through personal referral
+            </p>
+          )}
+
+          <p className="mt-12 text-2xl italic leading-relaxed" style={{ fontFamily: DISPLAY, color: 'var(--accent)' }}>
+            “A room where the most valuable person isn&rsquo;t always the most obvious one.”
+          </p>
         </div>
 
-        {data.referralPct > 0 && (
-          <p className="mt-10 text-[15px]" style={{ color: 'var(--text-secondary)' }}>
-            <span style={{ fontFamily: DISPLAY, fontSize: '1.5rem', color: 'var(--text-primary)' }}>
-              {data.referralPct}%
-            </span>{' '}
-            arrived through personal referral
-          </p>
-        )}
-
-        <p className="mt-12 text-2xl italic leading-relaxed" style={{ fontFamily: DISPLAY, color: 'var(--accent)' }}>
-          “A room where the most valuable person isn&rsquo;t always the most obvious one.”
-        </p>
-      </div>
-
-      {/* Right — data: multiplier tiers (or empty state), composition, archetype */}
-      <div className="flex flex-col gap-12 lg:col-span-7">
-        <div>
+        <div className="lg:col-span-7">
           <SectionLabel>Multiplier Tiers</SectionLabel>
           {hasMultiplierData ? (
             <div className="mt-5 flex flex-col gap-5">
@@ -273,41 +275,48 @@ function NetworkCapitalPanel({ data }: { data: NetworkCapital }) {
             </p>
           )}
         </div>
-
-        {data.topTags.length > 0 && (
-          <div>
-            <SectionLabel>Community Composition</SectionLabel>
-            <div className="mt-5 flex flex-col gap-4">
-              {data.topTags.map((t) => (
-                <FreqBar key={t.tag} label={t.tag} value={t.count} max={maxTag} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {data.archetypeAverages.length > 0 && (
-          <div>
-            <SectionLabel>Shared Archetype Profile</SectionLabel>
-            <div className="mt-5 flex flex-col gap-4">
-              {data.archetypeAverages.map((a) => (
-                <div key={a.label}>
-                  <div className="mb-1.5 flex items-baseline justify-between">
-                    <span className="text-[13px]" style={{ color: 'var(--text-primary)' }}>
-                      {a.label}
-                    </span>
-                    <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-tertiary)' }}>
-                      {Math.round(a.avg)}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full" style={{ background: 'var(--raised)' }}>
-                    <div className="h-2" style={{ width: `${Math.min(100, Math.max(0, a.avg))}%`, background: 'var(--accent)' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Row 2 — Community Composition + Shared Archetype Profile are independent
+          sections, not part of the hero row. Both are bar lists of similar height,
+          so they sit full-width as a 2-up instead of being stacked in a half-column. */}
+      {(hasComposition || hasArchetype) && (
+        <div className="grid grid-cols-1 gap-x-16 gap-y-12 md:grid-cols-2">
+          {hasComposition && (
+            <div>
+              <SectionLabel>Community Composition</SectionLabel>
+              <div className="mt-5 flex flex-col gap-4">
+                {data.topTags.map((t) => (
+                  <FreqBar key={t.tag} label={t.tag} value={t.count} max={maxTag} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasArchetype && (
+            <div>
+              <SectionLabel>Shared Archetype Profile</SectionLabel>
+              <div className="mt-5 flex flex-col gap-4">
+                {data.archetypeAverages.map((a) => (
+                  <div key={a.label}>
+                    <div className="mb-1.5 flex items-baseline justify-between">
+                      <span className="text-[15px]" style={{ color: 'var(--text-primary)' }}>
+                        {a.label}
+                      </span>
+                      <span className="text-[14px] tabular-nums" style={{ color: 'var(--text-tertiary)' }}>
+                        {Math.round(a.avg)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full" style={{ background: 'var(--raised)' }}>
+                      <div className="h-2" style={{ width: `${Math.min(100, Math.max(0, a.avg))}%`, background: 'var(--accent)' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -317,35 +326,36 @@ function RetentionPanel({ data }: { data: Retention }) {
   const avgEvents = data.avgEventsActive != null ? data.avgEventsActive.toFixed(1) : '—';
   const avgLead = data.avgLeadTimeDays != null ? `${Math.round(data.avgLeadTimeDays)}d` : '—';
   return (
-    <section className="grid grid-cols-1 gap-x-16 gap-y-12 py-16 lg:grid-cols-12">
-      {/* Left — hero */}
-      <div className="lg:col-span-5">
-        <SectionLabel>Retention &amp; Velocity</SectionLabel>
-        <div className="mt-6">
-          <div className="text-6xl leading-none" style={{ fontFamily: DISPLAY, fontWeight: 200, color: 'var(--text-primary)' }}>
-            {data.multiEventPct}%
-          </div>
-          <div className="mt-1 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
-            attended multiple events
+    <section className="space-y-16 py-16">
+      {/* Row 1 — hero balanced against the supporting stat trio (both short). */}
+      <div className="grid grid-cols-1 gap-x-16 gap-y-12 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <SectionLabel>Retention &amp; Velocity</SectionLabel>
+          <div className="mt-6">
+            <div className="text-6xl leading-none" style={{ fontFamily: DISPLAY, fontWeight: 200, color: 'var(--text-primary)' }}>
+              {data.multiEventPct}%
+            </div>
+            <div className="mt-1 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
+              attended multiple events
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Right — supporting stats + attendance distribution */}
-      <div className="flex flex-col gap-12 lg:col-span-7">
-        <div className="grid grid-cols-3 gap-8">
+        <div className="grid grid-cols-3 gap-8 lg:col-span-7">
           <Stat label="Avg events / active member" value={avgEvents} />
           <Stat label="Avg RSVP lead time" value={avgLead} />
           <Stat label="Active in last 30 days" value={String(data.activeLast30)} />
         </div>
+      </div>
 
-        <div>
-          <SectionLabel>Attendance Distribution</SectionLabel>
-          <div className="mt-5 flex flex-col gap-4">
-            {data.distribution.map((d) => (
-              <FreqBar key={d.label} label={d.label} value={d.count} max={maxDist} />
-            ))}
-          </div>
+      {/* Row 2 — the taller distribution list breaks to full width instead of being
+          trapped in a half-column under the hero. */}
+      <div>
+        <SectionLabel>Attendance Distribution</SectionLabel>
+        <div className="mt-5 flex flex-col gap-4">
+          {data.distribution.map((d) => (
+            <FreqBar key={d.label} label={d.label} value={d.count} max={maxDist} />
+          ))}
         </div>
       </div>
     </section>

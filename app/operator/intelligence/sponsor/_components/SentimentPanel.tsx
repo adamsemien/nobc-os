@@ -28,32 +28,36 @@ export function SentimentPanel({
   };
 
   return (
-    <section className="grid grid-cols-1 gap-x-16 gap-y-10 py-16 lg:grid-cols-12">
-      {/* Left — identity + control */}
-      <div className="lg:col-span-5">
-        <p
-          className="text-[11px] uppercase"
-          style={{ letterSpacing: '0.22em', color: 'var(--text-secondary)' }}
-        >
-          Sentiment &amp; Alignment
-        </p>
-        <p className="mt-2 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
-          Generated from member intelligence signals · refreshes hourly
-        </p>
+    <section className="py-16">
+      {/* Header row — eyebrow + subtitle on the left, Regenerate top-right. A short
+          header above a prose block reads cleaner than a short column beside a tall
+          one, which would strand the narrative in a half-column and leave a void. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
+        <div>
+          <p
+            className="text-[12px] uppercase"
+            style={{ letterSpacing: '0.26em', color: 'var(--text-secondary)' }}
+          >
+            Sentiment &amp; Alignment
+          </p>
+          <p className="mt-2 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
+            Generated from member intelligence signals · refreshes hourly
+          </p>
+        </div>
 
         <button
           type="button"
           onClick={regenerate}
           disabled={pending}
-          className="mt-6 text-[11px] uppercase disabled:opacity-50"
+          className="text-[12px] uppercase disabled:opacity-50"
           style={{ letterSpacing: '0.2em', color: 'var(--accent)' }}
         >
           Regenerate
         </button>
       </div>
 
-      {/* Right — narrative */}
-      <div className="lg:col-span-7">
+      {/* Narrative — breaks full width, capped to a comfortable reading measure. */}
+      <div className="mt-8 max-w-4xl">
         {pending ? (
           <p
             className="text-2xl italic"
