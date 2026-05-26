@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #4, #16 |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-05-26 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Monitor production; V1.5 will add SMS welcome via Stage 11. (2026-05-21: review queue + full-page detail now render genuine-shape submissions — full-page archetype bars iterate the six archetypes via `scorePct`, `basics.referrers` JSON → clean Referrers list, `photos.urls` → photo strip, split-view consents → checkboxes (`consentEmail`/`consentSms`), all dotted answer keys labeled. Demo seed enriched to the full ~43-field live-form answer set. Non-demo stray data (Jordan Mercer et al.) purged — workspace is demo-seed-only.) Audit 2026-05-21: corrected the Schema fields section (no `Member.applicationId`, `Application.memberId` is a bare scalar/no-FK, RedList fields) and added the contact/CRM data-model map below. |
+| **Next** | Monitor production; V1.5 will add SMS welcome via Stage 11. (2026-05-21: review queue + full-page detail now render genuine-shape submissions — full-page archetype bars iterate the six archetypes via `scorePct`, `basics.referrers` JSON → clean Referrers list, `photos.urls` → photo strip, split-view consents → checkboxes (`consentEmail`/`consentSms`), all dotted answer keys labeled. Demo seed enriched to the full ~43-field live-form answer set. Non-demo stray data (Jordan Mercer et al.) purged — workspace is demo-seed-only.) Audit 2026-05-21: corrected the Schema fields section (no `Member.applicationId`, `Application.memberId` is a bare scalar/no-FK, RedList fields) and added the contact/CRM data-model map below. 2026-05-26: **detail panel widened for wide viewports** — `applications/page.tsx` view cap raised 1400→1760px; the `DetailPanel` in `ApplicationsQueue.tsx` is now an `@container` (Tailwind v4 container queries) so it adapts to *panel* width, not viewport: contact row goes horizontal, archetype bars + short answers flow two-column, photos enlarge, long-form answers stay full-width (`@xl:col-span-2`, source order preserved). tsc + next build clean. Next action: review the open PR (`claude/operator-detail-panel-width`) — do not auto-merge — and spot-check the two-column answer split on a live wide monitor. Members/Events were checked: they use separate full-page detail routes, not this panel, so the fix is Applications-only (not a shared component). |
 
 ## Scope
 
