@@ -1,37 +1,40 @@
-/** Deep-red textured panel with the NoBC mark centered — shown in place of a
- *  hero image when an event has none. Used by all three event templates.
- *  Texture/vignette use rgba overlays (not flat color fills); surface colors
- *  are semantic tokens only. */
+/** Intentional fallback panel shown in place of a hero image when an event has
+ *  none. Used by all three event templates. A dark, warm brand-ink ground with a
+ *  soft top-light gradient + faint diagonal texture + vignette for depth, and just
+ *  the NoBC wordmark centered — quiet and deliberate, not a flat red placeholder.
+ *
+ *  (The brand's "dark green" lives in the operator chrome, not the warm editorial
+ *  events palette — so the ground is the events ink token. Surface colors are
+ *  semantic tokens; only the texture/vignette use rgba light/shadow overlays.) */
 export function EventHeroFallback({ className = '' }: { className?: string }) {
   return (
     <div
       aria-hidden
       className={`relative flex items-center justify-center overflow-hidden ${className}`}
       style={{
-        backgroundColor: 'var(--nobc-red)',
+        backgroundColor: 'var(--apply-ink)',
         backgroundImage:
-          'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 16px)',
+          'radial-gradient(135% 100% at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 55%), repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0 1px, transparent 1px 22px)',
       }}
     >
-      {/* soft vignette for depth */}
+      {/* vignette for depth */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            'radial-gradient(120% 90% at 50% 32%, transparent 42%, rgba(28,16,8,0.30))',
+          background: 'radial-gradient(115% 82% at 50% 40%, transparent 46%, rgba(0,0,0,0.42))',
         }}
       />
-      <div className="relative flex flex-col items-center px-10 text-center text-[var(--nobc-on-red)]">
-        <span className="text-[clamp(2.25rem,4.5vw,3.5rem)] italic leading-[1.05] font-[family-name:var(--font-cormorant)]">
+      <div className="relative flex flex-col items-center px-10 text-center">
+        <span
+          className="text-[clamp(2rem,4vw,3.25rem)] italic leading-[1.05] font-[family-name:var(--font-cormorant)]"
+          style={{ color: 'color-mix(in oklab, var(--events-paper) 82%, transparent)' }}
+        >
           No Bad Company
         </span>
         <span
-          className="mt-5 h-px w-14"
-          style={{ background: 'color-mix(in oklab, var(--nobc-on-red) 45%, transparent)' }}
+          className="mt-5 h-px w-12"
+          style={{ background: 'color-mix(in oklab, var(--events-paper) 30%, transparent)' }}
         />
-        <span className="mt-5 text-[10px] font-medium uppercase tracking-[0.34em] opacity-80 font-[family-name:var(--font-dm-sans)]">
-          Austin · By application
-        </span>
       </div>
     </div>
   );
