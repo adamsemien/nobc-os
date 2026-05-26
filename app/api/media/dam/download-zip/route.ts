@@ -5,7 +5,6 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { Readable } from 'node:stream';
-import type { ReadableStream as NodeWebReadableStream } from 'node:stream/web';
 import archiver from 'archiver';
 import { OperatorRole } from '@prisma/client';
 import { requireRole } from '@/lib/operator-role';
@@ -47,7 +46,7 @@ export async function POST(req: NextRequest) {
           name = (a.filename || 'file').replace(/(\.[^.]+)?$/, `-${i}$1`);
         }
         used.add(name);
-        archive.append(Readable.fromWeb(res.body as unknown as NodeWebReadableStream), { name });
+        archive.append(Readable.fromWeb(res.body as unknown as Parameters<typeof Readable.fromWeb>[0]), { name });
       } catch (err) {
         console.error('[dam/zip] append failed', { url: a.url, err });
       }
