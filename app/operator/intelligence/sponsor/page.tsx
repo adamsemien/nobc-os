@@ -38,9 +38,15 @@ async function loadNetworkCapital(workspaceId: string): Promise<NetworkCapital> 
   // "Building History" = score is null or < 4 → everyone not in the upper tiers.
   const buildingHistory = approvedCount - highYield - activeContributors;
 
-  // Top 6 community tags by frequency.
+  // Top 6 community tags by frequency. Internal seed/demo tags ("__demo",
+  // "__demo-tenur", …) are stripped — any "__"-prefixed tag is internal and must
+  // never surface in a sponsor-facing view.
   const tagCounts = new Map<string, number>();
-  for (const m of members) for (const t of m.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+  for (const m of members)
+    for (const t of m.tags) {
+      if (t.startsWith('__')) continue;
+      tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+    }
   const topTags = [...tagCounts.entries()]
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count)
@@ -213,69 +219,95 @@ function Header({ memberCount }: { memberCount: number }) {
 
 function NetworkCapitalPanel({ data }: { data: NetworkCapital }) {
   const maxTag = data.topTags[0]?.count ?? 0;
+  // Multiplier tiers only mean something once members carry a networkCapitalScore.
+  // Before any referral data accrues every member falls into "Building History" and
+  // the bars read as broken (two empty, one full) — so we show intentional editorial
+  // copy in place of the tiers until scoring has something to rank.
+  const scoredMembers = data.tiers
+    .filter((t) => t.label !== 'Building History')
+    .reduce((sum, t) => sum + t.count, 0);
+  const hasMultiplierData = scoredMembers > 0;
+
   return (
-    <section className="py-16">
-      <SectionLabel>Network Capital</SectionLabel>
+    <section className="grid grid-cols-1 gap-x-16 gap-y-12 py-16 lg:grid-cols-12">
+      {/* Left — identity: label, hero stat, referral, editorial pull quote */}
+      <div className="lg:col-span-5">
+        <SectionLabel>Network Capital</SectionLabel>
 
-      <div className="mt-6">
-        <div className="text-6xl leading-none" style={{ fontFamily: DISPLAY, fontWeight: 200, color: 'var(--text-primary)' }}>
-          {data.approvedCount}
-        </div>
-        <div className="mt-1 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
-          approved members
-        </div>
-      </div>
-
-      <div className="mt-10 flex max-w-2xl flex-col gap-5">
-        {data.tiers.map((t) => (
-          <ProportionBar key={t.label} label={t.label} value={t.count} total={data.approvedCount} />
-        ))}
-      </div>
-
-      <p className="mt-10 text-[15px]" style={{ color: 'var(--text-secondary)' }}>
-        <span style={{ fontFamily: DISPLAY, fontSize: '1.5rem', color: 'var(--text-primary)' }}>
-          {data.referralPct}%
-        </span>{' '}
-        arrived through personal referral
-      </p>
-
-      {data.topTags.length > 0 && (
-        <div className="mt-12 max-w-2xl">
-          <SectionLabel>Community Composition</SectionLabel>
-          <div className="mt-5 flex flex-col gap-4">
-            {data.topTags.map((t) => (
-              <FreqBar key={t.tag} label={t.tag} value={t.count} max={maxTag} />
-            ))}
+        <div className="mt-6">
+          <div className="text-6xl leading-none" style={{ fontFamily: DISPLAY, fontWeight: 200, color: 'var(--text-primary)' }}>
+            {data.approvedCount}
+          </div>
+          <div className="mt-1 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
+            approved members
           </div>
         </div>
-      )}
 
-      {data.archetypeAverages.length > 0 && (
-        <div className="mt-12 max-w-2xl">
-          <SectionLabel>Shared Archetype Profile</SectionLabel>
-          <div className="mt-5 flex flex-col gap-4">
-            {data.archetypeAverages.map((a) => (
-              <div key={a.label}>
-                <div className="mb-1.5 flex items-baseline justify-between">
-                  <span className="text-[13px]" style={{ color: 'var(--text-primary)' }}>
-                    {a.label}
-                  </span>
-                  <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-tertiary)' }}>
-                    {Math.round(a.avg)}
-                  </span>
-                </div>
-                <div className="h-2 w-full" style={{ background: 'var(--raised)' }}>
-                  <div className="h-2" style={{ width: `${Math.min(100, Math.max(0, a.avg))}%`, background: 'var(--accent)' }} />
-                </div>
-              </div>
-            ))}
-          </div>
+        {data.referralPct > 0 && (
+          <p className="mt-10 text-[15px]" style={{ color: 'var(--text-secondary)' }}>
+            <span style={{ fontFamily: DISPLAY, fontSize: '1.5rem', color: 'var(--text-primary)' }}>
+              {data.referralPct}%
+            </span>{' '}
+            arrived through personal referral
+          </p>
+        )}
+
+        <p className="mt-12 text-2xl italic leading-relaxed" style={{ fontFamily: DISPLAY, color: 'var(--accent)' }}>
+          “A room where the most valuable person isn&rsquo;t always the most obvious one.”
+        </p>
+      </div>
+
+      {/* Right — data: multiplier tiers (or empty state), composition, archetype */}
+      <div className="flex flex-col gap-12 lg:col-span-7">
+        <div>
+          <SectionLabel>Multiplier Tiers</SectionLabel>
+          {hasMultiplierData ? (
+            <div className="mt-5 flex flex-col gap-5">
+              {data.tiers.map((t) => (
+                <ProportionBar key={t.label} label={t.label} value={t.count} total={data.approvedCount} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-5 text-[15px] italic leading-relaxed" style={{ fontFamily: DISPLAY, color: 'var(--text-tertiary)' }}>
+              Multiplier scoring activates as referral data accrues.
+            </p>
+          )}
         </div>
-      )}
 
-      <p className="mt-14 max-w-2xl text-2xl italic leading-relaxed" style={{ fontFamily: DISPLAY, color: 'var(--accent)' }}>
-        “A room where the most valuable person isn&rsquo;t always the most obvious one.”
-      </p>
+        {data.topTags.length > 0 && (
+          <div>
+            <SectionLabel>Community Composition</SectionLabel>
+            <div className="mt-5 flex flex-col gap-4">
+              {data.topTags.map((t) => (
+                <FreqBar key={t.tag} label={t.tag} value={t.count} max={maxTag} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {data.archetypeAverages.length > 0 && (
+          <div>
+            <SectionLabel>Shared Archetype Profile</SectionLabel>
+            <div className="mt-5 flex flex-col gap-4">
+              {data.archetypeAverages.map((a) => (
+                <div key={a.label}>
+                  <div className="mb-1.5 flex items-baseline justify-between">
+                    <span className="text-[13px]" style={{ color: 'var(--text-primary)' }}>
+                      {a.label}
+                    </span>
+                    <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-tertiary)' }}>
+                      {Math.round(a.avg)}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full" style={{ background: 'var(--raised)' }}>
+                    <div className="h-2" style={{ width: `${Math.min(100, Math.max(0, a.avg))}%`, background: 'var(--accent)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -285,30 +317,35 @@ function RetentionPanel({ data }: { data: Retention }) {
   const avgEvents = data.avgEventsActive != null ? data.avgEventsActive.toFixed(1) : '—';
   const avgLead = data.avgLeadTimeDays != null ? `${Math.round(data.avgLeadTimeDays)}d` : '—';
   return (
-    <section className="py-16">
-      <SectionLabel>Retention &amp; Velocity</SectionLabel>
-
-      <div className="mt-6">
-        <div className="text-6xl leading-none" style={{ fontFamily: DISPLAY, fontWeight: 200, color: 'var(--text-primary)' }}>
-          {data.multiEventPct}%
-        </div>
-        <div className="mt-1 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
-          attended multiple events
+    <section className="grid grid-cols-1 gap-x-16 gap-y-12 py-16 lg:grid-cols-12">
+      {/* Left — hero */}
+      <div className="lg:col-span-5">
+        <SectionLabel>Retention &amp; Velocity</SectionLabel>
+        <div className="mt-6">
+          <div className="text-6xl leading-none" style={{ fontFamily: DISPLAY, fontWeight: 200, color: 'var(--text-primary)' }}>
+            {data.multiEventPct}%
+          </div>
+          <div className="mt-1 text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
+            attended multiple events
+          </div>
         </div>
       </div>
 
-      <div className="mt-10 grid max-w-2xl grid-cols-3 gap-8">
-        <Stat label="Avg events / active member" value={avgEvents} />
-        <Stat label="Avg RSVP lead time" value={avgLead} />
-        <Stat label="Active in last 30 days" value={String(data.activeLast30)} />
-      </div>
+      {/* Right — supporting stats + attendance distribution */}
+      <div className="flex flex-col gap-12 lg:col-span-7">
+        <div className="grid grid-cols-3 gap-8">
+          <Stat label="Avg events / active member" value={avgEvents} />
+          <Stat label="Avg RSVP lead time" value={avgLead} />
+          <Stat label="Active in last 30 days" value={String(data.activeLast30)} />
+        </div>
 
-      <div className="mt-12 max-w-2xl">
-        <SectionLabel>Attendance Distribution</SectionLabel>
-        <div className="mt-5 flex flex-col gap-4">
-          {data.distribution.map((d) => (
-            <FreqBar key={d.label} label={d.label} value={d.count} max={maxDist} />
-          ))}
+        <div>
+          <SectionLabel>Attendance Distribution</SectionLabel>
+          <div className="mt-5 flex flex-col gap-4">
+            {data.distribution.map((d) => (
+              <FreqBar key={d.label} label={d.label} value={d.count} max={maxDist} />
+            ))}
+          </div>
         </div>
       </div>
     </section>
