@@ -1,7 +1,25 @@
-import { clerkClient } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { db } from './db';
 
 export async function getOrCreateWorkspaceForUser(clerkUserId: string) {
+  // Resolve against the operator's ACTIVE Clerk org (the one they selected),
+  // not whichever org happens to be first in their membership list. auth() is
+  // read defensively: in a non-request context (scripts, webhooks) it throws,
+  // leaving activeOrgId null so the legacy first-membership fallback applies.
+  let activeOrgId: string | null = null;
+  try {
+    activeOrgId = (await auth()).orgId ?? null;
+  } catch {
+    activeOrgId = null;
+  }
+
+  // Fast path: workspace already bound to the active org (skips the Clerk
+  // membership lookup entirely for the common signed-in-operator case).
+  if (activeOrgId) {
+    const byActiveOrg = await db.workspace.findUnique({ where: { clerkOrgId: activeOrgId } });
+    if (byActiveOrg) return byActiveOrg;
+  }
+
   const client = await clerkClient();
   const memberships = await client.users.getOrganizationMembershipList({ userId: clerkUserId });
 
@@ -9,7 +27,12 @@ export async function getOrCreateWorkspaceForUser(clerkUserId: string) {
     throw new Error(`No organization membership found for user ${clerkUserId}`);
   }
 
-  const org = memberships.data[0].organization;
+  // Active org when set (and the user is a member of it); otherwise the first
+  // membership — the original behaviour, now reached only when orgId is null.
+  const activeOrg = activeOrgId
+    ? memberships.data.find((m) => m.organization.id === activeOrgId)?.organization
+    : undefined;
+  const org = activeOrg ?? memberships.data[0].organization;
   const orgSlug = org.slug ?? org.id;
 
   // Fast path: workspace already bound to this Clerk org
