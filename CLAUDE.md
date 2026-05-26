@@ -245,6 +245,7 @@ Define success criteria before coding, then loop until verified. Here, "verified
 | 12 | `_context/12-intelligence/` | ✅ Shipped (base + House Phone tab) / 🔶 sponsor-facing partial | #27 |
 | 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) | — |
 | 14 | `_context/14-house-phone/` | 🟡 In progress (inbox UI + analytics shipped; awaiting `TWILIO_*` + Railway deploy) | House Phone SMS inbox + Intelligence tab (post-V1) |
+| 15 | `_context/15-media-dam/` | 🟡 In progress (Phase 1 foundation shipped; grid/share/MCP/picker pending) | Digital Asset Manager (post-V1) |
 
 > **#18 (Stage 09 — AI chat panel):** direct Vercel AI SDK + MCP tool registry (`lib/mcp/`). Runtype orchestration deferred to V1.5.
 
