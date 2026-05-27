@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped (internal tooling) |
 | **V1 item** | — (internal, not in the V1 customer-facing scope table) |
-| **Last updated** | 2026-05-25 |
+| **Last updated** | 2026-05-27 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Iterate QA judge accuracy; expand persona archetype coverage; polish DevToolbar surface. (2026-05-24: **Vitest unit harness** added — `vitest.config.ts` + `npm run test:unit`; first suite `tests/unit/score-display.test.ts` covers `lib/score-display.ts → toScoreDisplay`. 2026-05-24: **"The Room" demo data** — 18 attendees (12 APPROVED members, 4 guests, 2 waitlisted) + matching RSVPs seeded directly against **The Residency — Summer Edition** via SQL; every row id is `demo_seed_*` with `origin = 'demo_seed'`, fully reversible — see "Demo data" below.) 2026-05-21: demo seed rewritten to emit the live `/apply` form's REAL dotted answer keys (42–43 rows); deterministic archetypeScores retained; verify `tsx scripts/verify-demo-applications.ts` → 30/30. Audit 2026-05-21: seed creates no today-event (hides "The Room" button) and dev-route checked-in members lack Applications (blanks archetype chips) — see Audit findings below. |
+| **Next** | Iterate QA judge accuracy; expand persona archetype coverage; polish DevToolbar surface. (2026-05-24: **Vitest unit harness** added — `vitest.config.ts` + `npm run test:unit`; first suite `tests/unit/score-display.test.ts` covers `lib/score-display.ts → toScoreDisplay`. 2026-05-24: **"The Room" demo data** — 18 attendees (12 APPROVED members, 4 guests, 2 waitlisted) + matching RSVPs seeded directly against **The Residency — Summer Edition** via SQL; every row id is `demo_seed_*` with `origin = 'demo_seed'`, fully reversible — see "Demo data" below.) 2026-05-21: demo seed rewritten to emit the live `/apply` form's REAL dotted answer keys (42–43 rows); deterministic archetypeScores retained; verify `tsx scripts/verify-demo-applications.ts` → 30/30. Audit 2026-05-21: seed creates no today-event (hides "The Room" button) and dev-route checked-in members lack Applications (blanks archetype chips) — see Audit findings below. **2026-05-27:** the DevToolbar is now also openable from **Settings → Developer** — `OpenDevToolbarButton` (client) writes the open flag to localStorage + dispatches `DEV_TOOLBAR_OPEN_EVENT`, which the toolbar listens for; the Settings entry is gated server-side by `DEV_USER_IDS`. |
 
 ## Scope
 
@@ -45,7 +45,8 @@ app/api/dev/seed/route.ts                           ← rebuild demo workspace d
 app/api/dev/reset/route.ts                          ← teardown demo dataset
 app/api/dev/test-apply-flow/route.ts                ← programmatic /apply exerciser
 app/operator/_components/QAMissionPanel.tsx        ← floating mission HUD + per-step bug + judge flash
-app/operator/_components/DevToolbar.tsx             ← dev pill + tool launcher (if present)
+app/operator/_components/DevToolbar.tsx             ← dev pill + tool launcher; exports DEV_TOOLBAR_OPEN_EVENT + listens for it (external open)
+app/operator/settings/OpenDevToolbarButton.tsx     ← Settings → Developer launcher (dev-gated): opens the DevToolbar via localStorage flag + CustomEvent
 lib/dev/qa-action-log.ts                            ← CustomEvent ring buffer for judge context
 lib/dev/qa-types.ts                                 ← JudgeVerdict, CompletedStep types
 lib/dev/persona-types.ts                            ← persona schema for generator

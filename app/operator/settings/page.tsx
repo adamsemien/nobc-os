@@ -11,6 +11,8 @@ import {
   Users,
 } from 'lucide-react';
 import { PageHeader } from '../_components/PageHeader';
+import { auth } from '@clerk/nextjs/server';
+import { OpenDevToolbarButton } from './OpenDevToolbarButton';
 
 type Card = {
   href: string;
@@ -76,7 +78,15 @@ const CARDS: Card[] = [
   },
 ];
 
-export default function SettingsLandingPage() {
+const DEV_IDS = (process.env.DEV_USER_IDS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+export default async function SettingsLandingPage() {
+  const { userId } = await auth();
+  const isDev = !!userId && DEV_IDS.includes(userId);
+
   return (
     <div className="px-6 pb-16 pt-8 lg:px-10">
       <div className="mx-auto w-full max-w-[1100px]">
@@ -107,6 +117,16 @@ export default function SettingsLandingPage() {
             </Link>
           ))}
         </div>
+
+        {isDev && (
+          <section className="mt-10 border-t border-border pt-8">
+            <h2 className="mb-1 text-base font-semibold text-text-primary">Developer</h2>
+            <p className="mb-4 text-sm text-text-secondary">
+              Internal tooling — visible only to developers.
+            </p>
+            <OpenDevToolbarButton />
+          </section>
+        )}
       </div>
     </div>
   );
