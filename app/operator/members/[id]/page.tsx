@@ -84,8 +84,8 @@ export default async function MemberDetailPage({
   const fullName = `${member.firstName} ${member.lastName}`.trim() || member.email;
 
   return (
-    <div className="px-6 pb-16 pt-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[1100px]">
+    <div className="px-6 pb-16 pt-8 sm:px-10 lg:px-14 xl:px-20">
+      <div className="w-full">
         <PageHeader
           crumbs={[
             { href: '/operator/members', label: 'Members' },
