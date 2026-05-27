@@ -131,12 +131,6 @@ The way we think about it: Intelligence is not a vanity dashboard — it's how y
 - r — reject
 - / — focus the search
 
-**Events**
-- n — new event (from the Events list)
-
-**Settings → Application Form**
-- Cmd+D — duplicate the selected question
-
 If something doesn't fire, click into the main area first (some browsers swallow shortcuts when focus is on a sidebar or modal).`,
   },
 ];
