@@ -1,0 +1,21 @@
+/**
+ * DAM HEIC/HEIF ingest helpers.
+ * - isHeic: pure detection by MIME or filename extension (case-insensitive).
+ * - convertHeicToJpeg: decode HEIC -> q90 JPEG via libheif (heic-convert).
+ * sharp's prebuilt binary can't decode HEIC on Vercel, so HEIC uploads are
+ * converted to JPEG on ingest (see the Phase-4-prerequisite spec).
+ */
+const HEIC_MIMES = new Set([
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+]);
+
+/** True for HEIC/HEIF by MIME or by file extension (case-insensitive).
+ *  Extension is the primary signal — iPhone uploads often have an empty file.type. */
+export function isHeic(mime: string | null | undefined, filename: string | null | undefined): boolean {
+  if (HEIC_MIMES.has((mime ?? '').toLowerCase())) return true;
+  const n = (filename ?? '').toLowerCase();
+  return n.endsWith('.heic') || n.endsWith('.heif');
+}
