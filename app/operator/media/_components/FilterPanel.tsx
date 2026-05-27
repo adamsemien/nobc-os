@@ -19,10 +19,10 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
     router.push(`${pathname}?${next.toString()}`);
   };
 
-  const lbl = 'mb-1 block text-[11px] uppercase tracking-wide';
+  const lbl = 'mb-1 block text-[12px] font-medium uppercase tracking-wide';
   const ctl = 'w-full rounded-[6px] border px-2 py-1.5 text-[13px]';
-  const ctlStyle = { borderColor: 'var(--border)', background: 'var(--card)' } as const;
-  const lblStyle = { color: 'var(--text-muted)' } as const;
+  const ctlStyle = { borderColor: 'var(--border)', background: 'var(--card)', accentColor: 'var(--primary)' } as const;
+  const lblStyle = { color: 'var(--text-secondary)' } as const;
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col gap-4 p-3">
@@ -62,9 +62,10 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
           <input type="date" className={ctl} style={ctlStyle} value={sp.get('to') ?? ''} onChange={(e) => set('to', e.target.value)} />
         </div>
       </div>
-      <label className="flex items-center gap-2 text-[13px]">
+      <label className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
         <input
           type="checkbox"
+          style={{ accentColor: 'var(--primary)' }}
           checked={sp.get('isSelect') === 'true'}
           onChange={(e) => set('isSelect', e.target.checked ? 'true' : '')}
         />

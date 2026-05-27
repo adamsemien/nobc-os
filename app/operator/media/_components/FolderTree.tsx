@@ -120,7 +120,7 @@ export function FolderTree() {
             <Icon className="h-4 w-4 shrink-0" style={{ color: accent }} />
             <span className="flex-1 truncate">{f.name}</span>
             {counts[f.id] ? (
-              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
                 {counts[f.id]}
               </span>
             ) : null}

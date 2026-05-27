@@ -62,14 +62,14 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search media…"
-          className="w-full rounded-[8px] border py-1.5 pl-8 pr-3 text-[13px]"
+          className="w-full rounded-[8px] border py-1.5 pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
           style={ctlStyle}
         />
       </div>
       <select
         value={sp.get('sort') ?? 'date'}
         onChange={(e) => setSort(e.target.value)}
-        className="rounded-[8px] border px-2 py-1.5 text-[13px]"
+        className="rounded-[8px] border px-2 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
         style={ctlStyle}
       >
         {SORTS.map((s) => (
@@ -91,7 +91,7 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
         style={{
           borderColor: 'var(--border)',
           background: sp.get('minQuality') ? 'var(--primary)' : 'var(--card)',
-          color: sp.get('minQuality') ? '#fff' : undefined,
+          color: sp.get('minQuality') ? 'var(--primary-foreground)' : undefined,
         }}
       >
         <Sparkles className="h-4 w-4" /> Top Picks

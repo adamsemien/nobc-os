@@ -13,7 +13,7 @@
 | **Blocked on** | Nothing for Phase 1. AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
 | **Next** | Confirm #30 production deploy READY, then Adam validates a real iPhone .HEIC on prod (old photo → EXIF shootDate ≠ upload time); Vercel-revert the deployment if it fails. Then start the Phase 4 share-surfaces spec (sponsor `/assets/[token]` + member `/gallery/[slug]` + ShareLink creation + download logging). |
 
-> **Media-page polish (2026-05-27, separate PR):** title top-padding, filter-rail date-input overflow, Trash/help-FAB clearance, view-density active state, "New folder" button, and a visible preview close (×). Operator-grid UX only — no HEIC/Phase-4 changes.
+> **Media-page polish + design pass (2026-05-27, PR #31):** title top-padding, filter-rail date-input overflow, Trash/help-FAB clearance, view-density active state, "New folder" button, visible preview close (×) + backdrop-click-to-close. Plus a design pass: filter/folder label legibility (12px / `--text-secondary` instead of 11px / `--text-muted`), brand-red (`--primary`) on interactive states that lacked it (filter checkbox + date `accent-color`, search/sort focus ring, Top Picks token), and a translucent-red selection wash + checkmark on grid thumbnails (mirrors the operator-sidebar active treatment). Folder-tree active stays evergreen (`--dam-folder-tree`) by design. Operator-grid UX only — no HEIC/Phase-4 changes.
 
 ## Scope
 

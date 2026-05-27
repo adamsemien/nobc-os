@@ -51,6 +51,12 @@ export function MediaTile({
         className="absolute inset-0 h-full w-full object-cover transition-[opacity,filter] duration-300 group-hover:brightness-105"
         style={{ opacity: loaded ? 1 : 0 }}
       />
+      {selected && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'color-mix(in srgb, var(--primary) 28%, transparent)' }}
+        />
+      )}
       <button
         type="button"
         onClick={(e) => {
@@ -66,12 +72,12 @@ export function MediaTile({
           borderColor: 'var(--border)',
         }}
       >
-        {selected && <Check className="h-3.5 w-3.5" style={{ color: '#fff' }} />}
+        {selected && <Check className="h-3.5 w-3.5" style={{ color: 'var(--primary-foreground)' }} />}
       </button>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-2 py-2 opacity-0 transition-opacity group-hover:opacity-100">
         {asset.isSelect && <Star className="h-3 w-3 shrink-0" style={{ color: '#fff', fill: '#fff' }} />}
         {asset.fileType === 'VIDEO' && <Film className="h-3 w-3 shrink-0" style={{ color: '#fff' }} />}
-        <span className="truncate font-[family-name:var(--font-mono)] text-[11px] text-white">
+        <span className="truncate font-[family-name:var(--font-mono)] text-[12px] text-white">
           {asset.filename}
         </span>
       </div>
