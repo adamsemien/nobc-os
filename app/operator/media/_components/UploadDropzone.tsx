@@ -221,7 +221,7 @@ export function UploadDropzone({ onDone, children }: { onDone: () => void; child
 
   return (
     <div
-      className="relative flex-1"
+      className="relative flex-1 min-w-0"
       // Depth counter so child dragenter/leave don't flicker the overlay.
       onDragEnter={(e) => {
         if (!e.dataTransfer.types.includes('Files')) return;

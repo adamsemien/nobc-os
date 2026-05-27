@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — Phase 1 merged (#26); Phase 2a in review (PR #27); Phase 2b built locally (incl. world-class upload UX), not yet pushed; Phase 3 (Timeline) next |
+| **State** | 🟡 In progress — Phase 1 + 2a merged & live in prod (#26, #27); Phase 2b in review (PR #29 — world-class upload + grid interactions + layout overflow fix); Phase 3 (Timeline) next |
 | **V1 item** | Post-V1 (new capability, not in items #1–#28) |
 | **Last updated** | 2026-05-26 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing for Phase 1. AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
-| **Next** | Open the Phase 2b PR (stacked on 2a #27, or rebased onto main once #27 merges). Then Phase 3 — Timeline / Moment Map: secondary view toggle, horizontal `shootDate` plot, hour scrubber, time-marker dividers, single-event-folder only, EXIF-missing fallback to upload order. |
+| **Next** | Review/merge Phase 2b (PR #29) — note: merging it also fixes the `/operator/media` horizontal-overflow bug currently live in prod from #27. Then Phase 3 — Timeline / Moment Map: secondary view toggle, horizontal `shootDate` plot, hour scrubber, time-marker dividers, single-event-folder only, EXIF-missing fallback to upload order. |
 
 ## Scope
 
