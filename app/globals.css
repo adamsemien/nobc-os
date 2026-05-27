@@ -42,8 +42,7 @@
   --surface: #FFFFFF;
   --raised: #F0EBE3;
   --card: #FFFFFF;
-  --dam-folder-tree: #1F3D2F;       /* deep evergreen — DAM folder tree surface */
-  --dam-folder-tree-text: #E8EFE9;
+  --dam-folder-tree: #1F3D2F;       /* deep evergreen — DAM folder-tree accent (icons + active states only; the panel uses --sidebar) */
   --sidebar: #F4F0EA;
   --sidebar-active-bg: color-mix(in srgb, #B22E21 8%, transparent);
   --border: #E8E0D5;
