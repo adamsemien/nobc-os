@@ -10,6 +10,9 @@
 !.yarn/releases
 !.yarn/versions
 
+# brainstorming visual-companion artifacts (local only)
+/.superpowers
+
 # testing
 /coverage
 

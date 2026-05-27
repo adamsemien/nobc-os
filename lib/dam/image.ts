@@ -23,7 +23,10 @@ export interface ProcessedImage {
 }
 
 /** 800px thumbnail + BlurHash + dimensions + EXIF shoot date. */
-export async function processImage(input: Buffer): Promise<ProcessedImage> {
+export async function processImage(
+  input: Buffer,
+  opts?: { exifInput?: Buffer },
+): Promise<ProcessedImage> {
   const meta = await sharp(input, { failOn: 'none' }).metadata();
 
   const thumbnail = await sharp(input, { failOn: 'none' })
@@ -34,7 +37,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
 
   const [blurhash, shootDate] = await Promise.all([
     encodeBlurhash(input).catch(() => null),
-    extractShootDate(input).catch(() => null),
+    extractShootDate(opts?.exifInput ?? input).catch(() => null),
   ]);
 
   return {
