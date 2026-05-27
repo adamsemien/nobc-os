@@ -14,7 +14,12 @@ const ALLOWED_IDS = (process.env.NEXT_PUBLIC_DEV_USER_IDS ?? '')
   .map((s) => s.trim())
   .filter(Boolean);
 
-const LS_OPEN = 'nobc-dev-toolbar-open';
+// Exported so external openers (e.g. Settings → Developer) can persist the
+// open flag and dispatch the open event without duplicating the magic strings.
+export const DEV_TOOLBAR_OPEN_STORAGE_KEY = 'nobc-dev-toolbar-open';
+export const DEV_TOOLBAR_OPEN_EVENT = 'nobc-open-dev-toolbar';
+
+const LS_OPEN = DEV_TOOLBAR_OPEN_STORAGE_KEY;
 const LS_SEEDED_AT = 'nobc-dev-seeded-at';
 const LS_SEEDED_EVENTS = 'nobc-dev-seeded-events';
 
@@ -167,6 +172,21 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isAllowed, toggle]);
+
+  // External open trigger — the Settings → Developer button dispatches this
+  // (alongside a localStorage write) so the toolbar can be opened without the
+  // ⌘⇧⌥D shortcut. Gated on isAllowed like everything else here.
+  useEffect(() => {
+    if (!isAllowed) return;
+    const onOpen = () => {
+      setOpen(true);
+      try {
+        localStorage.setItem(LS_OPEN, 'true');
+      } catch {}
+    };
+    window.addEventListener(DEV_TOOLBAR_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(DEV_TOOLBAR_OPEN_EVENT, onOpen);
+  }, [isAllowed]);
 
   // Rehydrate active mission on mount + load leaderboard / recent.
   useEffect(() => {
