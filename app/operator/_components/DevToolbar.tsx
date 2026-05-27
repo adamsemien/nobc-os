@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useUser } from '@clerk/nextjs';
 import type { Persona, PersonaStep } from '@/lib/dev/persona-types';
 import type {
@@ -72,6 +72,65 @@ const S = {
     lineHeight: '1.4',
   },
 };
+
+/** Keyboard key, styled to match the toolbar's dark theme. */
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd
+      style={{
+        display: 'inline-block',
+        background: '#231d2e',
+        border: '1px solid #3d3050',
+        borderRadius: 4,
+        padding: '1px 6px',
+        margin: '0 1px',
+        fontFamily: 'monospace',
+        fontSize: 10,
+        lineHeight: '1.6',
+        color: '#e8e4f0',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+    </kbd>
+  );
+}
+
+// Cheat-sheet content for the Shortcuts section.
+const SHORTCUT_GROUPS: { label: string; rows: { keys: string[]; desc: string }[] }[] = [
+  {
+    label: 'Global',
+    rows: [
+      { keys: ['⌘K'], desc: 'command palette' },
+      { keys: ['⌘⇧⌥A'], desc: 'AI agent panel' },
+      { keys: ['⌘⇧⌥D'], desc: 'this dev toolbar' },
+      { keys: ['?'], desc: 'help panel' },
+      { keys: ['Esc'], desc: 'close any panel' },
+    ],
+  },
+  {
+    label: 'Applications queue',
+    rows: [
+      { keys: ['j', 'k'], desc: 'navigate' },
+      { keys: ['a'], desc: 'approve' },
+      { keys: ['h'], desc: 'hold' },
+      { keys: ['r'], desc: 'reject' },
+      { keys: ['/'], desc: 'focus search' },
+    ],
+  },
+];
+
+const EASTER_EGGS: { trigger: string; desc: string }[] = [
+  { trigger: '↑↑↓↓←→←→BA', desc: 'screen inversion — Void theme only' },
+  { trigger: '3× name', desc: 'tribute overlay (click an applicant name)' },
+  { trigger: 'Rosé theme', desc: 'confetti on approve' },
+  { trigger: 'Obsidian theme', desc: 'idle whisper after 60s' },
+  { trigger: 'AIM theme', desc: 'away-message overlay' },
+  { trigger: 'MySpace theme', desc: 'profile overlay' },
+  { trigger: 'frogger', desc: 'playable game — type it on /apply' },
+];
+
+const ROOM_FLOURISHES = 'Arrival chime · sellout confetti · ✦ Purple-List VIP markers';
 
 export function DevToolbar({ workspaceId }: DevToolbarProps) {
   const { user, isLoaded } = useUser();
@@ -1031,6 +1090,59 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Shortcuts cheat sheet */}
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid #2d2438' }}>
+            <div style={{ color: '#5a4d6a', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+              Shortcuts
+            </div>
+
+            {SHORTCUT_GROUPS.map((group) => (
+              <div key={group.label} style={{ marginBottom: 10 }}>
+                <div style={{ color: '#7a6a8a', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>
+                  {group.label}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {group.rows.map((row) => (
+                    <div key={row.desc} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                      <span style={{ flexShrink: 0, minWidth: 66 }}>
+                        {row.keys.map((k, i) => (
+                          <span key={k}>
+                            {i > 0 && <span style={{ color: '#5a4d6a', fontSize: 10 }}> / </span>}
+                            <Kbd>{k}</Kbd>
+                          </span>
+                        ))}
+                      </span>
+                      <span style={{ color: '#c4b8d4', fontSize: 10, lineHeight: '1.6' }}>{row.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ color: '#7a6a8a', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>
+                Easter eggs
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {EASTER_EGGS.map((egg) => (
+                  <div key={egg.trigger} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <span style={{ flexShrink: 0 }}>
+                      <Kbd>{egg.trigger}</Kbd>
+                    </span>
+                    <span style={{ color: '#c4b8d4', fontSize: 10, lineHeight: '1.6' }}>{egg.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ color: '#7a6a8a', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>
+                The Room
+              </div>
+              <div style={{ color: '#c4b8d4', fontSize: 10, lineHeight: '1.6' }}>{ROOM_FLOURISHES}</div>
+            </div>
           </div>
 
           {/* Quick Nav */}
