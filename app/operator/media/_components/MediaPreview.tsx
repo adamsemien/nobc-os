@@ -69,7 +69,7 @@ export function MediaPreview({
   const labelStyle = { color: 'var(--text-muted)' } as const;
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-black/85" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex bg-black/85">
       {index > 0 && (
         <button
           aria-label="Previous"
@@ -89,7 +89,13 @@ export function MediaPreview({
         </button>
       )}
 
-      <div className="relative flex flex-1 items-center justify-center p-8" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="relative flex flex-1 items-center justify-center p-8"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
         <button
           aria-label="Close preview"
           className="absolute right-4 top-4 z-10 rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
