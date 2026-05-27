@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — Phases 1/2a/2b merged & live in prod (#26/#27/#29); Phase 3 (Timeline) spec'd & deferred (awaiting real event photography); HEIC ingest prerequisite in progress |
+| **State** | 🟡 In progress — Phases 1/2a/2b merged & live in prod (#26/#27/#29); HEIC ingest built + locally validated (full chain on a real HEIF), PR #30 merging to prod; Phase 3 (Timeline) spec'd & deferred (awaiting real event photography) |
 | **V1 item** | Post-V1 (new capability, not in items #1–#28) |
 | **Last updated** | 2026-05-27 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing for Phase 1. AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
-| **Next** | Land HEIC ingest (own PR), validate on preview with a real iPhone .HEIC, then start the Phase 4 share-surfaces spec (sponsor `/assets/[token]` + member `/gallery/[slug]` + ShareLink creation + download logging). |
+| **Next** | Confirm #30 production deploy READY, then Adam validates a real iPhone .HEIC on prod (old photo → EXIF shootDate ≠ upload time); Vercel-revert the deployment if it fails. Then start the Phase 4 share-surfaces spec (sponsor `/assets/[token]` + member `/gallery/[slug]` + ShareLink creation + download logging). |
 
 ## Scope
 
@@ -31,7 +31,8 @@ Full design contract: `docs/superpowers/specs/2026-05-26-dam-design.md`.
 ```
 lib/dam/storage.ts                       ← R2 private storage: uploadObject, presignGet (15m/24h TTLs), deleteObject, damKey
 lib/dam/image.ts                         ← Sharp: 800px WebP thumbnail, BlurHash, dimensions, EXIF shootDate; heuristic scoreImage; processImage gained optional exifInput (read EXIF from original HEIC)
-lib/dam/heic.ts                          ← isHeic (MIME + case-insensitive ext) + convertHeicToJpeg (libheif q90); HEIC ingest prerequisite
+lib/dam/heic.ts                          ← isHeic (MIME + case-insensitive ext) + convertHeicToJpeg (libheif q90; passes the Buffer view, not a raw ArrayBuffer — heic-decode needs the iterable); HEIC ingest prerequisite
+next.config.ts                           ← serverExternalPackages ['heic-convert','libheif-js'] so libheif.wasm is traced into the Vercel serverless bundle (HEIC ingest)
 lib/dam/tagging.ts                       ← tagImage(url) provider switch (cloudflare impl; hf/openai stubs); inferEnergyLevel
 app/api/media/dam/upload/route.ts        ← STAFF-gated R2 upload → Asset row → storageBytes bump → fire-and-forget tagging trigger
 app/api/media/dam/tag/[assetId]/route.ts ← async AI tag + heuristic score (runs after the upload response; optional DAM_TAG_SECRET guard)
@@ -103,4 +104,4 @@ app/operator/media/_components/          ← +BulkActionBar, MediaPreview, Uploa
 
 - **Fire-and-forget tagging is best-effort on Vercel** — the post-response trigger fetch is not guaranteed to fire after the serverless function freezes. Acceptable for Phase 1 (tagging is non-critical and no-ops until `CLOUDFLARE_*` is set). Production hardening (`waitUntil` / queue) is a tracked follow-up.
 - **Video** is enum-supported (`AssetFileType.VIDEO`) but the Phase-1 upload pipeline accepts images only (Sharp processes images); video ingest is a later phase.
-- **HEIC/HEIF** intentionally excluded from accepted MIME types — prebuilt Sharp/libvips lacks HEIC decode. Revisit with libheif if needed.
+- **HEIC/HEIF** is now accepted on upload and converted to a q90 JPEG (stored full-res) before Sharp processing — prebuilt Sharp/libvips can't decode HEIC on Vercel, so `lib/dam/heic.ts` decodes via libheif (`heic-convert`). EXIF `shootDate` is read from the original HEIC (the converted JPEG loses it); the original HEIC is discarded after conversion. The client `accept` filter in `UploadDropzone` still lists only `image/jpeg,image/png,image/webp`, so the Browse picker greys out HEIC — drag-and-drop is the working path until that filter is widened (tracked follow-up).

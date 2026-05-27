@@ -24,12 +24,14 @@ export function isHeic(mime: string | null | undefined, filename: string | null 
  *  Dynamically imported so the libheif WASM only loads when a HEIC actually arrives. */
 export async function convertHeicToJpeg(input: Buffer): Promise<Buffer> {
   const heicConvert = (await import('heic-convert')).default;
-  // heic-convert types want an ArrayBufferLike; a Node Buffer is a Uint8Array
-  // view, so hand it a standalone ArrayBuffer sliced to the view (pool-safe).
-  const arrayBuffer = input.buffer.slice(
-    input.byteOffset,
-    input.byteOffset + input.byteLength,
-  ) as ArrayBuffer;
-  const out = await heicConvert({ buffer: arrayBuffer, format: 'JPEG', quality: 0.9 });
+  // @types/heic-convert types `buffer` as ArrayBufferLike, but heic-decode
+  // actually needs the Uint8Array/Buffer view at runtime — it slices and spreads
+  // the bytes for the ftyp check, and a bare ArrayBuffer isn't iterable. Pass the
+  // Buffer directly (a Uint8Array view) and cast past the inaccurate type.
+  const out = await heicConvert({
+    buffer: input as unknown as ArrayBuffer,
+    format: 'JPEG',
+    quality: 0.9,
+  });
   return Buffer.from(out);
 }
