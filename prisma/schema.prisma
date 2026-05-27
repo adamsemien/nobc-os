@@ -1368,6 +1368,9 @@ model Asset {
   qualityScores Json? // breakdown { sharpness, exposure, ... }
   energyLevel   String? // low | medium | high (inferred from scene labels)
   shooterCredit String? // photographer credit
+  /// Full-text search vector — maintained by the dam_asset_search_vector trigger
+  /// (filename + tags + aiTags + sponsorName). GIN-indexed in prisma/sql/dam-search-vector.sql.
+  searchVector  Unsupported("tsvector")?
   isSelect      Boolean       @default(false)
   sortOrder     Int           @default(0) // manual ordering
   folderId      String?
