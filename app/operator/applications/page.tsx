@@ -119,8 +119,8 @@ export default async function OperatorApplicationsPage({
     : undefined;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-4 pb-16 pt-8 sm:px-6">
-      <div className="mx-auto flex min-h-0 w-full max-w-[1760px] flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col px-6 pb-16 pt-8 sm:px-10 lg:px-14 xl:px-20">
+      <div className="flex min-h-0 w-full flex-1 flex-col">
         <PageHeader
           title={
             <span className="flex items-center gap-3">

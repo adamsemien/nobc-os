@@ -179,8 +179,8 @@ export default async function AuditPage({
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="px-6 pb-16 pt-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[1280px]">
+    <div className="px-6 pb-16 pt-8 sm:px-10 lg:px-14 xl:px-20">
+      <div className="w-full">
         <PageHeader
           title="Activity"
           subtitle="Everything that happened — operator decisions, member RSVPs, agent actions."

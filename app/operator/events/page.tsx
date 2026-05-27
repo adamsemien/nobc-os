@@ -27,8 +27,8 @@ export default async function OperatorEventsPage() {
     : [];
 
   return (
-    <div className="px-6 pb-16 pt-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[1400px]">
+    <div className="px-6 pb-16 pt-8 sm:px-10 lg:px-14 xl:px-20">
+      <div className="w-full">
         <PageHeader
           title="Events"
           subtitle="Upcoming, past, and recurring series."

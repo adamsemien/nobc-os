@@ -385,8 +385,8 @@ export default function NewEventPage() {
   );
 
   return (
-    <div className="min-h-screen overflow-x-hidden px-4 py-8 sm:px-6 lg:px-10">
-      <div className="mx-auto w-full max-w-[1280px]">
+    <div className="min-h-screen overflow-x-hidden px-6 py-8 sm:px-10 lg:px-14 xl:px-20">
+      <div className="w-full">
         <Link href="/operator/events"
           className={`mb-6 inline-block text-[11px] font-medium uppercase tracking-widest text-text-secondary transition-colors hover:text-primary ${chrome}`}>
           ← All events

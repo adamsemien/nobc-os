@@ -165,8 +165,8 @@ export default async function OperatorEventDetailPage({
   });
 
   return (
-    <div className="px-6 pb-20 pt-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[1280px]">
+    <div className="px-6 pb-20 pt-8 sm:px-10 lg:px-14 xl:px-20">
+      <div className="w-full">
         <Breadcrumbs
           items={[
             { href: '/operator/events', label: 'Events' },

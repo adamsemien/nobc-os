@@ -131,8 +131,8 @@ export default async function OperatorApplicationDetailPage({
     new Date(app.reviewedAt).toLocaleDateString('en-US', { dateStyle: 'long' });
 
   return (
-    <div className="px-4 pb-52 pt-8 sm:px-6">
-      <div className="mx-auto max-w-6xl">
+    <div className="px-6 pb-52 pt-8 sm:px-10 lg:px-14 xl:px-20">
+      <div className="w-full">
         <Breadcrumbs
           items={[
             { href: '/operator/applications', label: 'Applications' },
