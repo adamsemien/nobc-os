@@ -53,11 +53,11 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
         </select>
       </div>
       <div className="flex gap-2">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <label className={lbl} style={lblStyle}>From</label>
           <input type="date" className={ctl} style={ctlStyle} value={sp.get('from') ?? ''} onChange={(e) => set('from', e.target.value)} />
         </div>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <label className={lbl} style={lblStyle}>To</label>
           <input type="date" className={ctl} style={ctlStyle} value={sp.get('to') ?? ''} onChange={(e) => set('to', e.target.value)} />
         </div>

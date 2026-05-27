@@ -89,7 +89,14 @@ export function MediaPreview({
         </button>
       )}
 
-      <div className="flex flex-1 items-center justify-center p-8" onClick={(e) => e.stopPropagation()}>
+      <div className="relative flex flex-1 items-center justify-center p-8" onClick={(e) => e.stopPropagation()}>
+        <button
+          aria-label="Close preview"
+          className="absolute right-4 top-4 z-10 rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+        >
+          <X className="h-6 w-6" />
+        </button>
         {asset.fileType === 'VIDEO' ? (
           <video src={`/api/media/dam/asset/${asset.id}/full`} controls className="max-h-full max-w-full" />
         ) : (

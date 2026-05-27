@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Folder, Star, Video, Megaphone, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Folder, Star, Video, Megaphone, Image as ImageIcon, Trash2, FolderPlus } from 'lucide-react';
 
 interface FolderNode {
   id: string;
@@ -27,6 +27,8 @@ export function FolderTree() {
   const [folders, setFolders] = useState<FolderNode[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [trashCount, setTrashCount] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
   const activeFolder = sp.get('folderId');
   const isTrash = sp.get('view') === 'trash';
 
@@ -35,7 +37,7 @@ export function FolderTree() {
   const accent = 'var(--dam-folder-tree, var(--primary))';
   const accentBg = 'color-mix(in srgb, var(--dam-folder-tree, var(--primary)) 12%, transparent)';
 
-  useEffect(() => {
+  const loadFolders = useCallback(() => {
     fetch('/api/media/dam/folders')
       .then((r) => r.json())
       .then((d) => {
@@ -46,6 +48,10 @@ export function FolderTree() {
       .catch((e) => console.error('[FolderTree] fetch failed', e));
   }, []);
 
+  useEffect(() => {
+    loadFolders();
+  }, [loadFolders]);
+
   const go = (params: Record<string, string | null>) => {
     const next = new URLSearchParams(sp.toString());
     for (const [k, v] of Object.entries(params)) {
@@ -55,9 +61,34 @@ export function FolderTree() {
     router.push(`${pathname}?${next.toString()}`);
   };
 
+  const createFolder = async () => {
+    const name = newName.trim();
+    if (!name) {
+      setCreating(false);
+      setNewName('');
+      return;
+    }
+    try {
+      const res = await fetch('/api/media/dam/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type: 'FULL_GALLERY' }),
+      });
+      if (res.ok) {
+        setNewName('');
+        setCreating(false);
+        loadFolders();
+      } else {
+        console.error('[FolderTree] create folder failed', res.status);
+      }
+    } catch (e) {
+      console.error('[FolderTree] create folder error', e);
+    }
+  };
+
   return (
     <nav
-      className="flex h-full w-[240px] shrink-0 flex-col gap-1 overflow-y-auto p-3 font-[family-name:var(--font-dm-sans)] text-[13px]"
+      className="flex h-full w-[240px] shrink-0 flex-col gap-1 overflow-y-auto p-3 pb-16 font-[family-name:var(--font-dm-sans)] text-[13px]"
       style={{ background: 'var(--sidebar)', color: 'var(--text-secondary)', boxShadow: 'var(--sidebar-shadow)' }}
     >
       <button
@@ -96,6 +127,33 @@ export function FolderTree() {
           </button>
         );
       })}
+      {creating ? (
+        <input
+          autoFocus
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') createFolder();
+            else if (e.key === 'Escape') {
+              setCreating(false);
+              setNewName('');
+            }
+          }}
+          onBlur={createFolder}
+          placeholder="Folder name…"
+          className="rounded-[6px] border px-2 py-1.5 text-[13px]"
+          style={{ borderColor: 'var(--border)', background: 'var(--card)', color: 'var(--text-primary)' }}
+        />
+      ) : (
+        <button
+          onClick={() => setCreating(true)}
+          className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-left transition-colors"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          <FolderPlus className="h-4 w-4 shrink-0" style={{ color: accent }} />
+          <span className="flex-1">New folder</span>
+        </button>
+      )}
       <button
         onClick={() => go({ view: 'trash', folderId: null })}
         className="mt-auto flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-left transition-colors"

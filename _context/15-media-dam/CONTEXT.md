@@ -13,6 +13,8 @@
 | **Blocked on** | Nothing for Phase 1. AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
 | **Next** | Confirm #30 production deploy READY, then Adam validates a real iPhone .HEIC on prod (old photo → EXIF shootDate ≠ upload time); Vercel-revert the deployment if it fails. Then start the Phase 4 share-surfaces spec (sponsor `/assets/[token]` + member `/gallery/[slug]` + ShareLink creation + download logging). |
 
+> **Media-page polish (2026-05-27, separate PR):** title top-padding, filter-rail date-input overflow, Trash/help-FAB clearance, view-density active state, "New folder" button, and a visible preview close (×). Operator-grid UX only — no HEIC/Phase-4 changes.
+
 ## Scope
 
 The operator-facing Digital Asset Manager and its external share surfaces. Delivered in 6 phased PRs (build order = dependency order):

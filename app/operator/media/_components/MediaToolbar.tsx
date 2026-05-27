@@ -28,7 +28,7 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
   const sp = useSearchParams();
   const { open, isUploading } = useUpload();
   const [q, setQ] = useState(sp.get('q') ?? '');
-  const [, setDensity] = useDensity();
+  const [density, setDensity] = useDensity();
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -97,17 +97,29 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
         <Sparkles className="h-4 w-4" /> Top Picks
       </button>
       <div className="flex gap-1">
-        {DENSITY_ICON.map(([d, Icon]) => (
-          <button
-            key={d}
-            onClick={() => pickDensity(d)}
-            aria-label={`${d} thumbnails`}
-            className="rounded-[6px] border p-1.5"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <Icon className="h-4 w-4" />
-          </button>
-        ))}
+        {DENSITY_ICON.map(([d, Icon]) => {
+          const active = d === density;
+          return (
+            <button
+              key={d}
+              onClick={() => pickDensity(d)}
+              aria-label={`${d} thumbnails`}
+              aria-pressed={active}
+              className="rounded-[6px] border p-1.5 transition-colors"
+              style={
+                active
+                  ? {
+                      borderColor: 'var(--primary)',
+                      background: 'color-mix(in srgb, var(--primary) 12%, var(--card))',
+                      color: 'var(--primary)',
+                    }
+                  : { borderColor: 'var(--border)' }
+              }
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          );
+        })}
       </div>
       <button
         type="button"

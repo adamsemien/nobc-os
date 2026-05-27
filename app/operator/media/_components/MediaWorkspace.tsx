@@ -54,7 +54,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-60px)] w-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       <FolderTree />
       <UploadDropzone onDone={reload}>
         <div className="flex h-full min-w-0 flex-col overflow-y-auto px-4">
