@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "seed:events": "npx tsx scripts/seed-events.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
+    "seed:dam": "tsx scripts/seed-dam.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
