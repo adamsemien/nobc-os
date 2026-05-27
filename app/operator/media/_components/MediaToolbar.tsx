@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Search, Grid3x3, Grid2x2, Square, Sparkles } from 'lucide-react';
+import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload } from 'lucide-react';
 import { useDensity, type Density } from './useDensity';
+import { useUpload } from './UploadDropzone';
 
 const SORTS: { value: string; label: string }[] = [
   { value: 'date', label: 'Date' },
@@ -25,6 +26,7 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
+  const { open, isUploading } = useUpload();
   const [q, setQ] = useState(sp.get('q') ?? '');
   const [, setDensity] = useDensity();
 
@@ -107,6 +109,15 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        onClick={open}
+        className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[13px] font-medium"
+        style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+      >
+        <Upload className="h-4 w-4" />
+        {isUploading ? 'Uploading…' : 'Upload'}
+      </button>
     </div>
   );
 }

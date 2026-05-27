@@ -6,19 +6,19 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — Phase 1 + 2a + 2b shipped; Phase 3 (Timeline) next |
+| **State** | 🟡 In progress — Phase 1 merged (#26); Phase 2a in review (PR #27); Phase 2b built locally (incl. world-class upload UX), not yet pushed; Phase 3 (Timeline) next |
 | **V1 item** | Post-V1 (new capability, not in items #1–#28) |
 | **Last updated** | 2026-05-26 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing for Phase 1. AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
-| **Next** | Phase 3 — Timeline / Moment Map: secondary view toggle, horizontal `shootDate` plot, hour scrubber, time-marker dividers, single-event-folder only, EXIF-missing fallback to upload order. |
+| **Next** | Open the Phase 2b PR (stacked on 2a #27, or rebased onto main once #27 merges). Then Phase 3 — Timeline / Moment Map: secondary view toggle, horizontal `shootDate` plot, hour scrubber, time-marker dividers, single-event-folder only, EXIF-missing fallback to upload order. |
 
 ## Scope
 
 The operator-facing Digital Asset Manager and its external share surfaces. Delivered in 6 phased PRs (build order = dependency order):
 
 1. ✅ **Foundation** — Prisma schema, R2 private storage, image processing (800px thumbnail / BlurHash / EXIF `shootDate`), async AI tagging + Sharp heuristic scoring, upload API.
-2. ✅ **Operator grid** at `/operator/media` — **2a** (justified grid, BlurHash, signed-URL thumbs, sort/filter/FTS, folder tree, density, nav) + **2b** (selection + bulk bar [flag/ZIP/tag/move/delete], FLIP transitions, full-screen preview + inline edit, drag-drop batch upload, trash restore/purge, Top Picks, manual reorder).
+2. ✅ **Operator grid** at `/operator/media` — **2a** (justified grid, BlurHash, signed-URL thumbs, sort/filter/FTS, folder tree, density, nav) + **2b** (selection + bulk bar [flag/ZIP/tag/move/delete], FLIP transitions, full-screen preview + inline edit, world-class upload [drag-drop files/folders + click-to-browse + clipboard paste, live per-file XHR progress with thumbnails], trash restore/purge, Top Picks, manual reorder).
 3. ⚪ **Timeline / Moment Map** view (single-event, `shootDate`-plotted).
 4. ⚪ **Share modes** (`/assets/[token]` sponsor, `/gallery/[slug]` member) + white-label branding + link analytics/notifications.
 5. ⚪ **MCP tools** at `/api/mcp` (9 tools).

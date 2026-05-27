@@ -2,9 +2,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import justifiedLayout from 'justified-layout';
 import { useSearchParams } from 'next/navigation';
+import { ImagePlus, Upload } from 'lucide-react';
 import { EmptyState } from '@/components/ui';
 import { invert } from '@/lib/dam/flip';
 import { MediaTile } from './MediaTile';
+import { useUpload } from './UploadDropzone';
 import type { MediaAsset } from './types';
 import { ROW_HEIGHT, type Density } from './useDensity';
 
@@ -25,6 +27,8 @@ export function MediaGrid({
   reloadKey: number;
 }) {
   const sp = useSearchParams();
+  const { open } = useUpload();
+  const isTrash = sp.get('view') === 'trash';
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -100,8 +104,41 @@ export function MediaGrid({
 
   return (
     <div ref={ref} className="relative w-full pb-12">
-      {!loading && assets.length === 0 && (
-        <EmptyState title="No media" subtitle="Upload photos to get started." />
+      {!loading && assets.length === 0 && isTrash && (
+        <EmptyState title="Trash is empty" subtitle="Deleted media appears here for 30 days." />
+      )}
+      {!loading && assets.length === 0 && !isTrash && (
+        <button
+          type="button"
+          onClick={open}
+          className="group mx-auto mt-10 flex w-full max-w-xl flex-col items-center gap-4 rounded-[18px] border-2 border-dashed px-8 py-16 text-center transition-colors hover:border-[color:var(--primary)]"
+          style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
+        >
+          <span
+            className="flex h-16 w-16 items-center justify-center rounded-full"
+            style={{ background: 'color-mix(in srgb, var(--primary) 10%, transparent)' }}
+          >
+            <ImagePlus className="h-7 w-7" style={{ color: 'var(--primary)' }} />
+          </span>
+          <span
+            className="font-[family-name:var(--font-display)] text-[26px] leading-tight"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Drag photos &amp; folders here
+          </span>
+          <span className="font-[family-name:var(--font-dm-sans)] text-[14px]" style={{ color: 'var(--text-muted)' }}>
+            Drop anywhere on this page, paste from your clipboard, or
+          </span>
+          <span
+            className="inline-flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-[14px] font-medium"
+            style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+          >
+            <Upload className="h-4 w-4" /> Browse files
+          </span>
+          <span className="font-[family-name:var(--font-mono)] text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            JPG · PNG · WebP — up to 50MB each
+          </span>
+        </button>
       )}
       {layout && (
         <div className="relative" style={{ height: layout.containerHeight }}>
