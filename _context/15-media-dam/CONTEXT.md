@@ -6,19 +6,19 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — Phase 1 + Phase 2a (grid foundation) shipped; Phase 2b next |
+| **State** | 🟡 In progress — Phase 1 + 2a merged & live in prod (#26, #27); Phase 2b in review (PR #29 — world-class upload + grid interactions + layout overflow fix); Phase 3 (Timeline) next |
 | **V1 item** | Post-V1 (new capability, not in items #1–#28) |
 | **Last updated** | 2026-05-26 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing for Phase 1. AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
-| **Next** | Phase 2b — interaction layer: selection + bulk action bar (incl. bulk tag) + FLIP sort animations + full-screen preview modal + batch upload + soft-delete/trash restore/purge + Top Picks filter + manual drag-reorder. |
+| **Next** | Review/merge Phase 2b (PR #29) — note: merging it also fixes the `/operator/media` horizontal-overflow bug currently live in prod from #27. Then Phase 3 — Timeline / Moment Map: secondary view toggle, horizontal `shootDate` plot, hour scrubber, time-marker dividers, single-event-folder only, EXIF-missing fallback to upload order. |
 
 ## Scope
 
 The operator-facing Digital Asset Manager and its external share surfaces. Delivered in 6 phased PRs (build order = dependency order):
 
 1. ✅ **Foundation** — Prisma schema, R2 private storage, image processing (800px thumbnail / BlurHash / EXIF `shootDate`), async AI tagging + Sharp heuristic scoring, upload API.
-2. 🟡 **Operator grid** at `/operator/media` — **2a ✅ shipped** (justified grid, BlurHash placeholders, signed-URL thumbnails, sort/filter/FTS, folder tree, density toggle, nav); **2b ⚪** (selection, bulk bar, FLIP, preview modal, batch upload, trash actions, Top Picks).
+2. ✅ **Operator grid** at `/operator/media` — **2a** (justified grid, BlurHash, signed-URL thumbs, sort/filter/FTS, folder tree, density, nav) + **2b** (selection + bulk bar [flag/ZIP/tag/move/delete], FLIP transitions, full-screen preview + inline edit, world-class upload [drag-drop files/folders + click-to-browse + clipboard paste, live per-file XHR progress with thumbnails], trash restore/purge, Top Picks, manual reorder).
 3. ⚪ **Timeline / Moment Map** view (single-event, `shootDate`-plotted).
 4. ⚪ **Share modes** (`/assets/[token]` sponsor, `/gallery/[slug]` member) + white-label branding + link analytics/notifications.
 5. ⚪ **MCP tools** at `/api/mcp` (9 tools).
@@ -45,6 +45,13 @@ app/operator/media/_components/          ← MediaWorkspace, MediaGrid, MediaTil
 app/operator/operator-nav.tsx            ← Media nav item (2a)
 app/globals.css                          ← --dam-folder-tree evergreen token (2a)
 types/justified-layout.d.ts              ← ambient types for the grid layout engine (2a)
+lib/dam/bulk.ts                          ← bulk-action request validator (2b)
+lib/dam/flip.ts                          ← FLIP invert helper (2b)
+app/api/media/dam/assets/bulk/route.ts   ← POST bulk: flag/tag/move/trash/restore/purge/reorder, STAFF (2b)
+app/api/media/dam/asset/[id]/route.ts    ← PATCH inline metadata edit, STAFF (2b)
+app/api/media/dam/asset/[id]/full/route.ts ← GET full-res 302 → signed URL (2b)
+app/api/media/dam/download-zip/route.ts  ← POST stream ZIP of originals via archiver, STAFF (2b)
+app/operator/media/_components/          ← +BulkActionBar, MediaPreview, UploadDropzone, types (2b); MediaTile/MediaGrid/MediaToolbar/MediaWorkspace extended
 ```
 
 ## Inputs

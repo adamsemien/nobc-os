@@ -32,6 +32,12 @@ describe('parseAssetQuery', () => {
   it('ignores an invalid fileType', () => {
     expect(parseAssetQuery(new URLSearchParams('fileType=GIF')).fileType).toBeUndefined();
   });
+
+  it('parses minQuality (Top Picks), ignoring non-numbers', () => {
+    expect(parseAssetQuery(new URLSearchParams('minQuality=75')).minQuality).toBe(75);
+    expect(parseAssetQuery(new URLSearchParams('minQuality=abc')).minQuality).toBeUndefined();
+    expect(parseAssetQuery(new URLSearchParams('')).minQuality).toBeUndefined();
+  });
 });
 
 describe('ASSET_SORTS', () => {
