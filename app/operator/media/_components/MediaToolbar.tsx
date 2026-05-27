@@ -28,7 +28,7 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
   const sp = useSearchParams();
   const { open, isUploading } = useUpload();
   const [q, setQ] = useState(sp.get('q') ?? '');
-  const [, setDensity] = useDensity();
+  const [density, setDensity] = useDensity();
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -62,14 +62,14 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search media…"
-          className="w-full rounded-[8px] border py-1.5 pl-8 pr-3 text-[13px]"
+          className="w-full rounded-[8px] border py-1.5 pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
           style={ctlStyle}
         />
       </div>
       <select
         value={sp.get('sort') ?? 'date'}
         onChange={(e) => setSort(e.target.value)}
-        className="rounded-[8px] border px-2 py-1.5 text-[13px]"
+        className="rounded-[8px] border px-2 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
         style={ctlStyle}
       >
         {SORTS.map((s) => (
@@ -91,23 +91,35 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
         style={{
           borderColor: 'var(--border)',
           background: sp.get('minQuality') ? 'var(--primary)' : 'var(--card)',
-          color: sp.get('minQuality') ? '#fff' : undefined,
+          color: sp.get('minQuality') ? 'var(--primary-foreground)' : undefined,
         }}
       >
         <Sparkles className="h-4 w-4" /> Top Picks
       </button>
       <div className="flex gap-1">
-        {DENSITY_ICON.map(([d, Icon]) => (
-          <button
-            key={d}
-            onClick={() => pickDensity(d)}
-            aria-label={`${d} thumbnails`}
-            className="rounded-[6px] border p-1.5"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <Icon className="h-4 w-4" />
-          </button>
-        ))}
+        {DENSITY_ICON.map(([d, Icon]) => {
+          const active = d === density;
+          return (
+            <button
+              key={d}
+              onClick={() => pickDensity(d)}
+              aria-label={`${d} thumbnails`}
+              aria-pressed={active}
+              className="rounded-[6px] border p-1.5 transition-colors"
+              style={
+                active
+                  ? {
+                      borderColor: 'var(--primary)',
+                      background: 'color-mix(in srgb, var(--primary) 12%, var(--card))',
+                      color: 'var(--primary)',
+                    }
+                  : { borderColor: 'var(--border)' }
+              }
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          );
+        })}
       </div>
       <button
         type="button"

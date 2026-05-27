@@ -26,9 +26,13 @@ export default async function MediaPage() {
     .filter((s): s is string => Boolean(s));
 
   return (
-    <div className="font-[family-name:var(--font-dm-sans)]">
-      <PageHeader title="Media" />
-      <MediaWorkspace options={{ events, sponsors }} />
+    <div className="flex h-screen flex-col font-[family-name:var(--font-dm-sans)]">
+      <div className="shrink-0 px-6 pt-8 lg:px-10">
+        <PageHeader title="Media" />
+      </div>
+      <div className="min-h-0 flex-1">
+        <MediaWorkspace options={{ events, sponsors }} />
+      </div>
     </div>
   );
 }
