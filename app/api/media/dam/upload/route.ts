@@ -12,9 +12,11 @@ import { OperatorRole } from '@prisma/client';
 import { requireRole } from '@/lib/operator-role';
 import { db } from '@/lib/db';
 import { processImage } from '@/lib/dam/image';
+import { isHeic, convertHeicToJpeg } from '@/lib/dam/heic';
 import { damKey, isStorageConfigured, uploadObject } from '@/lib/dam/storage';
 
 export const runtime = 'nodejs'; // Sharp requires the Node runtime, not edge.
+export const maxDuration = 60; // WASM HEIC decode of a ~12MP photo adds ~1-3s
 
 const MAX_BYTES = 50 * 1024 * 1024; // 50MB per photo
 const ALLOWED = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
@@ -43,7 +45,8 @@ export async function POST(req: NextRequest) {
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: 'file field required' }, { status: 400 });
   }
-  if (!ALLOWED.has(file.type)) {
+  const heic = isHeic(file.type, file.name);
+  if (!heic && !ALLOWED.has(file.type)) {
     return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
@@ -57,9 +60,31 @@ export async function POST(req: NextRequest) {
 
   const original = Buffer.from(await file.arrayBuffer());
 
+  // HEIC can't be decoded by sharp on Vercel — convert to JPEG first, and read
+  // EXIF from the original HEIC (the converted JPEG loses it).
+  let webBuffer: Buffer = original;
+  let effectiveMime = file.type;
+  let ext = extFromMime(file.type);
+  let exifInput: Buffer | undefined;
+  if (heic) {
+    try {
+      webBuffer = await convertHeicToJpeg(original);
+    } catch (err) {
+      console.error('[dam/upload] HEIC convert failed', {
+        workspaceId,
+        filename: file.name,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json({ error: 'Could not convert HEIC image' }, { status: 422 });
+    }
+    effectiveMime = 'image/jpeg';
+    ext = 'jpg';
+    exifInput = original;
+  }
+
   let processed;
   try {
-    processed = await processImage(original);
+    processed = await processImage(webBuffer, { exifInput });
   } catch (err) {
     console.error('[dam/upload] image processing failed', {
       workspaceId,
@@ -69,17 +94,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not process image' }, { status: 422 });
   }
 
-  const ext = extFromMime(file.type);
+  // Stored bytes are the JPEG (for HEIC) or the original; name reflects .jpg too.
+  const baseName = file.name || `upload.${ext}`;
+  const filename = heic ? baseName.replace(/\.(heic|heif)$/i, '.jpg') : baseName;
 
   // Create first to get the id for the R2 key prefix; keys backfilled after PUT.
   const asset = await db.asset.create({
     data: {
       workspaceId,
-      filename: file.name || `upload.${ext}`,
+      filename,
       url: '',
       thumbnailUrl: '',
       fileType: 'PHOTO',
-      size: original.length,
+      size: webBuffer.length,
       width: processed.width ?? undefined,
       height: processed.height ?? undefined,
       blurhash: processed.blurhash ?? undefined,
@@ -97,7 +124,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await Promise.all([
-      uploadObject(originalKey, original, file.type),
+      uploadObject(originalKey, webBuffer, effectiveMime),
       uploadObject(thumbKey, processed.thumbnail, processed.thumbnailContentType),
     ]);
   } catch (err) {
@@ -116,7 +143,7 @@ export async function POST(req: NextRequest) {
     }),
     db.workspace.update({
       where: { id: workspaceId },
-      data: { storageBytes: { increment: BigInt(original.length) } },
+      data: { storageBytes: { increment: BigInt(webBuffer.length) } },
     }),
   ]);
 
