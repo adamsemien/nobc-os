@@ -91,7 +91,7 @@ lib/legacy-answer-labels.ts                     ← dotted-key → human label r
 
 ## Rules — DO NOT VIOLATE
 
-1. **No SMS in V1.** Welcome flow is email-only via Resend. SMS welcome is V1.5 and routes through stage 11 → House Phone.
+1. **No SMS in V1.** Welcome flow is email-only via Resend. SMS welcome is V1.5 and would route through Stage 14 (House Phone) — not Stage 11. The earlier Runtype-based House Phone trigger in Stage 11 was scratched.
 2. **Welcome email never sends without operator approval.** No auto-approval logic, even for high-score applicants.
 3. **Red List check runs at submit AND approval.** Submit-time flags the application; approval-time hard-blocks if matched.
 4. **Duplicate detection runs at submit.** Match on normalized email, normalized phone, and (name + birthday) tuple. On match, set `duplicateOf` and surface to operator.
@@ -100,6 +100,6 @@ lib/legacy-answer-labels.ts                     ← dotted-key → human label r
 ## What this stage does NOT own
 
 - The application form itself → `01-apply/`
-- SMS welcome → `11-producer-integration/` (V1.5)
+- SMS welcome → V1.5, via `14-house-phone/` (House Phone owns SMS end-to-end; the Runtype-based "House Phone trigger" in Stage 11 was scratched)
 - The operator dashboard shell + auth → `07-operator-dashboard/`
 - Member directory views → `07-operator-dashboard/`

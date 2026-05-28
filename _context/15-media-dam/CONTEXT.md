@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — Phases 1/2a/2b/4 merged & live in prod (#26/#27/#29/Phase 4 PR open); HEIC ingest built + locally validated (full chain on a real HEIF), PR #30 merging to prod; Phase 3 (Timeline) spec'd & deferred (awaiting real event photography) |
+| **State** | 🟡 In progress — Phases 1, 2a, 2b, HEIC ingest, dev seed, grid polish, ShareLink schema (`watermark` + `allowedDownloads`), **and Phase 4 (external share surfaces) all merged to main** (PRs #26/#27/#29/#30/#31/#32/#38/#39 — Phase 4 merge commit `49db49c`, 2026-05-28). Phase 3 (Timeline) spec'd & deferred (awaiting real event photography). |
 | **V1 item** | Post-V1 (new capability, not in items #1–#28) |
-| **Last updated** | 2026-05-27 |
+| **Last updated** | 2026-05-28 |
 | **Owner** | Adam |
-| **Blocked on** | Nothing for Phase 1/4. AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
-| **Next** | Confirm #30 production deploy READY, then Adam validates a real iPhone .HEIC on prod (old photo → EXIF shootDate ≠ upload time); Vercel-revert the deployment if it fails. Then Phase 5 (MCP tools at `/api/mcp`) and Phase 6 (`<DamPicker>` modal + event-editor hero integration). |
+| **Blocked on** | AI tagging no-ops until `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_API_TOKEN` are set in Vercel (upload/thumb/BlurHash/EXIF/heuristic scoring all work without them). |
+| **Next** | Pick up Phase 3 (Timeline / Moment Map; spec in `docs/superpowers/specs/2026-05-27-dam-phase-3-timeline-design.md`) or jump to Phase 5 (MCP tools at `/api/mcp`) or Phase 6 (`<DamPicker>` modal + event-editor hero integration). |
 
 > **Media-page polish + design pass (2026-05-27, PR #31):** title top-padding, filter-rail date-input overflow, Trash/help-FAB clearance, view-density active state, "New folder" button, visible preview close (×) + backdrop-click-to-close. Plus a design pass: filter/folder label legibility (12px / `--text-secondary` instead of 11px / `--text-muted`), brand-red (`--primary`) on interactive states that lacked it (filter checkbox + date `accent-color`, search/sort focus ring, Top Picks token), and a translucent-red selection wash + checkmark on grid thumbnails (mirrors the operator-sidebar active treatment). Folder-tree active stays evergreen (`--dam-folder-tree`) by design. Operator-grid UX only — no HEIC/Phase-4 changes.
 
@@ -21,10 +21,13 @@
 
 The operator-facing Digital Asset Manager and its external share surfaces. Delivered in 6 phased PRs (build order = dependency order):
 
-1. ✅ **Foundation** — Prisma schema, R2 private storage, image processing (800px thumbnail / BlurHash / EXIF `shootDate`), async AI tagging + Sharp heuristic scoring, upload API.
-2. ✅ **Operator grid** at `/operator/media` — **2a** (justified grid, BlurHash, signed-URL thumbs, sort/filter/FTS, folder tree, density, nav) + **2b** (selection + bulk bar [flag/ZIP/tag/move/delete], FLIP transitions, full-screen preview + inline edit, world-class upload [drag-drop files/folders + click-to-browse + clipboard paste, live per-file XHR progress with thumbnails], trash restore/purge, Top Picks, manual reorder).
-3. 🟡 **Timeline / Moment Map** view (single-event, `shootDate`-plotted) — **spec'd & deferred** (`docs/superpowers/specs/2026-05-27-dam-phase-3-timeline-design.md`); build awaits real event photography. (HEIC ingest prerequisite lands first — `docs/superpowers/specs/2026-05-27-dam-heic-ingest-design.md`.)
-4. ✅ **Share modes** (`/assets/[token]` sponsor, `/gallery/[slug]` member) + per-share watermark + download cap + ShareLink creation/management UI. White-label branding override is plumbed (reads `ShareLink.brandingOverride`) but the operator settings panel is deferred to Stage 07. Link analytics surface via the shares list (`accessCount` + `downloadsUsed` per row); first-access email notification is a tracked follow-up.
+1. ✅ **Foundation** (PR #26, merged) — Prisma schema, R2 private storage, image processing (800px thumbnail / BlurHash / EXIF `shootDate`), async AI tagging + Sharp heuristic scoring, upload API.
+2. ✅ **Operator grid** at `/operator/media` (PRs #27/#29/#31, all merged) — **2a** (justified grid, BlurHash, signed-URL thumbs, sort/filter/FTS, folder tree, density, nav) + **2b** (selection + bulk bar [flag/ZIP/tag/move/delete], FLIP transitions, full-screen preview + inline edit, world-class upload [drag-drop files/folders + click-to-browse + clipboard paste, live per-file XHR progress with thumbnails], trash restore/purge, Top Picks, manual reorder) + polish/design pass.
+2c. ✅ **HEIC ingest** (PR #30, merged) — accept iPhone HEIC uploads, convert to q90 JPEG via libheif wasm, preserve EXIF `shootDate`. Phase-4 prerequisite.
+2d. ✅ **Dev seed + Clear Demo Media** (PRs #32/#37, merged) — `scripts/seed-dam.ts` (Pexels: 14 photos + 3 videos) + `POST /api/dev/seed-dam` (DevToolbar button) + `DELETE /api/dev/seed-dam` (DevToolbar "Clear Demo Media").
+2e. ✅ **ShareLink schema fields** (PR #38, merged) — `watermark Boolean @default(false)` + `allowedDownloads Int?` added to `ShareLink`. Phase-4 prerequisite.
+3. ⚪ **Timeline / Moment Map** view (single-event, `shootDate`-plotted) — **spec'd & deferred** (`docs/superpowers/specs/2026-05-27-dam-phase-3-timeline-design.md`); build awaits real event photography.
+4. ✅ **External share surfaces** (PR #39, merged 2026-05-28, merge commit `49db49c`) — sponsor delivery (`/assets/[token]`, optional password) + member gallery (`/gallery/[slug]`, password required), `CreateShareModal` (type / password / watermark / allowedDownloads), `/operator/media/shares` (list, copy URL, delete, filter by type), public APIs (`GET /api/share/token/[token]`, `POST .../auth`, `GET .../download/[assetId]`), HttpOnly `share_auth` cookie (1h, path-scoped), `AssetDownload` row per download, signed 24h R2 GET URL with `Content-Disposition: attachment`.
 5. ⚪ **MCP tools** at `/api/mcp` (9 tools).
 6. ⚪ **`<DamPicker>`** modal + event-editor hero integration.
 
@@ -58,22 +61,18 @@ app/api/media/dam/asset/[id]/route.ts    ← PATCH inline metadata edit, STAFF (
 app/api/media/dam/asset/[id]/full/route.ts ← GET full-res 302 → signed URL (2b)
 app/api/media/dam/download-zip/route.ts  ← POST stream ZIP of originals via archiver, STAFF (2b)
 app/operator/media/_components/          ← +BulkActionBar, MediaPreview, UploadDropzone, types (2b); MediaTile/MediaGrid/MediaToolbar/MediaWorkspace extended
-lib/share/password.ts                    ← Node scrypt hash + constant-time verify (no bcrypt) (Phase 4)
-lib/share/token.ts                       ← mintShareToken (32-byte base64url) + shareUrlPath/Absolute URL (Phase 4)
-lib/share/auth-cookie.ts                 ← HttpOnly share_auth cookie: HMAC keyed by per-share password hash, 1-hour TTL (Phase 4)
-lib/share/resolve.ts                     ← public resolveShareLink (expiry/folder-deleted/cookie checks) + bumpShareAccess (Phase 4)
-lib/share/assets.ts                      ← share-scoped Asset list + 15-min signed thumb URLs (Phase 4)
-app/api/share/links/route.ts             ← POST create + GET list, STAFF (Phase 4)
-app/api/share/links/[id]/route.ts        ← DELETE share link, STAFF (Phase 4)
-app/api/share/token/[token]/route.ts     ← public token resolver — assets + meta (or `requiresPassword`) (Phase 4)
-app/api/share/token/[token]/auth/route.ts ← public password POST — sets HttpOnly share_auth cookie (Phase 4)
-app/api/share/token/[token]/download/[assetId]/route.ts ← public — log AssetDownload, enforce allowedDownloads, 302→signed R2 with Content-Disposition (Phase 4)
-app/assets/[token]/page.tsx              ← public sponsor delivery page, editorial aesthetic (Phase 4)
-app/gallery/[slug]/page.tsx              ← public member gallery page, password-gated (Phase 4)
-app/_components/share/                   ← ShareHeader, ShareGallery, Watermark, SharePasswordForm, ShareErrorState, ShareFooter (Phase 4)
-app/operator/media/_components/CreateShareModal.tsx ← Share modal opened from BulkActionBar (Phase 4)
-app/operator/media/shares/page.tsx       ← STAFF-gated shares list (Phase 4)
-app/operator/media/shares/_components/SharesList.tsx ← row management: copy URL + delete + filter pills (Phase 4)
+scripts/seed-dam.ts                      ← Pexels demo: 14 photos + 3 videos (Phase 2d)
+app/api/dev/seed-dam/route.ts            ← POST seed / DELETE clear demo media — DevToolbar wiring (Phase 2d; PRs #32 + #37)
+
+# Phase 4 (PR #39, merged 2026-05-28 — merge commit 49db49c)
+app/assets/[token]/page.tsx              ← public sponsor delivery surface (no Clerk; token + optional password)
+app/gallery/[slug]/page.tsx              ← public member gallery (no Clerk; password required)
+app/operator/media/shares/page.tsx       ← operator share-link manager (list / copy / delete / filter by type)
+app/operator/media/_components/CreateShareModal.tsx  ← bulk-action Share modal (type/password/watermark/allowedDownloads)
+app/api/share/links/route.ts             ← POST create ShareLink — wraps selection in a fresh SPONSOR/SELECTS MediaFolder
+app/api/share/token/[token]/route.ts     ← GET resolve token → assets + meta (public)
+app/api/share/token/[token]/auth/route.ts ← POST password → HttpOnly share_auth cookie (1h, path-scoped)
+app/api/share/token/[token]/download/[assetId]/route.ts ← GET log + 302 → 24h signed R2 URL with Content-Disposition: attachment
 ```
 
 ## Inputs
@@ -117,14 +116,10 @@ app/operator/media/shares/_components/SharesList.tsx ← row management: copy UR
 
 - `POST /api/media/dam/upload` — STAFF-gated upload. ✅ Phase 1.
 - `POST /api/media/dam/tag/[assetId]` — internal async tag + score. ✅ Phase 1.
+- `GET /api/media/dam/assets` / `folders` / `asset/[id]/{thumb,full}` / `assets/bulk` / `asset/[id]` / `download-zip` — operator grid surface. ✅ Phase 2a/2b.
 - `/operator/media` — operator grid. ✅ Phase 2.
-- `POST/GET /api/share/links` — STAFF create + list share links. ✅ Phase 4.
-- `DELETE /api/share/links/[id]` — STAFF delete share link. ✅ Phase 4.
-- `GET /api/share/token/[token]` — public token resolver (assets + meta, or `requiresPassword`). ✅ Phase 4.
-- `POST /api/share/token/[token]/auth` — public password POST (sets HttpOnly cookie). ✅ Phase 4.
-- `GET /api/share/token/[token]/download/[assetId]` — public log + 302 → 24-hr signed R2. ✅ Phase 4.
-- `/assets/[token]` sponsor delivery + `/gallery/[slug]` member gallery — public, editorial aesthetic. ✅ Phase 4.
-- `/operator/media/shares` — STAFF management list. ✅ Phase 4.
+- `POST /api/dev/seed-dam` + `DELETE /api/dev/seed-dam` — demo seed / clear. ✅ Phase 2d (DevToolbar).
+- `/assets/[token]` (sponsor) + `/gallery/[slug]` (member) + `/operator/media/shares` + `/api/share/*` — external share surfaces. ✅ Phase 4 (PR #39, merged 2026-05-28).
 
 ## Edge cases
 

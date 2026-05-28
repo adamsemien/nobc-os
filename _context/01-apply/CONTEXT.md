@@ -132,4 +132,4 @@ Net: three key vocabularies (`personality.*` live → `real.*` legacy → `real_
 - Approval workflow / welcome email → `02-approval/`
 - Red List + duplicate handling on submit → `02-approval/`
 - Operator review UI → `07-operator-dashboard/`
-- Sending the welcome SMS → `11-producer-integration/` (House Phone trigger)
+- Sending the welcome SMS → V1.5. (House Phone is owned by `14-house-phone/` + the external Railway service; the Runtype-based "House Phone trigger" in Stage 11 was scratched.)
