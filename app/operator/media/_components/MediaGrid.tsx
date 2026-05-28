@@ -10,27 +10,27 @@ import { useUpload } from './UploadDropzone';
 import type { MediaAsset } from './types';
 import { ROW_HEIGHT, type Density } from './useDensity';
 
-/** Justified grid with selection, click-to-open, and hand-rolled FLIP transitions. */
+/** Justified grid with selection, click-to-open, and hand-rolled FLIP transitions.
+ *  Data + loading state are owned by the parent (MediaWorkspace) so grid and list
+ *  views share the same fetched assets without re-loading on toggle. */
 export function MediaGrid({
+  assets,
+  loading,
   density,
   selection,
   onToggle,
   onOpen,
-  onAssetsChange,
-  reloadKey,
 }: {
+  assets: MediaAsset[];
+  loading: boolean;
   density: Density;
   selection: Set<string>;
   onToggle: (id: string, additive: boolean) => void;
   onOpen: (index: number) => void;
-  onAssetsChange?: (assets: MediaAsset[]) => void;
-  reloadKey: number;
 }) {
   const sp = useSearchParams();
   const { open } = useUpload();
   const isTrash = sp.get('view') === 'trash';
-  const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [loading, setLoading] = useState(true);
   const [containerWidth, setContainerWidth] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const tileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -43,30 +43,6 @@ export function MediaGrid({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    fetch(`/api/media/dam/assets?${sp.toString()}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!active) return;
-        const a: MediaAsset[] = d.assets ?? [];
-        setAssets(a);
-        onAssetsChange?.(a);
-      })
-      .catch((e) => {
-        console.error('[MediaGrid] fetch failed', e);
-        if (active) setAssets([]);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp, reloadKey]);
 
   const layout = useMemo(() => {
     if (!containerWidth) return null;

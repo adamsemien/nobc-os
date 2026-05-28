@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload } from 'lucide-react';
+import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload, LayoutGrid, List } from 'lucide-react';
 import { useDensity, type Density } from './useDensity';
 import { useUpload } from './UploadDropzone';
+import type { ViewMode } from './useViewMode';
 
 const SORTS: { value: string; label: string }[] = [
   { value: 'date', label: 'Date' },
@@ -21,8 +22,21 @@ const DENSITY_ICON: [Density, typeof Square][] = [
   ['large', Square],
 ];
 
-/** Search (debounced) + sort + density controls, top-right of the grid area. */
-export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void }) {
+const VIEW_MODE_ICON: [ViewMode, typeof Square, string][] = [
+  ['grid', LayoutGrid, 'Grid view'],
+  ['list', List, 'List view'],
+];
+
+/** Search (debounced) + sort + view-mode + density controls, top-right of the grid area. */
+export function MediaToolbar({
+  onDensity,
+  viewMode,
+  onViewMode,
+}: {
+  onDensity: (d: Density) => void;
+  viewMode: ViewMode;
+  onViewMode: (m: ViewMode) => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -53,6 +67,11 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
   };
 
   const ctlStyle = { borderColor: 'var(--border)', background: 'var(--card)' } as const;
+  const activeStyle = {
+    borderColor: 'var(--primary)',
+    background: 'color-mix(in srgb, var(--primary) 12%, var(--card))',
+    color: 'var(--primary)',
+  } as const;
 
   return (
     <div className="flex items-center gap-3 py-3">
@@ -96,31 +115,42 @@ export function MediaToolbar({ onDensity }: { onDensity: (d: Density) => void })
       >
         <Sparkles className="h-4 w-4" /> Top Picks
       </button>
-      <div className="flex gap-1">
-        {DENSITY_ICON.map(([d, Icon]) => {
-          const active = d === density;
+      <div className="hidden gap-1 md:flex">
+        {VIEW_MODE_ICON.map(([m, Icon, label]) => {
+          const active = m === viewMode;
           return (
             <button
-              key={d}
-              onClick={() => pickDensity(d)}
-              aria-label={`${d} thumbnails`}
+              key={m}
+              onClick={() => onViewMode(m)}
+              aria-label={label}
               aria-pressed={active}
               className="rounded-[6px] border p-1.5 transition-colors"
-              style={
-                active
-                  ? {
-                      borderColor: 'var(--primary)',
-                      background: 'color-mix(in srgb, var(--primary) 12%, var(--card))',
-                      color: 'var(--primary)',
-                    }
-                  : { borderColor: 'var(--border)' }
-              }
+              style={active ? activeStyle : { borderColor: 'var(--border)' }}
             >
               <Icon className="h-4 w-4" />
             </button>
           );
         })}
       </div>
+      {viewMode === 'grid' && (
+        <div className="hidden gap-1 md:flex">
+          {DENSITY_ICON.map(([d, Icon]) => {
+            const active = d === density;
+            return (
+              <button
+                key={d}
+                onClick={() => pickDensity(d)}
+                aria-label={`${d} thumbnails`}
+                aria-pressed={active}
+                className="rounded-[6px] border p-1.5 transition-colors"
+                style={active ? activeStyle : { borderColor: 'var(--border)' }}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            );
+          })}
+        </div>
+      )}
       <button
         type="button"
         onClick={open}

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import type { MediaAsset } from './types';
 
-function formatBytes(n: number): string {
+export function formatBytes(n: number): string {
   if (!n) return '—';
   const u = ['B', 'KB', 'MB', 'GB'];
   let i = 0;
