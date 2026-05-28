@@ -29,18 +29,19 @@ Everything from a member clicking "RSVP" on an event to a confirmed RSVP row. Ha
 ## Files in play
 
 ```
-app/m/events/[slug]/rsvp/page.tsx               ← RSVP flow UI
+app/m/events/[slug]/_components/EventAccessFlow.tsx  ← access flow UI (no separate `/rsvp` page — the flow renders inside the event-detail page)
 app/m/events/[slug]/_components/EventAccessFlow.tsx ← member/guest access flow UI (+ operator bypass/preview entry)
 app/api/m/events/[slug]/access/submit/route.ts  ← access submit (free path; guest-flow fix + operator bypass)
 app/api/m/events/[slug]/access/payment-intent/route.ts ← paid access PaymentIntent (guest-flow fix + operator paid bypass)
 lib/event-access-submit.ts                      ← shared access-submit logic; findOrCreateGuestMember mints memberQrCode
 app/api/rsvp/route.ts                           ← create RSVP
 app/api/rsvp/[id]/route.ts                      ← read/cancel
-app/api/rsvp/[id]/approve/route.ts              ← operator approve (if required)
-app/api/rsvp/[id]/reject/route.ts               ← operator reject
-lib/rsvp/capacity.ts                            ← capacity decrement + waitlist promote
-lib/rsvp/waitlist.ts                            ← FIFO promote logic
-app/operator/events/[id]/rsvps/page.tsx         ← operator Access (RSVP) management
+app/api/operator/rsvps/[id]/approve/route.ts    ← operator approve (if required)
+app/api/operator/rsvps/[id]/reject/route.ts     ← operator reject
+app/api/operator/rsvps/[id]/cancel/route.ts     ← operator cancel
+app/api/operator/rsvps/[id]/refund/route.ts     ← operator refund (ADMIN-gated)
+app/api/operator/events/[id]/rsvps/route.ts     ← operator RSVP list for an event (renders inside `/operator/events/[id]`, no standalone `/rsvps` page)
+# capacity check + waitlist enqueue/promote happens inline in lib/event-access-submit.ts above; no separate lib/rsvp/ modules
 app/api/m/profile/route.ts                      ← member profile read/update (used during Access flow)
 app/api/m/rsvps/route.ts                        ← member-facing list of their own Access entries
 ```

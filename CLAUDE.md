@@ -2,7 +2,7 @@
 
 ## What This Is
 
-NoBC OS is the member-facing platform for No Bad Company — a premium curated member club and event operator. Part of a three-layer stack alongside Producer (operator-facing, on Replit) and a Runtype + Tenur AI layer.
+NoBC OS is the member-facing platform for No Bad Company — a premium curated member club and event operator. Part of a stack alongside Producer (operator-facing, on Replit). AI runs in-process via the Anthropic API + Vercel AI SDK; there is no external agent runtime (Runtype was evaluated and scratched).
 
 **Tenant Zero is NoBC.** Built multi-tenant from day one to sell as SaaS to other premium member clubs (Soho House-tier target).
 
@@ -28,8 +28,7 @@ Methodology: see the `nobc-icm` skill.
 - **Auth:** Clerk with Organizations (org = workspace = tenant)
 - **Email:** Resend (transactional only)
 - **Payments:** Stripe (authorize/capture)
-- **AI:** `claude-sonnet-4-20250514` via Vercel AI SDK (the locked model — see Locked Decisions)
-- **Agent runtime:** Runtype (V1.5)
+- **AI:** `claude-sonnet-4-20250514` via Vercel AI SDK + the Anthropic API directly (the locked model — see Locked Decisions). The operator chat panel runs in-process through `lib/agent/`; the MCP server at `/api/mcp` is an unconsumed surface awaiting a future agent client. **There is no external agent runtime.** Runtype was evaluated and scratched.
 - **Deploy:** Vercel
 - **Testing:** Vitest (unit) + Playwright (E2E). Unit harness added 2026-05-22 (`npm run test:unit`).
 
@@ -37,9 +36,9 @@ Methodology: see the `nobc-icm` skill.
 
 ## Current Build State
 
-**As of 2026-05-25 — V1 is functionally complete.**
+**As of 2026-05-28 — V1 is functionally complete.**
 17/20 V1 items are DONE in code. 2 are PARTIAL (credentials only, not code). 0 are NOT STARTED.
-A May-2026 session added the House Phone SMS inbox, the member-QR rollout, the editorial event-page redesign, operator roles, and the House Phone Intelligence tab — see "What shipped beyond V1 scope" below.
+A May-2026 session added the House Phone SMS inbox (Runtype evaluated and **scratched** — final architecture is a standalone Node.js service on Railway), the member-QR rollout, the editorial event-page redesign, operator roles, the House Phone Intelligence tab, and the Digital Asset Manager through Phase 4 — see "What shipped beyond V1 scope" below.
 
 ### V1 scope status (items 1–20)
 
@@ -84,15 +83,29 @@ A May-2026 session added the House Phone SMS inbox, the member-QR rollout, the e
 - Cmd+K palette, event room/vibe, model switcher
 - Internal QA/persona/seed dev tooling
 
-**May-2026 session (PRs #4 / #5 / #6 open at time of writing — documented here ahead of merge; #1–#3 already merged to main):**
-- **House Phone** — shared multi-operator SMS inbox. Outbound replies + inbox UI in nobc-os (`/api/sms/*`, `/operator/house-phone`); inbound on a separate Railway service (`nobc-house-phone`). Stage 14.
+**May-2026 session — all PRs #1–#38 merged to main; PR #39 (DAM Phase 4) open at time of writing.**
+- **House Phone** — shared multi-operator SMS inbox. **Architecture: outbound replies + inbox UI in nobc-os (`/api/sms/*`, `/operator/house-phone`); inbound on a separate standalone Node.js service on Railway (`nobc-house-phone`).** Runtype was evaluated for the inbound path and **scratched** — too much latency for synchronous SMS reply, too much indirection for raw Twilio signature validation + per-phone rate limiting. Stage 14.
 - **Member QR rollout** — `lib/member-qr.ts` `generateMemberQrCode()` is now the single mint path for every production Member-creation route, so non-member ticket buyers get a scannable QR (fixes the paid-purchase email + door scan). Stages 02/05/06.
 - **Operator RSVP bypass + guest-flow fix** — signed-in non-members can complete the guest flow; operators can bypass the access flow (free + paid) and preview it. Stage 04.
-- **Event-page editorial redesign** — all three member event-detail templates (Split, Editorial, Minimal), cream paper tokens, warm access copy, hero **upload** in event settings. Stage 03. (PR #3, merged to main.)
+- **Event-page editorial redesign** — all three member event-detail templates (Split, Editorial, Minimal), cream paper tokens, warm access copy, hero **upload** in event settings. Stage 03. (PR #3.)
+- **Add Member (manual member creation)** — `POST /api/operator/members/create` + Add Member slide-over. Stage 07. (PR #4, merged.)
 - **Operator roles** — `OperatorRole` (ADMIN/STAFF/READ_ONLY) + `WorkspaceMember` + `lib/operator-role.ts`, Team settings UI. Stage 07. (PR #5.)
 - **House Phone Intelligence tab** — `GET /api/sms/analytics` + `GET /api/sms/categorize` + `SmsMessage.category`, surfaced in the Intelligence dashboard. Stages 12/14. (PR #6.)
 - **Vitest unit harness** + `toScoreDisplay` tests. Stage 13.
-- **Add Member (manual member creation)** — `POST /api/operator/members/create` + Add Member slide-over. **In progress — PR #4 open, NOT yet merged.** Stage 07.
+- **Sponsor Intelligence dashboard** + Clerk-org-aware role floor + RBAC route-protection audit + funnel/sponsor-nav fixes. Stages 07/12. (PRs #7–#22.)
+- **Split-template member event-page polish** — 50/50 hero, hero-upload discoverability, post-merge review. Stage 03. (PRs #23–#25.)
+- **Digital Asset Manager (DAM)** — operator media library at `/operator/media`. Stage 15.
+  - **Phase 1 — Foundation** (PR #26, merged): R2 private storage, Sharp image processing, BlurHash, EXIF `shootDate`, async Cloudflare Workers AI tagging + heuristic scoring, upload API.
+  - **Phase 2a — Operator grid** (PR #27, merged): justified-layout grid, FTS, folder tree, sort/filter, density toggle, signed thumbnails.
+  - **Phase 2b — Grid interactions** (PR #29, merged): bulk action bar, full-screen preview + inline edit, drag-drop batch upload, FLIP transitions, trash restore/purge, Top Picks.
+  - **HEIC ingest** (PR #30, merged): accept iPhone HEIC, convert to JPEG via libheif wasm, preserve EXIF.
+  - **Polish + design pass** (PR #31, merged): label legibility, brand-red interactive states, selection wash.
+  - **Demo media seed** (PRs #32 + #37, merged): `scripts/seed-dam.ts` + DevToolbar Seed / Clear Demo Media buttons.
+  - **ShareLink schema** (PR #38, merged): `watermark Boolean @default(false)` + `allowedDownloads Int?`.
+  - **Phase 4 — External share surfaces** (PR #39, **open / not yet merged**): public `/assets/[token]` (sponsor) + `/gallery/[slug]` (member), `CreateShareModal`, `/operator/media/shares`, password-gated HttpOnly cookie, watermark + download-cap enforcement. Shipped 2026-05-28.
+- **DevToolbar surface polish** — Settings → Developer entry (PR #33), Shortcuts cheat-sheet (PR #36), help-text drift fix (PR #35). Stage 13.
+- **Full-width operator data pages** (PR #34, merged) — all 8 operator data pages (Events, Applications, Members, Activity + their detail/New pages) dropped `mx-auto max-w-[…]` caps and adopted the dashboard's wide gutters. **Settings/forms pages intentionally keep their narrow caps — by design, not bugs.** Stage 07.
+- **Applications review-panel widen on wide viewports** (PR #28, merged). Stage 02.
 
 ---
 
@@ -121,7 +134,7 @@ Product language is locked. Do NOT improvise. Do NOT use synonyms.
   - Apply-required events: "Apply to Attend"
   - Ticketed events: "Get Ticket — $X"
   - Confirmation state: "Reserve My Spot" → "You're on the list"
-- **Never expose raw enum values in UI** — `apply_or_pay`, `OPEN`, `MemberStatus.GUEST` must always be mapped to display strings
+- **Never expose raw enum values in UI** — `TICKETED`, `OPEN`, `MemberStatus.GUEST`, `RSVPStatus.WAITLISTED` must always be mapped to display strings. (Historical note: `apply_or_pay` was a third `EventAccessMode` value, removed in commit `b23ab8a` 2026-05-20 — it is now `TICKETED` + `approvalRequired: true`.)
 - "Non-member ticket buyer" displays as **Guest** (where MemberStatus=GUEST)
 - "Custom questions" displays as **"Registration fields"** in operator UI
 
@@ -160,8 +173,19 @@ Producer (Replit) ←Phase J HMAC webhook→ NoBC OS (Vercel)
        └──── Both connect to ────────→ Postgres (Neon)
                   same instance
 
-NoBC OS → Runtype Master Agent → House Phone → Twilio
-                                  (sub-agent)
+           Twilio (SMS)
+              │
+              ▼
+    nobc-house-phone (Railway, standalone Node.js)
+              │  inbound webhook → AI auto-reply → write rows
+              ▼
+       Postgres (same Neon instance)
+              ▲
+              │  poll + outbound reply via Twilio REST
+              │
+         NoBC OS (Vercel) — /operator/house-phone, /api/sms/*
+
+    [Runtype is NOT in the House Phone path — see "House Phone — Runtype scratched" below.]
 ```
 
 **Critical:** Producer and NoBC OS share the SAME Postgres instance. This is why schema changes are production-affecting and must NEVER auto-push — they could break Producer.
@@ -172,7 +196,12 @@ Phase J details:
 - Fire-and-forget pattern, one retry, queue on failure
 - Env vars: `PRODUCER_WEBHOOK_URL`, `PRODUCER_WEBHOOK_SECRET`
 
-**House Phone (the shared SMS inbox) is shipped in two halves on the same Postgres:** **inbound** SMS runs on a separate Railway service (`nobc-house-phone`, its own repo — Twilio webhook receipt, signature validation, contact lookup, AI auto-reply) that writes `SmsConversation`/`SmsMessage`; **outbound** replies + the operator inbox UI live in nobc-os (`/api/sms/*`, `/operator/house-phone`). This is a different thing from the Runtype "House Phone" sub-agent in the diagram above (same name). See `_context/14-house-phone`.
+**House Phone — Runtype scratched.** Earlier drafts of this file routed House Phone SMS through a Runtype master agent / Communications sub-agent. That was evaluated and **dropped** — the inbound path needs synchronous Twilio webhook receipt + signature validation + per-phone rate limiting + a tight AI-reply turnaround, and routing through a master agent added latency and opacity for no offsetting benefit. Final architecture, in two halves on the same Postgres:
+
+- **Inbound** SMS runs on a separate **standalone Node.js service on Railway** (`nobc-house-phone`, its own repo — Twilio webhook receipt, signature validation, contact lookup, AI auto-reply via Haiku) that writes `SmsConversation`/`SmsMessage`.
+- **Outbound** replies + the operator inbox UI live in nobc-os (`/api/sms/*`, `/operator/house-phone`), sending via the Twilio REST API directly under the explicit Twilio override.
+
+No Runtype in either half. See `_context/14-house-phone`. Runtype is still on the V1.5 roadmap for the operator AI chat panel (Stage 09) and the AI Event Builder (Stage 10) — those are unrelated to House Phone and not scratched.
 
 ---
 
@@ -187,8 +216,17 @@ Every read and every write is workspace-scoped. `workspaceId` is on every user-d
 ### No hex literals in components
 All colors are CSS variables. Semantic tokens only: `bg-primary`, `text-text-primary`. The theme system supports white-labeling for multi-tenant SaaS.
 
-### Schema changes: generate then push manually
-Run `prisma generate` first. Show the diff. Never auto-push. Producer is on the same Postgres instance — schema changes are production-affecting.
+### Schema changes: never `prisma db push`
+`prisma db push` is forbidden on this repo, full stop. It will attempt to drop **`Asset_searchVector_idx`** — the GIN index that powers DAM full-text search. That index lives only in the production database, created out-of-band by `prisma/sql/dam-search-vector.sql`; it is NOT in `schema.prisma` because Prisma cannot represent a GIN index on its `Unsupported("tsvector")` type. A `db push` run treats the index as drift and removes it, breaking `/operator/media` search until someone re-runs the SQL by hand. Producer also shares this Postgres instance — a `db push` is doubly destructive.
+
+The required workflow for any additive schema change:
+
+1. Edit `prisma/schema.prisma`.
+2. Run `prisma generate` to update the client.
+3. Run `prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script` (or equivalent) and review the SQL — refuse any DROP, ALTER TYPE, or RENAME.
+4. Apply the additive SQL with `prisma db execute --file <migration.sql>` against the Neon DB. Never `db push`, never auto-push, never use `--accept-data-loss`.
+
+For non-additive changes (drops, renames, type changes), stop and ask Adam — coordination with Producer is required before any destructive migration.
 
 ### Debugging & observability
 Error boundaries must **log** the errors they catch — never silently swallow them (fixed 2026-05-22, `baf3031`: the app error boundary now logs caught errors instead of discarding them, so production failures surface in logs). Any new catch block or boundary you add must log with enough context to trace the failure.
@@ -241,11 +279,11 @@ Define success criteria before coding, then loop until verified. Here, "verified
 | 08 | `_context/08-mcp-server/` | 🔶 Partial | #17 |
 | 09 | `_context/09-ai-chat/` | ✅ Shipped | #18 |
 | 10 | `_context/10-ai-event-builder/` | 🔶 Partial | #19 |
-| 11 | `_context/11-producer-integration/` | ✅ Shipped | #20, #26, House Phone trigger (V1.5) |
+| 11 | `_context/11-producer-integration/` | ✅ Shipped (Phase J + Svix) — **House Phone is not in this stage anymore (Runtype scratched)** | #20, #26 |
 | 12 | `_context/12-intelligence/` | ✅ Shipped (base + House Phone tab) / 🔶 sponsor-facing partial | #27 |
-| 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) | — |
-| 14 | `_context/14-house-phone/` | 🟡 In progress (inbox UI + analytics shipped; awaiting `TWILIO_*` + Railway deploy) | House Phone SMS inbox + Intelligence tab (post-V1) |
-| 15 | `_context/15-media-dam/` | 🟡 In progress (Phase 1 foundation shipped; grid/share/MCP/picker pending) | Digital Asset Manager (post-V1) |
+| 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) — DevToolbar now also openable from Settings → Developer (PR #33) | — |
+| 14 | `_context/14-house-phone/` | 🟡 In progress (inbox UI + analytics shipped; awaiting `TWILIO_*` + Railway deploy; Railway service = standalone Node.js, NOT Runtype) | House Phone SMS inbox + Intelligence tab (post-V1) |
+| 15 | `_context/15-media-dam/` | 🟡 In progress (Phases 1, 2a, 2b, HEIC, seed, ShareLink schema all merged; Phase 4 PR #39 open / not merged; Phase 3 deferred; Phases 5–6 not started) | Digital Asset Manager (post-V1) |
 
 > **#18 (Stage 09 — AI chat panel):** direct Vercel AI SDK + MCP tool registry (`lib/mcp/`). Runtype orchestration deferred to V1.5.
 

@@ -8,9 +8,9 @@
 |---|---|
 | **State** | 🟡 In progress |
 | **V1 item** | Post-V1 / V1.5 comms (not in items #1–20) |
-| **Last updated** | 2026-05-26 |
+| **Last updated** | 2026-05-28 |
 | **Owner** | Adam |
-| **Blocked on** | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` + `HOUSE_PHONE_WORKSPACE_ID` not yet set in Vercel; the **Railway** inbound-SMS service (external, `nobc-house-phone`) is built and security-hardened (see "Railway inbound service" below) but must be deployed and pointed at the Twilio number. (Analytics tab: nothing — code-complete.) |
+| **Blocked on** | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` + `HOUSE_PHONE_WORKSPACE_ID` not yet set in Vercel; the **Railway** inbound-SMS service (external, `nobc-house-phone` — standalone Node.js, **not** Runtype) is built and security-hardened (see "Railway inbound service" below) but must be deployed and pointed at the Twilio number. (Analytics tab: nothing — code-complete.) |
 | **Next** | _Inbox access bug fixed 2026-05-26 — the three `/api/sms` routes now authorize by Clerk org membership (Rule 5), so a Clerk org admin with no `WorkspaceMember` row sees the inbox; confirmed working in prod._ The House Phone Intelligence tab is code-complete (`/operator/intelligence?category=house-phone`; see Files in play). For the inbox itself: set the four env vars in Vercel, deploy/point the Railway inbound webhook at the Twilio number, then verify the inbound → Postgres → polled-UI → reply round trip end to end. |
 
 ## Scope
@@ -23,7 +23,7 @@ The operator-facing side of House Phone, hosted in nobc-os:
 - **The UI** — `/operator/house-phone`, a two-pane inbox open to any workspace member.
 - **Analytics** — the *House Phone* tab in the operator Intelligence dashboard (`/operator/intelligence?category=house-phone`) reads these SMS rows for volume, AI-categorized topics, contact insights, and response stats. Backed by `/api/sms/analytics` and `/api/sms/categorize`; the tab UI lives in the Intelligence stage (`_context/12-intelligence/`).
 
-Responsibility ends at the database boundary. **Inbound** SMS handling (Twilio webhook receipt, signature validation, AI auto-reply generation) lives in a **separate Railway service**, not here — it writes `SmsConversation`/`SmsMessage` rows to the same Postgres, which this stage then reads.
+Responsibility ends at the database boundary. **Inbound** SMS handling (Twilio webhook receipt, signature validation, AI auto-reply generation) lives in a **separate Railway service** — a standalone Node.js service (`nobc-house-phone`), **not** Runtype. Runtype was evaluated for this and **scratched**: too much latency, too much indirection, and the inbound path needs raw control over Twilio signature validation + rate limiting. The Railway service writes `SmsConversation`/`SmsMessage` rows to the same Postgres, which this stage then reads.
 
 ## Files in play
 
@@ -52,7 +52,8 @@ app/operator/intelligence/_components/IntelligenceView.tsx ← House Phone tab r
 - Operator session (Clerk) → `getMemberWorkspaceId(userId)` scopes every read/write.
 - `SmsConversation` / `SmsMessage` rows written by the Railway inbound service.
 - Published events for the conversation→event selector.
-- Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `HOUSE_PHONE_WORKSPACE_ID`.
+- Env (nobc-os): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — used by `lib/twilio.ts` for outbound replies.
+- Env (Railway service only — **not referenced in nobc-os code**): `HOUSE_PHONE_WORKSPACE_ID` — reserved so the external Railway inbound service can scope conversations without a Clerk session. Documented here for the Vercel-deploy checklist; no `process.env.HOUSE_PHONE_WORKSPACE_ID` lives in this tree.
 
 ## Outputs
 
@@ -70,14 +71,13 @@ app/operator/intelligence/_components/IntelligenceView.tsx ← House Phone tab r
 
 ## What this stage does NOT own
 
-- **Inbound SMS, signature validation, AI auto-reply** → the external Railway service.
-- **General SMS-via-Runtype for non-House-Phone features** → still banned in nobc-os (root `CLAUDE.md`, "No Twilio — except the House Phone inbox").
+- **Inbound SMS, signature validation, AI auto-reply** → the external Railway service (standalone Node.js, `nobc-house-phone`).
 - **Events / publishing** → `_context/03-events/` (this stage only reads published events for the selector).
-- **The Runtype "House Phone" Communications sub-agent** → a separate, identically-named thing in the Architecture diagram; unrelated to this web inbox.
+- **Runtype orchestration of SMS** — **scratched.** Earlier drafts of the architecture routed House Phone through a Runtype master agent / Communications sub-agent; that was evaluated and dropped in favor of the standalone Railway service. The "House Phone" sub-agent inside Runtype is no longer the implementation; treat any remaining mentions of it as stale.
 
 ## Railway inbound service (external — `nobc-house-phone`, separate repo)
 
-Not owned here (its code lives in its own repo, not this tree), but documented for the full picture. It receives Twilio inbound webhooks and writes `SmsConversation`/`SmsMessage` rows this stage reads. Security hardening applied (2026-05-22 → 24):
+Not owned here (its code lives in its own repo, not this tree), but documented for the full picture. **Final architecture: standalone Node.js service on Railway.** Runtype was evaluated for this role and **scratched** — the inbound path needs raw Twilio webhook + signature validation + per-phone rate limiting + a synchronous AI-reply turnaround tight enough to feel like a real conversation, and routing through a master agent added latency and opacity for no offsetting benefit. The service receives Twilio inbound webhooks and writes `SmsConversation`/`SmsMessage` rows this stage reads. Security hardening applied (2026-05-22 → 24):
 
 - **Twilio signature validation** is enforced on `POST /inbound` (invalid signature → 403); the temporary debug probe was removed.
 - **Per-phone rate limiting** — in-memory, 10 inbound msgs/phone/hour → 429 before any DB write, AI call, or reply.

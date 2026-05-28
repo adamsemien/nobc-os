@@ -104,7 +104,7 @@ Auto-applied binary tags: `Founder`, `ContentCreator`, `HospitalityOperator`, `I
 3. **Never hardcode archetype text in components.** All copy lives in `config/archetypes.ts`. Edit there, never inline.
 4. **Save/resume is required.** Draft saves to DB on every step advance. Never break this.
 5. **No auth on `/apply`.** It's a public route.
-6. **Photos go to Vercel Blob via `BLOB_READ_WRITE_TOKEN`.** Do not switch storage providers without migration plan.
+6. **Photos go to Vercel Blob.** `app/api/apply/membership/upload/route.ts` calls `@vercel/blob`'s `put()`, which reads `BLOB_READ_WRITE_TOKEN` from the environment automatically — there is no `process.env.BLOB_READ_WRITE_TOKEN` reference in code. Set the token in Vercel; do not switch storage providers without a migration plan. (The DAM in Stage 15 is a separate, R2-only pipeline; this rule only governs `/apply` photo uploads.)
 
 ## Easter egg: South Congress Frogger
 
@@ -132,4 +132,4 @@ Net: three key vocabularies (`personality.*` live → `real.*` legacy → `real_
 - Approval workflow / welcome email → `02-approval/`
 - Red List + duplicate handling on submit → `02-approval/`
 - Operator review UI → `07-operator-dashboard/`
-- Sending the welcome SMS → `11-producer-integration/` (House Phone trigger)
+- Sending the welcome SMS → V1.5. (House Phone is owned by `14-house-phone/` + the external Railway service; the Runtype-based "House Phone trigger" in Stage 11 was scratched.)

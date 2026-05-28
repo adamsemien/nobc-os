@@ -27,9 +27,9 @@ app/api/stripe/refund/route.ts                  ← operator-triggered refund
 app/api/webhooks/nobc/stripe/route.ts           ← canonical Stripe webhook receiver (status flips + confirmation email + Svix). [was listed as app/api/stripe/webhook — that path does not exist]
 app/api/webhooks/stripe/route.ts                ← flat re-export of the canonical handler above
 app/api/cron/capture-payments/route.ts          ← scheduled capture for confirmed events (no-shows / post-event)
-app/legal/terms/page.tsx                        ← compliance page
-app/legal/privacy/page.tsx                      ← compliance page
-app/legal/refund-policy/page.tsx                ← compliance page
+app/terms/page.tsx                              ← compliance page (route: /terms)
+app/privacy/page.tsx                            ← compliance page (route: /privacy)
+app/refund-policy/page.tsx                      ← compliance page (route: /refund-policy)
 lib/email-templates.ts                          ← rsvpConfirmedEmail (purchase, link-only) + compTicketEmail (comp, QR embedded)
 ```
 
@@ -102,5 +102,5 @@ End-to-end traced. Two parallel pay paths feed one webhook; both end at a link-o
 
 ## Backlog (V1.5)
 
-- **Door sales flow** — staff-facing one-screen checkout on `/check-in/[slug]`. Name + phone/email, Apple Pay or Stripe tap-to-pay, instant QR via SMS or on-screen. Under 30 seconds per transaction. *(SMS delivery must route through the House Phone / Runtype — never Twilio directly, per the Absolute Rules.)* **V1.5.**
+- **Door sales flow** — staff-facing one-screen checkout on `/check-in/[slug]`. Name + phone/email, Apple Pay or Stripe tap-to-pay, instant QR via SMS or on-screen. Under 30 seconds per transaction. *(SMS delivery routes through Stage 14 House Phone — outbound Twilio in nobc-os via `lib/twilio.ts` + `/api/sms/reply`. Runtype was scratched for SMS; the Twilio override in root `CLAUDE.md` is scoped to House Phone only.)* **V1.5.**
 - **Ticket tier cutoffs** — a tier auto-closes when its cutoff time passes OR sold quantity hits its limit. Critical for early bird pricing. **Schema check (done):** `TicketTier` already carries the needed fields — `startsAt` / `endsAt` (DateTime?) for the time window and `quantity` + `soldCount` for the inventory cap, plus `manuallyOpened` / `manuallyClosed` and `autoOpenTrigger` for progression. **No `cutoffAt` column is needed** (`endsAt` is the cutoff time, `startsAt` the open time). What's missing is the *enforcement logic* that closes a tier when `endsAt` passes or `soldCount >= quantity`. **V1.5.**
