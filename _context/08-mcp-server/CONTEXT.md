@@ -1,6 +1,6 @@
 # Stage 08 — MCP Server
 
-> The NoBC OS MCP server. Exposes every platform action (read + critical write) as an MCP tool so the Runtype master agent can operate the platform end-to-end.
+> The NoBC OS MCP server. Exposes every platform action (read + critical write) as an MCP tool over JSON-RPC at `/api/mcp` for external agent clients. **There is no consumer wired today** — Runtype was the originally intended client and has been scratched; the in-app `lib/agent/` chat (Stage 09) does not call this surface.
 
 ## Status
 
@@ -11,7 +11,7 @@
 | **Last updated** | 2026-05-25 |
 | **Owner** | Adam |
 | **Blocked on** | Authorization: `/api/mcp` is gated by Clerk auth + workspace ONLY, no operator role — any user in the workspace's Clerk org can call every write tool. The RBAC helper now exists as of 2026-05-25 (`lib/operator-role.ts` / `requireRole`, PR #5 — see `07-operator-dashboard`), but the MCP write path was **not** included in the first coverage pass; gating it is now a wiring task, not a missing-helper one. |
-| **Next** | Gate the MCP write tools with `requireRole` (helper now shipped, PR #5). Wire the Runtype master agent to the live `/api/mcp` endpoint. Add `payments.refund` + `wallet.revoke` tools once Stripe capture / wallet revocation land. Extract approve/checkin write logic into a shared service layer (currently lives in the tool modules). |
+| **Next** | Gate the MCP write tools with `requireRole` (helper now shipped, PR #5). Decide on a future agent client to consume `/api/mcp` (Runtype is scratched — TBD). Add `payments.refund` + `wallet.revoke` tools once Stripe capture / wallet revocation land. Extract approve/checkin write logic into a shared service layer (currently lives in the tool modules). |
 
 ## Scope
 
@@ -61,7 +61,7 @@ Every write tool sets `destructive: true` (surfaced to clients as `destructiveHi
 
 ## Inputs
 
-- MCP client (Runtype master agent, Claude Desktop, future SaaS integrators)
+- MCP client (Claude Desktop today; future SaaS integrators / a TBD agent runtime tomorrow — Runtype was scratched)
 - OAuth-scoped access tokens (workspace-bound, 1-hour TTL with refresh)
 
 ## Outputs
@@ -76,7 +76,7 @@ Every write tool sets `destructive: true` (surfaced to clients as `destructiveHi
 2. **MCP tools call the same service-layer functions the UI calls.** Do not duplicate business logic. The route handler is thin; logic lives in `lib/`.
 3. **OAuth tokens are workspace-scoped.** A token issued for workspace A cannot read or write workspace B's data. Validate on every call.
 4. **Agent actions write `AuditEvent` with `actorType = 'agent'`.** Distinguish from operator actions for traceability.
-5. **Destructive tools require explicit operator approval.** Refunds, cancellations, member deletions — even via MCP, these must surface a confirmation gate (currently handled by Runtype master agent's human-in-the-loop pattern; document the contract here).
+5. **Destructive tools require explicit operator approval.** Refunds, cancellations, member deletions — even via MCP, these must surface a confirmation gate. **No HITL pattern is wired today** — the MCP endpoint will execute any authenticated `tools/call`, destructive or not. Runtype was the original intended HITL host and was scratched (see CLAUDE.md). A server-side confirmation gate is unimplemented and remains a prerequisite before any external client is allowed to drive writes here.
 6. **Token TTL is 1 hour with refresh.** Long-lived tokens are not acceptable.
 
 ## Tool surface (V1 minimum)
@@ -96,10 +96,10 @@ workspace.settings.read
 
 `app/api/mcp/route.ts` → `lib/mcp/auth.ts:21-32` verifies a Clerk bearer token / session → `userId` → `requireWorkspaceId` (`:26`). That is the **only** check: authentication + workspace derivation. **No operator role is verified.** So any Clerk user who belongs to the workspace's org can call every write tool (`nobc_approve_application`, `nobc_cancel_event`, `add_to_red_list`, `issue_comp_ticket`, etc.). This is the same unenforced-RBAC gap analyzed in full in `07-operator-dashboard` (Audit findings — authorization gap).
 
-Caveat on Rule #5 below ("Destructive tools require explicit operator approval"): that human-in-the-loop gate lives in the **Runtype master agent**, not in this server — the MCP endpoint itself will execute a destructive `tools/call` for any authenticated org member without a server-side approval or role check. When the Stage 07 RBAC fix lands, gate the MCP write path on it too.
+Caveat on Rule #5 above ("Destructive tools require explicit operator approval"): no HITL gate is wired today. The MCP endpoint will execute any authenticated `tools/call` for an org member, destructive or not, without a server-side approval or role check. Runtype was the originally planned HITL host and has been scratched, so the gate currently lives in **no agent** — the in-app `lib/agent/` (Stage 09) handles its own confirmations independently of `/api/mcp`. When the Stage 07 RBAC fix extends to MCP, the write path should also gain an explicit per-tool approval requirement here (server-side, not assumed from any client).
 
 ## What this stage does NOT own
 
 - The Tenur MCP or Producer MCP → external (Tenur team / existing Producer codebase)
-- The Runtype master agent that orchestrates across MCPs → `09-ai-chat/` is the consumer; agent config lives in Runtype itself
+- Any future external agent client that orchestrates across MCPs → there is none today; Stage 09's in-app `lib/agent/` does not call this surface
 - Outbound webhooks (Phase J, Svix) → `11-producer-integration/`

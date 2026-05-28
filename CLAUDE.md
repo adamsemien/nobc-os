@@ -2,7 +2,7 @@
 
 ## What This Is
 
-NoBC OS is the member-facing platform for No Bad Company — a premium curated member club and event operator. Part of a three-layer stack alongside Producer (operator-facing, on Replit) and a Runtype + Tenur AI layer.
+NoBC OS is the member-facing platform for No Bad Company — a premium curated member club and event operator. Part of a stack alongside Producer (operator-facing, on Replit). AI runs in-process via the Anthropic API + Vercel AI SDK; there is no external agent runtime (Runtype was evaluated and scratched).
 
 **Tenant Zero is NoBC.** Built multi-tenant from day one to sell as SaaS to other premium member clubs (Soho House-tier target).
 
@@ -28,8 +28,7 @@ Methodology: see the `nobc-icm` skill.
 - **Auth:** Clerk with Organizations (org = workspace = tenant)
 - **Email:** Resend (transactional only)
 - **Payments:** Stripe (authorize/capture)
-- **AI:** `claude-sonnet-4-20250514` via Vercel AI SDK (the locked model — see Locked Decisions)
-- **Agent runtime:** Runtype (V1.5)
+- **AI:** `claude-sonnet-4-20250514` via Vercel AI SDK + the Anthropic API directly (the locked model — see Locked Decisions). The operator chat panel runs in-process through `lib/agent/`; the MCP server at `/api/mcp` is an unconsumed surface awaiting a future agent client. **There is no external agent runtime.** Runtype was evaluated and scratched.
 - **Deploy:** Vercel
 - **Testing:** Vitest (unit) + Playwright (E2E). Unit harness added 2026-05-22 (`npm run test:unit`).
 
@@ -135,7 +134,7 @@ Product language is locked. Do NOT improvise. Do NOT use synonyms.
   - Apply-required events: "Apply to Attend"
   - Ticketed events: "Get Ticket — $X"
   - Confirmation state: "Reserve My Spot" → "You're on the list"
-- **Never expose raw enum values in UI** — `apply_or_pay`, `OPEN`, `MemberStatus.GUEST` must always be mapped to display strings
+- **Never expose raw enum values in UI** — `TICKETED`, `OPEN`, `MemberStatus.GUEST`, `RSVPStatus.WAITLISTED` must always be mapped to display strings. (Historical note: `apply_or_pay` was a third `EventAccessMode` value, removed in commit `b23ab8a` 2026-05-20 — it is now `TICKETED` + `approvalRequired: true`.)
 - "Non-member ticket buyer" displays as **Guest** (where MemberStatus=GUEST)
 - "Custom questions" displays as **"Registration fields"** in operator UI
 

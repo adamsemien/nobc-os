@@ -15,7 +15,7 @@
 
 ## Scope
 
-A specialized agent flow (within the Runtype master agent or as a Runtype sub-agent) for operator-led event creation. Follows ICM principles internally — five sequential stages, human review gate before publish:
+A specialized agent flow for operator-led event creation. Originally planned as a Runtype sub-agent; Runtype has been scratched, so the runtime is the in-app `lib/agent/` (Stage 09) with this stage's prompt contracts layered on top. Follows ICM principles internally — five sequential stages, human review gate before publish:
 
 ```
 Stage A — Intake         "What's the event? Date, vibe, access mode, capacity"
@@ -25,7 +25,7 @@ Stage D — Review gate    ← human (operator) reviews, edits, approves
 Stage E — Publish        Write to DB via MCP tools, fire Phase J webhook
 ```
 
-This stage owns the **UI for the event builder flow** and the **agent prompt contracts**. The agent itself runs in Runtype.
+This stage owns the **UI for the event builder flow** and the **agent prompt contracts**. The agent runs in-process through Stage 09's `lib/agent/` runtime (Runtype was scratched).
 
 ## Files in play
 
@@ -68,4 +68,4 @@ lib/event-builder/prompts/                      ← prompt contracts per stage
 - The Phase J webhook send → `11-producer-integration/`
 - General-purpose AI chat → `09-ai-chat/`
 - The MCP tool implementations called by the agent → `08-mcp-server/`
-- Runtype master agent configuration → managed in Runtype editor
+- General-purpose AI chat runtime → `09-ai-chat/` (`lib/agent/`); Runtype was scratched and is no longer the runtime for this stage either
