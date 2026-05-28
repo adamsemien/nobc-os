@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { Share2 } from 'lucide-react';
 import { OperatorRole } from '@prisma/client';
 import { requireRolePage } from '@/lib/operator-role';
 import { db } from '@/lib/db';
@@ -28,7 +30,19 @@ export default async function MediaPage() {
   return (
     <div className="flex h-screen flex-col font-[family-name:var(--font-dm-sans)]">
       <div className="shrink-0 px-6 pt-8 lg:px-10">
-        <PageHeader title="Media" />
+        <PageHeader
+          title="Media"
+          action={
+            <Link
+              href="/operator/media/shares"
+              className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[13px]"
+              style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
+            >
+              <Share2 className="h-4 w-4" />
+              Shares
+            </Link>
+          }
+        />
       </div>
       <div className="min-h-0 flex-1">
         <MediaWorkspace options={{ events, sponsors }} />

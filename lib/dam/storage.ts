@@ -74,21 +74,37 @@ export async function uploadObject(key: string, body: Buffer, contentType: strin
 /**
  * Short-lived signed GET URL for a private DAM object. Returns null when storage
  * is unconfigured or the key is empty (callers render a placeholder).
+ *
+ * Optionally sets `Content-Disposition` on the response so the browser
+ * downloads the file instead of displaying it inline — used by the public
+ * share download endpoint (the `download` HTML attribute can't force a save on
+ * cross-origin R2 URLs).
  */
 export async function presignGet(
   key: string,
   expiresSeconds: number = DISPLAY_URL_TTL,
+  opts: { downloadFilename?: string } = {},
 ): Promise<string | null> {
   const client = s3Client();
   const b = bucket();
   if (!client || !b || !key.trim()) return null;
   try {
-    return await getSignedUrl(client, new GetObjectCommand({ Bucket: b, Key: key.trim() }), {
-      expiresIn: expiresSeconds,
+    const cmd = new GetObjectCommand({
+      Bucket: b,
+      Key: key.trim(),
+      ...(opts.downloadFilename
+        ? { ResponseContentDisposition: `attachment; filename="${sanitizeFilename(opts.downloadFilename)}"` }
+        : {}),
     });
+    return await getSignedUrl(client, cmd, { expiresIn: expiresSeconds });
   } catch {
     return null;
   }
+}
+
+/** Strip characters that would break a Content-Disposition header. ASCII-safe. */
+function sanitizeFilename(name: string): string {
+  return name.replace(/[\r\n"\\]/g, '_').slice(0, 200);
 }
 
 /** Delete a private R2 object (permanent-delete path). No-op when unconfigured/empty. */

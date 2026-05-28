@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Star, Tag, FolderInput, Download, Trash2, RotateCcw, X } from 'lucide-react';
+import { Star, Tag, FolderInput, Download, Trash2, RotateCcw, X, Share2 } from 'lucide-react';
+import { CreateShareModal } from './CreateShareModal';
 
 interface FolderOpt {
   id: string;
@@ -59,6 +60,7 @@ export function BulkActionBar({
   const [tagText, setTagText] = useState('');
   const [moveOpen, setMoveOpen] = useState(false);
   const [confirmPurge, setConfirmPurge] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -153,6 +155,9 @@ export function BulkActionBar({
             <button className={btn} style={btnStyle} disabled={busy} onClick={() => run(() => downloadZip(selectedIds))}>
               <Download className="h-4 w-4" /> ZIP
             </button>
+            <button className={btn} style={btnStyle} disabled={busy} onClick={() => setShareOpen(true)}>
+              <Share2 className="h-4 w-4" /> Share
+            </button>
             <button className={btn} style={btnStyle} disabled={busy} onClick={() => run(() => bulk('softDelete', selectedIds))}>
               <Trash2 className="h-4 w-4" /> Delete
             </button>
@@ -162,6 +167,14 @@ export function BulkActionBar({
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {shareOpen && (
+        <CreateShareModal
+          selectedIds={selectedIds}
+          onClose={() => setShareOpen(false)}
+          onCreated={onDone}
+        />
+      )}
 
       {confirmPurge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmPurge(false)}>
