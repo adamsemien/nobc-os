@@ -43,6 +43,7 @@ app/api/dev/persona/generate/route.ts               ← generate one persona
 app/api/dev/persona/run/route.ts                    ← run a persona through /apply
 app/api/dev/seed/route.ts                           ← rebuild demo workspace dataset (uses shared demo-applications)
 app/api/dev/reset/route.ts                          ← teardown demo dataset
+app/api/dev/seed-dam/route.ts                       ← DELETE — clear dam-seed demo media (assets + R2 objects + seed folders)
 app/api/dev/test-apply-flow/route.ts                ← programmatic /apply exerciser
 app/operator/_components/QAMissionPanel.tsx        ← floating mission HUD + per-step bug + judge flash
 app/operator/_components/DevToolbar.tsx             ← dev pill + tool launcher; exports DEV_TOOLBAR_OPEN_EVENT + listens for it (external open)
