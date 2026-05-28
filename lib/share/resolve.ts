@@ -15,7 +15,8 @@ import { SHARE_AUTH_COOKIE_NAME, verifyShareAuthCookie } from './auth-cookie';
 export type ShareFailure =
   | { ok: false; reason: 'NOT_FOUND' }
   | { ok: false; reason: 'EXPIRED' }
-  | { ok: false; reason: 'FOLDER_DELETED' };
+  | { ok: false; reason: 'FOLDER_DELETED' }
+  | { ok: false; reason: 'INTERNAL_ERROR' };
 
 export interface ResolvedShare {
   ok: true;
@@ -51,24 +52,30 @@ export async function resolveShareLink(
 ): Promise<ResolvedShare | ShareFailure> {
   if (!token || token.length < 8) return { ok: false, reason: 'NOT_FOUND' };
 
-  const link = await db.shareLink.findUnique({
-    where: { token },
-    select: {
-      id: true,
-      token: true,
-      mode: true,
-      workspaceId: true,
-      folderId: true,
-      watermark: true,
-      allowedDownloads: true,
-      expiresAt: true,
-      password: true,
-      brandingOverride: true,
-      folder: { select: { name: true, deletedAt: true } },
-      workspace: { select: { name: true } },
-      _count: { select: { downloads: true } },
-    },
-  });
+  let link;
+  try {
+    link = await db.shareLink.findUnique({
+      where: { token },
+      select: {
+        id: true,
+        token: true,
+        mode: true,
+        workspaceId: true,
+        folderId: true,
+        watermark: true,
+        allowedDownloads: true,
+        expiresAt: true,
+        password: true,
+        brandingOverride: true,
+        folder: { select: { name: true, deletedAt: true } },
+        workspace: { select: { name: true } },
+        _count: { select: { downloads: true } },
+      },
+    });
+  } catch (err) {
+    console.error('[share/resolve] findUnique failed', { token, error: String(err) });
+    return { ok: false, reason: 'INTERNAL_ERROR' };
+  }
   if (!link) return { ok: false, reason: 'NOT_FOUND' };
   if (link.folder.deletedAt) return { ok: false, reason: 'FOLDER_DELETED' };
   if (link.expiresAt && link.expiresAt.getTime() < Date.now()) return { ok: false, reason: 'EXPIRED' };

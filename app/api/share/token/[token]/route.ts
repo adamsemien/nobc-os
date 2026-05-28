@@ -19,27 +19,37 @@ const FAILURE_STATUS = { NOT_FOUND: 404, EXPIRED: 410, FOLDER_DELETED: 410 } as 
 
 export async function GET(_req: Request, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
-  const r = await resolveShareLink(token);
-  if (!r.ok) return NextResponse.json({ error: r.reason }, { status: FAILURE_STATUS[r.reason] });
+  try {
+    const r = await resolveShareLink(token);
+    if (!r.ok) {
+      if (r.reason === 'INTERNAL_ERROR') {
+        return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
+      }
+      return NextResponse.json({ error: r.reason }, { status: FAILURE_STATUS[r.reason] });
+    }
 
-  const meta = {
-    mode: r.mode,
-    folderName: r.folderName,
-    watermark: r.watermark,
-    allowedDownloads: r.allowedDownloads,
-    downloadsUsed: r.downloadsUsed,
-    expiresAt: r.expiresAt,
-    workspaceName: r.workspaceName,
-    passwordProtected: r.passwordProtected,
-  };
+    const meta = {
+      mode: r.mode,
+      folderName: r.folderName,
+      watermark: r.watermark,
+      allowedDownloads: r.allowedDownloads,
+      downloadsUsed: r.downloadsUsed,
+      expiresAt: r.expiresAt,
+      workspaceName: r.workspaceName,
+      passwordProtected: r.passwordProtected,
+    };
 
-  if (r.passwordProtected && !r.authed) {
-    return NextResponse.json({ requiresPassword: true, ...meta }, { status: 401 });
+    if (r.passwordProtected && !r.authed) {
+      return NextResponse.json({ requiresPassword: true, ...meta }, { status: 401 });
+    }
+
+    const assets = await listShareAssets(r.workspaceId, r.folderId);
+    // Best-effort access tracking — never await failure on the hot path.
+    void bumpShareAccess(r.id);
+
+    return NextResponse.json({ ...meta, assets });
+  } catch (err) {
+    console.error('[share/token GET] handler failed', { token, error: String(err) });
+    return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
   }
-
-  const assets = await listShareAssets(r.workspaceId, r.folderId);
-  // Best-effort access tracking — never await failure on the hot path.
-  void bumpShareAccess(r.id);
-
-  return NextResponse.json({ ...meta, assets });
 }

@@ -34,7 +34,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
     password,
     link?.passwordHash ?? 'scrypt$32768$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
   );
-  if (!link || !link.passwordHash || !okPassword) {
+  if (!link) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (!link.passwordHash || !okPassword) {
     return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
   }
 

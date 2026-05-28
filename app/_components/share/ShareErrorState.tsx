@@ -21,9 +21,18 @@ const COPY: Record<string, { kicker: string; title: string; body: string }> = {
     title: 'This share is unavailable',
     body: 'The underlying files have been removed. Ask the sender to share an updated selection.',
   },
+  INTERNAL_ERROR: {
+    kicker: 'Something went wrong',
+    title: 'We had trouble loading this share',
+    body: 'Please refresh and try again. If it keeps happening, contact your sender or reach out below.',
+  },
 };
 
-export function ShareErrorState({ reason }: { reason: 'NOT_FOUND' | 'EXPIRED' | 'FOLDER_DELETED' }) {
+export function ShareErrorState({
+  reason,
+}: {
+  reason: 'NOT_FOUND' | 'EXPIRED' | 'FOLDER_DELETED' | 'INTERNAL_ERROR';
+}) {
   const copy = COPY[reason] ?? COPY.NOT_FOUND;
   return (
     <div className="flex min-h-screen flex-col bg-events-paper text-[var(--apply-ink)]">

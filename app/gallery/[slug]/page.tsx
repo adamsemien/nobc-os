@@ -8,10 +8,10 @@
  * matches the share mode.
  */
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { ShareLinkMode } from '@prisma/client';
 import { resolveShareLink, bumpShareAccess } from '@/lib/share/resolve';
-import { listShareAssets } from '@/lib/share/assets';
+import { listShareAssets, type SharedAsset } from '@/lib/share/assets';
 import { ShareHeader } from '@/app/_components/share/ShareHeader';
 import { ShareGallery } from '@/app/_components/share/ShareGallery';
 import { ShareErrorState } from '@/app/_components/share/ShareErrorState';
@@ -35,7 +35,10 @@ interface Branding {
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug: token } = await params;
   const r = await resolveShareLink(token);
-  if (!r.ok) return <ShareErrorState reason={r.reason} />;
+  if (!r.ok) {
+    if (r.reason === 'INTERNAL_ERROR') return <ShareErrorState reason="INTERNAL_ERROR" />;
+    notFound();
+  }
   if (r.mode !== ShareLinkMode.MEMBER_GALLERY) redirect(`/assets/${token}`);
 
   const branding = (r.brandingOverride as Branding | null) ?? null;
@@ -57,7 +60,13 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
     );
   }
 
-  const assets = await listShareAssets(r.workspaceId, r.folderId);
+  let assets: SharedAsset[];
+  try {
+    assets = await listShareAssets(r.workspaceId, r.folderId);
+  } catch (err) {
+    console.error('[gallery/page] listShareAssets failed', { token, error: String(err) });
+    return <ShareErrorState reason="INTERNAL_ERROR" />;
+  }
   const downloadsExhausted =
     r.allowedDownloads != null && r.downloadsUsed >= r.allowedDownloads;
   void bumpShareAccess(r.id);
