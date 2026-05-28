@@ -1428,6 +1428,8 @@ model ShareLink {
   accessCount      Int           @default(0)
   brandingOverride Json? // { logo, primaryColor, companyName }
   customDomain     String?       @unique
+  watermark        Boolean       @default(false)
+  allowedDownloads Int?
   createdAt        DateTime      @default(now())
 
   downloads AssetDownload[]

@@ -91,7 +91,7 @@ app/operator/media/_components/          ← +BulkActionBar, MediaPreview, Uploa
 
 - `Asset` — id, workspaceId, filename, url (R2 key), thumbnailUrl (R2 key), blurhash, fileType (PHOTO/VIDEO), size (Int bytes), width, height, duration, shootDate, tags[] (manual), aiTags[] (AI), qualityScore, qualityScores (Json), energyLevel, shooterCredit, isSelect, sortOrder, folderId, eventId, sponsorName, uploadedBy, deletedAt (soft delete), createdAt, updatedAt.
 - `MediaFolder` — id, workspaceId, name, type (FULL_GALLERY/SELECTS/VIDEO/SPONSOR/BRAND), eventId, parentId (self-tree), usageRightsExpiry, sortOrder, deletedAt, createdAt.
-- `ShareLink` — id, workspaceId, token (unique), folderId, mode (SPONSOR/MEMBER_GALLERY), password (bcrypt), expiresAt, firstAccessedAt, lastAccessedAt, accessCount, brandingOverride (Json), customDomain (unique), createdAt.
+- `ShareLink` — id, workspaceId, token (unique), folderId, mode (SPONSOR/MEMBER_GALLERY), password (bcrypt), expiresAt, firstAccessedAt, lastAccessedAt, accessCount, brandingOverride (Json), customDomain (unique), watermark (default false), allowedDownloads (Int?), createdAt.
 - `AssetDownload` — id, workspaceId, assetId, shareLinkId, downloadedAt.
 - `Workspace.storageBytes` — BigInt, total stored bytes (+upload / −permanent delete).
 
