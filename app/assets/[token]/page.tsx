@@ -7,6 +7,7 @@
  * render the password gate first. Member-gallery tokens are redirected to
  * `/gallery/[slug]` so the URL prefix is always correct for the mode.
  */
+import { Fragment } from 'react';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { ShareLinkMode } from '@prisma/client';
@@ -114,9 +115,14 @@ function ShareMetaLine({
     bits.push(`Expires ${formatExpiry(expiresAt)}`);
   }
   return (
-    <p className="text-center text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-      {bits.join(' · ')}
-    </p>
+    <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      {bits.map((bit, i) => (
+        <Fragment key={i}>
+          {i > 0 && <span aria-hidden>·</span>}
+          <span>{bit}</span>
+        </Fragment>
+      ))}
+    </div>
   );
 }
 

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 const NAV_LINKS = [
   { href: '/m', label: 'Home' },
   { href: '/m/events', label: 'Events' },
-  { href: '/m/rsvps', label: 'My RSVPs' },
+  { href: '/m/rsvps', label: 'RSVPs' },
   { href: '/m/profile', label: 'Profile' },
   { href: '/m/help', label: 'Help' },
 ];
@@ -79,7 +79,7 @@ export default function MemberPortalNav({ firstName: _firstName }: MemberPortalN
           <Link
             key={link.href}
             href={link.href}
-            className="flex flex-1 flex-col items-center justify-center py-3 text-[0.55rem] uppercase tracking-[0.15em] transition-colors"
+            className="flex flex-1 flex-col items-center justify-center py-3 text-[0.65rem] uppercase tracking-[0.15em] whitespace-nowrap transition-colors"
             style={{
               color: isActive(link.href)
                 ? 'var(--events-warm-accent)'

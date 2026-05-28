@@ -139,8 +139,8 @@ export function EventsGrid({ events }: Props) {
             onClick={() => setView('list')}
             className={
               view === 'list'
-                ? 'text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-events-ref-ink'
-                : 'text-[0.65rem] font-normal uppercase tracking-[0.28em] text-events-ref-muted transition-colors hover:text-events-ref-ink'
+                ? 'inline-flex items-center min-h-[44px] px-2 text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-events-ref-ink'
+                : 'inline-flex items-center min-h-[44px] px-2 text-[0.65rem] font-normal uppercase tracking-[0.28em] text-events-ref-muted transition-colors hover:text-events-ref-ink'
             }
           >
             LIST
@@ -153,8 +153,8 @@ export function EventsGrid({ events }: Props) {
             onClick={() => setView('calendar')}
             className={
               view === 'calendar'
-                ? 'text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-events-ref-ink'
-                : 'text-[0.65rem] font-normal uppercase tracking-[0.28em] text-events-ref-muted transition-colors hover:text-events-ref-ink'
+                ? 'inline-flex items-center min-h-[44px] px-2 text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-events-ref-ink'
+                : 'inline-flex items-center min-h-[44px] px-2 text-[0.65rem] font-normal uppercase tracking-[0.28em] text-events-ref-muted transition-colors hover:text-events-ref-ink'
             }
           >
             CALENDAR

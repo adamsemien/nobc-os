@@ -7,6 +7,7 @@
  * mode is SPONSOR are redirected to `/assets/[token]` so the URL prefix
  * matches the share mode.
  */
+import { Fragment } from 'react';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { ShareLinkMode } from '@prisma/client';
@@ -75,15 +76,23 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
     <div className="flex min-h-screen flex-col bg-events-paper text-[var(--apply-ink)]">
       <ShareHeader title={r.folderName} kicker="Member Gallery" branding={branding} />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 pb-20 pt-8">
-        <p className="text-center text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-          {[
+        {(() => {
+          const bits = [
             `${assets.length} ${assets.length === 1 ? 'file' : 'files'}`,
             r.allowedDownloads != null ? `${r.downloadsUsed}/${r.allowedDownloads} downloads used` : null,
             r.expiresAt ? `Expires ${r.expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </p>
+          ].filter((x): x is string => x !== null);
+          return (
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+              {bits.map((bit, i) => (
+                <Fragment key={i}>
+                  {i > 0 && <span aria-hidden>·</span>}
+                  <span>{bit}</span>
+                </Fragment>
+              ))}
+            </div>
+          );
+        })()}
         <div className="my-8 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
         <ShareGallery
           token={token}

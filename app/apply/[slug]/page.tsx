@@ -170,7 +170,7 @@ function SiteNav({ slug }: { slug: string }) {
         </Link>
         <Link
           href={`/apply/${slug}`}
-          className="border border-nobc-red bg-nobc-red px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-nobc-on-red transition-colors hover:bg-nobc-red-hover sm:px-4 sm:text-[0.65rem]"
+          className="inline-flex items-center min-h-[44px] border border-nobc-red bg-nobc-red px-3 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-nobc-on-red transition-colors hover:bg-nobc-red-hover sm:px-4 sm:text-[0.65rem]"
           style={{ borderRadius: '4px' }}
           aria-current="page"
         >

@@ -72,7 +72,7 @@ export function ShareGallery({
             ) : (
               <a
                 href={`/api/share/token/${encodeURIComponent(token)}/download/${encodeURIComponent(asset.id)}`}
-                className="rounded-[4px] border px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-[var(--apply-ink)] transition-colors hover:bg-[var(--nobc-red)] hover:text-white hover:border-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+                className="inline-flex items-center min-h-[44px] rounded-[4px] border px-4 text-[10px] uppercase tracking-[0.22em] text-[var(--apply-ink)] transition-colors hover:bg-[var(--nobc-red)] hover:text-white hover:border-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
                 style={{ borderColor: 'var(--apply-rule)' }}
               >
                 Download

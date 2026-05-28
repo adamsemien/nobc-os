@@ -466,7 +466,7 @@ function FlowHeader({
         <button
           type="button"
           onClick={onBack}
-          className="text-[11px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
+          className="inline-flex items-center min-h-[44px] -mx-2 px-2 text-[11px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
         >
           {atStart ? 'Cancel' : '← Back'}
         </button>
@@ -474,7 +474,7 @@ function FlowHeader({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="text-lg leading-none text-[var(--apply-muted)] hover:text-[var(--nobc-red)]"
+          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] -mx-2 text-lg leading-none text-[var(--apply-muted)] hover:text-[var(--nobc-red)]"
         >
           ✕
         </button>

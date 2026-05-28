@@ -121,14 +121,14 @@ function PlusOneSection({
     return (
       <div className="mt-6 border-t border-[var(--apply-rule)] pt-6">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
               Guest
             </p>
             <p className="mt-1 text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
               {addedGuest.guestName}
             </p>
-            <p className="text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            <p className="truncate text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
               {addedGuest.guestEmail}
             </p>
           </div>
