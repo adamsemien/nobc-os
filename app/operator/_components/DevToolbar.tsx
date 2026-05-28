@@ -140,6 +140,8 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
   const [status, setStatus] = useState<StatusMsg | null>(null);
   const [seededAt, setSeededAt] = useState<string | null>(null);
   const [seededEvents, setSeededEvents] = useState<SeededEvent[]>([]);
+  const [clearingMedia, setClearingMedia] = useState(false);
+  const [mediaStatus, setMediaStatus] = useState<StatusMsg | null>(null);
 
   // AI QA Runner state
   const [scenario, setScenario] = useState('');
@@ -599,6 +601,25 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
     }
   }
 
+  async function handleClearMedia() {
+    if (!window.confirm('Delete all dam-seed demo media (assets + R2 objects + seed folders)?')) return;
+    setClearingMedia(true);
+    setMediaStatus(null);
+    try {
+      const res = await fetch('/api/dev/seed-dam', { method: 'DELETE' });
+      const data = (await res.json()) as { error?: string; deletedAssets?: number };
+      if (!res.ok) throw new Error(data.error ?? 'Clear failed');
+      setMediaStatus({
+        type: 'success',
+        msg: `Cleared ${data.deletedAssets ?? 0} assets — run \`npm run seed:dam\` to re-seed`,
+      });
+    } catch (err) {
+      setMediaStatus({ type: 'error', msg: err instanceof Error ? err.message : 'Unknown error' });
+    } finally {
+      setClearingMedia(false);
+    }
+  }
+
   const navItems = [
     { label: 'Dashboard', href: '/operator' },
     { label: 'Events', href: '/operator/events' },
@@ -776,6 +797,26 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
                 }}
               >
                 {status.type === 'success' ? '✓ ' : '✗ '}{status.msg}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <button
+                onClick={handleClearMedia}
+                disabled={clearingMedia}
+                style={{ ...S.btn, background: '#2a1820', borderColor: '#5a2020', color: '#e8b4aa' }}
+              >
+                {clearingMedia ? '⏳' : '🖼'} Clear Demo Media
+              </button>
+            </div>
+            {mediaStatus && (
+              <div
+                style={{
+                  marginTop: 6,
+                  color: mediaStatus.type === 'success' ? '#4ade80' : '#f87171',
+                  fontSize: 10,
+                }}
+              >
+                {mediaStatus.type === 'success' ? '✓ ' : '✗ '}{mediaStatus.msg}
               </div>
             )}
           </div>
