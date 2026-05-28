@@ -217,8 +217,17 @@ Every read and every write is workspace-scoped. `workspaceId` is on every user-d
 ### No hex literals in components
 All colors are CSS variables. Semantic tokens only: `bg-primary`, `text-text-primary`. The theme system supports white-labeling for multi-tenant SaaS.
 
-### Schema changes: generate then push manually
-Run `prisma generate` first. Show the diff. Never auto-push. Producer is on the same Postgres instance — schema changes are production-affecting.
+### Schema changes: never `prisma db push`
+`prisma db push` is forbidden on this repo, full stop. It will attempt to drop **`Asset_searchVector_idx`** — the GIN index that powers DAM full-text search. That index lives only in the production database, created out-of-band by `prisma/sql/dam-search-vector.sql`; it is NOT in `schema.prisma` because Prisma cannot represent a GIN index on its `Unsupported("tsvector")` type. A `db push` run treats the index as drift and removes it, breaking `/operator/media` search until someone re-runs the SQL by hand. Producer also shares this Postgres instance — a `db push` is doubly destructive.
+
+The required workflow for any additive schema change:
+
+1. Edit `prisma/schema.prisma`.
+2. Run `prisma generate` to update the client.
+3. Run `prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script` (or equivalent) and review the SQL — refuse any DROP, ALTER TYPE, or RENAME.
+4. Apply the additive SQL with `prisma db execute --file <migration.sql>` against the Neon DB. Never `db push`, never auto-push, never use `--accept-data-loss`.
+
+For non-additive changes (drops, renames, type changes), stop and ask Adam — coordination with Producer is required before any destructive migration.
 
 ### Debugging & observability
 Error boundaries must **log** the errors they catch — never silently swallow them (fixed 2026-05-22, `baf3031`: the app error boundary now logs caught errors instead of discarding them, so production failures surface in logs). Any new catch block or boundary you add must log with enough context to trace the failure.
