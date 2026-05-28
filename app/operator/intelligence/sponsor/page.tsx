@@ -4,6 +4,7 @@ import { requireRolePage } from '@/lib/operator-role';
 import { getAudienceNarrative } from './actions';
 import { SentimentPanel } from './_components/SentimentPanel';
 import { SponsorBriefBar } from './_components/SponsorBriefBar';
+import { IntelligenceTabs } from '../_components/IntelligenceTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -401,6 +402,7 @@ export default async function SponsorIntelligencePage() {
   if (approvedCount < 5) {
     return (
       <div className="min-h-screen px-6 py-10 md:px-12" style={{ background: 'var(--bg)', color: 'var(--text-primary)' }}>
+        <IntelligenceTabs isAdmin={true} />
         <Header memberCount={approvedCount} />
         <Hairline />
         <div className="flex min-h-[40vh] items-center justify-center">
@@ -426,6 +428,7 @@ export default async function SponsorIntelligencePage() {
 
   return (
     <div className="min-h-screen px-6 py-10 md:px-12" style={{ background: 'var(--bg)', color: 'var(--text-primary)' }}>
+      <IntelligenceTabs isAdmin={true} />
       <Header memberCount={approvedCount} />
       <Hairline />
 

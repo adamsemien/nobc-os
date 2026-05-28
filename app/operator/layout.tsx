@@ -1,4 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
+import { UserButton } from '@clerk/nextjs';
+import { ExternalLink } from 'lucide-react';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { isAdmin } from '@/lib/operator-role';
 import { db } from '@/lib/db';
@@ -56,7 +58,35 @@ export default async function OperatorLayout({
         style={{ background: 'var(--page-bg)' }}
       >
         <OperatorNav pendingApplicationCount={pendingApplicationCount} isAdmin={operatorIsAdmin} />
-        <main className="flex min-h-screen min-w-0 flex-1 flex-col">{children}</main>
+        <main className="flex min-h-screen min-w-0 flex-1 flex-col">
+          <div
+            className="flex items-center justify-end gap-3 px-6 pt-3 sm:px-10 lg:px-14 xl:px-20"
+            aria-label="Operator utility strip"
+          >
+            <a
+              href="/m/events"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-[var(--primary)]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <ExternalLink className="h-[13px] w-[13px]" aria-hidden />
+              Preview Site
+            </a>
+            <a
+              href="/apply"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-[var(--primary)]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <ExternalLink className="h-[13px] w-[13px]" aria-hidden />
+              Apply Form
+            </a>
+            <UserButton />
+          </div>
+          {children}
+        </main>
         {/* Cmd+K is owned by CommandPaletteProvider — AgentPanel binds Cmd+Shift+Option+A. */}
         <AgentPanel />
         <ObsidianIdleEgg />

@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
+import { isAdmin } from '@/lib/operator-role';
 import {
   buildContext,
   listMetrics,
@@ -11,6 +12,7 @@ import {
   type MetricCategory,
 } from '@/lib/intelligence';
 import { IntelligenceView } from './_components/IntelligenceView';
+import { IntelligenceTabs } from './_components/IntelligenceTabs';
 import type { Tile } from './_components/MetricTile';
 import type { ConstellationMember } from './_components/MemberConstellation';
 
@@ -109,6 +111,7 @@ export default async function IntelligencePage({
   const { userId } = await auth();
   if (!userId) redirect('/');
   const workspaceId = await requireWorkspaceId(userId);
+  const admin = await isAdmin(userId, workspaceId);
 
   const sp = await searchParams;
   const params = new URLSearchParams();
@@ -126,19 +129,24 @@ export default async function IntelligencePage({
       take: 20,
     });
     return (
-      <IntelligenceView
-        filters={filters}
-        tiles={[]}
-        insights={rows.map((r) => ({
-          id: r.id,
-          metricId: r.metricId,
-          narrative: r.narrative,
-          generatedAt: r.generatedAt.toISOString(),
-          acknowledged: r.acknowledged,
-        }))}
-        constellation={constellation}
-        funnel={funnel}
-      />
+      <>
+        <div className="px-6 pt-6 md:px-10">
+          <IntelligenceTabs isAdmin={admin} />
+        </div>
+        <IntelligenceView
+          filters={filters}
+          tiles={[]}
+          insights={rows.map((r) => ({
+            id: r.id,
+            metricId: r.metricId,
+            narrative: r.narrative,
+            generatedAt: r.generatedAt.toISOString(),
+            acknowledged: r.acknowledged,
+          }))}
+          constellation={constellation}
+          funnel={funnel}
+        />
+      </>
     );
   }
 
@@ -154,12 +162,17 @@ export default async function IntelligencePage({
   );
 
   return (
-    <IntelligenceView
-      filters={filters}
-      tiles={tiles}
-      insights={[]}
-      constellation={constellation}
-      funnel={funnel}
-    />
+    <>
+      <div className="px-6 pt-6 md:px-10">
+        <IntelligenceTabs isAdmin={admin} />
+      </div>
+      <IntelligenceView
+        filters={filters}
+        tiles={tiles}
+        insights={[]}
+        constellation={constellation}
+        funnel={funnel}
+      />
+    </>
   );
 }

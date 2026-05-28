@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
 import { useCounts } from '@/components/counts/CountsProvider';
 import {
   Home,
@@ -10,15 +9,9 @@ import {
   CalendarDays,
   Images,
   Users,
-  ListChecks,
   BarChart3,
-  Sparkles,
-  Activity,
-  ScanLine,
   MessageSquare,
   Settings,
-  ShieldCheck,
-  ExternalLink,
 } from 'lucide-react';
 
 type NavItem = {
@@ -26,23 +19,17 @@ type NavItem = {
   label: string;
   match: string;
   exact?: boolean;
-  adminOnly?: boolean;
   Icon: typeof Home;
 };
 
 const PRIMARY_ITEMS: NavItem[] = [
-  { href: '/operator',                 label: 'Dashboard',     match: '/operator',                 exact: true, Icon: Home },
-  { href: '/operator/applications',    label: 'Applications',  match: '/operator/applications',                 Icon: Inbox },
-  { href: '/operator/events',          label: 'Events',        match: '/operator/events',                       Icon: CalendarDays },
-  { href: '/operator/media',           label: 'Media',         match: '/operator/media',                        Icon: Images },
-  { href: '/operator/check-in',        label: 'Check-in',      match: '/operator/check-in',                     Icon: ScanLine },
-  { href: '/operator/house-phone',     label: 'House Phone',   match: '/operator/house-phone',                  Icon: MessageSquare },
-  { href: '/operator/members',         label: 'Members',       match: '/operator/members',                      Icon: Users },
-  { href: '/operator/team',            label: 'Team',          match: '/operator/team',                         Icon: ShieldCheck },
-  { href: '/operator/settings/lists',  label: 'Lists',         match: '/operator/settings/lists',               Icon: ListChecks },
-  { href: '/operator/intelligence',    label: 'Intelligence',  match: '/operator/intelligence',     exact: true, Icon: BarChart3 },
-  { href: '/operator/intelligence/sponsor', label: 'Sponsors', match: '/operator/intelligence/sponsor', Icon: Sparkles },
-  { href: '/operator/audit',           label: 'Activity',      match: '/operator/audit',                        Icon: Activity },
+  { href: '/operator',              label: 'Dashboard',    match: '/operator',              exact: true, Icon: Home },
+  { href: '/operator/events',       label: 'Events',       match: '/operator/events',                    Icon: CalendarDays },
+  { href: '/operator/applications', label: 'Applications', match: '/operator/applications',              Icon: Inbox },
+  { href: '/operator/members',      label: 'Members',      match: '/operator/members',                   Icon: Users },
+  { href: '/operator/house-phone',  label: 'House Phone',  match: '/operator/house-phone',               Icon: MessageSquare },
+  { href: '/operator/media',        label: 'Media',        match: '/operator/media',                     Icon: Images },
+  { href: '/operator/intelligence', label: 'Intelligence', match: '/operator/intelligence',              Icon: BarChart3 },
 ];
 
 const FOOTER_ITEM: NavItem = {
@@ -52,14 +39,9 @@ const FOOTER_ITEM: NavItem = {
   Icon: Settings,
 };
 
-const EXTERNAL_LINKS = [
-  { href: '/m/events', label: 'Preview Site' },
-  { href: '/apply', label: 'Apply Form' },
-];
-
 export function OperatorNav({
   pendingApplicationCount = 0,
-  isAdmin = false,
+  isAdmin: _isAdmin = false,
 }: {
   pendingApplicationCount?: number;
   isAdmin?: boolean;
@@ -72,12 +54,6 @@ export function OperatorNav({
     counts?.applications.pending ?? pendingApplicationCount;
 
   const renderItem = (item: NavItem) => {
-    const active = item.exact
-      ? pathname === item.match
-      : pathname.startsWith(item.match) && pathname !== '/operator/settings/lists'
-        ? pathname.startsWith(item.match)
-        : pathname === item.match;
-    // Simpler: dashboard is exact, lists is exact-prefix, everything else startsWith.
     const isActive = item.exact
       ? pathname === item.match
       : pathname.startsWith(item.match);
@@ -143,37 +119,16 @@ export function OperatorNav({
           style={{ color: 'var(--primary)' }}
         >
           <span className="hidden md:inline">No Bad Company</span>
-          <span className="md:hidden">NBC</span>
+          <span className="md:hidden">NoBC</span>
         </Link>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-2 py-3 md:px-3">
-        {PRIMARY_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(renderItem)}
-
-        <div className="my-1.5 mx-1 border-t" style={{ borderColor: 'var(--border)' }} />
-
-        {EXTERNAL_LINKS.map(({ href, label }) => (
-          <a
-            key={href}
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group relative flex min-h-[36px] items-center gap-3 overflow-hidden rounded-[8px] px-3 font-[family-name:var(--font-dm-sans)] text-[12px] font-medium transition-colors duration-150 hover:bg-[var(--sidebar-active-bg)]"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <ExternalLink className="h-[15px] w-[15px] shrink-0" />
-            <span className="hidden md:inline">{label}</span>
-          </a>
-        ))}
+        {PRIMARY_ITEMS.map(renderItem)}
       </nav>
 
       {/* Settings pinned to bottom */}
-      <div className="px-2 pb-2 md:px-3">{renderItem(FOOTER_ITEM)}</div>
-
-      {/* Footer — avatar */}
-      <div className="flex items-center justify-center border-t border-[var(--border)] px-3 py-3 md:px-4">
-        <UserButton />
-      </div>
+      <div className="px-2 pb-3 md:px-3">{renderItem(FOOTER_ITEM)}</div>
     </aside>
   );
 }

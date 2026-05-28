@@ -439,7 +439,7 @@ export default async function OperatorDashboardPage() {
                   className="text-[13px] font-semibold"
                   style={{ color: 'var(--primary)' }}
                 >
-                  Full log →
+                  View all →
                 </Link>
               }
             />
