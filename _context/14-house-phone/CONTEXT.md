@@ -52,7 +52,8 @@ app/operator/intelligence/_components/IntelligenceView.tsx ← House Phone tab r
 - Operator session (Clerk) → `getMemberWorkspaceId(userId)` scopes every read/write.
 - `SmsConversation` / `SmsMessage` rows written by the Railway inbound service.
 - Published events for the conversation→event selector.
-- Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `HOUSE_PHONE_WORKSPACE_ID`.
+- Env (nobc-os): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — used by `lib/twilio.ts` for outbound replies.
+- Env (Railway service only — **not referenced in nobc-os code**): `HOUSE_PHONE_WORKSPACE_ID` — reserved so the external Railway inbound service can scope conversations without a Clerk session. Documented here for the Vercel-deploy checklist; no `process.env.HOUSE_PHONE_WORKSPACE_ID` lives in this tree.
 
 ## Outputs
 

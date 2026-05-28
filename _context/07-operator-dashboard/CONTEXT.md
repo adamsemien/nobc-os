@@ -58,7 +58,7 @@ _context/07-operator-dashboard/riso-reference.html       ← the editorial/riso-
 lib/theme.ts                                             ← active theme resolution (11-theme system, incl. editorial + per-workspace override)
 lib/operator-role.ts                                     ← RBAC (PR #5): OperatorRole hierarchy + getOperatorRole / isAdmin / isStaff / requireRole / requireRolePage. (Replaced the never-built `lib/permissions.ts` name from the 05-21 audit.)
 lib/auth.ts                                              ← getOrCreateWorkspaceForUser / requireWorkspaceId / getMemberWorkspaceId — resolves workspace from Clerk org membership; role now comes from lib/operator-role.ts (WorkspaceMember row)
-lib/audit.ts                                             ← AuditEvent write + query helpers (single module)
+lib/audit.ts                                             ← (planned, not yet built) — AuditEvent writes currently happen inline at each operator route; consolidate when the surface stabilizes
 app/globals.css                                          ← glass tokens (.operator-scope), .op-glass material, .op-btn, .op-ambient + drift, .op-rise entrance (all honor prefers-reduced-motion)
 ```
 

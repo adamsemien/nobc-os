@@ -27,9 +27,9 @@ app/api/stripe/refund/route.ts                  ← operator-triggered refund
 app/api/webhooks/nobc/stripe/route.ts           ← canonical Stripe webhook receiver (status flips + confirmation email + Svix). [was listed as app/api/stripe/webhook — that path does not exist]
 app/api/webhooks/stripe/route.ts                ← flat re-export of the canonical handler above
 app/api/cron/capture-payments/route.ts          ← scheduled capture for confirmed events (no-shows / post-event)
-app/legal/terms/page.tsx                        ← compliance page
-app/legal/privacy/page.tsx                      ← compliance page
-app/legal/refund-policy/page.tsx                ← compliance page
+app/terms/page.tsx                              ← compliance page (route: /terms)
+app/privacy/page.tsx                            ← compliance page (route: /privacy)
+app/refund-policy/page.tsx                      ← compliance page (route: /refund-policy)
 lib/email-templates.ts                          ← rsvpConfirmedEmail (purchase, link-only) + compTicketEmail (comp, QR embedded)
 ```
 

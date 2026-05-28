@@ -30,14 +30,14 @@ This stage owns the **UI for the event builder flow** and the **agent prompt con
 ## Files in play
 
 ```
-app/operator/events/new/ai/page.tsx             ← AI event builder entry
-app/operator/events/new/ai/[sessionId]/page.tsx ← in-progress session
-components/operator/EventBuilder/Intake.tsx     ← stage A UI
-components/operator/EventBuilder/Enrichment.tsx ← stage B UI
-components/operator/EventBuilder/Draft.tsx      ← stage C UI
-components/operator/EventBuilder/Review.tsx     ← stage D UI (human gate)
-app/api/agent/event-builder/route.ts            ← agent flow proxy
-lib/event-builder/prompts/                      ← prompt contracts per stage
+app/api/agent/event-builder/route.ts            ← agent flow proxy (the only piece of this stage that exists today)
+app/api/ai/event-builder/route.ts               ← alternate AI-builder entry route (parallel to the agent path)
+
+# All of the following are PLANNED, NOT YET BUILT — the 🔶 Partial status reflects this:
+# app/operator/events/new/ai/page.tsx             ← AI event builder entry
+# app/operator/events/new/ai/[sessionId]/page.tsx ← in-progress session
+# components/operator/EventBuilder/{Intake,Enrichment,Draft,Review}.tsx  ← per-stage UIs
+# lib/event-builder/prompts/                      ← prompt contracts per stage
 ```
 
 ## Inputs

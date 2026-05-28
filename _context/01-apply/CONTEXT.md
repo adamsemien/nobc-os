@@ -104,7 +104,7 @@ Auto-applied binary tags: `Founder`, `ContentCreator`, `HospitalityOperator`, `I
 3. **Never hardcode archetype text in components.** All copy lives in `config/archetypes.ts`. Edit there, never inline.
 4. **Save/resume is required.** Draft saves to DB on every step advance. Never break this.
 5. **No auth on `/apply`.** It's a public route.
-6. **Photos go to Vercel Blob via `BLOB_READ_WRITE_TOKEN`.** Do not switch storage providers without migration plan.
+6. **Photos go to Vercel Blob.** `app/api/apply/membership/upload/route.ts` calls `@vercel/blob`'s `put()`, which reads `BLOB_READ_WRITE_TOKEN` from the environment automatically — there is no `process.env.BLOB_READ_WRITE_TOKEN` reference in code. Set the token in Vercel; do not switch storage providers without a migration plan. (The DAM in Stage 15 is a separate, R2-only pipeline; this rule only governs `/apply` photo uploads.)
 
 ## Easter egg: South Congress Frogger
 

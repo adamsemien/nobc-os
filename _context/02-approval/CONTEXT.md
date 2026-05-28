@@ -30,9 +30,9 @@ app/api/operator/applications/[id]/reject/route.ts            ← reject endpoin
 app/api/operator/applications/[id]/waitlist/route.ts          ← waitlist endpoint
 app/api/operator/applications/[id]/hold/route.ts              ← on-hold endpoint
 app/api/operator/applications/bulk/route.ts                   ← bulk approve/reject/waitlist
-lib/email/welcome.ts                            ← Resend welcome template
-lib/red-list/check.ts                           ← Red List screening
-lib/duplicates/detect.ts                        ← email/phone/name match
+lib/applications/approve.ts                     ← approve path — creates Member, fires welcome email via Resend
+lib/watchlist.ts                                ← Red List + WatchList string-match screening at submit/approval (single module, replaces the never-created lib/red-list/ and lib/duplicates/ splits)
+lib/email-templates.ts                          ← welcomeMemberEmail + other Resend templates
 lib/operator-application-display.ts             ← referrer lines (parses basics.referrers JSON), queue preview
 lib/legacy-answer-labels.ts                     ← dotted-key → human label resolution for answer rows
 ```

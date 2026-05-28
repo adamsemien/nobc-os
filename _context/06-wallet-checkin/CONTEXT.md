@@ -8,7 +8,7 @@
 |---|---|
 | **State** | 🔶 Partial |
 | **V1 item** | #11, #12 |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-05-28 |
 | **Owner** | Adam |
 | **Blocked on** | `PASSNINJA_*` keys unset in Vercel (Apple/Google passes still 503; deferred). The QR-in-email + door-scan path no longer depends on PassNinja — it works via the plain `memberQrCode` QR. |
 | **Next** | Set `PASSNINJA_*` in Vercel to light up native wallet passes, then re-introduce the (now removed) "Add to Wallet" buttons as POST forms (the 405 was not fixed — buttons were removed). Optional: one-time backfill `memberQrCode` for Members created before 2026-05-21 (see Fix applied note). |
@@ -24,19 +24,15 @@
 ## Files in play
 
 ```
-app/api/wallet/apple/route.ts                   ← .pkpass generation
-app/api/wallet/google/route.ts                  ← Google Wallet JWT
-app/api/wallet/[rsvpId]/revoke/route.ts         ← pass revocation
-app/check-in/page.tsx                           ← PWA scanner UI
-app/check-in/[eventSlug]/page.tsx               ← event-specific scanner
-app/api/check-in/scan/route.ts                  ← QR scan handler
+app/api/wallet/apple/[rsvpId]/route.ts          ← Apple Wallet pass — PassNinja-backed (`@passninja/passninja-js`)
+app/api/wallet/google/[rsvpId]/route.ts         ← Google Wallet JWT — direct JWT path (parallel to PassNinja's Google path); reads GOOGLE_WALLET_* env
+app/api/check-in/[rsvpId]/route.ts              ← QR scan check-in for a known RSVP
 app/api/check-in/event/route.ts                 ← event-context check-in (door staff workflow)
 app/api/check-in/walkin/route.ts                ← walk-in check-in (no prior RSVP)
+app/check-in/[slug]/page.tsx                    ← per-event scanner UI (PWA, CHECKIN_SECRET-gated)
 public/manifest.json                            ← PWA manifest
 public/sw.js                                    ← service worker (offline)
-lib/wallet/apple-pass.ts                        ← .pkpass builder
-lib/wallet/google-pass.ts                       ← Google JWT builder
-lib/check-in/qr.ts                              ← QR encode/decode
+lib/wallet-pass.ts                              ← PassNinja-backed Apple+Google pass helpers (single file, replaces the per-platform builders that were never created; QR encoding lives inline in the email/wallet send paths, no shared lib/check-in/qr.ts module)
 ```
 
 ## Inputs
@@ -71,7 +67,17 @@ lib/check-in/qr.ts                              ← QR encode/decode
 - `PASSNINJA_ACCOUNT_ID` — required alongside the API key
 - `PASSNINJA_PASS_TYPE` — pass-type slug (defaults `nobc.member`). Code reads `PASSNINJA_PASS_TYPE`, **not** `PASSNINJA_TEMPLATE_ID`.
 
-The `APPLE_WALLET_*` / `GOOGLE_WALLET_*` / `CHECK_IN_QR_SECRET` vars listed in prior drafts are **not used anywhere in code** (no roll-your-own `.pkpass` builder or QR HMAC was ever shipped — QR is a plain `QRCode.toDataURL` of `memberQrCode`).
+The `APPLE_WALLET_*` and `CHECK_IN_QR_SECRET` vars listed in prior drafts are **not used anywhere in code** — there is no roll-your-own `.pkpass` builder and no QR HMAC (QR is a plain `QRCode.toDataURL` of `memberQrCode`).
+
+**Correction (2026-05-28 audit):** `GOOGLE_WALLET_*` IS used in code. `app/api/wallet/google/[rsvpId]/route.ts` reads:
+
+- `GOOGLE_WALLET_CREDENTIALS` — JSON-encoded service-account key (the route checks this is set before responding 200; otherwise 503).
+- `GOOGLE_WALLET_ISSUER_ID` — Google Wallet API issuer ID.
+- `GOOGLE_WALLET_CLASS_ID` — pass-class ID used at JWT signing time.
+
+The Apple side goes through PassNinja (`lib/wallet-pass.ts`) and does not need raw Apple-cert env vars. The Google route is a parallel **direct JWT** path that runs alongside PassNinja's Google path — both surfaces remain in the codebase.
+
+Also surfaced by the audit: `lib/wallet-pass.ts:8` reads **`PASSNINJA_PASS_TYPE_SLUG`** as a fallback before `PASSNINJA_PASS_TYPE`. Set either; the code prefers the `_SLUG` variant if present.
 
 ## Audit findings — ticket→QR delivery + The Room data (2026-05-21, code-verified, read-only)
 

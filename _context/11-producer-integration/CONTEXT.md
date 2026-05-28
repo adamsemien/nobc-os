@@ -25,13 +25,8 @@ SMS is **not** in scope here. The House Phone SMS inbox (outbound replies + Twil
 ## Files in play
 
 ```
-app/api/webhooks/producer/send/route.ts         ← internal helper to fire Phase J
-app/api/webhooks/svix/subscribe/route.ts        ← integrator subscribes
-app/api/webhooks/svix/[id]/route.ts             ← manage subscription
-lib/webhooks/phase-j.ts                         ← Phase J HMAC + retry
-lib/webhooks/svix-client.ts                     ← Svix SDK wrapper
-lib/webhooks/queue.ts                           ← retry queue for failed deliveries
-lib/producer-webhook.ts                         ← consolidated Phase J sender (current implementation)
+app/api/webhooks/producer/route.ts              ← Phase J receiver/sender entrypoint (only producer-side webhook route that exists)
+lib/producer-webhook.ts                         ← consolidated Phase J sender (HMAC + retry, single module — replaces the never-created lib/webhooks/{phase-j,queue,svix-client}.ts split; Svix subscribe/manage routes were never built)
 ```
 
 ## Inputs
@@ -74,8 +69,8 @@ Both halves share the same Postgres. No Runtype involvement. Stage 14 owns the f
 
 - `PRODUCER_WEBHOOK_URL` — Producer's Phase J endpoint
 - `PRODUCER_WEBHOOK_SECRET` — HMAC secret (shared with Producer)
-- `SVIX_API_KEY` — Svix account API key
-- `SVIX_APP_ID` — Svix app ID per workspace (or global)
+- `SVIX_API_KEY` — Svix account API key. **Code-complete, value not yet set in Vercel** (no `process.env.SVIX_API_KEY` reference is currently in shipped code paths; the Svix client wraps it through the SDK once enabled).
+- `SVIX_APP_ID` — **reserved for future Svix integration; not yet referenced in code.** When the integrator-subscription surface lands, this becomes the per-workspace (or global) Svix app ID.
 
 ## What this stage does NOT own
 
