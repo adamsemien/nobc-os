@@ -211,7 +211,7 @@ export function QuestionsTab({ eventId, questions }: Props) {
           <div className="space-y-2">
             {items.length === 0 ? (
               <p className="rounded-md border border-dashed border-border py-10 text-center text-sm text-text-muted">
-                No questions yet. Add one to collect info during registration.
+                No questions yet. Add your first question to collect info from attendees during registration.
               </p>
             ) : (
               items.map(q => (
