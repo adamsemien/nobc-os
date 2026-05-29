@@ -366,7 +366,11 @@ export function EventSettingsTab({ event }: Props) {
 
       {/* Access — three-group flow builder */}
       <div className="border-t border-border pt-6">
-        <p className="mb-3 text-[11px] font-medium uppercase tracking-widest text-text-secondary">Access</p>
+        <p className="mb-1 text-[11px] font-medium uppercase tracking-widest text-text-secondary">Access</p>
+        <p className="mb-4 max-w-2xl text-xs leading-relaxed text-text-muted">
+          <span className="font-medium text-text-secondary">Gates</span> control who gets in — a &ldquo;Custom Question&rdquo; gate is a screening step.{' '}
+          <span className="font-medium text-text-secondary">Registration fields</span>, managed on the Questions tab, collect info from everyone who gets in.
+        </p>
         <AccessGroupsCard
           value={eventAccess}
           onChange={setEventAccess}
