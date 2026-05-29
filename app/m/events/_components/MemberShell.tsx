@@ -52,11 +52,13 @@ export function MemberShellNav({
         </Link>
         <Link
           href={applyHref}
-          className={`${
-            dark
-              ? 'border border-events-cta-border px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-cta-fg transition-colors hover:border-nobc-red hover:bg-nobc-red hover:text-nobc-on-red sm:px-4 sm:text-[0.65rem]'
-              : 'border border-events-ref-ink px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-ref-ink transition-colors hover:border-nobc-red hover:bg-nobc-red hover:text-nobc-on-red sm:px-4 sm:text-[0.65rem]'
-          }${overlay ? ' [text-shadow:0_1px_4px_rgba(0,0,0,0.6)] [box-shadow:0_0_0_1px_rgba(255,255,255,0.9),0_1px_4px_rgba(0,0,0,0.5)]' : ''}`}
+          className={
+            overlay
+              ? 'border border-nobc-red bg-nobc-red px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-nobc-on-red transition-colors hover:bg-nobc-red-hover sm:px-4 sm:text-[0.65rem]'
+              : dark
+                ? 'border border-events-cta-border px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-cta-fg transition-colors hover:border-nobc-red hover:bg-nobc-red hover:text-nobc-on-red sm:px-4 sm:text-[0.65rem]'
+                : 'border border-events-ref-ink px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-ref-ink transition-colors hover:border-nobc-red hover:bg-nobc-red hover:text-nobc-on-red sm:px-4 sm:text-[0.65rem]'
+          }
           style={{ borderRadius: '4px' }}
         >
           Apply
