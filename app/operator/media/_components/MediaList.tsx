@@ -1,7 +1,7 @@
 'use client';
 import { useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Check } from 'lucide-react';
+import { Check, Play } from 'lucide-react';
 import { ScoreBadge } from '@/app/operator/_components/ScoreBadge';
 import { BlurhashCanvas } from './BlurhashCanvas';
 import { formatBytes } from './MediaPreview';
@@ -197,6 +197,13 @@ function MediaListRow({
             className="absolute inset-0 h-full w-full object-cover transition-opacity duration-200"
             style={{ opacity: loaded ? 1 : 0 }}
           />
+          {asset.fileType === 'VIDEO' && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="flex items-center justify-center rounded-full bg-black/50 p-1">
+                <Play className="h-3 w-3 fill-white text-white" />
+              </span>
+            </div>
+          )}
         </div>
       </td>
       <td className="min-w-0 px-4 align-middle">

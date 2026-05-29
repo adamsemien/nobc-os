@@ -1,6 +1,6 @@
 'use client';
 import { useState, type MouseEvent } from 'react';
-import { Check, Star, Film } from 'lucide-react';
+import { Check, Star, Film, Play } from 'lucide-react';
 import { BlurhashCanvas } from './BlurhashCanvas';
 
 export interface TileAsset {
@@ -56,6 +56,13 @@ export function MediaTile({
           className="pointer-events-none absolute inset-0"
           style={{ background: 'color-mix(in srgb, var(--primary) 28%, transparent)' }}
         />
+      )}
+      {asset.fileType === 'VIDEO' && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span className="flex items-center justify-center rounded-full bg-black/50 p-1.5">
+            <Play className="h-4 w-4 fill-white text-white" />
+          </span>
+        </div>
       )}
       <button
         type="button"
