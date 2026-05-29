@@ -15,13 +15,14 @@ export function MemberShellNav({
   theme = 'cream',
 }: {
   applyHref: string;
-  theme?: 'cream' | 'dark';
+  theme?: 'cream' | 'dark' | 'overlay';
 }) {
-  const dark = theme === 'dark';
+  const dark = theme === 'dark' || theme === 'overlay'; // light text treatment
+  const solidBg = theme === 'dark'; // only 'dark' paints a band
   return (
     <nav
       className={
-        dark
+        solidBg
           ? 'mx-auto flex max-w-6xl items-center justify-between gap-6 border-b border-events-line-soft bg-events-canvas-raised px-6 pb-6 pt-10 sm:px-8 sm:pt-12'
           : 'mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 pb-6 pt-10 sm:px-8 sm:pt-12'
       }

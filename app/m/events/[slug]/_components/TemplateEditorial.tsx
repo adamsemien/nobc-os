@@ -33,7 +33,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
         )}
 
         <div className="absolute inset-x-0 top-0 z-10">
-          <MemberShellNav applyHref={applyHref} theme="dark" />
+          <MemberShellNav applyHref={applyHref} theme="overlay" />
         </div>
 
         <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-10 sm:px-10 sm:pb-14">
