@@ -20,14 +20,16 @@ type EventRow = {
 };
 
 function statusBadgeCls(status: string, startAt: string): string {
-  if (new Date(startAt) < new Date()) return 'bg-muted text-text-muted';
-  if (status === 'PUBLISHED') return 'bg-success-soft text-success';
   if (status === 'CANCELLED') return 'bg-danger-soft text-danger';
-  return 'bg-muted text-text-muted';
+  if (status === 'PUBLISHED') {
+    if (new Date(startAt) < new Date()) return 'bg-muted text-text-muted'; // past
+    return 'bg-success-soft text-success';
+  }
+  return 'bg-muted text-text-muted'; // DRAFT
 }
 
 function statusLabel(status: string, startAt: string): string {
-  if (new Date(startAt) < new Date()) return 'past';
+  if (status === 'PUBLISHED' && new Date(startAt) < new Date()) return 'past';
   return status.toLowerCase();
 }
 
