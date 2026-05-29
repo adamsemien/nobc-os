@@ -19,6 +19,7 @@ export function MemberShellNav({
 }) {
   const dark = theme === 'dark' || theme === 'overlay'; // light text treatment
   const solidBg = theme === 'dark'; // only 'dark' paints a band
+  const overlay = theme === 'overlay'; // floating over a photo — text-shadow for legibility
   return (
     <nav
       className={
@@ -29,11 +30,11 @@ export function MemberShellNav({
     >
       <Link
         href="/m/events"
-        className={
+        className={`${
           dark
             ? 'text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-fg sm:text-[0.7rem] sm:tracking-[0.16em]'
             : 'text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-ref-ink sm:text-[0.7rem] sm:tracking-[0.16em]'
-        }
+        }${overlay ? ' [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]' : ''}`}
       >
         <span className="text-nobc-red">NO BAD </span>
         <span>COMPANY</span>
@@ -41,21 +42,21 @@ export function MemberShellNav({
       <div className="flex items-center gap-6 sm:gap-8">
         <Link
           href="/m/events"
-          className={
+          className={`${
             dark
               ? 'text-[0.65rem] font-normal uppercase tracking-[0.2em] text-events-fg-soft'
               : 'text-[0.65rem] font-normal uppercase tracking-[0.2em] text-events-ref-ink'
-          }
+          }${overlay ? ' [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]' : ''}`}
         >
           Events
         </Link>
         <Link
           href={applyHref}
-          className={
+          className={`${
             dark
               ? 'border border-events-cta-border px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-cta-fg transition-colors hover:border-nobc-red hover:bg-nobc-red hover:text-nobc-on-red sm:px-4 sm:text-[0.65rem]'
               : 'border border-events-ref-ink px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-ref-ink transition-colors hover:border-nobc-red hover:bg-nobc-red hover:text-nobc-on-red sm:px-4 sm:text-[0.65rem]'
-          }
+          }${overlay ? ' [text-shadow:0_1px_4px_rgba(0,0,0,0.6)] [box-shadow:0_0_0_1px_rgba(255,255,255,0.9),0_1px_4px_rgba(0,0,0,0.5)]' : ''}`}
           style={{ borderRadius: '4px' }}
         >
           Apply
