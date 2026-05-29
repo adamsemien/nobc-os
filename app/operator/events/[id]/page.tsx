@@ -7,6 +7,7 @@ import { EventAttendeesTab } from './_components/EventAttendeesTab';
 import { EventApplicationsTab } from './_components/EventApplicationsTab';
 import { EventCheckinTab } from './_components/EventCheckinTab';
 import { EventSettingsTab } from './_components/EventSettingsTab';
+import { QuestionsTab } from './_components/QuestionsTab';
 import { CopyInviteLinkButton } from './_components/CopyInviteLinkButton';
 import { EventActionBar } from './_components/EventActionBar';
 import { LiveRsvpFeed } from './_components/LiveRsvpFeed';
@@ -45,6 +46,7 @@ type EventFull = {
     order: number;
     showToMember: boolean;
     showToGuest: boolean;
+    whenInFlow: string;
   }[];
   _count: { rsvps: number };
   _stats: {
@@ -241,6 +243,9 @@ export default async function OperatorEventDetailPage({
           <EventApplicationsTab applications={applications} eventId={id} />
         )}
         {tab === 'checkin' && <EventCheckinTab rsvps={rsvps} eventId={id} />}
+        {tab === 'questions' && (
+          <QuestionsTab eventId={id} questions={event.customQuestions} />
+        )}
         {tab === 'settings' && <EventSettingsTab event={event} />}
       </div>
     </div>

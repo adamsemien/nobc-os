@@ -14,6 +14,8 @@ export type FieldType =
 
 export type ShowTo = "members" | "guests" | "both"
 
+export type WhenInFlow = "BEFORE_SUBMIT" | "AFTER_PAYMENT" | "BEFORE_APPROVAL"
+
 export type AccessQuestion = {
   tempId: string
   id?: string
@@ -22,6 +24,7 @@ export type AccessQuestion = {
   required: boolean
   options: string[]
   showTo: ShowTo
+  whenInFlow?: WhenInFlow
 }
 
 export type ApiQuestion = {
@@ -32,7 +35,7 @@ export type ApiQuestion = {
   options: string[]
   showToMember: boolean
   showToGuest: boolean
-  whenInFlow: "BEFORE_SUBMIT"
+  whenInFlow: WhenInFlow
 }
 
 export const FIELD_TYPE_OPTIONS: { value: FieldType; label: string }[] = [
@@ -55,6 +58,12 @@ export const SHOW_TO_OPTIONS: { value: ShowTo; label: string }[] = [
   { value: "guests", label: "Guests only" },
 ]
 
+export const WHEN_IN_FLOW_OPTIONS: { value: WhenInFlow; label: string }[] = [
+  { value: "BEFORE_SUBMIT", label: "Before submitting" },
+  { value: "AFTER_PAYMENT", label: "After payment" },
+  { value: "BEFORE_APPROVAL", label: "Before approval" },
+]
+
 export function coerceFieldType(raw: string): FieldType {
   const t = raw.toLowerCase()
   const valid: FieldType[] = [
@@ -63,6 +72,11 @@ export function coerceFieldType(raw: string): FieldType {
   ]
   if ((valid as string[]).includes(t)) return t as FieldType
   return "text"
+}
+
+export function coerceWhenInFlow(raw: string | null | undefined): WhenInFlow {
+  if (raw === "AFTER_PAYMENT" || raw === "BEFORE_APPROVAL") return raw
+  return "BEFORE_SUBMIT"
 }
 
 /** Builds the API payload shape for POST/PATCH event endpoints. */
@@ -78,7 +92,7 @@ export function toApiQuestion(q: AccessQuestion): ApiQuestion {
         : [],
     showToMember: q.showTo === "members" || q.showTo === "both",
     showToGuest: q.showTo === "guests" || q.showTo === "both",
-    whenInFlow: "BEFORE_SUBMIT",
+    whenInFlow: q.whenInFlow ?? "BEFORE_SUBMIT",
   }
 }
 
@@ -91,6 +105,7 @@ export function fromApiQuestion(raw: {
   required: boolean
   showToMember?: boolean
   showToGuest?: boolean
+  whenInFlow?: string | null
 }): AccessQuestion {
   const showToMember = raw.showToMember ?? true
   const showToGuest = raw.showToGuest ?? true
@@ -104,6 +119,7 @@ export function fromApiQuestion(raw: {
     required: raw.required,
     options: raw.options ?? [],
     showTo,
+    whenInFlow: coerceWhenInFlow(raw.whenInFlow),
   }
 }
 

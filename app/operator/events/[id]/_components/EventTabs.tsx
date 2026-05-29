@@ -8,6 +8,7 @@ const TABS = [
   { key: 'attendees', label: 'Attendees' },
   { key: 'applications', label: 'Applications' },
   { key: 'checkin', label: 'Check-in' },
+  { key: 'questions', label: 'Questions' },
   { key: 'settings', label: 'Settings' },
 ];
 
