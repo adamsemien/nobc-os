@@ -83,8 +83,42 @@ function serialize(items: AccessQuestion[]): string {
   return JSON.stringify(items.map(q => ({ ...toApiQuestion(q), id: q.id ?? '' })));
 }
 
+function mergeShowTo(a: ShowTo, b: ShowTo): ShowTo {
+  return a === b ? a : 'both';
+}
+
+/** Collapse duplicate rows that share a label (case-insensitive) into one,
+ *  unioning their audience. Legacy/builder data stored a question shown to
+ *  both members and guests as two EventCustomQuestion rows (one per audience),
+ *  which fromApiQuestion renders as two identical list items. Deduping on load
+ *  makes each question appear once; saving (deleteMany + createMany from items)
+ *  then rewrites the collapsed set, cleaning the underlying rows. Blank
+ *  (untitled) questions never collapse together. */
+function dedupeQuestions(items: AccessQuestion[]): AccessQuestion[] {
+  const indexByLabel = new Map<string, number>();
+  const out: AccessQuestion[] = [];
+  for (const q of items) {
+    const key = q.label.trim().toLowerCase();
+    if (!key) {
+      out.push(q);
+      continue;
+    }
+    const idx = indexByLabel.get(key);
+    if (idx === undefined) {
+      indexByLabel.set(key, out.length);
+      out.push(q);
+    } else {
+      out[idx] = { ...out[idx], showTo: mergeShowTo(out[idx].showTo, q.showTo) };
+    }
+  }
+  return out;
+}
+
 export function QuestionsTab({ eventId, questions }: Props) {
-  const initial = useMemo(() => questions.map(fromApiQuestion), [questions]);
+  const initial = useMemo(
+    () => dedupeQuestions(questions.map(fromApiQuestion)),
+    [questions],
+  );
 
   const [items, setItems] = useState<AccessQuestion[]>(initial);
   const [baseline, setBaseline] = useState(() => serialize(initial));
