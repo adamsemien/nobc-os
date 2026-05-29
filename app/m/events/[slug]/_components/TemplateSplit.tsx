@@ -82,7 +82,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           </div>
 
           {/* how to attend (borderless, numbered steps) */}
-          {event.workflowPaths?.length ? (
+          {event.workflowPaths?.length && event.resolved.kind !== 'closed' ? (
             <div className="mt-10 max-w-2xl">
               <WorkflowPathsCard paths={event.workflowPaths} variant="bare" />
             </div>

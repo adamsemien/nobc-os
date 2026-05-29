@@ -88,7 +88,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
             </div>
           ) : null}
 
-          {event.workflowPaths?.length ? (
+          {event.workflowPaths?.length && event.resolved.kind !== 'closed' ? (
             <div className="mt-10 max-w-2xl">
               <WorkflowPathsCard paths={event.workflowPaths} />
             </div>

@@ -71,7 +71,7 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
           <RsvpCard event={event} variant="borderless" />
         </div>
 
-        {event.workflowPaths?.length ? (
+        {event.workflowPaths?.length && event.resolved.kind !== 'closed' ? (
           <div className="mx-auto mt-10 max-w-md text-left">
             <WorkflowPathsCard paths={event.workflowPaths} />
           </div>
