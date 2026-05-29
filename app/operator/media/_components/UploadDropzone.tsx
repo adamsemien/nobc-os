@@ -20,8 +20,12 @@ interface UploadApi {
 const UploadContext = createContext<UploadApi>({ open: () => {}, isUploading: false });
 export const useUpload = () => useContext(UploadContext);
 
-/** Accepted by the upload route (ALLOWED set). Keep in sync with /api/media/dam/upload. */
-const ACCEPT = 'image/jpeg,image/png,image/webp';
+/**
+ * File-picker accept list. JPEG/PNG/WebP map to the upload route's ALLOWED set;
+ * HEIC/HEIF are accepted via the route's separate isHeic path (converted to JPEG
+ * server-side), not ALLOWED. Keep in sync with /api/media/dam/upload.
+ */
+const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
 interface QueueItem {
   id: string;
