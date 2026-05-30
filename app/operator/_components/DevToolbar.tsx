@@ -732,12 +732,18 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
             fontSize: 12,
             color: '#e8e4f0',
             boxShadow: '0 8px 48px rgba(0,0,0,0.7)',
-            overflow: 'hidden',
+            overflowX: 'hidden',
+            overflowY: 'auto',
+            maxHeight: 'calc(100vh - 3rem)',
           }}
         >
           {/* Header */}
           <div
             style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              background: '#1a1520',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
