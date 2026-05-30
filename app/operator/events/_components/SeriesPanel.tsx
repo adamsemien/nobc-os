@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import type { SeriesRow } from './EventsPageTabs';
+import { GenerateDescriptionButton } from './GenerateDescriptionButton';
 
 type Instance = {
   id: string;
@@ -597,6 +598,10 @@ function SeriesFields({
           Description <span className="text-text-muted">(optional)</span>
         </label>
         <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <GenerateDescriptionButton
+          context={{ title: name, currentDescription: description, kind: 'series' }}
+          onResult={setDescription}
+        />
       </div>
       <div>
         <label className="mb-1 block text-xs font-medium text-text-secondary">Default access</label>

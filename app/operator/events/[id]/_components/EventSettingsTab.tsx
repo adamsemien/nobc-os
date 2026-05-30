@@ -16,6 +16,7 @@ import {
 } from '@/lib/registration-fields';
 import { TierManager } from './TierManager';
 import { HeroImageUpload } from '../../_components/HeroImageUpload';
+import { GenerateDescriptionButton } from '../../_components/GenerateDescriptionButton';
 
 type EventFull = {
   id: string;
@@ -271,6 +272,16 @@ export function EventSettingsTab({ event }: Props) {
           style={{ borderRadius: '6px' }}
           value={description}
           onChange={e => setDescription(e.target.value)}
+        />
+        <GenerateDescriptionButton
+          context={{
+            title,
+            location,
+            startAt: combineDatetime(startDate, startTime),
+            currentDescription: description,
+            kind: 'event',
+          }}
+          onResult={setDescription}
         />
       </div>
 
