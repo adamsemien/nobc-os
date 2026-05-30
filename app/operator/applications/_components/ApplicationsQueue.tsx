@@ -278,7 +278,6 @@ export function ApplicationsQueue({
   const [pendingBulkAction, setPendingBulkAction] = useState<string | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<'reject' | null>(null);
   const [reviewNote, setReviewNote] = useState('');
-  const [voidInverted, setVoidInverted] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const selectedIdRef = useRef(selectedId);
@@ -395,26 +394,6 @@ export function ApplicationsQueue({
 
   useEffect(() => { postActionRef.current = postAction; }, [postAction]);
 
-  useEffect(() => {
-    const sequence = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
-    let pos = 0;
-    const onKey = (e: KeyboardEvent) => {
-      if (document.documentElement.dataset.theme !== 'void') { pos = 0; return; }
-      if (e.key === sequence[pos]) {
-        pos++;
-        if (pos === sequence.length) {
-          pos = 0;
-          setVoidInverted(true);
-          setTimeout(() => setVoidInverted(false), 3000);
-        }
-      } else {
-        pos = e.key === sequence[0] ? 1 : 0;
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
   const bulkAction = useCallback(async (action: 'approve' | 'reject' | 'hold') => {
     setPendingBulkAction(action);
     const ids = Array.from(selectedIds);
@@ -488,13 +467,6 @@ export function ApplicationsQueue({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 lg:h-[calc(100vh-10rem)] lg:flex-none">
-      {voidInverted && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: '#ffffff',
-          pointerEvents: 'none',
-        }} />
-      )}
       {flash ? (
         <div
           role="status"

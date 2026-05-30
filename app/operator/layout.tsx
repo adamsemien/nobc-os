@@ -9,6 +9,7 @@ import { AgentPanel } from './_components/AgentPanel';
 import { ObsidianIdleEgg } from './_components/ObsidianIdleEgg';
 import { AimEasterEgg } from './_components/AimEasterEgg';
 import { MyspaceEasterEgg } from './_components/MyspaceEasterEgg';
+import { KonamiEasterEgg } from './_components/KonamiEasterEgg';
 import { CommandPaletteProvider } from '@/components/command-palette/CommandPaletteProvider';
 import { CommandKPill } from '@/components/command-palette/CommandKPill';
 import { CountsProvider } from '@/components/counts/CountsProvider';
@@ -92,6 +93,7 @@ export default async function OperatorLayout({
         <ObsidianIdleEgg />
         <AimEasterEgg />
         <MyspaceEasterEgg />
+        <KonamiEasterEgg />
         <CommandKPill />
         <OperatorTopBar />
         <HelpPanel />

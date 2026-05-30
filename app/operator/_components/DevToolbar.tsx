@@ -120,14 +120,14 @@ const SHORTCUT_GROUPS: { label: string; rows: { keys: string[]; desc: string }[]
   },
 ];
 
-const EASTER_EGGS: { trigger: string; desc: string }[] = [
-  { trigger: '↑↑↓↓←→←→BA', desc: 'screen inversion — Void theme only' },
-  { trigger: '3× name', desc: 'tribute overlay (click an applicant name)' },
-  { trigger: 'Rosé theme', desc: 'confetti on approve' },
-  { trigger: 'Obsidian theme', desc: 'idle whisper after 60s' },
-  { trigger: 'AIM theme', desc: 'away-message overlay' },
-  { trigger: 'MySpace theme', desc: 'profile overlay' },
-  { trigger: 'frogger', desc: 'playable game — type it on /apply' },
+const EASTER_EGGS: string[] = [
+  '↑↑↓↓←→←→BA on any page (Void theme) — 3-second white-out flash',
+  'Click applicant name 3× fast in review panel — full-screen founder message',
+  'Approve an application (Rosé theme) — confetti on approval',
+  'Idle 60s (Obsidian theme) — ambient whisper',
+  'Switch to AIM theme — away message banner (Settings → Theme)',
+  'Switch to MySpace theme — now playing banner (Settings → Theme)',
+  'Type "frogger" on /apply — playable game',
 ];
 
 const ROOM_FLOURISHES = 'Arrival chime · sellout confetti · ✦ Purple-List VIP markers';
@@ -1168,11 +1168,8 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {EASTER_EGGS.map((egg) => (
-                  <div key={egg.trigger} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    <span style={{ flexShrink: 0 }}>
-                      <Kbd>{egg.trigger}</Kbd>
-                    </span>
-                    <span style={{ color: '#c4b8d4', fontSize: 10, lineHeight: '1.6' }}>{egg.desc}</span>
+                  <div key={egg} style={{ color: '#c4b8d4', fontSize: 10, lineHeight: '1.6' }}>
+                    {egg}
                   </div>
                 ))}
               </div>
