@@ -141,6 +141,7 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
   const [seededAt, setSeededAt] = useState<string | null>(null);
   const [seededEvents, setSeededEvents] = useState<SeededEvent[]>([]);
   const [clearingMedia, setClearingMedia] = useState(false);
+  const [seedingMedia, setSeedingMedia] = useState(false);
   const [mediaStatus, setMediaStatus] = useState<StatusMsg | null>(null);
 
   // AI QA Runner state
@@ -601,6 +602,28 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
     }
   }
 
+  async function handleSeedMedia() {
+    setSeedingMedia(true);
+    setMediaStatus(null);
+    try {
+      const res = await fetch('/api/dev/seed-dam', { method: 'POST' });
+      const data = (await res.json()) as {
+        error?: string;
+        photoCount?: number;
+        videoCount?: number;
+      };
+      if (!res.ok) throw new Error(data.error ?? 'Seed failed');
+      setMediaStatus({
+        type: 'success',
+        msg: `Seeded ${data.photoCount ?? 0} photos + ${data.videoCount ?? 0} videos`,
+      });
+    } catch (err) {
+      setMediaStatus({ type: 'error', msg: err instanceof Error ? err.message : 'Unknown error' });
+    } finally {
+      setSeedingMedia(false);
+    }
+  }
+
   async function handleClearMedia() {
     if (!window.confirm('Delete all dam-seed demo media (assets + R2 objects + seed folders)?')) return;
     setClearingMedia(true);
@@ -807,8 +830,15 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               <button
+                onClick={handleSeedMedia}
+                disabled={seedingMedia || clearingMedia}
+                style={S.btn}
+              >
+                {seedingMedia ? '⏳' : '🖼'} Seed Demo Media
+              </button>
+              <button
                 onClick={handleClearMedia}
-                disabled={clearingMedia}
+                disabled={clearingMedia || seedingMedia}
                 style={{ ...S.btn, background: '#2a1820', borderColor: '#5a2020', color: '#e8b4aa' }}
               >
                 {clearingMedia ? '⏳' : '🖼'} Clear Demo Media
