@@ -30,7 +30,11 @@ export type SeriesRow = {
   endsAt: string | null;
   count: number | null;
   active: boolean;
-  _count: { events: number };
+  defaultAccessMode: 'OPEN' | 'TICKETED';
+  defaultPlusOnesAllowed: boolean;
+  instanceCount: number;
+  confirmedCount: number;
+  revenueCents: number;
 };
 
 export function EventsPageTabs({

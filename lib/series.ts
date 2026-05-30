@@ -9,10 +9,49 @@
 import { RRule } from 'rrule';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
+import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
+import type { EventAccess } from '@/lib/event-access-schema';
 import type { EventAccessMode, RefundPolicy } from '@prisma/client';
 
 /** Hard cap on how many instances one generate call may create. */
 const MAX_INSTANCES = 200;
+
+/** Builds the canonical three-group EventAccess JSON from a series' default
+ *  access mode, so generated instances carry the modern gate-based access object —
+ *  not just the legacy `accessMode` column. OPEN → member + guest enabled with no
+ *  gates (auto-confirm / free); TICKETED → member + guest each gated by a `ticket`
+ *  gate (deriveFlow maps that to a `pay` step). Comp stays disabled. Matches the
+ *  GroupAccess/Gate shape in lib/event-access-schema.ts so the member-facing flow
+ *  resolves these instances correctly. */
+function accessFromMode(mode: EventAccessMode): EventAccess {
+  if (mode === 'TICKETED') {
+    return {
+      member: { enabled: true, gates: [{ id: 'm-ticket', type: 'ticket', label: 'Ticket', priceCents: 0 }], priceCents: 0 },
+      guest: { enabled: true, gates: [{ id: 'g-ticket', type: 'ticket', label: 'Ticket', priceCents: 0 }], priceCents: 0 },
+      comp: { enabled: false, budgetCap: null },
+      registrationStyle: 'all_at_once',
+    };
+  }
+  return {
+    member: { enabled: true, gates: [], priceCents: 0 },
+    guest: { enabled: true, gates: [], priceCents: 0 },
+    comp: { enabled: false, budgetCap: null },
+    registrationStyle: 'all_at_once',
+  };
+}
+
+/** Reduces an event's confirmed/held RSVP slice to display metrics, reusing the
+ *  same revenue rule as GET /api/operator/events (confirmed + paid, minus refunds). */
+export function summarizeRsvps(
+  rsvps: { ticketStatus: string; stripePaymentIntentId: string | null; refundAmountCents: number | null }[],
+  priceInCents: number | null,
+): { confirmedCount: number; revenueCents: number } {
+  const confirmedCount = rsvps.filter((r) => r.ticketStatus === 'confirmed').length;
+  const revenueCents = rsvps
+    .filter((r) => r.ticketStatus === 'confirmed' && r.stripePaymentIntentId != null)
+    .reduce((sum, r) => sum + (priceInCents ?? 0) - (r.refundAmountCents ?? 0), 0);
+  return { confirmedCount, revenueCents };
+}
 
 export class SeriesError extends Error {
   constructor(
@@ -64,12 +103,131 @@ function assertValidRecurrence(rule: string): void {
   }
 }
 
+/** Lists every series with rolled-up instance count, confirmed RSVPs, and revenue
+ *  across all of the series' Event instances. */
 export async function listEventSeries(workspaceId: string) {
-  return db.eventSeries.findMany({
+  const series = await db.eventSeries.findMany({
     where: { workspaceId },
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { events: true } } },
+    include: {
+      events: {
+        select: {
+          priceInCents: true,
+          rsvps: {
+            where: { ticketStatus: { in: ['confirmed', 'held'] } },
+            select: { ticketStatus: true, stripePaymentIntentId: true, refundAmountCents: true },
+          },
+        },
+      },
+    },
   });
+
+  return series.map(({ events, ...s }) => {
+    let confirmedCount = 0;
+    let revenueCents = 0;
+    for (const ev of events) {
+      const agg = summarizeRsvps(ev.rsvps, ev.priceInCents);
+      confirmedCount += agg.confirmedCount;
+      revenueCents += agg.revenueCents;
+    }
+    return { ...s, instanceCount: events.length, confirmedCount, revenueCents };
+  });
+}
+
+/** One series with its instances, each carrying confirmed-RSVP + revenue metrics. */
+export async function getEventSeriesDetail(workspaceId: string, seriesId: string) {
+  const series = await db.eventSeries.findFirst({ where: { id: seriesId, workspaceId } });
+  if (!series) throw new SeriesError('not_found', 'Series not found.');
+
+  const events = await db.event.findMany({
+    where: { workspaceId, seriesId },
+    orderBy: { startAt: 'asc' },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      startAt: true,
+      status: true,
+      instanceNumber: true,
+      capacity: true,
+      priceInCents: true,
+      rsvps: {
+        where: { ticketStatus: { in: ['confirmed', 'held'] } },
+        select: { ticketStatus: true, stripePaymentIntentId: true, refundAmountCents: true },
+      },
+    },
+  });
+
+  const instances = events.map(({ rsvps, priceInCents, ...ev }) => ({
+    ...ev,
+    ...summarizeRsvps(rsvps, priceInCents),
+  }));
+
+  return { series, instances };
+}
+
+/** Adds a single ad-hoc instance to a series, inheriting the series defaults
+ *  (eventAccess derived from defaultAccessMode, plus-ones, description, hero,
+ *  refund policy). instanceNumber auto-increments; slug is workspace-unique. */
+export async function addSeriesInstance(
+  workspaceId: string,
+  actorId: string,
+  seriesId: string,
+  input: { startAt: Date; title?: string | null; capacity?: number | null },
+) {
+  const series = await db.eventSeries.findFirst({ where: { id: seriesId, workspaceId } });
+  if (!series) throw new SeriesError('not_found', 'Series not found.');
+
+  const existing = await db.event.findMany({
+    where: { workspaceId, seriesId },
+    select: { instanceNumber: true },
+  });
+  const instanceNumber =
+    existing.reduce((max, e) => Math.max(max, e.instanceNumber ?? 0), 0) + 1;
+
+  const slugBase = slugify(series.name);
+  const takenSlugs = new Set(
+    (
+      await db.event.findMany({
+        where: { workspaceId, slug: { startsWith: slugBase } },
+        select: { slug: true },
+      })
+    ).map((e) => e.slug),
+  );
+
+  const access = accessFromMode(series.defaultAccessMode);
+  const legacy = deriveLegacyFromAccess(access);
+
+  const event = await db.event.create({
+    data: {
+      workspaceId,
+      seriesId,
+      instanceNumber,
+      recurrenceRule: series.recurrenceRule,
+      slug: uniqueSlug(takenSlugs, slugBase, instanceNumber),
+      title: input.title?.trim() || `${series.name} #${instanceNumber}`,
+      description: series.defaultDescription,
+      heroImageAssetId: series.defaultHeroImageAssetId,
+      startAt: input.startAt,
+      capacity: input.capacity ?? null,
+      eventAccess: access as object,
+      ...legacy,
+      plusOnesAllowed: series.defaultPlusOnesAllowed,
+      defaultRefundPolicy: series.defaultRefundPolicy,
+    },
+    select: { id: true, slug: true, title: true, startAt: true, status: true, instanceNumber: true, capacity: true },
+  });
+
+  await emitEvent({
+    workspaceId,
+    actorId,
+    action: 'series.instance_added',
+    entityType: 'EVENT_SERIES',
+    entityId: seriesId,
+    metadata: { eventId: event.id, instanceNumber },
+  });
+
+  return { ...event, confirmedCount: 0, revenueCents: 0 };
 }
 
 export async function createEventSeries(
@@ -266,6 +424,12 @@ export async function generateInstances(
 
   const newOccurrences = occurrences.filter((d) => !existingStarts.has(d.getTime()));
 
+  // Inherit the modern eventAccess JSON (+ the legacy scalar columns it derives)
+  // from the series default — the previous code set only `accessMode`, leaving
+  // instances on the schema-default eventAccess regardless of the series mode.
+  const access = accessFromMode(series.defaultAccessMode);
+  const legacy = deriveLegacyFromAccess(access);
+
   const rows = newOccurrences.map((startAt) => {
     const instanceNumber = nextInstanceNumber++;
     return {
@@ -278,7 +442,8 @@ export async function generateInstances(
       description: series.defaultDescription,
       heroImageAssetId: series.defaultHeroImageAssetId,
       startAt,
-      accessMode: series.defaultAccessMode,
+      eventAccess: access as object,
+      ...legacy,
       plusOnesAllowed: series.defaultPlusOnesAllowed,
       defaultRefundPolicy: series.defaultRefundPolicy,
     };
