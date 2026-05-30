@@ -8,7 +8,9 @@ const TABS = [
   { key: 'attendees', label: 'Attendees' },
   { key: 'applications', label: 'Applications' },
   { key: 'checkin', label: 'Check-in' },
-  { key: 'questions', label: 'Questions' },
+  // Questions tab hidden from operator nav (V1.5) — gates cover the use case for now.
+  // QuestionsTab.tsx stays on disk; page.tsx still renders it for ?tab=questions.
+  // { key: 'questions', label: 'Questions' },
   { key: 'settings', label: 'Settings' },
 ];
 
