@@ -852,7 +852,11 @@ model EventSeries {
   // Defaults inherited by instances on creation
   defaultHeroImageAssetId String?
   defaultDescription      String?
+  defaultCapacity         Int?
   defaultAccessMode       EventAccessMode @default(OPEN)
+  /// Full gate-based access config inherited by instances (mirrors Event.eventAccess).
+  /// When set, supersedes the legacy defaultAccessMode for instance generation.
+  defaultEventAccess      Json?
   defaultPlusOnesAllowed  Boolean         @default(false)
   defaultRefundPolicy     RefundPolicy    @default(window)
   brandColorHex           String?
