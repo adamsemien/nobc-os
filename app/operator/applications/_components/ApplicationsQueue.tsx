@@ -466,7 +466,7 @@ export function ApplicationsQueue({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:h-[calc(100vh-10rem)] lg:flex-none">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {flash ? (
         <div
           role="status"
@@ -716,7 +716,7 @@ export function ApplicationsQueue({
 
       {sheetOpen && selected ? (
         <div
-          className="fixed inset-0 z-50 flex flex-col lg:hidden"
+          className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] flex-col lg:hidden"
           style={{ backgroundColor: 'color-mix(in srgb, var(--foreground) 18%, var(--background))' }}
         >
           <div className="flex items-center gap-2 border-b border-border bg-surface-elevated px-3 py-3">
@@ -740,7 +740,7 @@ export function ApplicationsQueue({
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-4">
+          <div className="min-h-0 flex-1 bg-background px-4 py-4">
             <DetailPanel
               app={selected}
               headingFont={headingFont}
@@ -893,7 +893,7 @@ function DetailPanel({
     // child can actually grow to fill and then clip — without it the scroll silently
     // breaks and the bottom of the answer list disappears under the action footer.
     <div
-      className="@container flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface-elevated p-4 sm:p-6"
+      className="@container flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-lg border border-border bg-surface-elevated p-4 sm:p-6"
       style={{ borderRadius: '8px' }}
     >
       {showEasterEgg && (
