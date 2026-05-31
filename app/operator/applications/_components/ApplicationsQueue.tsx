@@ -373,13 +373,18 @@ export function ApplicationsQueue({
           const text = await res.text().catch(() => '');
           throw new Error(text || `Request failed (${res.status})`);
         }
-        const messages: Record<typeof path, string> = {
-          approve: 'Application approved.',
-          reject: 'Application rejected.',
-          waitlist: 'Application waitlisted.',
-          hold: 'Application moved to hold.',
+        const actedName = applications.find(a => a.id === id)?.fullName ?? 'Application';
+        const nextName = visibleAppsRef.current.filter(a => a.id !== id)[0]?.fullName ?? null;
+        const verb: Record<typeof path, string> = {
+          approve: 'approved',
+          reject: 'rejected',
+          waitlist: 'waitlisted',
+          hold: 'moved to hold',
         };
-        removeAndNotify(id, messages[path]);
+        const message = nextName
+          ? `${actedName} ${verb[path]} — now reviewing ${nextName}`
+          : `${actedName} ${verb[path]} — no applications left to review`;
+        removeAndNotify(id, message);
         emitCountsRefresh();
         logQAAction(`application ${path} (queue)`);
       } catch (e) {
@@ -389,7 +394,7 @@ export function ApplicationsQueue({
         setPendingAction(null);
       }
     },
-    [removeAndNotify, reviewNote],
+    [applications, removeAndNotify, reviewNote],
   );
 
   useEffect(() => { postActionRef.current = postAction; }, [postAction]);
@@ -687,6 +692,7 @@ export function ApplicationsQueue({
               app={selected}
               headingFont={headingFont}
               pendingAction={pendingAction}
+              flash={flash}
               reviewNote={reviewNote}
               onNoteChange={setReviewNote}
               onApprove={() => postAction(selected.id, 'approve')}
@@ -745,6 +751,7 @@ export function ApplicationsQueue({
               app={selected}
               headingFont={headingFont}
               pendingAction={pendingAction}
+              flash={flash}
               reviewNote={reviewNote}
               onNoteChange={setReviewNote}
               onApprove={() => postAction(selected.id, 'approve')}
@@ -792,6 +799,7 @@ function DetailPanel({
   app,
   headingFont,
   pendingAction,
+  flash,
   reviewNote,
   onNoteChange,
   onApprove,
@@ -803,6 +811,7 @@ function DetailPanel({
   app: ApplicationsQueueItem;
   headingFont: CSSProperties;
   pendingAction: 'approve' | 'reject' | 'waitlist' | 'hold' | null;
+  flash: { type: 'success' | 'error'; message: string } | null;
   reviewNote: string;
   onNoteChange: (v: string) => void;
   onApprove: () => void;
@@ -1187,7 +1196,31 @@ function DetailPanel({
         />
       </div>
 
-      <div className="sticky bottom-0 z-10 mt-auto flex flex-col gap-3 border-t border-border bg-surface-elevated pt-6 sm:flex-row sm:gap-4">
+      <div className="sticky bottom-0 z-10 mt-auto flex flex-col gap-3 border-t border-border bg-surface-elevated pt-6">
+        {flash ? (
+          <div
+            role="status"
+            className="rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-text-primary"
+            style={
+              flash.type === 'error'
+                ? {
+                    borderRadius: '8px',
+                    borderLeftWidth: '4px',
+                    borderLeftStyle: 'solid',
+                    borderLeftColor: 'var(--op-reject)',
+                  }
+                : {
+                    borderRadius: '8px',
+                    borderLeftWidth: '4px',
+                    borderLeftStyle: 'solid',
+                    borderLeftColor: 'var(--op-approve)',
+                  }
+            }
+          >
+            {flash.message}
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
         <div className="relative flex-1">
           <button
             ref={approveBtnRef}
@@ -1233,6 +1266,7 @@ function DetailPanel({
           )}
           <span className="text-center leading-tight">Reject application</span>
         </button>
+        </div>
       </div>
     </div>
   );
