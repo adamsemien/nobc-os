@@ -1,15 +1,17 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
+import { OperatorRole } from '@prisma/client';
 import { getSvix } from '@/lib/svix';
 import { db } from '@/lib/db';
 
-// Returns a short-lived Svix AppPortal token for the operator to manage their webhooks
+// Returns a short-lived Svix AppPortal token for the operator to manage their webhooks.
+// ADMIN-gated: the token grants full outbound-webhook management and first call provisions
+// the Svix app, matching the rest of settings/*.
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireRole(OperatorRole.ADMIN);
+  if (!gate.ok) return gate.response;
+  const { workspaceId } = gate;
 
-  const workspaceId = await requireWorkspaceId(userId);
   const svix = getSvix();
   if (!svix) {
     return NextResponse.json({ error: 'Webhooks not configured' }, { status: 503 });
