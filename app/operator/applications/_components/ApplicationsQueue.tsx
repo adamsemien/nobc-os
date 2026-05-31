@@ -12,6 +12,7 @@ import { Avatar } from '../../_components/Avatar';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { emitCountsRefresh } from '@/components/counts/CountsProvider';
 import { logQAAction } from '@/lib/dev/qa-action-log';
+import { CommentThread } from '@/components/comments/CommentThread';
 import { WaxSealStamp } from './WaxSealStamp';
 
 export type ApplicationsQueueItem = {
@@ -1185,13 +1186,26 @@ function DetailPanel({
         </ul>
       </section>
 
-      <div className="mt-4">
+      {/* Saved team comments — persisted, attributed, visible to everyone. */}
+      <CommentThread entityType="application" entityId={app.id} />
+
+      {/* Decision note — NOT a saved comment. Attached to the next decision
+          (approve/reject/waitlist) and recorded with that action; cleared once
+          you act. Distinct from the team comments above. */}
+      <div className="mt-6">
+        <label
+          htmlFor="review-note"
+          className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted"
+        >
+          Decision note
+        </label>
         <textarea
+          id="review-note"
           value={reviewNote}
           onChange={e => onNoteChange(e.target.value)}
-          placeholder="Private note (optional)..."
+          placeholder="Optional — saved with your approve / reject / waitlist decision below."
           rows={2}
-          className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
+          className="mt-2 w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
           style={{ borderRadius: '6px' }}
         />
       </div>
