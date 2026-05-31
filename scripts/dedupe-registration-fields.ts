@@ -22,7 +22,8 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaNeon } from '@prisma/adapter-neon';
 
 const APPLY = process.argv.includes('--apply');
-const SNAPSHOT = '_context/_audit/dedupe-snapshot-event_custom_questions.json';
+// Timestamped per run so re-runs never overwrite a prior snapshot (the rollback record).
+const SNAPSHOT = `_context/_audit/dedupe-DELETED-event_custom_questions-${Date.now()}.json`;
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
