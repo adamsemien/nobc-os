@@ -19,6 +19,7 @@ export const PDF = {
   rule: '#ddd6cf', // --events-ref-rule (hairline rule)
   red: '#b22e21', // --nobc-red (primary accent)
   onRed: '#fdfcf9', // --nobc-on-red (text on red)
+  onInkMuted: '#cbbfb6', // muted caption text on the dark (ink) value band
 } as const;
 
 /** Influence-tier chart palette (mirrors the literal archetype chart colors in the web UI). */

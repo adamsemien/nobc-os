@@ -76,14 +76,14 @@ export default async function Page({ params }: { params: Promise<{ token: string
 
         <div className="my-9 rounded-[6px] border px-7 py-7 text-center" style={{ borderColor: 'var(--apply-rule)' }}>
           <div className="text-[10px] uppercase tracking-[0.3em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            Equivalent media value
+            {recap.kind === 'audience_intelligence_brief' ? 'Projected media value · one activation' : 'Equivalent media value'}
           </div>
           <div className="mt-2 text-[clamp(2.5rem,9vw,4rem)] leading-none text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
             {fmtUsdCompact(mv.headline.totalCents)}
           </div>
           {mv.valueVsFeeMultiple != null && (
             <div className="mt-3 text-[13px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-              {fmtMultiple(mv.valueVsFeeMultiple)} the return on your rights fee
+              {fmtMultiple(mv.valueVsFeeMultiple)} your rights fee in equivalent media value
             </div>
           )}
         </div>

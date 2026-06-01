@@ -12,7 +12,6 @@ import {
   SHARE_AUTH_COOKIE_NAME,
   SHARE_AUTH_TTL_SECONDS,
   buildShareAuthCookie,
-  shareAuthCookiePath,
 } from '@/lib/share/auth-cookie';
 
 export const runtime = 'nodejs';
@@ -38,7 +37,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    path: shareAuthCookiePath(`/doc/${token}`),
+    // Path '/' so the cookie reaches both the /doc/[token] landing and the
+    // /api/doc/[token]/download route. Safe: the cookie HMAC is keyed to this asset's id +
+    // password hash, so it can't authorize any other document.
+    path: '/',
     maxAge: SHARE_AUTH_TTL_SECONDS,
   });
   return res;

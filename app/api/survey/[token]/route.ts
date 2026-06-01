@@ -33,9 +33,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
     else if (typeof v === 'string') clean[k] = v.slice(0, 500);
   }
 
-  await db.surveyResponse.update({
-    where: { id: sr.id },
+  // Atomic single-submit guard: only the first concurrent submit (submittedAt still null) writes.
+  const res = await db.surveyResponse.updateMany({
+    where: { id: sr.id, submittedAt: null },
     data: { answers: clean, submittedAt: new Date() },
   });
+  if (res.count === 0) return NextResponse.json({ error: 'Already submitted' }, { status: 409 });
   return NextResponse.json({ ok: true });
 }

@@ -56,6 +56,19 @@ function nums(rows: { answers: unknown }[], key: string): number[] {
   return out;
 }
 
+// Quote pull-outs are sponsor-facing free text, so any quote that carries contact PII is
+// DROPPED entirely (not half-redacted) before it can reach the recap. Names can't be detected
+// reliably, but the high-signal vectors — email / phone / URL — are caught here.
+const EMAIL_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+const PHONE_RE = /\+?\d[\d\s().-]{7,}\d/;
+const URL_RE = /https?:\/\/\S+|www\.\S+/i;
+function scrubQuote(raw: string): string | null {
+  const q = raw.trim();
+  if (q.length < 3 || q.length > 220) return null;
+  if (EMAIL_RE.test(q) || PHONE_RE.test(q) || URL_RE.test(q)) return null;
+  return q;
+}
+
 const avg = (xs: number[]): number | null => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 /** Top-2-box share on a 1–5 scale (answered 4 or 5). */
 const top2box = (xs: number[]): number | null => (xs.length ? xs.filter((x) => x >= 4).length / xs.length : null);
@@ -107,13 +120,13 @@ export async function computeBrandLift(args: {
   const cqMean = avg(nums(post, 'conversation_quality'));
   const conversationQuality = cqMean != null ? Math.round(((cqMean - 1) / 4) * 100) : null;
 
-  // Anonymized quote pull-outs (free text carries no names by construction).
+  // Anonymized quote pull-outs — scrubbed of contact PII before they can reach the sponsor.
   const quotes = post
     .map((r) => {
       const a = r.answers && typeof r.answers === 'object' ? (r.answers as Record<string, unknown>) : {};
-      return typeof a.quote === 'string' ? a.quote.trim() : '';
+      return typeof a.quote === 'string' ? scrubQuote(a.quote) : null;
     })
-    .filter((q) => q.length > 0 && q.length <= 220)
+    .filter((q): q is string => q != null)
     .slice(0, 3);
 
   return {

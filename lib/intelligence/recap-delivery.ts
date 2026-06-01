@@ -21,6 +21,9 @@ function docUrl(token: string): string {
   return base ? `${base}/doc/${token}` : `/doc/${token}`;
 }
 
+// Magic links are 256-bit bearer tokens; expire them by default so a leaked link is not perpetual.
+const DOC_TTL_DAYS = 90;
+
 export interface GeneratedDoc {
   token: string;
   url: string;
@@ -56,6 +59,7 @@ async function storeAndDeliver(
       pdfUrl: key,
       magicLinkUrl: token,
       generatedBySession: generatedBySession ?? null,
+      expiresAt: new Date(Date.now() + DOC_TTL_DAYS * 24 * 60 * 60 * 1000),
       payload: { recap: payload, access: { passwordHash } } as unknown as Prisma.InputJsonValue,
     },
     select: { id: true },

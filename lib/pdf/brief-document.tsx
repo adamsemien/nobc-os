@@ -27,9 +27,9 @@ const s = StyleSheet.create({
 
   band: { backgroundColor: PDF.ink, borderRadius: 4, paddingVertical: 18, paddingHorizontal: 22, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   bandBig: { fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: PDF.onRed, lineHeight: 1 },
-  bandCap: { fontFamily: SANS, fontSize: 8, letterSpacing: 1.5, textTransform: 'uppercase', color: '#cbbfb6', marginTop: 6 },
+  bandCap: { fontFamily: SANS, fontSize: 8, letterSpacing: 1.5, textTransform: 'uppercase', color: PDF.onInkMuted, marginTop: 6 },
   bandMult: { fontFamily: SERIF, fontSize: 18, fontStyle: 'italic', color: PDF.onRed, textAlign: 'right', lineHeight: 1 },
-  bandMultCap: { fontFamily: SANS, fontSize: 7.5, letterSpacing: 1, textTransform: 'uppercase', color: '#cbbfb6', textAlign: 'right', marginTop: 2 },
+  bandMultCap: { fontFamily: SANS, fontSize: 7.5, letterSpacing: 1, textTransform: 'uppercase', color: PDF.onInkMuted, textAlign: 'right', marginTop: 2 },
 
   heroRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 18, marginHorizontal: -6 },
   heroCell: { width: '20%', paddingHorizontal: 6 },

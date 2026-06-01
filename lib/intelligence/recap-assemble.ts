@@ -14,7 +14,7 @@ import { resolveDeliverables, autoEventPhotos } from './deliverables';
 import { computeBrandLift } from './survey';
 import { computeAcquisition } from './activation';
 import { INFLUENCE_TIER_META } from './influence-tiers';
-import { fmtInt, fmtMultiple, fmtPct, fmtUsdCompact } from './recap-format';
+import { fmtInt, fmtMultiple, fmtPct, fmtSignedPct, fmtUsdCompact } from './recap-format';
 import type {
   AcquisitionSummary,
   AudienceMetrics,
@@ -124,10 +124,15 @@ function buildObjectives(args: {
     ? {
         objective: 'Affinity',
         declared: declared.has('Affinity'),
-        status: (affinity.considerationLiftPct ?? 0) > 0 || (affinity.awarenessLiftPct ?? 0) > 0 ? 'met' : 'on_track',
+        status:
+          (affinity.awarenessLiftPct ?? 0) > 0 || (affinity.considerationLiftPct ?? 0) > 0
+            ? (affinity.awarenessLiftPct ?? 0) >= 0 && (affinity.considerationLiftPct ?? 0) >= 0
+              ? 'met'
+              : 'on_track'
+            : 'partial',
         headline:
           affinity.awarenessLiftPct != null
-            ? `+${affinity.awarenessLiftPct}% awareness lift and +${affinity.considerationLiftPct ?? 0}% consideration lift across ${affinity.sampleSize} responses.`
+            ? `${fmtSignedPct(affinity.awarenessLiftPct)} awareness lift and ${fmtSignedPct(affinity.considerationLiftPct ?? 0)} consideration lift across ${affinity.sampleSize} responses${affinity.smallSample ? ' (small sample)' : ''}.`
             : `${affinity.sampleSize} brand-lift responses captured${affinity.smallSample ? ' (small sample — read qualitatively)' : ''}.`,
         whatThisMeans: 'Measures whether the night actually shifted how your audience feels about you.',
         benchmark: 'Pre/post lift against the same audience — the cleanest read of brand impact.',
@@ -191,7 +196,7 @@ function buildHeroStats(m: AudienceMetrics, mv: MediaValueResult, tt: { label: s
     {
       value: fmtPct(m.qualifiedExecMix),
       label: 'Founder & operator mix',
-      whatThisMeans: 'Decision-makers and capital actually in the room.',
+      whatThisMeans: `Decision-makers and capital actually in the room.${m.unsegmentedPct > 0.15 ? ` ${fmtPct(m.unsegmentedPct)} of attendees are unprofiled, so the true mix may be higher.` : ''}`,
       benchmark: 'A 60%+ mix clears the bar for a premium executive audience.',
     },
     m.personaMatchPct != null

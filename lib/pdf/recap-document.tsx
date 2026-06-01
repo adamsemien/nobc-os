@@ -60,9 +60,9 @@ const s = StyleSheet.create({
   // value band
   valueBand: { backgroundColor: PDF.ink, borderRadius: 4, paddingVertical: 18, paddingHorizontal: 22, marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   valueBig: { fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: PDF.onRed, lineHeight: 1 },
-  valueCaption: { fontFamily: SANS, fontSize: 8, letterSpacing: 1.5, textTransform: 'uppercase', color: '#cbbfb6', marginTop: 6 },
+  valueCaption: { fontFamily: SANS, fontSize: 8, letterSpacing: 1.5, textTransform: 'uppercase', color: PDF.onInkMuted, marginTop: 6 },
   valueMult: { fontFamily: SERIF, fontSize: 18, fontStyle: 'italic', color: PDF.onRed, textAlign: 'right', lineHeight: 1 },
-  valueMultCap: { fontFamily: SANS, fontSize: 7.5, letterSpacing: 1, textTransform: 'uppercase', color: '#cbbfb6', textAlign: 'right', marginTop: 2 },
+  valueMultCap: { fontFamily: SANS, fontSize: 7.5, letterSpacing: 1, textTransform: 'uppercase', color: PDF.onInkMuted, textAlign: 'right', marginTop: 2 },
 
   // hero stats
   heroRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, marginHorizontal: -6 },
@@ -172,7 +172,7 @@ function CoverPage({ payload }: { payload: RecapPayload }) {
         {mv.valueVsFeeMultiple != null && (
           <View>
             <Text style={s.valueMult}>{fmtMultiple(mv.valueVsFeeMultiple)}</Text>
-            <Text style={s.valueMultCap}>Return on your rights fee</Text>
+            <Text style={s.valueMultCap}>Media value vs. your rights fee</Text>
           </View>
         )}
       </View>
@@ -204,7 +204,8 @@ function influenceRows(dist: InfluenceTierShare[]): { label: string; pct: number
     color: TIER_COLORS[d.tier] ?? PDF.muted,
   }));
   const other = suppressed.reduce((acc, d) => acc + d.count, 0);
-  if (other > 0) rows.push({ label: 'Other (fewer than 5 each)', pct: 0, count: other, color: PDF.faint });
+  const otherPct = suppressed.reduce((acc, d) => acc + d.pct, 0);
+  if (other > 0) rows.push({ label: 'Other (fewer than 5 each)', pct: otherPct, count: other, color: PDF.faint });
   return rows;
 }
 

@@ -24,12 +24,12 @@ export default async function Page({ params }: { params: Promise<{ token: string
   const { token } = await params;
   const sr = await db.surveyResponse.findUnique({
     where: { token },
-    select: { phase: true, submittedAt: true, eventId: true, sponsorBrand: { select: { name: true } } },
+    select: { phase: true, submittedAt: true, eventId: true, workspaceId: true, sponsorBrand: { select: { name: true } } },
   });
   if (!sr) notFound();
 
   const sponsorName = sr.sponsorBrand?.name ?? 'our partner';
-  const event = await db.event.findFirst({ where: { id: sr.eventId }, select: { title: true } });
+  const event = await db.event.findFirst({ where: { id: sr.eventId, workspaceId: sr.workspaceId }, select: { title: true } });
   const eventTitle = event?.title ?? 'No Bad Company';
 
   const body = sr.submittedAt ? (
