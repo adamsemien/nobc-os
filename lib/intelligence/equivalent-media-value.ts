@@ -5,8 +5,8 @@
  * (operator-entered owned+earned impressions). Anchors, all documented in the recap footnotes:
  *   - $2,500 per qualified executive lead
  *   - $300–$700 per-attendee executive-dinner parity (floor/mid/ceiling)
- *   - LinkedIn $31 median CPM, ~$62 ceiling (55–70 midpoint) for the impression layer
- *   - Tribeza ~$114 CPM as optional Austin-local context (aggressive tier)
+ *   - Impression layer: LinkedIn $31 median CPM on the Conservative AND Typical (headline) tiers
+ *   - Aggressive-tier ceiling: Tribeza ~$114 Austin-local CPM (vs LinkedIn's $55–70 ceiling band)
  *
  * Rule (per spec): if the qualified-executive mix is below 60%, the headline (Typical) tier
  * downshifts off the per-lead method onto the per-attendee dinner-parity floor and says so.
@@ -18,9 +18,8 @@ const LEAD_USD = 2500;
 const DINNER_LOW_USD = 300;
 const DINNER_MID_USD = 500;
 const DINNER_HIGH_USD = 700;
-const CPM_LINKEDIN_MED = 31;
-const CPM_LINKEDIN_CEIL = 62; // midpoint of the $55–$70 ceiling band
-const CPM_TRIBEZA = 114;
+const CPM_LINKEDIN_MED = 31; // LinkedIn median CPM — impression-layer rate for Conservative + Typical (headline)
+const CPM_TRIBEZA = 114; // Tribeza Austin-local CPM — the Aggressive-tier ceiling (vs LinkedIn's $55–70 ceiling band)
 const QUALIFIED_THRESHOLD = 0.6;
 
 const usdToCents = (usd: number): number => Math.round(usd * 100);
@@ -55,25 +54,25 @@ export function computeEquivalentMediaValue(p: MediaValueParams): MediaValueResu
   };
 
   // Typical (headline): qualified attendees at lead value, the rest at the dinner floor;
-  // impressions at LinkedIn's ceiling CPM. Below the 60% exec threshold, the headline
+  // impressions at LinkedIn's median CPM. Below the 60% exec threshold, the headline
   // downshifts onto whole-room dinner parity instead of per-lead value.
   let typAud: number;
   let typMethod: string;
   if (!downshifted) {
     typAud = usdToCents(QL * LEAD_USD + (N - QL) * DINNER_LOW_USD);
-    typMethod = `${QL} qualified executive leads at $${LEAD_USD.toLocaleString()}/lead + ${N - QL} further attendees at dinner parity ($${DINNER_LOW_USD}); ${R.toLocaleString()} impressions at LinkedIn's $${CPM_LINKEDIN_CEIL} ceiling CPM.`;
+    typMethod = `${QL} qualified executive leads at $${LEAD_USD.toLocaleString()}/lead + ${N - QL} further attendees at dinner parity ($${DINNER_LOW_USD}); ${R.toLocaleString()} impressions at LinkedIn's $${CPM_LINKEDIN_MED} median CPM.`;
   } else {
     typAud = usdToCents(N * DINNER_MID_USD);
-    typMethod = `Qualified-executive mix (${Math.round(q * 100)}%) is below the 60% threshold for per-lead valuation, so the room is valued at executive-dinner parity ($${DINNER_MID_USD}/attendee × ${N}) rather than $${LEAD_USD.toLocaleString()}/lead; ${R.toLocaleString()} impressions at LinkedIn's $${CPM_LINKEDIN_CEIL} ceiling CPM.`;
+    typMethod = `Qualified-executive mix (${Math.round(q * 100)}%) is below the 60% threshold for per-lead valuation, so the room is valued at executive-dinner parity ($${DINNER_MID_USD}/attendee × ${N}) rather than $${LEAD_USD.toLocaleString()}/lead; ${R.toLocaleString()} impressions at LinkedIn's $${CPM_LINKEDIN_MED} median CPM.`;
   }
-  const typImp = impressionCents(R, CPM_LINKEDIN_CEIL);
+  const typImp = impressionCents(R, CPM_LINKEDIN_MED);
   const typical: MediaValueTier = {
     tier: 'typical',
     label: 'Typical',
     audienceValueCents: typAud,
     impressionValueCents: typImp,
     totalCents: typAud + typImp,
-    cpmUsed: CPM_LINKEDIN_CEIL,
+    cpmUsed: CPM_LINKEDIN_MED,
     perAttendedCents: N ? Math.round((typAud + typImp) / N) : 0,
     methodology: typMethod,
   };
@@ -90,7 +89,7 @@ export function computeEquivalentMediaValue(p: MediaValueParams): MediaValueResu
     totalCents: aggAud + aggImp,
     cpmUsed: CPM_TRIBEZA,
     perAttendedCents: N ? Math.round((aggAud + aggImp) / N) : 0,
-    methodology: `${QL} qualified executive leads at $${LEAD_USD.toLocaleString()}/lead + ${N - QL} attendees at the $${DINNER_HIGH_USD} dinner-parity ceiling; ${R.toLocaleString()} impressions at Tribeza's ~$${CPM_TRIBEZA} Austin-local CPM.`,
+    methodology: `${QL} qualified executive leads at $${LEAD_USD.toLocaleString()}/lead + ${N - QL} attendees at the $${DINNER_HIGH_USD} dinner-parity ceiling; ${R.toLocaleString()} impressions at Tribeza's ~$${CPM_TRIBEZA} Austin-local CPM (above LinkedIn's $55–70 ceiling band).`,
   };
 
   const rightsFeeCents = p.rightsFeeCents ?? null;

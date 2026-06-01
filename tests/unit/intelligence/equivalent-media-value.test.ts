@@ -13,15 +13,17 @@ describe('computeEquivalentMediaValue', () => {
 
   it('uses the per-lead method above the 60% qualified threshold', () => {
     expect(demo.downshifted).toBe(false);
-    // 16 leads × $2,500 + 8 × $300 dinner floor = $42,400 audience
+    // 16 leads × $2,500 + 8 × $300 dinner floor = $42,400 audience (unchanged)
     expect(demo.headline.audienceValueCents).toBe(4_240_000);
-    // 500k impressions × $62 LinkedIn ceiling CPM = $31,000
-    expect(demo.headline.impressionValueCents).toBe(3_100_000);
-    expect(demo.headline.totalCents).toBe(7_340_000);
+    // 500k impressions × $31 LinkedIn median CPM = $15,500 (Typical now uses the median, not the ceiling)
+    expect(demo.headline.impressionValueCents).toBe(1_550_000);
+    expect(demo.headline.totalCents).toBe(5_790_000);
+    expect(demo.headline.cpmUsed).toBe(31);
   });
 
   it('computes the value-vs-fee multiple to one decimal', () => {
-    expect(demo.valueVsFeeMultiple).toBe(1.5);
+    // $57,900 headline / $50,000 fee = 1.158 → 1.2
+    expect(demo.valueVsFeeMultiple).toBe(1.2);
   });
 
   it('orders the three tiers conservative <= typical <= aggressive', () => {
