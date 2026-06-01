@@ -430,11 +430,16 @@ model EventCustomQuestion {
   showToMember Boolean          @default(true)
   showToGuest  Boolean          @default(true)
   whenInFlow   QuestionFlowStep @default(BEFORE_SUBMIT)
+  // Sponsor-scoped activation/booth form (Sponsor Intelligence, Phase 2). Null = a normal
+  // registration field; set = a question shown at the sponsor's at-activation booth surface.
+  sponsorBrandId String?
+  sponsorBrand   SponsorBrandProfile? @relation(fields: [sponsorBrandId], references: [id])
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
   @@index([workspaceId])
   @@index([eventId])
+  @@index([sponsorBrandId])
 }
 
 enum RSVPStatus {
@@ -1154,6 +1159,7 @@ model SponsorBrandProfile {
   generatedAssets GeneratedAsset[]
   recapSnapshots  RecapSnapshot[]
   surveyResponses SurveyResponse[]
+  sponsorScopedQuestions EventCustomQuestion[]
   seriesSponsors  SeriesSponsor[]
   workspace       Workspace        @relation(fields: [workspaceId], references: [id])
 

@@ -12,7 +12,18 @@ interface Q {
 
 const SCALE5_LABELS = ['Not at all', 'A little', 'Somewhat', 'Quite', 'Very'];
 
-export function SurveyForm({ token, intro, questions }: { token: string; intro: string; questions: Q[] }) {
+export function SurveyForm({
+  token,
+  intro,
+  questions,
+  endpoint,
+}: {
+  token: string;
+  intro: string;
+  questions: Q[];
+  endpoint?: string;
+}) {
+  const submitUrl = endpoint ?? `/api/survey/${encodeURIComponent(token)}`;
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -29,7 +40,7 @@ export function SurveyForm({ token, intro, questions }: { token: string; intro: 
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/survey/${encodeURIComponent(token)}`, {
+      const res = await fetch(submitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers }),

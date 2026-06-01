@@ -12,6 +12,7 @@ import { computeEquivalentMediaValue } from './equivalent-media-value';
 import { generateRecapNarrative } from './recap-narrative';
 import { resolveDeliverables, autoEventPhotos } from './deliverables';
 import { computeBrandLift } from './survey';
+import { computeAcquisition } from './activation';
 import { INFLUENCE_TIER_META } from './influence-tiers';
 import { fmtInt, fmtMultiple, fmtPct, fmtUsdCompact } from './recap-format';
 import type {
@@ -229,13 +230,13 @@ export async function assembleRecap(args: AssembleArgs): Promise<AssembledRecap>
     ownedImpressions = 0,
     earnedImpressions = 0,
     deliverables,
-    acquisition = null,
     kind = 'activation_recap',
   } = args;
 
-  // Affinity (brand-lift): use an explicitly-passed summary, else auto-compute from any
-  // submitted PRE/POST survey responses. Null → recap keeps "available with the module".
+  // Affinity (brand-lift) + Acquisition (booth): use an explicitly-passed summary, else
+  // auto-compute from submitted survey/activation responses. Null → "available with the module".
   let affinity = args.affinity ?? null;
+  let acquisition = args.acquisition ?? null;
 
   const event = await db.event.findFirst({
     where: { id: eventId, workspaceId },
@@ -261,8 +262,9 @@ export async function assembleRecap(args: AssembleArgs): Promise<AssembledRecap>
     rightsFeeCents: sponsor?.rightsFeeCents ?? null,
   });
 
-  if (!affinity && sponsorBrandId) {
-    affinity = await computeBrandLift({ workspaceId, eventId, sponsorBrandId });
+  if (sponsorBrandId) {
+    if (!affinity) affinity = await computeBrandLift({ workspaceId, eventId, sponsorBrandId });
+    if (!acquisition) acquisition = await computeAcquisition({ workspaceId, eventId, sponsorBrandId });
   }
 
   const declared = detectDeclared(sponsor?.declaredObjectives);

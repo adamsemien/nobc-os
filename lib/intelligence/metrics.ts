@@ -239,3 +239,89 @@ export async function computeAudienceMetrics(args: {
     unsegmentedPct: attended ? unsegmented / attended : 0,
   };
 }
+
+/**
+ * Workspace-level audience deep-dive (for the pre-sale Audience Intelligence Brief).
+ * The whole approved membership rather than one event's attendees. registered == attended ==
+ * the addressable audience; there is no scan rate. Same PII-safety + suppression rules.
+ */
+export async function computeWorkspaceAudience(args: {
+  workspaceId: string;
+  persona?: PersonaCriteria | null;
+}): Promise<AudienceMetrics> {
+  const { workspaceId, persona } = args;
+
+  const members = await db.member.findMany({
+    where: { workspaceId, status: 'APPROVED' },
+    select: { email: true, industry: true, seniority: true, companySize: true },
+  });
+  const emails = Array.from(new Set(members.map((m) => m.email.toLowerCase().trim()).filter(Boolean)));
+  const apps = emails.length
+    ? await db.application.findMany({
+        where: { workspaceId, email: { in: emails } },
+        select: { email: true, archetype: true, city: true },
+      })
+    : [];
+  const archetypeByEmail = new Map<string, string | null>();
+  const cityByEmail = new Map<string, string>();
+  for (const a of apps) {
+    const k = a.email.toLowerCase().trim();
+    archetypeByEmail.set(k, a.archetype);
+    if (a.city && a.city.trim()) cityByEmail.set(k, a.city.trim());
+  }
+
+  const size = members.length;
+  const influenceCounts = new Map<InfluenceBucket, number>();
+  const seniorityCounts = new Map<string, number>();
+  const industryCounts = new Map<string, number>();
+  const cityCounts = new Map<string, number>();
+  let qualifiedExec = 0;
+  let unsegmented = 0;
+  let personaMatched = 0;
+
+  for (const m of members) {
+    const email = m.email.toLowerCase().trim();
+    const archetype = archetypeByEmail.get(email) ?? null;
+    const bucket = archetypeToBucket(archetype);
+    influenceCounts.set(bucket, (influenceCounts.get(bucket) ?? 0) + 1);
+    if (bucket === 'Unsegmented') unsegmented++;
+    if (bucket !== 'Unsegmented' && QUALIFIED_EXEC_TIERS.includes(bucket)) qualifiedExec++;
+    if (m.seniority) seniorityCounts.set(m.seniority, (seniorityCounts.get(m.seniority) ?? 0) + 1);
+    if (m.industry) industryCounts.set(m.industry, (industryCounts.get(m.industry) ?? 0) + 1);
+    const city = cityByEmail.get(email);
+    if (city) cityCounts.set(city, (cityCounts.get(city) ?? 0) + 1);
+    if (persona && personaMatches(persona, { archetype, industry: m.industry, seniority: m.seniority, companySize: m.companySize })) {
+      personaMatched++;
+    }
+  }
+
+  const buckets: InfluenceBucket[] = [...INFLUENCE_TIER_ORDER, 'Unsegmented'];
+  const influenceDistribution: InfluenceTierShare[] = buckets
+    .map((tier): InfluenceTierShare => {
+      const count = influenceCounts.get(tier) ?? 0;
+      return { tier, count, pct: size ? count / size : 0, suppressed: count > 0 && count < MIN_CELL };
+    })
+    .filter((sh) => sh.count > 0);
+
+  let weightSum = 0;
+  for (const [bucket, count] of influenceCounts) {
+    weightSum += (INFLUENCE_TIER_META[bucket]?.weight ?? INFLUENCE_TIER_META.Unsegmented.weight) * count;
+  }
+  const aggregateInfluenceScore = size ? Math.round(weightSum / size) : 0;
+
+  return {
+    registered: size,
+    attended: size,
+    overallScanRate: 0,
+    scanByTier: [],
+    influenceDistribution,
+    aggregateInfluenceScore,
+    qualifiedExecMix: size ? qualifiedExec / size : 0,
+    personaMatchPct: persona ? (size ? personaMatched / size : 0) : null,
+    personaMatchSuppressed: persona ? size < MIN_CELL : false,
+    geoSpread: toDistribution(cityCounts, size),
+    senioritySpread: toDistribution(seniorityCounts, size),
+    industrySpread: toDistribution(industryCounts, size),
+    unsegmentedPct: size ? unsegmented / size : 0,
+  };
+}

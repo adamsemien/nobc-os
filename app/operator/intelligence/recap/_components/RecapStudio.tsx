@@ -56,6 +56,8 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
   const [savingBrief, setSavingBrief] = useState(false);
   const [briefMsg, setBriefMsg] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [presaleBusy, setPresaleBusy] = useState(false);
+  const [presaleUrl, setPresaleUrl] = useState<string | null>(null);
 
   // Generate
   const [eventId, setEventId] = useState(events[0]?.id ?? '');
@@ -68,6 +70,8 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
   const [copied, setCopied] = useState(false);
   const [sendingSurvey, setSendingSurvey] = useState<'PRE' | 'POST' | null>(null);
   const [surveyMsg, setSurveyMsg] = useState<string | null>(null);
+  const [boothBusy, setBoothBusy] = useState(false);
+  const [boothUrl, setBoothUrl] = useState<string | null>(null);
 
   async function onSaveBrief() {
     if (!sponsorId || savingBrief) return;
@@ -99,6 +103,27 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
       setSponsorId(res.id);
     } catch {
       setBriefMsg('Could not create sponsor.');
+    }
+  }
+
+  async function onPresaleBrief() {
+    if (!sponsorId || presaleBusy) return;
+    setPresaleBusy(true);
+    setPresaleUrl(null);
+    setBriefMsg(null);
+    try {
+      const res = await fetch('/api/intelligence/audience-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sponsorBrandId: sponsorId }),
+      });
+      const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+      if (res.ok && data.ok && data.url) setPresaleUrl(data.url);
+      else setBriefMsg(data.error ?? 'Could not generate the brief.');
+    } catch {
+      setBriefMsg('Could not generate the brief.');
+    } finally {
+      setPresaleBusy(false);
     }
   }
 
@@ -152,6 +177,27 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
       setSurveyMsg('Could not send — please try again.');
     } finally {
       setSendingSurvey(null);
+    }
+  }
+
+  async function onBoothLink() {
+    if (!sponsorId || !eventId || boothBusy) return;
+    setBoothBusy(true);
+    setBoothUrl(null);
+    setSurveyMsg(null);
+    try {
+      const res = await fetch('/api/intelligence/booth-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, sponsorBrandId: sponsorId }),
+      });
+      const data = (await res.json()) as { ok?: boolean; url?: string };
+      if (res.ok && data.ok && data.url) setBoothUrl(data.url);
+      else setSurveyMsg('Could not create the booth link.');
+    } catch {
+      setSurveyMsg('Could not create the booth link.');
+    } finally {
+      setBoothBusy(false);
     }
   }
 
@@ -268,6 +314,26 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
             </button>
           </div>
         </div>
+
+        <div className="mt-8 border-t pt-5" style={{ borderColor: 'var(--border)' }}>
+          <p className="text-[11px] uppercase" style={{ letterSpacing: '0.2em', color: 'var(--text-secondary)' }}>
+            Pre-sale brief
+          </p>
+          <p className="mt-2 text-[12px]" style={{ color: 'var(--text-tertiary)' }}>
+            An Audience Intelligence one-sheeter for this sponsor — audience deep-dive, match score, and
+            projected value from your historical events.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={onPresaleBrief} disabled={presaleBusy} className="rounded-[3px] px-5 py-2.5 text-[11px] uppercase disabled:opacity-50" style={{ letterSpacing: '0.18em', background: 'var(--accent)', color: 'var(--on-primary)' }}>
+              {presaleBusy ? 'Generating…' : 'Generate pre-sale brief'}
+            </button>
+            {presaleUrl && (
+              <a href={presaleUrl} target="_blank" rel="noopener noreferrer" className="break-all text-[12px] underline" style={{ color: 'var(--text-secondary)' }}>
+                {presaleUrl}
+              </a>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* ── Generate Activation Recap ────────────────────────── */}
@@ -343,6 +409,16 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
             <button type="button" onClick={() => onSendSurvey('POST')} disabled={sendingSurvey !== null || !eventId} className="rounded-[3px] border px-4 py-2 text-[11px] uppercase disabled:opacity-50" style={{ letterSpacing: '0.14em', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
               {sendingSurvey === 'POST' ? 'Sending…' : 'Send post-survey'}
             </button>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={onBoothLink} disabled={boothBusy || !eventId} className="rounded-[3px] border px-4 py-2 text-[11px] uppercase disabled:opacity-50" style={{ letterSpacing: '0.14em', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+              {boothBusy ? 'Creating…' : 'Generate booth link'}
+            </button>
+            {boothUrl && (
+              <a href={boothUrl} target="_blank" rel="noopener noreferrer" className="break-all text-[12px] underline" style={{ color: 'var(--text-secondary)' }}>
+                {boothUrl}
+              </a>
+            )}
           </div>
           {surveyMsg && <p className="mt-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{surveyMsg}</p>}
         </div>

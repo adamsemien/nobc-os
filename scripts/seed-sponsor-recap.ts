@@ -184,6 +184,7 @@ async function main(): Promise<void> {
     "Easily the most considered evening I've been to in Austin this year.",
   ];
   let surveyCount = 0;
+  let activationCount = 0;
   for (let i = 0; i < checkedInAttendees.length; i++) {
     const { memberId } = checkedInAttendees[i];
     await db.surveyResponse.create({
@@ -216,8 +217,24 @@ async function main(): Promise<void> {
       },
     });
     surveyCount += 2;
+
+    // ~2/3 of attendees visit the sponsor booth (Phase 2 activation loop)
+    if (i % 3 !== 0) {
+      await db.surveyResponse.create({
+        data: {
+          workspaceId,
+          eventId: event.id,
+          sponsorBrandId: sponsor.id,
+          memberId,
+          phase: 'ACTIVATION',
+          answers: { interaction: 'Stopped by to talk about the new range', crm_opt_in: i % 4 === 0 ? 'no' : 'yes' },
+          submittedAt: startAt,
+        },
+      });
+      activationCount++;
+    }
   }
-  console.log(`Seeded ${surveyCount} survey responses (${checkedInAttendees.length} PRE+POST pairs).`);
+  console.log(`Seeded ${surveyCount} survey responses (${checkedInAttendees.length} PRE+POST pairs) + ${activationCount} booth interactions.`);
 
   // ── generate the recap (the real pipeline) ───────────────────────────────────
   const { generateAndStoreRecap } = await import('@/lib/intelligence/recap-delivery');
@@ -294,6 +311,31 @@ async function main(): Promise<void> {
     const affObj = p.objectives.find((o) => o.objective === 'Affinity');
     if (affObj) console.log(`  Affinity objective: [${affObj.status}] ${affObj.headline}`);
   }
+
+  if (p.acquisition) {
+    const ac = p.acquisition;
+    console.log(`\n=== ACQUISITION — booth (live) ===`);
+    console.log(`  ${ac.boothInteractions} booth interactions · ${ac.interactionRatePct}% of attendees · ${ac.crmOptIns} CRM opt-ins (${ac.crmOptInRatePct}%)${ac.suppressed ? ' [suppressed]' : ''}`);
+    const acqObj = p.objectives.find((o) => o.objective === 'Acquisition');
+    if (acqObj) console.log(`  Acquisition objective: [${acqObj.status}] ${acqObj.headline}`);
+  }
+
+  // ── pre-sale Audience Intelligence Brief (Phase 2b) ──────────────────────────
+  const { generateAndStoreBrief } = await import('@/lib/intelligence/recap-delivery');
+  const { renderDocPdf } = await import('@/lib/pdf/render');
+  const brief = await generateAndStoreBrief({ workspaceId, sponsorBrandId: sponsor.id, generatedBySession: 'seed-script' });
+  try {
+    writeFileSync('/tmp/sponsor-brief-demo.pdf', await renderDocPdf(brief.payload));
+    console.log('\nBrief PDF written to /tmp/sponsor-brief-demo.pdf');
+  } catch (e) {
+    console.error('brief PDF write failed:', e);
+  }
+  const bp = brief.payload;
+  console.log(`\n=== PRE-SALE AUDIENCE INTELLIGENCE BRIEF ===`);
+  console.log(`Magic link: ${brief.url}`);
+  console.log(`Standfirst: ${bp.narrative.coverStandfirst}`);
+  for (const h of bp.heroStats) console.log(`  ${h.value}  ${h.label} — ${h.whatThisMeans}`);
+  console.log(`Recommendation: ${bp.narrative.renewal}`);
 
   console.log(`\nDone.`);
   await db.$disconnect();
