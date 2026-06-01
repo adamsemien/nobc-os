@@ -11,6 +11,7 @@ import { computeAudienceMetrics, type PersonaCriteria } from './metrics';
 import { computeEquivalentMediaValue } from './equivalent-media-value';
 import { generateRecapNarrative } from './recap-narrative';
 import { resolveDeliverables, autoEventPhotos } from './deliverables';
+import { computeBrandLift } from './survey';
 import { INFLUENCE_TIER_META } from './influence-tiers';
 import { fmtInt, fmtMultiple, fmtPct, fmtUsdCompact } from './recap-format';
 import type {
@@ -228,10 +229,13 @@ export async function assembleRecap(args: AssembleArgs): Promise<AssembledRecap>
     ownedImpressions = 0,
     earnedImpressions = 0,
     deliverables,
-    affinity = null,
     acquisition = null,
     kind = 'activation_recap',
   } = args;
+
+  // Affinity (brand-lift): use an explicitly-passed summary, else auto-compute from any
+  // submitted PRE/POST survey responses. Null → recap keeps "available with the module".
+  let affinity = args.affinity ?? null;
 
   const event = await db.event.findFirst({
     where: { id: eventId, workspaceId },
@@ -256,6 +260,10 @@ export async function assembleRecap(args: AssembleArgs): Promise<AssembledRecap>
     totalReach,
     rightsFeeCents: sponsor?.rightsFeeCents ?? null,
   });
+
+  if (!affinity && sponsorBrandId) {
+    affinity = await computeBrandLift({ workspaceId, eventId, sponsorBrandId });
+  }
 
   const declared = detectDeclared(sponsor?.declaredObjectives);
   const objectives = buildObjectives({ declared, m: metrics, mv: mediaValue, affinity, acquisition });

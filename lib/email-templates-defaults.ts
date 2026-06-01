@@ -126,6 +126,22 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     variables: ['member.firstName', 'event.title'],
     enabled: true,
   },
+  {
+    key: 'sponsor.survey_invite',
+    name: 'Sponsor brand-lift survey',
+    description: 'Pre/post survey invite that measures brand lift for a sponsored event.',
+    subject: 'A quick word on {{event.title}}',
+    bodyHtml:
+      `<p>{{member.firstName}} —</p>` +
+      `<p>{{survey.intro}}</p>` +
+      `<p>It takes under a minute and stays anonymous in anything we share.</p>` +
+      `<p><a href="{{survey.url}}" style="display:inline-block;background:#B22E21;color:#f9f7f2;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;">{{survey.cta}}</a></p>` +
+      SIG,
+    bodyText:
+      `{{member.firstName}} —\n\n{{survey.intro}}\n\nIt takes under a minute and stays anonymous in anything we share.\n\n{{survey.cta}}: {{survey.url}}\n\n—\nNo Bad Company`,
+    variables: ['member.firstName', 'event.title', 'survey.intro', 'survey.cta', 'survey.url'],
+    enabled: true,
+  },
 ];
 
 export type DefaultSetting = {

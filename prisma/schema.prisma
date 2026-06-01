@@ -48,6 +48,7 @@ model Workspace {
   sponsorBrandProfiles SponsorBrandProfile[]
   generatedAssets      GeneratedAsset[]
   recapSnapshots       RecapSnapshot[]
+  surveyResponses      SurveyResponse[]
   svixAppId            String?
   watchList            WatchList[]
   emailTemplates       EmailTemplate[]
@@ -194,6 +195,7 @@ model Member {
   referredByMember Member?  @relation("MemberReferrals", fields: [referredByMemberId], references: [id])
   referredMembers  Member[] @relation("MemberReferrals")
   engagementEvents MemberEngagementEvent[]
+  surveyResponses  SurveyResponse[]
 
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
@@ -1151,6 +1153,7 @@ model SponsorBrandProfile {
 
   generatedAssets GeneratedAsset[]
   recapSnapshots  RecapSnapshot[]
+  surveyResponses SurveyResponse[]
   seriesSponsors  SeriesSponsor[]
   workspace       Workspace        @relation(fields: [workspaceId], references: [id])
 
@@ -1197,6 +1200,37 @@ model GeneratedAsset {
   workspace    Workspace            @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
+}
+
+// Pre/post/at-activation survey responses (Sponsor Intelligence, Phase 1/2). Powers brand-lift
+// (PRE vs POST) and the activation-loop booth capture (ACTIVATION). New CREATE TYPE enum — never
+// ALTER an existing enum. Workspace-scoped; eventId is a soft FK (string + index).
+enum SurveyPhase {
+  PRE
+  POST
+  ACTIVATION
+}
+
+model SurveyResponse {
+  id             String               @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace            @relation(fields: [workspaceId], references: [id])
+  eventId        String
+  sponsorBrandId String?
+  sponsorBrand   SponsorBrandProfile? @relation(fields: [sponsorBrandId], references: [id])
+  memberId       String?
+  member         Member?              @relation(fields: [memberId], references: [id])
+  phase          SurveyPhase
+  token          String?              @unique // public submission magic-link token (null for seeded/direct)
+  answers        Json                 @default("{}")
+  sentAt         DateTime? // set when an invite email is dispatched
+  submittedAt    DateTime? // set when the respondent submits
+  createdAt      DateTime             @default(now())
+
+  @@index([workspaceId])
+  @@index([eventId])
+  @@index([sponsorBrandId])
+  @@index([memberId])
 }
 
 // Internal operator-to-operator notes attached to any entity

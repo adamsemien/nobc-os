@@ -66,6 +66,8 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
   const [genError, setGenError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [sendingSurvey, setSendingSurvey] = useState<'PRE' | 'POST' | null>(null);
+  const [surveyMsg, setSurveyMsg] = useState<string | null>(null);
 
   async function onSaveBrief() {
     if (!sponsorId || savingBrief) return;
@@ -130,6 +132,26 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
       setGenError('Generation failed — please try again.');
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function onSendSurvey(phase: 'PRE' | 'POST') {
+    if (!sponsorId || !eventId || sendingSurvey) return;
+    setSendingSurvey(phase);
+    setSurveyMsg(null);
+    try {
+      const res = await fetch('/api/intelligence/survey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, sponsorBrandId: sponsorId, phase }),
+      });
+      const data = (await res.json()) as { ok?: boolean; invited?: number; sent?: number; skipped?: number; error?: string };
+      if (!res.ok || !data.ok) setSurveyMsg(data.error ?? 'Could not send the survey.');
+      else setSurveyMsg(`${phase} survey — ${data.invited} invited, ${data.sent} emailed, ${data.skipped} skipped.`);
+    } catch {
+      setSurveyMsg('Could not send — please try again.');
+    } finally {
+      setSendingSurvey(null);
     }
   }
 
@@ -305,6 +327,25 @@ export function RecapStudio({ sponsors, events }: { sponsors: SponsorDTO[]; even
             </div>
           </div>
         )}
+
+        <div className="mt-8 border-t pt-5" style={{ borderColor: 'var(--border)' }}>
+          <p className="text-[11px] uppercase" style={{ letterSpacing: '0.2em', color: 'var(--text-secondary)' }}>
+            Brand-lift survey
+          </p>
+          <p className="mt-2 text-[12px]" style={{ color: 'var(--text-tertiary)' }}>
+            Email the audience a pre- or post-event survey from team@thenobadcompany.com. The recap&rsquo;s
+            Affinity section fills in automatically as responses arrive.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button type="button" onClick={() => onSendSurvey('PRE')} disabled={sendingSurvey !== null || !eventId} className="rounded-[3px] border px-4 py-2 text-[11px] uppercase disabled:opacity-50" style={{ letterSpacing: '0.14em', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+              {sendingSurvey === 'PRE' ? 'Sending…' : 'Send pre-survey'}
+            </button>
+            <button type="button" onClick={() => onSendSurvey('POST')} disabled={sendingSurvey !== null || !eventId} className="rounded-[3px] border px-4 py-2 text-[11px] uppercase disabled:opacity-50" style={{ letterSpacing: '0.14em', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+              {sendingSurvey === 'POST' ? 'Sending…' : 'Send post-survey'}
+            </button>
+          </div>
+          {surveyMsg && <p className="mt-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{surveyMsg}</p>}
+        </div>
       </section>
     </div>
   );

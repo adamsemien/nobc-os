@@ -65,7 +65,10 @@ async function main(): Promise<void> {
   // ── cleanup (also runs at the start of a seed for idempotency) ───────────────
   async function cleanup(): Promise<void> {
     const ev = await db.event.findFirst({ where: { workspaceId, slug: DEMO_SLUG }, select: { id: true } });
-    if (ev) await db.rSVP.deleteMany({ where: { workspaceId, eventId: ev.id } });
+    if (ev) {
+      await db.surveyResponse.deleteMany({ where: { workspaceId, eventId: ev.id } });
+      await db.rSVP.deleteMany({ where: { workspaceId, eventId: ev.id } });
+    }
     const demoMembers = await db.member.findMany({ where: { workspaceId, tags: { has: DEMO_TAG } }, select: { email: true } });
     const emails = demoMembers.map((m) => m.email);
     if (emails.length) await db.application.deleteMany({ where: { workspaceId, email: { in: emails } } });
@@ -114,6 +117,7 @@ async function main(): Promise<void> {
 
   // ── demo members + applications + RSVPs ──────────────────────────────────────
   let attended = 0;
+  const attendees: { memberId: string; checkedIn: boolean }[] = [];
   for (let i = 0; i < N; i++) {
     const arch = archetypeFor(i);
     const email = `demo+recap-${i}@nobc.demo`;
@@ -168,8 +172,52 @@ async function main(): Promise<void> {
         guestName: isGuest ? fullName : null,
       },
     });
+    attendees.push({ memberId: member.id, checkedIn });
   }
   console.log(`Seeded ${N} members/applications/RSVPs · ${attended} checked in.`);
+
+  // ── demo brand-lift survey responses (PRE baseline + POST) ───────────────────
+  const checkedInAttendees = attendees.filter((a) => a.checkedIn);
+  const QUOTES = [
+    "I came for the dinner and left with two introductions I'll be following up on Monday.",
+    'The small touches — the Aesop wash in the bathroom — said everything about the taste in the room.',
+    "Easily the most considered evening I've been to in Austin this year.",
+  ];
+  let surveyCount = 0;
+  for (let i = 0; i < checkedInAttendees.length; i++) {
+    const { memberId } = checkedInAttendees[i];
+    await db.surveyResponse.create({
+      data: {
+        workspaceId,
+        eventId: event.id,
+        sponsorBrandId: sponsor.id,
+        memberId,
+        phase: 'PRE',
+        answers: { awareness: [3, 4, 2, 4, 3][i % 5], consideration: [2, 4, 3, 4, 2][i % 5] },
+        submittedAt: startAt,
+      },
+    });
+    await db.surveyResponse.create({
+      data: {
+        workspaceId,
+        eventId: event.id,
+        sponsorBrandId: sponsor.id,
+        memberId,
+        phase: 'POST',
+        answers: {
+          awareness: [4, 5, 4, 3, 5][i % 5],
+          consideration: [4, 4, 5, 3, 4][i % 5],
+          recall: i % 6 === 0 ? 'no' : 'yes',
+          nps: [9, 10, 9, 8, 10, 9][i % 6],
+          conversation_quality: i % 5 === 0 ? 4 : 5,
+          ...(i < QUOTES.length ? { quote: QUOTES[i] } : {}),
+        },
+        submittedAt: startAt,
+      },
+    });
+    surveyCount += 2;
+  }
+  console.log(`Seeded ${surveyCount} survey responses (${checkedInAttendees.length} PRE+POST pairs).`);
 
   // ── generate the recap (the real pipeline) ───────────────────────────────────
   const { generateAndStoreRecap } = await import('@/lib/intelligence/recap-delivery');
@@ -235,6 +283,16 @@ async function main(): Promise<void> {
   console.log(`\n=== INFLUENCE DISTRIBUTION ===`);
   for (const s of p.audience.influenceDistribution) {
     console.log(`  ${s.tier}: ${s.count} (${Math.round(s.pct * 100)}%)${s.suppressed ? ' [suppressed <5]' : ''}`);
+  }
+
+  if (p.affinity) {
+    const a = p.affinity;
+    console.log(`\n=== AFFINITY — brand lift (live) ===`);
+    console.log(`  sample ${a.sampleSize}${a.smallSample ? ' (small — read qualitatively)' : ''}`);
+    console.log(`  awareness +${a.awarenessLiftPct}pp · consideration +${a.considerationLiftPct}pp · recall ${a.sponsorshipRecallPct}% · activation NPS ${a.activationNps} · conversation ${a.conversationQuality}/100`);
+    for (const q of a.quotes) console.log(`  “${q}”`);
+    const affObj = p.objectives.find((o) => o.objective === 'Affinity');
+    if (affObj) console.log(`  Affinity objective: [${affObj.status}] ${affObj.headline}`);
   }
 
   console.log(`\nDone.`);
