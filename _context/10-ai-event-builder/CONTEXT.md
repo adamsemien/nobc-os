@@ -6,12 +6,20 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🔶 Partial |
+| **State** | 🔶 Partial — **v1 (Phases 1–3) built on `feat/ai-event-builder`, unmerged, pending review** |
 | **V1 item** | #19 |
-| **Last updated** | 2026-05-20 |
+| **Last updated** | 2026-06-04 |
 | **Owner** | Adam |
-| **Blocked on** | Nothing |
-| **Next** | Build out the structured EventBuilder/Intake/Enrichment/Draft/Review UI flow (route handlers exist, UI flow incomplete) |
+| **Blocked on** | Nothing (awaiting review + merge of `feat/ai-event-builder`) |
+| **Next** | Review + merge `feat/ai-event-builder`. Then optional Phase 4 (per-event `EventSponsor` join — none exists today; v1 only notes the sponsor name) and Phase 5 polish (`EventDraft` save/resume, an "AI draft" badge in the event list, `AgentPanel`-style slide-over trigger). |
+
+> **v1 reality (2026-06-04, `feat/ai-event-builder`, Phases 1–3).** Shipped the smallest useful version: natural language → reviewable draft, committed only on explicit operator action. **Approach diverges from the original 5-stage / MCP-write design below**, deliberately and more safely:
+> - **One `generateObject` call** (`app/api/agent/event-builder`, STAFF-gated, `claude-sonnet-4-20250514`) returns a zod-validated `EventDraft` (event fields + optional `ticketTiers[]` + `announcementDraft` + `sponsorName`). The model **writes nothing to the DB and registers no tools**; there is no `status` field, so it can never publish.
+> - **Review surface is the existing `/operator/events/new` multi-step form** (not new `events/new/ai/*` pages), with an "AI draft — review before publishing" banner; every field editable.
+> - **Writes go through the existing gated REST create routes** — `POST /api/operator/events`, then `POST /api/operator/ticket-tiers` per tier, then `POST /api/operator/comments` for the announcement draft — **not** MCP tools. This satisfies the "human gate / model never writes" intent of Rules 1–2 via a different (simpler) path than Rule 2's literal "MCP tools" wording. Update Rule 2 if this becomes the permanent design.
+> - Sponsor is a **note only** (no `EventSponsor` model). Announcement is **stored as a draft event comment, never sent** (no member-broadcast channel exists; v1 builds none).
+> - Deleted the dead, ungated public duplicate `app/api/ai/event-builder/route.ts` (no callers).
+> - Not built in v1: the "AI draft" badge in the event list (Rule 5), `EventDraft` persistence, rewind-between-stages (Rule 4 — the form's step nav covers editing). Zero schema change.
 
 ## Scope
 
@@ -30,14 +38,18 @@ This stage owns the **UI for the event builder flow** and the **agent prompt con
 ## Files in play
 
 ```
-app/api/agent/event-builder/route.ts            ← agent flow proxy (the only piece of this stage that exists today)
-app/api/ai/event-builder/route.ts               ← alternate AI-builder entry route (parallel to the agent path)
+app/api/agent/event-builder/route.ts            ← v1 generator: single generateObject → zod EventDraft (event + tiers + announcement + sponsorName), STAFF-gated, no DB writes, no tools
+app/operator/events/new/page.tsx                 ← v1 review + commit UI: AI prompt → editable draft (banner, tier cards, announcement) → existing create routes
 
-# All of the following are PLANNED, NOT YET BUILT — the 🔶 Partial status reflects this:
-# app/operator/events/new/ai/page.tsx             ← AI event builder entry
-# app/operator/events/new/ai/[sessionId]/page.tsx ← in-progress session
-# components/operator/EventBuilder/{Intake,Enrichment,Draft,Review}.tsx  ← per-stage UIs
-# lib/event-builder/prompts/                      ← prompt contracts per stage
+# Committed-through (existing, unchanged) routes:
+#   POST /api/operator/events         ← event create (STAFF, zod, txn, audit)
+#   POST /api/operator/ticket-tiers   ← per-tier create (STAFF)
+#   POST /api/operator/comments       ← announcement saved as a draft event comment (STAFF)
+
+# Deleted in v1: app/api/ai/event-builder/route.ts (dead, ungated public duplicate, no callers)
+
+# Deferred (Phases 4–5, NOT built):
+# EventSponsor model + sponsor matching · EventDraft persistence · "AI draft" badge in event list · slide-over trigger
 ```
 
 ## Inputs
