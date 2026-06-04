@@ -47,6 +47,8 @@ model Workspace {
   entityTags           EntityTag[]
   sponsorBrandProfiles SponsorBrandProfile[]
   generatedAssets      GeneratedAsset[]
+  recapSnapshots       RecapSnapshot[]
+  surveyResponses      SurveyResponse[]
   svixAppId            String?
   watchList            WatchList[]
   emailTemplates       EmailTemplate[]
@@ -193,6 +195,7 @@ model Member {
   referredByMember Member?  @relation("MemberReferrals", fields: [referredByMemberId], references: [id])
   referredMembers  Member[] @relation("MemberReferrals")
   engagementEvents MemberEngagementEvent[]
+  surveyResponses  SurveyResponse[]
 
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
@@ -427,11 +430,16 @@ model EventCustomQuestion {
   showToMember Boolean          @default(true)
   showToGuest  Boolean          @default(true)
   whenInFlow   QuestionFlowStep @default(BEFORE_SUBMIT)
+  // Sponsor-scoped activation/booth form (Sponsor Intelligence, Phase 2). Null = a normal
+  // registration field; set = a question shown at the sponsor's at-activation booth surface.
+  sponsorBrandId String?
+  sponsorBrand   SponsorBrandProfile? @relation(fields: [sponsorBrandId], references: [id])
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
   @@index([workspaceId])
   @@index([eventId])
+  @@index([sponsorBrandId])
 }
 
 enum RSVPStatus {
@@ -1142,7 +1150,16 @@ model SponsorBrandProfile {
   primaryColor String?
   logoAssetId  String?
 
+  // Sponsor Brief intake (Sponsor Intelligence, Phase 0). Brand-level brief — there is no
+  // per-event sponsor model; per-event reproducibility is captured in RecapSnapshot.
+  declaredObjectives    String? // sponsor's stated objectives in their own language (Awareness/Affinity/Acquisition/Activation + targets)
+  targetPersonaCriteria Json?   // persona to match the audience against: { archetypes, industries, seniority, companySizes, minAttendance }
+  rightsFeeCents        Int?    // sponsorship rights fee in cents (money-as-cents convention) — drives the value-vs-fee multiple
+
   generatedAssets GeneratedAsset[]
+  recapSnapshots  RecapSnapshot[]
+  surveyResponses SurveyResponse[]
+  sponsorScopedQuestions EventCustomQuestion[]
   seriesSponsors  SeriesSponsor[]
   workspace       Workspace        @relation(fields: [workspaceId], references: [id])
 
@@ -1150,6 +1167,27 @@ model SponsorBrandProfile {
   updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
+}
+
+// Frozen, reproducible snapshot of the computed numbers behind an Activation Recap PDF
+// (Sponsor Intelligence, Phase 0). Numbers are computed in code and stored here so a
+// regenerated PDF and the magic-link always agree. Workspace-scoped.
+model RecapSnapshot {
+  id                 String               @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace            @relation(fields: [workspaceId], references: [id])
+  eventId            String // soft FK (plain string + index), mirrors Asset.eventId
+  sponsorBrandId     String?
+  sponsorBrand       SponsorBrandProfile? @relation(fields: [sponsorBrandId], references: [id])
+  metrics            Json // frozen computed metrics behind the recap (audience, scan rates, archetype mix, persona match)
+  mediaValueInputs   Json // attendeeCount, qualifiedMix, totalReach + the three EMV tier outputs
+  generatedAt        DateTime             @default(now())
+  generatedBySession String?
+  createdAt          DateTime             @default(now())
+
+  @@index([workspaceId])
+  @@index([eventId])
+  @@index([sponsorBrandId])
 }
 
 model GeneratedAsset {
@@ -1168,6 +1206,37 @@ model GeneratedAsset {
   workspace    Workspace            @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
+}
+
+// Pre/post/at-activation survey responses (Sponsor Intelligence, Phase 1/2). Powers brand-lift
+// (PRE vs POST) and the activation-loop booth capture (ACTIVATION). New CREATE TYPE enum — never
+// ALTER an existing enum. Workspace-scoped; eventId is a soft FK (string + index).
+enum SurveyPhase {
+  PRE
+  POST
+  ACTIVATION
+}
+
+model SurveyResponse {
+  id             String               @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace            @relation(fields: [workspaceId], references: [id])
+  eventId        String
+  sponsorBrandId String?
+  sponsorBrand   SponsorBrandProfile? @relation(fields: [sponsorBrandId], references: [id])
+  memberId       String?
+  member         Member?              @relation(fields: [memberId], references: [id])
+  phase          SurveyPhase
+  token          String?              @unique // public submission magic-link token (null for seeded/direct)
+  answers        Json                 @default("{}")
+  sentAt         DateTime? // set when an invite email is dispatched
+  submittedAt    DateTime? // set when the respondent submits
+  createdAt      DateTime             @default(now())
+
+  @@index([workspaceId])
+  @@index([eventId])
+  @@index([sponsorBrandId])
+  @@index([memberId])
 }
 
 // Internal operator-to-operator notes attached to any entity

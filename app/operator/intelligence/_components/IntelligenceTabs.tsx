@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-type Tab = { key: 'community' | 'sponsors'; label: string; href: string };
+type Tab = { key: 'community' | 'sponsors' | 'recap'; label: string; href: string };
 
 export function IntelligenceTabs({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
@@ -12,10 +12,12 @@ export function IntelligenceTabs({ isAdmin }: { isAdmin: boolean }) {
   ];
   if (isAdmin) {
     tabs.push({ key: 'sponsors', label: 'Sponsors', href: '/operator/intelligence/sponsor' });
+    tabs.push({ key: 'recap', label: 'Recap Studio', href: '/operator/intelligence/recap' });
   }
 
+  const isRecap = pathname.startsWith('/operator/intelligence/recap');
   const isSponsors = pathname.startsWith('/operator/intelligence/sponsor');
-  const activeKey: Tab['key'] = isSponsors ? 'sponsors' : 'community';
+  const activeKey: Tab['key'] = isRecap ? 'recap' : isSponsors ? 'sponsors' : 'community';
 
   return (
     <nav
