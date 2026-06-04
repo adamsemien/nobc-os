@@ -463,6 +463,27 @@ export default function NewEventPage() {
         }
       }
 
+      // Phase 3: persist the announcement copy as a draft comment ON the event
+      // (reuses the comments primitive). This stores the copy; it does NOT send
+      // anything to members — there is no member-broadcast channel in v1.
+      if (announcement.trim()) {
+        try {
+          const annRes = await fetch('/api/operator/comments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              entityType: 'event',
+              entityId: event.id,
+              body: `Announcement draft (AI)\n\n${announcement.trim()}`.slice(0, 4000),
+            }),
+            credentials: 'include',
+          });
+          if (!annRes.ok) console.error(`[ai-event-builder] announcement draft save failed: ${annRes.status}`);
+        } catch (err) {
+          console.error('[ai-event-builder] announcement draft save error:', err);
+        }
+      }
+
       logQAAction(`created event (status=${status})`);
       router.push(`/operator/events/${event.id}`);
     } catch (e) {
