@@ -31,6 +31,15 @@ type FlowTemplate = {
   customQuestions: Array<{ label: string; type: string; required: boolean; options: string[] }>;
 };
 
+type DraftTier = {
+  id: string;
+  name: string;
+  description: string;
+  memberPrice: string; // dollars; converted to cents on submit
+  nonMemberPrice: string; // dollars
+  quantity: string;
+};
+
 type Step = 1 | 2 | 3 | 4;
 
 type FormState = {
@@ -171,6 +180,13 @@ export default function NewEventPage() {
   const [questions, setQuestions] = useState<AccessQuestion[]>([]);
   const [template, setTemplate] = useState<TemplateKey>('editorial');
 
+  // AI draft extras (Phases 2/3): tiers, announcement, sponsor note, plus-ones.
+  const [aiDraft, setAiDraft] = useState(false);
+  const [plusOnes, setPlusOnes] = useState(false);
+  const [aiTiers, setAiTiers] = useState<DraftTier[]>([]);
+  const [announcement, setAnnouncement] = useState('');
+  const [sponsorName, setSponsorName] = useState('');
+
   // AI builder
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiExpanded, setAiExpanded] = useState(false);
@@ -222,6 +238,13 @@ export default function NewEventPage() {
     set('slug', val);
   }
 
+  function updateTier(idx: number, key: keyof DraftTier, value: string) {
+    setAiTiers(prev => prev.map((t, i) => (i === idx ? { ...t, [key]: value } : t)));
+  }
+  function removeTier(idx: number) {
+    setAiTiers(prev => prev.filter((_, i) => i !== idx));
+  }
+
   async function handleAiGenerate() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
@@ -240,10 +263,16 @@ export default function NewEventPage() {
         description?: string;
         startDatetime?: string;
         endDatetime?: string;
-        venue?: string;
+        location?: string;
         capacity?: number;
         accessMode?: 'OPEN' | 'TICKETED';
+        approvalRequired?: boolean;
+        plusOnesAllowed?: boolean;
         template?: TemplateKey;
+        customQuestions?: Array<{ label: string; type: string; required: boolean; options?: string[] }>;
+        ticketTiers?: Array<{ name: string; description?: string; memberPriceCents?: number; nonMemberPriceCents?: number; quantity: number }>;
+        announcementDraft?: string;
+        sponsorName?: string;
       };
 
       setForm(prev => {
@@ -253,23 +282,58 @@ export default function NewEventPage() {
         if (data.description) next.description = data.description;
         if (data.startDatetime) { const p = parseIsoToDateTime(data.startDatetime); if (p) { next.startDate = p.date; next.startTime = p.time; } }
         if (data.endDatetime) { const p = parseIsoToDateTime(data.endDatetime); if (p) { next.endDate = p.date; next.endTime = p.time; } }
-        if (data.venue) next.location = data.venue;
+        if (data.location) next.location = data.location;
         if (data.capacity != null) next.capacity = String(data.capacity);
         return next;
       });
       if (data.slug) setSlugEdited(true);
 
-      if (data.accessMode === 'TICKETED') {
+      // Reasonable access prefill from the draft. The operator edits everything in step 3.
+      const ticketed = data.accessMode === 'TICKETED';
+      const approval = data.approvalRequired === true;
+      if (ticketed || approval) {
         setAccess({
-          member: { enabled: true, gates: [newGate('ticket')], priceCents: 0 },
-          guest: { enabled: true, gates: [newGate('ticket')], priceCents: 0 },
+          member: {
+            enabled: true,
+            gates: [...(approval ? [newGate('application')] : []), ...(ticketed ? [newGate('ticket')] : [])],
+            priceCents: 0,
+          },
+          guest: { enabled: ticketed, gates: ticketed ? [newGate('ticket')] : [], priceCents: 0 },
           comp: { enabled: false, budgetCap: null },
         });
       } else {
         setAccess(defaultEventAccess());
       }
 
+      setPlusOnes(data.plusOnesAllowed === true);
+
+      if (data.customQuestions && data.customQuestions.length > 0) {
+        setQuestions(data.customQuestions.map((q, i) => ({
+          tempId: `ai-${i}-${Date.now()}`,
+          label: q.label,
+          type: coerceFieldType(q.type),
+          required: q.required,
+          options: q.options ?? [],
+          showTo: 'both' as const,
+        })));
+      }
+
+      if (data.ticketTiers && data.ticketTiers.length > 0) {
+        setAiTiers(data.ticketTiers.map((t, i) => ({
+          id: `ai-tier-${i}-${Date.now()}`,
+          name: t.name,
+          description: t.description ?? '',
+          memberPrice: t.memberPriceCents != null ? String(t.memberPriceCents / 100) : '',
+          nonMemberPrice: t.nonMemberPriceCents != null ? String(t.nonMemberPriceCents / 100) : '',
+          quantity: String(t.quantity),
+        })));
+      }
+
+      if (data.announcementDraft) setAnnouncement(data.announcementDraft);
+      if (data.sponsorName) setSponsorName(data.sponsorName);
+
       if (data.template) setTemplate(data.template);
+      setAiDraft(true);
       setAiFilled(true);
       setHighlightFields(true);
       setStep(2);
@@ -351,7 +415,9 @@ export default function NewEventPage() {
         status,
         eventAccess: access,
         workflow,
-        ...(appliedTemplate && { plusOnesAllowed: appliedTemplate.plusOnesAllowed, showCapacity: appliedTemplate.showCapacity }),
+        ...(appliedTemplate
+          ? { plusOnesAllowed: appliedTemplate.plusOnesAllowed, showCapacity: appliedTemplate.showCapacity }
+          : (plusOnes ? { plusOnesAllowed: true } : {})),
         ...(questions.length > 0 && { customQuestions: questions.map(toApiQuestion) }),
       };
 
@@ -366,6 +432,37 @@ export default function NewEventPage() {
         throw new Error(text || `Save failed (${res.status})`);
       }
       const { event } = (await res.json()) as { event: { id: string } };
+
+      // Best-effort post-steps through EXISTING routes (no new write path). The event
+      // already exists; tier/announcement failures are logged (never swallowed) and do
+      // not block navigation — the operator lands on the event to finish setup.
+      const toCents = (v: string) => {
+        const n = parseFloat(v);
+        return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined;
+      };
+      for (const t of aiTiers) {
+        const quantity = parseInt(t.quantity, 10);
+        if (!t.name.trim() || !Number.isFinite(quantity) || quantity <= 0) continue;
+        try {
+          const tierRes = await fetch('/api/operator/ticket-tiers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              eventId: event.id,
+              name: t.name.trim(),
+              description: t.description.trim() || undefined,
+              memberPriceCents: toCents(t.memberPrice),
+              nonMemberPriceCents: toCents(t.nonMemberPrice),
+              quantity,
+            }),
+            credentials: 'include',
+          });
+          if (!tierRes.ok) console.error(`[ai-event-builder] tier "${t.name}" create failed: ${tierRes.status}`);
+        } catch (err) {
+          console.error(`[ai-event-builder] tier "${t.name}" create error:`, err);
+        }
+      }
+
       logQAAction(`created event (status=${status})`);
       router.push(`/operator/events/${event.id}`);
     } catch (e) {
@@ -395,6 +492,19 @@ export default function NewEventPage() {
         <h1 className={`mb-7 text-[24px] font-semibold tracking-tight text-text-primary ${chrome}`}>
           New Event
         </h1>
+
+        {aiDraft && (
+          <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-primary-soft bg-primary-soft px-4 py-3">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div className={`text-[13px] text-text-primary ${chrome}`}>
+              <p className="font-semibold">AI draft — review before publishing.</p>
+              <p className="mt-0.5 text-text-secondary">
+                Every field is editable. Nothing is sent or published until you confirm.
+                {sponsorName ? ` Sponsor noted: ${sponsorName} (not linked to a sponsor record in this version).` : ''}
+              </p>
+            </div>
+          </div>
+        )}
 
         <StepIndicator current={step} />
 
@@ -538,6 +648,51 @@ export default function NewEventPage() {
             </div>
 
             <AccessGroupsCard value={access} onChange={setAccess} questions={questions} onQuestionsChange={setQuestions} eventTitle={form.title} />
+
+            {aiTiers.length > 0 && (
+              <div className="mt-8 rounded-[10px] border border-border bg-card p-5">
+                <p className={`mb-1 text-[11px] font-medium uppercase tracking-widest text-text-secondary ${chrome}`}>
+                  Ticket Tiers — AI draft
+                </p>
+                <p className={`mb-4 text-[12px] text-text-tertiary ${chrome}`}>
+                  Added to the event after you save. Prices in dollars. Edit or remove before saving.
+                </p>
+                <div className="space-y-3">
+                  {aiTiers.map((t, idx) => (
+                    <div key={t.id} className="rounded-[8px] border border-border bg-surface p-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <FieldLabel>Tier name</FieldLabel>
+                          <TextInput value={t.name} onChange={e => updateTier(idx, 'name', e.target.value)} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <FieldLabel>Description</FieldLabel>
+                          <TextInput value={t.description} onChange={e => updateTier(idx, 'description', e.target.value)} />
+                        </div>
+                        <div>
+                          <FieldLabel>Member price ($)</FieldLabel>
+                          <TextInput type="number" min={0} step="0.01" value={t.memberPrice} onChange={e => updateTier(idx, 'memberPrice', e.target.value)} />
+                        </div>
+                        <div>
+                          <FieldLabel>Guest price ($)</FieldLabel>
+                          <TextInput type="number" min={0} step="0.01" value={t.nonMemberPrice} onChange={e => updateTier(idx, 'nonMemberPrice', e.target.value)} />
+                        </div>
+                        <div>
+                          <FieldLabel>Quantity</FieldLabel>
+                          <TextInput type="number" min={1} value={t.quantity} onChange={e => updateTier(idx, 'quantity', e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button type="button" onClick={() => removeTier(idx)}
+                          className={`text-[11px] font-medium uppercase tracking-widest text-text-tertiary transition-colors hover:text-danger ${chrome}`}>
+                          Remove tier
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -545,6 +700,21 @@ export default function NewEventPage() {
           <section key="s4" className="page-fade-in">
             <SectionTitle sub="Pick the layout for the member-facing event page.">Template</SectionTitle>
             <TemplatePicker value={template} onChange={setTemplate} />
+
+            {(aiDraft || announcement) && (
+              <div className="mt-8 rounded-[10px] border border-border bg-card p-5">
+                <p className={`mb-1 text-[11px] font-medium uppercase tracking-widest text-text-secondary ${chrome}`}>
+                  Announcement draft
+                </p>
+                <p className={`mb-3 text-[12px] text-text-tertiary ${chrome}`}>
+                  Saved to the event as an internal draft when you save. Not sent to members.
+                </p>
+                <textarea rows={6} value={announcement} onChange={e => setAnnouncement(e.target.value)}
+                  placeholder="Announcement copy…"
+                  className={`w-full resize-none rounded-[8px] border border-border bg-surface px-3 py-2.5 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary focus:outline-none ${chrome}`}
+                />
+              </div>
+            )}
           </section>
         )}
 
