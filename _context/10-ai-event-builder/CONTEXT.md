@@ -16,7 +16,7 @@
 > **v1 reality (2026-06-04, `feat/ai-event-builder`, Phases 1–3).** Shipped the smallest useful version: natural language → reviewable draft, committed only on explicit operator action. **Approach diverges from the original 5-stage / MCP-write design below**, deliberately and more safely:
 > - **One `generateObject` call** (`app/api/agent/event-builder`, STAFF-gated, `claude-sonnet-4-20250514`) returns a zod-validated `EventDraft` (event fields + optional `ticketTiers[]` + `announcementDraft` + `sponsorName`). The model **writes nothing to the DB and registers no tools**; there is no `status` field, so it can never publish.
 > - **Review surface is the existing `/operator/events/new` multi-step form** (not new `events/new/ai/*` pages), with an "AI draft — review before publishing" banner; every field editable.
-> - **Writes go through the existing gated REST create routes** — `POST /api/operator/events`, then `POST /api/operator/ticket-tiers` per tier, then `POST /api/operator/comments` for the announcement draft — **not** MCP tools. This satisfies the "human gate / model never writes" intent of Rules 1–2 via a different (simpler) path than Rule 2's literal "MCP tools" wording. Update Rule 2 if this becomes the permanent design.
+> - **Writes go through the existing gated REST create routes** — `POST /api/operator/events`, then `POST /api/operator/ticket-tiers` per tier, then `POST /api/operator/comments` for the announcement draft — **not** MCP tools. This satisfies the "human gate / model never writes" intent of Rules 1–2 via a different (simpler) path than the original "MCP tools" design. This is now the permanent v1 design — Rule 2 below has been updated to match.
 > - Sponsor is a **note only** (no `EventSponsor` model). Announcement is **stored as a draft event comment, never sent** (no member-broadcast channel exists; v1 builds none).
 > - Deleted the dead, ungated public duplicate `app/api/ai/event-builder/route.ts` (no callers).
 > - Not built in v1: the "AI draft" badge in the event list (Rule 5), `EventDraft` persistence, rewind-between-stages (Rule 4 — the form's step nav covers editing). Zero schema change.
@@ -68,7 +68,7 @@ app/operator/events/new/page.tsx                 ← v1 review + commit UI: AI p
 ## Rules — DO NOT VIOLATE
 
 1. **Human approval gate is mandatory.** No auto-publish path. Operator must confirm at stage D.
-2. **All writes go through MCP tools, not direct DB.** The event builder calls `events.create`, `events.update`, `events.publish` via stage 08. Founding principle #2 enforced.
+2. **Writes go through the existing gated REST create routes, not MCP tools.** The v1 review UI commits via `POST /api/operator/events`, then `POST /api/operator/ticket-tiers` per tier, then `POST /api/operator/comments` for the announcement draft — each already STAFF-gated, zod-validated, workspace-scoped, and audited. This is the permanent v1 design. The model itself still **writes nothing** to the DB and registers no tools; the human review gate (Rule 1) is what commits. (The original "all writes via MCP tools / stage 08" design was superseded — kept here only as history.)
 3. **Each stage's prompt has a defined contract.** Inputs and outputs are typed and predictable. Document them in `lib/event-builder/prompts/`.
 4. **Operator can rewind and edit at any stage.** Going from D back to C is supported. The flow is not a one-way pipeline.
 5. **Draft events are visible in the operator event list with a clear "AI draft" badge.** Don't hide them from the regular events view.

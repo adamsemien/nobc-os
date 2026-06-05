@@ -138,7 +138,7 @@ Announcement rules (the announcementDraft field) — follow exactly:
 - No em dashes anywhere. Use periods and short sentences.
 - Short declarative sentences. No hedging, no filler.
 - Say "Access" or "Get Access", never "RSVP".
-- Refer to the club as "Canto". Never write "NBC".
+- Refer to the club as "No Bad Company" or "NoBC". Never write "NBC".
 - Keep it to at most three short paragraphs. It is a draft for an operator to review, not a sent message.`,
   });
 
