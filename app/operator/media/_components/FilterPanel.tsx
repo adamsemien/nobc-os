@@ -55,11 +55,11 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
       <div className="flex gap-2">
         <div className="min-w-0 flex-1">
           <label className={lbl} style={lblStyle}>From</label>
-          <input type="date" className={ctl} style={ctlStyle} value={sp.get('from') ?? ''} onChange={(e) => set('from', e.target.value)} />
+          <input type="date" className={`${ctl} min-w-0`} style={ctlStyle} value={sp.get('from') ?? ''} onChange={(e) => set('from', e.target.value)} />
         </div>
         <div className="min-w-0 flex-1">
           <label className={lbl} style={lblStyle}>To</label>
-          <input type="date" className={ctl} style={ctlStyle} value={sp.get('to') ?? ''} onChange={(e) => set('to', e.target.value)} />
+          <input type="date" className={`${ctl} min-w-0`} style={ctlStyle} value={sp.get('to') ?? ''} onChange={(e) => set('to', e.target.value)} />
         </div>
       </div>
       <label className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>

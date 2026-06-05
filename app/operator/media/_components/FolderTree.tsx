@@ -88,7 +88,7 @@ export function FolderTree() {
 
   return (
     <nav
-      className="flex h-full w-[240px] shrink-0 flex-col gap-1 overflow-y-auto p-3 pb-16 font-[family-name:var(--font-dm-sans)] text-[13px]"
+      className="flex h-full w-[240px] shrink-0 flex-col gap-1 overflow-y-auto p-3 pb-24 font-[family-name:var(--font-dm-sans)] text-[13px]"
       style={{ background: 'var(--sidebar)', color: 'var(--text-secondary)', boxShadow: 'var(--sidebar-shadow)' }}
     >
       <button
