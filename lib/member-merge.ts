@@ -10,9 +10,8 @@ import { logEngagementEvent } from '@/lib/engagement';
  * row is tombstoned via `mergedIntoId` (status untouched, so self-lookup keeps
  * working), making the merge fully reversible by nulling the pointer.
  *
- * Candidate policy: exact normalized-email matches are auto-mergeable; phone
- * matches require operator confirmation and are NEVER auto-merged. (Instagram is
- * not a Member column yet — deferred to PR2 enrichment.)
+ * Candidate policy: exact normalized-email matches are auto-mergeable; phone and
+ * instagram matches require operator confirmation and are NEVER auto-merged.
  */
 
 function normEmail(e: string): string {
@@ -21,8 +20,19 @@ function normEmail(e: string): string {
 function normPhone(p: string): string {
   return p.replace(/[\s\-().+]/g, '').replace(/^1(\d{10})$/, '$1');
 }
+/** Normalize an instagram handle: strip the @, any profile-URL wrapper, and trailing
+ *  slash/query, lowercased. Returns '' for input that isn't a usable handle. */
+function normInstagram(h: string): string {
+  return h
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//, '')
+    .replace(/\?.*$/, '')
+    .replace(/\/+$/, '')
+    .replace(/^@/, '');
+}
 
-export type MergeMatchType = 'email_exact' | 'phone';
+export type MergeMatchType = 'email_exact' | 'phone' | 'instagram';
 
 export type MergeCandidate = {
   memberId: string;
@@ -41,10 +51,11 @@ export async function findMergeCandidates(
 ): Promise<MergeCandidate[]> {
   const target = await db.member.findFirst({
     where: { id: memberId, workspaceId },
-    select: { id: true, email: true, phone: true },
+    select: { id: true, email: true, phone: true, instagram: true },
   });
   if (!target) return [];
   const targetPhone = target.phone ? normPhone(target.phone) : null;
+  const targetInstagram = target.instagram ? normInstagram(target.instagram) : '';
 
   // Exact-normalized-email duplicates → auto-mergeable. The (workspaceId, email)
   // unique constraint is on the stored value, so case-variant rows can coexist.
@@ -66,9 +77,13 @@ export async function findMergeCandidates(
     autoMergeable: true,
   }));
 
-  // Phone matches → operator-confirm only (normalized app-side; never auto-merged).
+  // Soft signals below are operator-confirm only (normalized app-side; never
+  // auto-merged). `seen` is shared so a member already surfaced by a stronger signal
+  // (email > phone > instagram) is not listed twice.
+  const seen = new Set(candidates.map((c) => c.memberId));
+
+  // Phone matches.
   if (targetPhone) {
-    const seen = new Set(candidates.map((c) => c.memberId));
     const phoneRows = await db.member.findMany({
       where: { workspaceId, mergedIntoId: null, id: { not: memberId }, phone: { not: null } },
       select: { id: true, email: true, firstName: true, lastName: true, phone: true },
@@ -84,6 +99,29 @@ export async function findMergeCandidates(
           matchType: 'phone',
           autoMergeable: false,
         });
+        seen.add(m.id);
+      }
+    }
+  }
+
+  // Instagram matches (Member.instagram landed in PR2 — handle normalized app-side).
+  if (targetInstagram) {
+    const igRows = await db.member.findMany({
+      where: { workspaceId, mergedIntoId: null, id: { not: memberId }, instagram: { not: null } },
+      select: { id: true, email: true, firstName: true, lastName: true, instagram: true },
+    });
+    for (const m of igRows) {
+      if (seen.has(m.id)) continue;
+      if (m.instagram && normInstagram(m.instagram) === targetInstagram) {
+        candidates.push({
+          memberId: m.id,
+          email: m.email,
+          firstName: m.firstName,
+          lastName: m.lastName,
+          matchType: 'instagram',
+          autoMergeable: false,
+        });
+        seen.add(m.id);
       }
     }
   }

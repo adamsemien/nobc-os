@@ -30,7 +30,7 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('@/lib/engagement', () => ({ logEngagementEvent: vi.fn() }));
 
-import { executeMerge } from '@/lib/member-merge';
+import { executeMerge, findMergeCandidates } from '@/lib/member-merge';
 
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
@@ -107,6 +107,53 @@ describe('executeMerge', () => {
   it('refuses to merge a member into itself', async () => {
     const res = await executeMerge({ workspaceId: 'w1', canonicalId: 'X', loserId: 'X', actorId: 'op1' });
     expect(res.ok).toBe(false);
+  });
+});
+
+describe('findMergeCandidates — instagram (operator-confirm)', () => {
+  it('matches on a normalized instagram handle (@/URL/case-insensitive), never auto-mergeable', async () => {
+    // target carries an @-prefixed handle, no phone.
+    m.memberFindFirst.mockResolvedValueOnce({
+      id: 'T', email: 't@example.com', phone: null, instagram: '@HandleX',
+    });
+    // email matches: none. instagram matches: a row storing the same handle as a full URL.
+    m.memberFindMany
+      .mockResolvedValueOnce([]) // email_exact
+      .mockResolvedValueOnce([
+        { id: 'IG', email: 'ig@example.com', firstName: 'Ig', lastName: 'Match', instagram: 'https://instagram.com/handlex/' },
+      ]); // instagram
+
+    const candidates = await findMergeCandidates('w1', 'T');
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      memberId: 'IG',
+      matchType: 'instagram',
+      autoMergeable: false,
+    });
+  });
+
+  it('does not query instagram when the target has no handle', async () => {
+    m.memberFindFirst.mockResolvedValueOnce({ id: 'T', email: 't@example.com', phone: null, instagram: null });
+    m.memberFindMany.mockResolvedValueOnce([]); // email only — no phone, no instagram query
+
+    const candidates = await findMergeCandidates('w1', 'T');
+
+    expect(candidates).toEqual([]);
+    // exactly one findMany (the email query); no phone/instagram queries fired.
+    expect(m.memberFindMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('email match takes precedence — an instagram dup of the same member is not listed twice', async () => {
+    m.memberFindFirst.mockResolvedValueOnce({ id: 'T', email: 't@example.com', phone: null, instagram: 'handlex' });
+    m.memberFindMany
+      .mockResolvedValueOnce([{ id: 'D', email: 'T@Example.com', firstName: 'D', lastName: '' }]) // email_exact -> D
+      .mockResolvedValueOnce([{ id: 'D', email: 'T@Example.com', firstName: 'D', lastName: '', instagram: 'handlex' }]); // instagram -> same D
+
+    const candidates = await findMergeCandidates('w1', 'T');
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({ memberId: 'D', matchType: 'email_exact', autoMergeable: true });
   });
 });
 
