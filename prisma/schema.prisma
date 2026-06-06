@@ -1396,6 +1396,18 @@ enum MemberEngagementEventType {
   application_submitted
   newsletter_opened
   sponsor_perk_clicked
+  // Added 2026-06-06 (member-intelligence PR1). Each value is added to the DB via
+  // a standalone `ALTER TYPE ... ADD VALUE` (see prisma/sql/additive_engagement_enum.sql).
+  guest_created
+  application_approved
+  application_rejected
+  comp_issued
+  access_requested
+  ticket_purchased
+  plus_one_added
+  referral_made
+  enrichment_synced
+  merged
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

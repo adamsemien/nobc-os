@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { resolveMember } from '@/lib/member-identity';
+import { logEngagementEvent } from '@/lib/engagement';
 import { resend } from '@/lib/resend';
 
 const BodySchema = z.object({
@@ -90,6 +91,14 @@ export async function POST(req: NextRequest) {
       entityType: 'RSVP',
       entityId: rsvp.id,
     },
+  });
+
+  // CRM timeline signal for the guest — isolated, fire-and-forget.
+  void logEngagementEvent({
+    workspaceId,
+    memberId: guest.id,
+    eventType: 'plus_one_added',
+    eventId,
   });
 
   if (process.env.RESEND_API_KEY) {

@@ -1,6 +1,7 @@
 import { MemberStatus, Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { generateMemberQrCode } from '@/lib/member-qr';
+import { logEngagementEvent } from '@/lib/engagement';
 
 /**
  * Canonical Member resolution — the ONE place a Member row is born.
@@ -94,7 +95,17 @@ export async function resolveMember(input: ResolveMemberInput): Promise<Resolved
   };
 
   try {
-    return await db.member.create({ data, select: SELECT });
+    const created = await db.member.create({ data, select: SELECT });
+    // Funnel entry signal — the canonical "a person now exists" event. Isolated
+    // (logEngagementEvent never throws); degrades to a logged no-op until the
+    // guest_created enum value is migrated.
+    void logEngagementEvent({
+      workspaceId,
+      memberId: created.id,
+      eventType: 'guest_created',
+      metadata: { source },
+    });
+    return created;
   } catch (err) {
     // Concurrent create on the same identity key — re-resolve the winner.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {

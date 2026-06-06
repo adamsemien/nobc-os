@@ -73,6 +73,7 @@ export async function approveApplication(params: {
     entityType: 'APPLICATION',
     entityId: applicationId,
     metadata: { memberId: member.id },
+    engagement: { memberId: member.id, eventType: 'application_approved', eventId: applicationId },
   });
   if (!existingMember) {
     await emitEvent({
