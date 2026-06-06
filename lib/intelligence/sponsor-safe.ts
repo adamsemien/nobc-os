@@ -63,6 +63,47 @@ export interface SponsorAudienceMember {
   customFields: Record<string, unknown> | null;
 }
 
+/**
+ * Project any member-shaped object down to the sponsor-safe fields. Because it picks
+ * an explicit field list, ANY psychographic field on the input (archetype, interests,
+ * tasteSignals, a psychographics relation) is dropped — this is the runtime companion
+ * to the compile-time guard, to be used wherever member data crosses into a sponsor
+ * aggregation. The input type intentionally allows extra keys so callers can pass a
+ * full Member without first stripping it.
+ */
+export function toSponsorAudienceMember(m: {
+  id: string;
+  workspaceId: string;
+  industry?: string | null;
+  jobFunction?: string | null;
+  seniority?: string | null;
+  companySize?: string | null;
+  companyName?: string | null;
+  companyDomain?: string | null;
+  linkedinUrl?: string | null;
+  city?: string | null;
+  country?: string | null;
+  ageRange?: string | null;
+  customFields?: Record<string, unknown> | null;
+  [extra: string]: unknown;
+}): SponsorAudienceMember {
+  return {
+    id: m.id,
+    workspaceId: m.workspaceId,
+    industry: m.industry ?? null,
+    jobFunction: m.jobFunction ?? null,
+    seniority: m.seniority ?? null,
+    companySize: m.companySize ?? null,
+    companyName: m.companyName ?? null,
+    companyDomain: m.companyDomain ?? null,
+    linkedinUrl: m.linkedinUrl ?? null,
+    city: m.city ?? null,
+    country: m.country ?? null,
+    ageRange: m.ageRange ?? null,
+    customFields: m.customFields ?? null,
+  };
+}
+
 // ── Compile-time firewall assertion ─────────────────────────────────────────
 // If `SponsorAudienceMember` ever grows a psychographic key, `Leaked` becomes a
 // non-`never` union and the `Assert<...>` below fails to compile. This is the
