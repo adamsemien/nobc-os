@@ -190,6 +190,22 @@ model Member {
   ageRange          String?
   householdIncome   String?
 
+  // PR2 — member-intelligence dimensions. Firmographic/demographic values live in
+  // customFields (keyed by FieldDefinition.stableKey); fieldProvenance carries the
+  // per-field { value, source, confidence, syncedAt } record. Psychographic data is
+  // deliberately NOT here — it lives in the separate MemberPsychographics table so
+  // the sponsor view physically cannot reach it.
+  customFields         Json?
+  fieldProvenance      Json?
+  city                 String?
+  country              String?
+  companyName          String?
+  companyDomain        String?
+  linkedinUrl          String?
+  instagram            String?
+  enrichmentStatus     MemberEnrichmentStatus @default(NONE)
+  enrichmentLastSynced DateTime?
+
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -207,12 +223,63 @@ model Member {
   mergedInto       Member?  @relation("MemberMerge", fields: [mergedIntoId], references: [id])
   mergedFrom       Member[] @relation("MemberMerge")
 
+  // Psychographic data — separate table, firewalled from sponsor surfaces.
+  psychographics   MemberPsychographics?
+
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
   @@index([workspaceId])
   @@index([referredByMemberId])
   @@index([mergedIntoId])
   @@index([workspaceId, phone])
+}
+
+enum MemberEnrichmentStatus {
+  NONE
+  PENDING
+  PARTIAL
+  COMPLETE
+  STALE
+}
+
+/// Psychographic profile — INTERNAL/operator-only. Held in its own table so the
+/// sponsor_audience_member view (and any sponsor-facing query) physically cannot
+/// join it. Populated additively from Application.archetype* (no change to
+/// config/archetypes.ts or the scoring system).
+model MemberPsychographics {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  memberId        String   @unique
+  member          Member   @relation(fields: [memberId], references: [id])
+  archetype       String?
+  archetypeScores Json?
+  interests       String[]
+  tasteSignals    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+/// Operator-defined firmographic/demographic fields (workspace-scoped). Mirrors
+/// the QuestionDefinition pattern. `sponsorVisible` gates whether a field may
+/// appear in sponsor-facing aggregates.
+model FieldDefinition {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  stableKey      String
+  name           String
+  type           String
+  section        String
+  sponsorVisible Boolean  @default(false)
+  options        String[]
+  order          Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([workspaceId, stableKey])
+  @@index([workspaceId])
 }
 
 enum ApplicationStatus {
