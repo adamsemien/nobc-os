@@ -52,3 +52,24 @@ describe('sponsor firewall — type boundary present', () => {
     expect(src).toMatch(/export\s+type\s+ProvenanceSource/);
   });
 });
+
+// The firewall VIEW (S8) is structurally projection-only: a single-table SELECT with
+// no JOIN (so it physically cannot reach MemberPsychographics) and an explicit column
+// list (no SELECT *). Both audience invariants must be baked into its WHERE. These
+// checks are comment-proof — they assert on structure, not prose.
+describe('sponsor firewall — sponsor_audience_member view definition', () => {
+  const sql = read('prisma/sql/sponsor-audience-view.sql');
+
+  it('has no JOIN — cannot reach another table', () => {
+    expect(sql).not.toMatch(/\bjoin\b/i);
+  });
+  it('uses an explicit column list, never SELECT *', () => {
+    expect(sql).not.toMatch(/select\s+\*/i);
+  });
+  it('bakes in the dedup invariant (mergedIntoId IS NULL)', () => {
+    expect(sql).toMatch(/"mergedIntoId"\s+IS\s+NULL/i);
+  });
+  it('bakes in the no-guests invariant (status = APPROVED)', () => {
+    expect(sql).toMatch(/"status"\s*=\s*'APPROVED'/i);
+  });
+});
