@@ -44,6 +44,7 @@ export type ResolvedMember = {
   approved: boolean;
   memberQrCode: string | null;
   phone: string | null;
+  mergedIntoId: string | null;
 };
 
 const SELECT = {
@@ -56,6 +57,7 @@ const SELECT = {
   approved: true,
   memberQrCode: true,
   phone: true,
+  mergedIntoId: true,
 } as const;
 
 function splitName(name: string | undefined): { firstName: string; lastName: string } {
@@ -77,7 +79,10 @@ export async function resolveMember(input: ResolveMemberInput): Promise<Resolved
     select: SELECT,
   });
   if (existing) {
-    return ensureQrCode(existing);
+    // Soft-merge: if this row was merged into a canonical person, resolve through
+    // it so all new activity attaches to the surviving record.
+    const canonical = await followMergedInto(existing);
+    return ensureQrCode(canonical);
   }
 
   const { firstName, lastName } = splitName(input.name);
@@ -138,6 +143,24 @@ export async function promoteMemberToApproved(
     select: SELECT,
   });
   return ensureQrCode(member);
+}
+
+/**
+ * Follow a soft-merge pointer to the canonical record. Walks `mergedIntoId` to the
+ * surviving member (capped to avoid a pathological cycle). Returns the input when
+ * it is not merged.
+ */
+async function followMergedInto(member: ResolvedMember): Promise<ResolvedMember> {
+  let current = member;
+  for (let hops = 0; current.mergedIntoId && hops < 10; hops++) {
+    const next = await db.member.findUnique({
+      where: { id: current.mergedIntoId },
+      select: SELECT,
+    });
+    if (!next) break; // dangling pointer — fall back to the last good row
+    current = next;
+  }
+  return current;
 }
 
 /** Backfill a missing QR on an existing row so the QR-law holds for every path. */

@@ -176,6 +176,12 @@ model Member {
   referredByMemberId  String?
   networkCapitalScore Float?
 
+  // Soft-merge (member-intelligence PR1): a duplicate person points at its
+  // canonical record; reads resolve through it, history re-points to canonical.
+  // Nullable + additive — no row deletion.
+  mergedIntoId        String?
+  mergedAt            DateTime?
+
   // Sponsor intelligence — self-reported / enriched demographic + firmographic fields
   industry          String?
   jobFunction       String?
@@ -197,10 +203,16 @@ model Member {
   engagementEvents MemberEngagementEvent[]
   surveyResponses  SurveyResponse[]
 
+  // Self-relation: soft-merge canonical pointer.
+  mergedInto       Member?  @relation("MemberMerge", fields: [mergedIntoId], references: [id])
+  mergedFrom       Member[] @relation("MemberMerge")
+
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
   @@index([workspaceId])
   @@index([referredByMemberId])
+  @@index([mergedIntoId])
+  @@index([workspaceId, phone])
 }
 
 enum ApplicationStatus {
@@ -503,6 +515,7 @@ model RSVP {
   @@unique([workspaceId, eventId, memberId])
   @@index([workspaceId])
   @@index([eventId])
+  @@index([memberId])
   @@index([orderId])
   @@index([tierId])
 }

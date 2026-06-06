@@ -230,7 +230,7 @@ async function notifyMembersOfPublish(workspaceId: string, eventId: string, acto
       select: { id: true, title: true, slug: true, startAt: true, location: true, description: true },
     }),
     db.member.findMany({
-      where: { workspaceId, status: 'APPROVED', email: { not: '' } },
+      where: { workspaceId, status: 'APPROVED', email: { not: '' }, mergedIntoId: null },
       select: { email: true, firstName: true, lastName: true },
     }),
   ]);

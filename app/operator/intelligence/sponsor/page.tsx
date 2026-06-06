@@ -26,13 +26,16 @@ type NetworkCapital = {
 
 async function loadNetworkCapital(workspaceId: string): Promise<NetworkCapital> {
   const base = { workspaceId, status: 'APPROVED' as const };
+  // Member reads exclude soft-merged duplicates; the Application read keeps plain
+  // `base` (Application has no mergedIntoId).
+  const memberBase = { ...base, mergedIntoId: null };
   const [approvedCount, highYield, activeContributors, referredCount, members, approvedApps] =
     await Promise.all([
-      db.member.count({ where: base }),
-      db.member.count({ where: { ...base, networkCapitalScore: { gte: 7 } } }),
-      db.member.count({ where: { ...base, networkCapitalScore: { gte: 4, lt: 7 } } }),
-      db.member.count({ where: { ...base, referredByMemberId: { not: null } } }),
-      db.member.findMany({ where: base, select: { tags: true } }),
+      db.member.count({ where: memberBase }),
+      db.member.count({ where: { ...memberBase, networkCapitalScore: { gte: 7 } } }),
+      db.member.count({ where: { ...memberBase, networkCapitalScore: { gte: 4, lt: 7 } } }),
+      db.member.count({ where: { ...memberBase, referredByMemberId: { not: null } } }),
+      db.member.findMany({ where: memberBase, select: { tags: true } }),
       db.application.findMany({ where: base, select: { archetypeScores: true } }),
     ]);
 
@@ -92,7 +95,8 @@ type Retention = {
 };
 
 async function loadRetention(workspaceId: string): Promise<Retention> {
-  const base = { workspaceId, status: 'APPROVED' as const };
+  // All member reads here exclude soft-merged duplicates.
+  const base = { workspaceId, status: 'APPROVED' as const, mergedIntoId: null };
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
   const [approvedCount, multiEvent, activeAgg, oneEvent, twoThree, fourPlus, activeLast30, leadEvents] =
     await Promise.all([

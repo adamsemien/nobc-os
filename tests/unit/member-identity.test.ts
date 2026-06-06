@@ -2,18 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the Prisma singleton and the QR mint so resolveMember can be exercised
 // without a database. We assert on the exact `data` passed to member.create.
-const { findFirst, create, update } = vi.hoisted(() => ({
+const { findFirst, findUnique, create, update } = vi.hoisted(() => ({
   findFirst: vi.fn(),
+  findUnique: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
 }));
-vi.mock('@/lib/db', () => ({ db: { member: { findFirst, create, update } } }));
+vi.mock('@/lib/db', () => ({ db: { member: { findFirst, findUnique, create, update } } }));
 vi.mock('@/lib/member-qr', () => ({ generateMemberQrCode: () => 'qr_fixed_token' }));
+vi.mock('@/lib/engagement', () => ({ logEngagementEvent: vi.fn() }));
 
 import { resolveMember } from '@/lib/member-identity';
 
 beforeEach(() => {
   findFirst.mockReset();
+  findUnique.mockReset();
   create.mockReset();
   update.mockReset();
 });
@@ -72,6 +75,24 @@ describe('resolveMember — invariants', () => {
     expect(m.id).toBe('existing');
     // Resolving an already-APPROVED person never demotes them.
     expect(m.status).toBe('APPROVED');
+  });
+
+  it('follows mergedIntoId to the canonical record on lookup', async () => {
+    // The email resolves to a loser row pointing at canonical 'C'.
+    findFirst.mockResolvedValue({
+      id: 'loser', workspaceId: 'w1', email: 'f@example.com', firstName: 'F', lastName: '',
+      status: 'GUEST', approved: false, memberQrCode: 'loser_qr', phone: null, mergedIntoId: 'C',
+    });
+    findUnique.mockResolvedValue({
+      id: 'C', workspaceId: 'w1', email: 'canon@example.com', firstName: 'Canon', lastName: '',
+      status: 'APPROVED', approved: true, memberQrCode: 'canon_qr', phone: null, mergedIntoId: null,
+    });
+
+    const m = await resolveMember({ workspaceId: 'w1', email: 'f@example.com', source: 'plus_one' });
+
+    expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'C' } }));
+    expect(m.id).toBe('C');
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('backfills a missing memberQrCode on an existing row (QR law on lookup)', async () => {

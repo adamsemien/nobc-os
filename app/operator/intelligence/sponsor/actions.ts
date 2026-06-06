@@ -43,7 +43,7 @@ async function collectSignals(workspaceId: string): Promise<string> {
       select: { aiTags: true },
     }),
     db.member.findMany({
-      where: { workspaceId, status: 'APPROVED' },
+      where: { workspaceId, status: 'APPROVED', mergedIntoId: null },
       select: { industry: true, jobFunction: true },
     }),
   ]);
