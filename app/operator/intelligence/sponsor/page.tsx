@@ -21,7 +21,6 @@ type NetworkCapital = {
   tiers: { label: string; count: number }[];
   referralPct: number;
   topTags: { tag: string; count: number }[];
-  archetypeAverages: { label: string; avg: number }[];
 };
 
 async function loadNetworkCapital(workspaceId: string): Promise<NetworkCapital> {
@@ -29,14 +28,13 @@ async function loadNetworkCapital(workspaceId: string): Promise<NetworkCapital> 
   // Member reads exclude soft-merged duplicates; the Application read keeps plain
   // `base` (Application has no mergedIntoId).
   const memberBase = { ...base, mergedIntoId: null };
-  const [approvedCount, highYield, activeContributors, referredCount, members, approvedApps] =
+  const [approvedCount, highYield, activeContributors, referredCount, members] =
     await Promise.all([
       db.member.count({ where: memberBase }),
       db.member.count({ where: { ...memberBase, networkCapitalScore: { gte: 7 } } }),
       db.member.count({ where: { ...memberBase, networkCapitalScore: { gte: 4, lt: 7 } } }),
       db.member.count({ where: { ...memberBase, referredByMemberId: { not: null } } }),
       db.member.findMany({ where: memberBase, select: { tags: true } }),
-      db.application.findMany({ where: base, select: { archetypeScores: true } }),
     ]);
 
   // "Building History" = score is null or < 4 → everyone not in the upper tiers.
@@ -56,22 +54,10 @@ async function loadNetworkCapital(workspaceId: string): Promise<NetworkCapital> 
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
 
-  // Average each archetype axis present in archetypeScores (0–100 scale).
-  const sums = new Map<string, number>();
-  const counts = new Map<string, number>();
-  for (const a of approvedApps) {
-    const scores = a.archetypeScores as Record<string, number> | null;
-    if (!scores) continue;
-    for (const [k, v] of Object.entries(scores)) {
-      if (typeof v !== 'number') continue;
-      sums.set(k, (sums.get(k) ?? 0) + v);
-      counts.set(k, (counts.get(k) ?? 0) + 1);
-    }
-  }
-  const archetypeAverages = [...sums.entries()]
-    .map(([label, sum]) => ({ label, avg: sum / (counts.get(label) || 1) }))
-    .sort((a, b) => b.avg - a.avg)
-    .slice(0, 6);
+  // Archetype is psychographic data — it must never reach a sponsor-facing surface.
+  // It lives in a separate, firewalled profile table and is deliberately not read
+  // here (member-intelligence PR2, S10; enforced by
+  // tests/unit/sponsor-firewall.test.ts).
 
   return {
     approvedCount,
@@ -82,7 +68,6 @@ async function loadNetworkCapital(workspaceId: string): Promise<NetworkCapital> 
     ],
     referralPct: approvedCount ? Math.round((referredCount / approvedCount) * 100) : 0,
     topTags,
-    archetypeAverages,
   };
 }
 
@@ -233,7 +218,6 @@ function NetworkCapitalPanel({ data }: { data: NetworkCapital }) {
     .reduce((sum, t) => sum + t.count, 0);
   const hasMultiplierData = scoredMembers > 0;
   const hasComposition = data.topTags.length > 0;
-  const hasArchetype = data.archetypeAverages.length > 0;
 
   return (
     <section className="space-y-16 py-16">
@@ -282,44 +266,17 @@ function NetworkCapitalPanel({ data }: { data: NetworkCapital }) {
         </div>
       </div>
 
-      {/* Row 2 — Community Composition + Shared Archetype Profile are independent
-          sections, not part of the hero row. Both are bar lists of similar height,
-          so they sit full-width as a 2-up instead of being stacked in a half-column. */}
-      {(hasComposition || hasArchetype) && (
-        <div className="grid grid-cols-1 gap-x-16 gap-y-12 md:grid-cols-2">
-          {hasComposition && (
-            <div>
-              <SectionLabel>Community Composition</SectionLabel>
-              <div className="mt-5 flex flex-col gap-4">
-                {data.topTags.map((t) => (
-                  <FreqBar key={t.tag} label={t.tag} value={t.count} max={maxTag} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {hasArchetype && (
-            <div>
-              <SectionLabel>Shared Archetype Profile</SectionLabel>
-              <div className="mt-5 flex flex-col gap-4">
-                {data.archetypeAverages.map((a) => (
-                  <div key={a.label}>
-                    <div className="mb-1.5 flex items-baseline justify-between">
-                      <span className="text-[15px]" style={{ color: 'var(--text-primary)' }}>
-                        {a.label}
-                      </span>
-                      <span className="text-[14px] tabular-nums" style={{ color: 'var(--text-tertiary)' }}>
-                        {Math.round(a.avg)}
-                      </span>
-                    </div>
-                    <div className="h-2 w-full" style={{ background: 'var(--raised)' }}>
-                      <div className="h-2" style={{ width: `${Math.min(100, Math.max(0, a.avg))}%`, background: 'var(--accent)' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      {/* Row 2 — Community Composition. Member archetype was previously rendered here
+          as a "Shared Archetype Profile"; that is psychographic data and is firewalled
+          off every sponsor surface (PR2 S10), so this row is composition alone. */}
+      {hasComposition && (
+        <div className="md:max-w-[50%]">
+          <SectionLabel>Community Composition</SectionLabel>
+          <div className="mt-5 flex flex-col gap-4">
+            {data.topTags.map((t) => (
+              <FreqBar key={t.tag} label={t.tag} value={t.count} max={maxTag} />
+            ))}
+          </div>
         </div>
       )}
     </section>
