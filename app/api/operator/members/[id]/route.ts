@@ -1,7 +1,11 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { OperatorRole, Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
+import { emitEvent } from '@/lib/emit-event';
+import { applyFieldWrites, patchMemberSchema, type FieldWrite } from '@/lib/member-provenance';
 
 export async function GET(
   _req: NextRequest,
@@ -91,4 +95,77 @@ export async function GET(
     })),
     watch: watchEntry,
   });
+}
+
+// Provenance write-path (member-intelligence PR2). Writes member dimension values into
+// `customFields` and stamps `fieldProvenance[key] = { value, source, confidence, syncedAt }`.
+// STAFF+ only (READ_ONLY operators cannot write). The merge is additive: unwritten keys
+// are preserved. Editing a soft-merged duplicate is refused — operators edit the canonical
+// record. Sync-sourced writes (verified_enrichment | producer) also append an
+// `enrichment_synced` engagement event; operator edits land in the audit log only.
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
+  const { id } = await params;
+
+  const json = await req.json().catch(() => null);
+  const parsed = patchMemberSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid request', details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const member = await db.member.findFirst({
+    where: { id, workspaceId },
+    select: { id: true, customFields: true, fieldProvenance: true, mergedIntoId: true },
+  });
+  if (!member) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (member.mergedIntoId) {
+    return NextResponse.json(
+      { error: 'Member has been merged; edit the canonical record' },
+      { status: 409 },
+    );
+  }
+
+  const writes = parsed.data.fields as Record<string, FieldWrite>;
+  const syncedAt = new Date().toISOString();
+  const { customFields, fieldProvenance } = applyFieldWrites({
+    customFields: member.customFields as Record<string, unknown> | null,
+    fieldProvenance: member.fieldProvenance as Record<string, unknown> | null,
+    writes,
+    syncedAt,
+  });
+
+  const updated = await db.member.update({
+    where: { id: member.id },
+    data: {
+      customFields: customFields as Prisma.InputJsonValue,
+      fieldProvenance: fieldProvenance as Prisma.InputJsonValue,
+    },
+    select: { id: true, customFields: true, fieldProvenance: true },
+  });
+
+  const keys = Object.keys(writes);
+  const isSync = Object.values(writes).some(
+    (w) => w.source === 'verified_enrichment' || w.source === 'producer',
+  );
+  await emitEvent({
+    workspaceId,
+    actorId: userId,
+    action: 'member.fields_updated',
+    entityType: 'member',
+    entityId: member.id,
+    metadata: { fields: keys.join(','), count: keys.length },
+    ...(isSync
+      ? { engagement: { memberId: member.id, eventType: 'enrichment_synced' as const } }
+      : {}),
+  });
+
+  return NextResponse.json({ member: updated });
 }
