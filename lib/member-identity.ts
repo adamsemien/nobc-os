@@ -109,6 +109,26 @@ export async function resolveMember(input: ResolveMemberInput): Promise<Resolved
   }
 }
 
+/**
+ * Promote an existing Member to APPROVED — the ONLY allowed promotion path,
+ * used by the approval gate, the PURPLE allowlist, and operator actions.
+ *
+ * Preserves the same Member row: same `id`, same `memberQrCode` (backfilled if
+ * missing), and all attached RSVP / Ticket / engagement history. It NEVER creates
+ * a new person — a GUEST becomes an APPROVED member in place.
+ */
+export async function promoteMemberToApproved(
+  memberId: string,
+  opts?: { approvedAt?: Date },
+): Promise<ResolvedMember> {
+  const member = await db.member.update({
+    where: { id: memberId },
+    data: { status: MemberStatus.APPROVED, approved: true, approvedAt: opts?.approvedAt ?? new Date() },
+    select: SELECT,
+  });
+  return ensureQrCode(member);
+}
+
 /** Backfill a missing QR on an existing row so the QR-law holds for every path. */
 async function ensureQrCode(member: ResolvedMember): Promise<ResolvedMember> {
   if (member.memberQrCode) return member;

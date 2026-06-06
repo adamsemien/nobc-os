@@ -6,7 +6,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { scoreApplication } from '@/lib/scoring';
 import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
-import { resolveMember } from '@/lib/member-identity';
+import { resolveMember, promoteMemberToApproved } from '@/lib/member-identity';
 import { maybeFireSlack } from '@/lib/comments-notify';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 
@@ -75,10 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       phone: application.phone ?? undefined,
       source: 'apply_purple',
     });
-    const member = await db.member.update({
-      where: { id: resolved.id },
-      data: { status: 'APPROVED', approved: true, approvedAt: now },
-    });
+    const member = await promoteMemberToApproved(resolved.id, { approvedAt: now });
 
     await db.application.update({
       where: { id },

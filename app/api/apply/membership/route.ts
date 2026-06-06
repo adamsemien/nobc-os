@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { resolveMember } from '@/lib/member-identity';
 import { emailSchema, phoneSchema, shortText, answersMap, normalizePhone } from '@/lib/validation';
 
 const PostSchema = z.object({
@@ -46,9 +47,20 @@ export async function POST(req: NextRequest) {
   const workspace = await db.workspace.findFirst({ select: { id: true } });
   if (!workspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 500 });
 
+  // Link identity at submission: resolve (or mint) the GUEST Member now so the
+  // applicant has one continuous record before approval, not only at it.
+  const member = await resolveMember({
+    workspaceId: workspace.id,
+    email,
+    name: fullName ?? '',
+    phone: phone ?? undefined,
+    source: 'apply_membership',
+  });
+
   const application = await db.application.create({
     data: {
       workspaceId: workspace.id,
+      memberId: member.id,
       email,
       fullName: fullName ?? '',
       phone: normalizePhone(phone ?? null),

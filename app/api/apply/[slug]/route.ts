@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { ApplySchema, answerQuestions } from '@/lib/apply-config';
 import { tagApplication } from '@/lib/ai/tag-application';
 import { attachEventRsvpAfterApply } from '@/lib/apply-event-rsvp';
+import { resolveMember } from '@/lib/member-identity';
 import { emitEvent } from '@/lib/emit-event';
 
 export async function POST(
@@ -78,6 +79,9 @@ export async function POST(
     await db.application.create({
       data: {
         workspaceId: workspace.id,
+        // Link to the known person when we already have one; never mint a new
+        // Member for a held/red-listed applicant.
+        memberId: redListedMember?.id ?? null,
         email,
         fullName,
         phone: data.phone,
@@ -93,10 +97,21 @@ export async function POST(
     return NextResponse.json({ status: 'success' });
   }
 
+  // Link identity at submission: resolve (or mint) the GUEST Member before the
+  // application transaction so the applicant record is continuous from submit.
+  const applicantMember = await resolveMember({
+    workspaceId: workspace.id,
+    email,
+    name: fullName,
+    phone: data.phone ?? undefined,
+    source: 'apply_slug',
+  });
+
   const application = await db.$transaction(async (tx) => {
     const app = await tx.application.create({
       data: {
         workspaceId: workspace.id,
+        memberId: applicantMember.id,
         email,
         fullName,
         phone: data.phone,
