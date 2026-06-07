@@ -33,6 +33,9 @@ export interface MemberRecordCore {
   mergedIntoId: string | null;
   mergedAt: string | null;
   createdAt: string;
+  aiSummary: string | null;
+  energyScore: number | null;
+  networkValueScore: number | null;
 }
 
 export interface MemberRecordDimensions {
@@ -60,6 +63,23 @@ export interface MemberRecordPsychographics {
   tasteSignals: unknown;
 }
 
+/** Red List status, matched from WatchList by email (PURPLE = watch, BLOCKED = bar). */
+export interface MemberRecordRedList {
+  type: string;
+  note: string | null;
+}
+
+/**
+ * Operator-facing application intelligence — the latest Application's AI assessment.
+ * Archetype is deliberately NOT here: it is psychographic and lives only in the
+ * firewalled psychographics block, gated separately.
+ */
+export interface MemberRecordIntelligence {
+  aiScore: number | null;
+  aiReasoning: string | null;
+  aiRecommendation: string | null;
+}
+
 export interface MemberTimelineEntry {
   id: string;
   eventType: string;
@@ -75,6 +95,10 @@ export interface MemberRecord {
   fieldProvenance: Record<string, unknown> | null;
   /** Operator-only. Null whenever includePsychographics is false (e.g. a sponsor path). */
   psychographics: MemberRecordPsychographics | null;
+  /** Red List match (PURPLE/BLOCKED) from WatchList, or null if not listed. */
+  redList: MemberRecordRedList | null;
+  /** Latest Application AI assessment (no archetype — that stays firewalled). */
+  intelligence: MemberRecordIntelligence | null;
   timeline: MemberTimelineEntry[];
 }
 
@@ -109,6 +133,9 @@ export async function assembleMemberRecord(args: {
       mergedIntoId: true,
       mergedAt: true,
       createdAt: true,
+      aiSummary: true,
+      energyScore: true,
+      networkValueScore: true,
       customFields: true,
       fieldProvenance: true,
       industry: true,
@@ -126,9 +153,12 @@ export async function assembleMemberRecord(args: {
   });
   if (!member) return null;
 
-  // Psychographics + timeline read in parallel. Psychographics is fetched ONLY when the
-  // caller is permitted to see it — a sponsor path never even issues the query.
-  const [psychoRow, timelineRows] = await Promise.all([
+  // Psychographics + timeline + Red List + application intelligence read in parallel.
+  // Psychographics is fetched ONLY when the caller is permitted to see it — a sponsor path
+  // never even issues the query. Red List + intelligence are operator-facing (not
+  // psychographic) and always read. Both match the canonical email-based lookups the
+  // existing member GET endpoint uses, so the two surfaces agree.
+  const [psychoRow, timelineRows, watchRow, applicationRow] = await Promise.all([
     includePsychographics
       ? db.memberPsychographics.findUnique({
           where: { memberId },
@@ -140,6 +170,17 @@ export async function assembleMemberRecord(args: {
       orderBy: { occurredAt: 'desc' },
       take: timelineLimit,
       select: { id: true, eventType: true, eventId: true, occurredAt: true, metadata: true },
+    }),
+    db.watchList.findFirst({
+      where: { workspaceId, deletedAt: null, matchEmail: { equals: member.email, mode: 'insensitive' } },
+      select: { type: true, note: true },
+    }),
+    db.application.findFirst({
+      where: { workspaceId, email: { equals: member.email, mode: 'insensitive' } },
+      orderBy: { createdAt: 'desc' },
+      // aiScore/aiReasoning/aiRecommendation only — archetype/archetypeScores are
+      // psychographic and must NOT be surfaced through this operator-intelligence block.
+      select: { aiScore: true, aiReasoning: true, aiRecommendation: true },
     }),
   ]);
 
@@ -162,6 +203,9 @@ export async function assembleMemberRecord(args: {
       mergedIntoId: member.mergedIntoId,
       mergedAt: iso(member.mergedAt),
       createdAt: member.createdAt.toISOString(),
+      aiSummary: member.aiSummary ?? null,
+      energyScore: member.energyScore ?? null,
+      networkValueScore: member.networkValueScore ?? null,
     },
     dimensions: {
       firmographic: {
@@ -188,6 +232,14 @@ export async function assembleMemberRecord(args: {
           archetypeScores: psychoRow.archetypeScores ?? null,
           interests: psychoRow.interests,
           tasteSignals: psychoRow.tasteSignals ?? null,
+        }
+      : null,
+    redList: watchRow ? { type: watchRow.type, note: watchRow.note } : null,
+    intelligence: applicationRow
+      ? {
+          aiScore: applicationRow.aiScore ?? null,
+          aiReasoning: applicationRow.aiReasoning ?? null,
+          aiRecommendation: applicationRow.aiRecommendation ?? null,
         }
       : null,
     timeline: timelineRows.map((t) => ({

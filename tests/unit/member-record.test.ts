@@ -4,12 +4,16 @@ const m = vi.hoisted(() => ({
   memberFindFirst: vi.fn(),
   psychoFindUnique: vi.fn(),
   engagementFindMany: vi.fn(),
+  watchFindFirst: vi.fn(),
+  applicationFindFirst: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({
   db: {
     member: { findFirst: m.memberFindFirst },
     memberPsychographics: { findUnique: m.psychoFindUnique },
     memberEngagementEvent: { findMany: m.engagementFindMany },
+    watchList: { findFirst: m.watchFindFirst },
+    application: { findFirst: m.applicationFindFirst },
   },
 }));
 
@@ -22,6 +26,7 @@ const baseMember = {
   approvedAt: new Date('2026-01-01T00:00:00Z'), totalEventsAttended: 3,
   lastAttendedDate: null, enrichmentStatus: 'NONE', enrichmentLastSynced: null,
   mergedIntoId: null, mergedAt: null, createdAt: new Date('2025-12-01T00:00:00Z'),
+  aiSummary: 'A strong fit.', energyScore: 82, networkValueScore: 71,
   customFields: { vibe: 'high' }, fieldProvenance: { vibe: { value: 'high', source: 'operator_entered', syncedAt: 't' } },
   industry: 'Fashion', jobFunction: 'Founder', seniority: 'C-Suite', companySize: '11-50',
   companyName: 'Acme', companyDomain: 'acme.com', linkedinUrl: 'li/ada', instagram: 'ada',
@@ -37,6 +42,8 @@ beforeEach(() => {
   m.engagementFindMany.mockResolvedValue([
     { id: 'e1', eventType: 'checked_in', eventId: 'EV1', occurredAt: new Date('2026-02-01T00:00:00Z'), metadata: null },
   ]);
+  m.watchFindFirst.mockResolvedValue(null);
+  m.applicationFindFirst.mockResolvedValue(null);
 });
 
 describe('assembleMemberRecord', () => {
@@ -64,6 +71,30 @@ describe('assembleMemberRecord', () => {
     expect(m.psychoFindUnique).not.toHaveBeenCalled();
   });
 
+  it('surfaces core intelligence (aiSummary/scores), Red List, and application AI — without archetype', async () => {
+    m.watchFindFirst.mockResolvedValue({ type: 'PURPLE', note: 'keep an eye' });
+    m.applicationFindFirst.mockResolvedValue({ aiScore: 7.5, aiReasoning: 'great energy', aiRecommendation: 'yes' });
+
+    const rec = await assembleMemberRecord({ workspaceId: 'w1', memberId: 'M', includePsychographics: true });
+
+    expect(rec!.member).toMatchObject({ aiSummary: 'A strong fit.', energyScore: 82, networkValueScore: 71 });
+    expect(rec!.redList).toEqual({ type: 'PURPLE', note: 'keep an eye' });
+    expect(rec!.intelligence).toEqual({ aiScore: 7.5, aiReasoning: 'great energy', aiRecommendation: 'yes' });
+    // the intelligence block must never carry psychographic archetype data
+    expect(Object.keys(rec!.intelligence!)).not.toContain('archetype');
+    expect(Object.keys(rec!.intelligence!)).not.toContain('archetypeScores');
+    // the application read must not even request archetype fields
+    expect(m.applicationFindFirst.mock.calls[0][0].select).toEqual({
+      aiScore: true, aiReasoning: true, aiRecommendation: true,
+    });
+  });
+
+  it('returns null redList + intelligence when there is no WatchList match or application', async () => {
+    const rec = await assembleMemberRecord({ workspaceId: 'w1', memberId: 'M', includePsychographics: true });
+    expect(rec!.redList).toBeNull();
+    expect(rec!.intelligence).toBeNull();
+  });
+
   it('returns null when the member is not in the workspace', async () => {
     m.memberFindFirst.mockResolvedValue(null);
     const rec = await assembleMemberRecord({ workspaceId: 'w1', memberId: 'nope', includePsychographics: true });
@@ -88,7 +119,7 @@ describe('toSponsorAudienceMember — runtime firewall projection', () => {
       psychographics: { archetype: 'Connector' },
       aiSummary: 'should not leak',
       householdIncome: '250k+',
-    } as any;
+    } as unknown as Parameters<typeof toSponsorAudienceMember>[0];
 
     const safe = toSponsorAudienceMember(dirty);
     const keys = Object.keys(safe);

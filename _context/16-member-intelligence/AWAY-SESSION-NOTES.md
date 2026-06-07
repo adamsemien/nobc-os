@@ -139,6 +139,17 @@ Provider needed once in `app/layout.tsx` (or a client `Providers` wrapper): `<Qu
 
 ---
 
+## PR3 Slice 0 — data layer (2026-06-07, landed)
+
+Non-visual plumbing that unblocks the UI slices. No schema changes; firewall green.
+
+- **`assembleMemberRecord` extended** (additive): `member` core gains `aiSummary`/`energyScore`/`networkValueScore`; new top-level `redList` (WatchList, email-match, PURPLE/BLOCKED) + `intelligence` (latest Application `aiScore`/`aiReasoning`/`aiRecommendation`). **Archetype is excluded from the application select** — it stays in the firewalled psychographics block.
+- **`GET …/record` psychographics tightened to STAFF+**: `includePsychographics = roleAtLeast(gate.role, STAFF)`. READ_ONLY operators view the record without psychographics (was: any operator).
+- **TanStack hooks landed** (dependency + provider now in place): `lib/hooks/useMemberRecord.ts`, `lib/hooks/usePatchMemberFields.ts` (typed `getQueryData<MemberRecord>`, no `any`).
+- **Tests:** `member-record` +2 (redList/intelligence surface, no-archetype-leak, null case), `member-record-route` READ_ONLY→`false` + STAFF→`true`. Suite **143 passing**.
+
+> Slice 0 of the read-experience → write → dimensions → merge → referral sequence. Next: Slice 1 (F1+F2+F3 record page) adds `@tanstack/react-virtual`.
+
 ## Suggested next steps (PR3 proper, your review)
 
 1. Approve TanStack dependency → drop in the hooks above + provider.

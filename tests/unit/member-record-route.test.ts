@@ -6,7 +6,15 @@ const m = vi.hoisted(() => ({
   requireRole: vi.fn(),
   assemble: vi.fn(),
 }));
-vi.mock('@/lib/operator-role', () => ({ requireRole: m.requireRole }));
+vi.mock('@/lib/operator-role', () => ({
+  requireRole: m.requireRole,
+  // Faithful rank check (ADMIN > STAFF > READ_ONLY) so the route's psychographics gate
+  // is exercised for real against the mocked gate role.
+  roleAtLeast: (role: string, min: string) => {
+    const order: Record<string, number> = { READ_ONLY: 0, STAFF: 1, ADMIN: 2 };
+    return (order[role] ?? -1) >= (order[min] ?? Infinity);
+  },
+}));
 vi.mock('@/lib/member-record', () => ({ assembleMemberRecord: m.assemble }));
 
 import { GET } from '@/app/api/operator/members/[id]/record/route';
@@ -15,8 +23,8 @@ const GATE = { ok: true, userId: 'op1', workspaceId: 'w1', role: 'READ_ONLY' };
 
 function call(id = 'M', search = '') {
   const url = `https://x/api/operator/members/${id}/record${search}`;
-  const req = { nextUrl: new URL(url) } as any;
-  return GET(req, { params: Promise.resolve({ id }) } as any);
+  const req = { nextUrl: new URL(url) } as unknown as Parameters<typeof GET>[0];
+  return GET(req, { params: Promise.resolve({ id }) } as unknown as Parameters<typeof GET>[1]);
 }
 
 beforeEach(() => {
@@ -26,11 +34,18 @@ beforeEach(() => {
 });
 
 describe('GET /api/operator/members/[id]/record', () => {
-  it('requires an operator role and requests psychographics for the operator path', async () => {
+  it('lets a READ_ONLY operator view the record but withholds psychographics', async () => {
     const res = await call();
     expect(res.status).toBe(200);
     expect(m.requireRole).toHaveBeenCalled();
-    expect(m.assemble.mock.calls[0][0]).toMatchObject({ workspaceId: 'w1', memberId: 'M', includePsychographics: true });
+    expect(m.assemble.mock.calls[0][0]).toMatchObject({ workspaceId: 'w1', memberId: 'M', includePsychographics: false });
+  });
+
+  it('includes psychographics for a STAFF operator', async () => {
+    m.requireRole.mockResolvedValue({ ...GATE, role: 'STAFF' });
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect(m.assemble.mock.calls[0][0]).toMatchObject({ includePsychographics: true });
   });
 
   it('returns the gate response for a non-operator (no DB work)', async () => {
