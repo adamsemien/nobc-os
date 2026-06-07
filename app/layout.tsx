@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Playfair_Display, Cormorant_Garamond, DM_Sans, DM_Mo
 import { ClerkProvider } from "@clerk/nextjs";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { clerkAppearance } from "@/lib/clerk-appearance";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -99,7 +100,7 @@ export default function RootLayout({
           <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
           <a href="#main-content" className="skip-to-main">Skip to main content</a>
           <div id="main-content">
-            {children}
+            <Providers>{children}</Providers>
           </div>
         </body>
       </html>
