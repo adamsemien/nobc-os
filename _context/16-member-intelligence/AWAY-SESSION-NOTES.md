@@ -150,6 +150,10 @@ Non-visual plumbing that unblocks the UI slices. No schema changes; firewall gre
 
 > Slice 0 of the read-experience → write → dimensions → merge → referral sequence. Next: Slice 1 (F1+F2+F3 record page) adds `@tanstack/react-virtual`.
 
+## PR3 Slice 1 — read experience (2026-06-08, landed)
+
+F1 identity/lifecycle + F2 engagement timeline + F3 provenance as a server-assembled RSC shell (`requireRolePage(READ_ONLY)`, `assembleMemberRecord` direct — no self-HTTP, `includePsychographics = roleAtLeast(role, STAFF)`); adds `@tanstack/react-virtual`; no schema changes; firewall green; no psychographic data rendered. New: `MemberRecordHeader`/`LifecycleBadge`/`MemberTimeline` (client island, `react-virtual`, day-grouped, fills the column at `lg+` — no layout void)/`ProvenanceBadge` (5 sources incl. producer) + `lib/engagement-labels.ts` (locked human labels, never "RSVP") + `lib/provenance-display.ts`; notes composer = existing `CommentThread` (already wired to `/api/operator/comments`). Companion demo seed `scripts/seed-member-record-demo.ts` (workspace-by-slug via `DEMO_SEED_WORKSPACE_SLUG`, never defaults to prod; find-or-create Celia + Application + 9 events; direct writes, zero side effects). Suite **151 passing**; tsc 0, eslint clean, build Errors 0.
+
 ## Suggested next steps (PR3 proper, your review)
 
 1. Approve TanStack dependency → drop in the hooks above + provider.
