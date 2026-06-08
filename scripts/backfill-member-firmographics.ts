@@ -128,6 +128,15 @@ const FREE_EMAIL_DOMAINS = new Set([
   'fastmail.com',
 ]);
 
+// Seed / demo personas live in the prod workspace under @nobadco.dev addresses (created by the
+// seed scripts, e.g. seed-member-record-demo.ts), sometimes on a persona-batch subdomain like
+// tenur.nobadco.dev. These are NOT real members: skip them entirely — no enrichment, and never
+// reported as an unknown company domain — so a real run isn't polluted with fake data.
+const SEED_EMAIL_DOMAINS = ['nobadco.dev'];
+function isSeedDomain(domain: string): boolean {
+  return SEED_EMAIL_DOMAINS.some((seed) => domain === seed || domain.endsWith(`.${seed}`));
+}
+
 // ── CLI flags ────────────────────────────────────────────────────────────────────────────
 function flagValue(name: string): string | undefined {
   const prefix = `--${name}=`;
@@ -283,10 +292,19 @@ function domainOf(email: string): string | null {
   let fieldsWritten = 0;
   let skippedCount = 0;
   let errorCount = 0;
+  let seedSkippedCount = 0;
   const unknownDomains = new Map<string, number>();
 
   for (const member of members) {
     const name = `${member.firstName} ${member.lastName}`.trim() || '(no name)';
+
+    // Skip seed/demo personas entirely — not real members; enriching them pollutes the run.
+    const memberDomain = domainOf(member.email);
+    if (memberDomain && isSeedDomain(memberDomain)) {
+      seedSkippedCount += 1;
+      continue;
+    }
+
     const current: Record<FirmographicField, string | null> = {
       companyName: member.companyName,
       companyDomain: member.companyDomain,
@@ -319,16 +337,15 @@ function domainOf(email: string): string | null {
         }
       }
 
-      // Phase 2 — email domain heuristic.
-      const domain = domainOf(member.email);
-      if (domain && !FREE_EMAIL_DOMAINS.has(domain)) {
-        const match = DOMAIN_MAP[domain];
+      // Phase 2 — email domain heuristic. (Seed domains were already skipped above.)
+      if (memberDomain && !FREE_EMAIL_DOMAINS.has(memberDomain)) {
+        const match = DOMAIN_MAP[memberDomain];
         if (match) {
           candidates.push({ field: 'companyName', value: match.companyName, source: SOURCE_DOMAIN, confidence: CONFIDENCE_DOMAIN });
-          candidates.push({ field: 'companyDomain', value: domain, source: SOURCE_DOMAIN, confidence: CONFIDENCE_DOMAIN });
+          candidates.push({ field: 'companyDomain', value: memberDomain, source: SOURCE_DOMAIN, confidence: CONFIDENCE_DOMAIN });
           candidates.push({ field: 'industry', value: match.industry, source: SOURCE_DOMAIN, confidence: CONFIDENCE_DOMAIN });
         } else {
-          unknownDomains.set(domain, (unknownDomains.get(domain) ?? 0) + 1);
+          unknownDomains.set(memberDomain, (unknownDomains.get(memberDomain) ?? 0) + 1);
         }
       }
     } catch (err) {
@@ -411,6 +428,7 @@ function domainOf(email: string): string | null {
   console.log(`Members ${EXECUTE ? 'updated' : 'to update'}:  ${updatedCount}`);
   console.log(`Fields ${EXECUTE ? 'written' : 'to write'}:    ${fieldsWritten}`);
   console.log(`Skipped (already set):    ${skippedCount}`);
+  console.log(`Skipped (seed/demo data): ${seedSkippedCount}`);
   console.log(`Errors:                   ${errorCount}`);
   const unknownList = [...unknownDomains.entries()].sort((a, b) => b[1] - a[1]);
   if (unknownList.length > 0) {

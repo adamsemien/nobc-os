@@ -20,6 +20,11 @@ that are currently `null` or `""`:
 A field is written **only if its current column value is empty**. Existing values are never
 overwritten. Personal-email domains (gmail, outlook, …) are skipped and not reported.
 
+**Seed/demo personas are skipped entirely.** Members on a `@nobadco.dev` address (incl. subdomains
+like `tenur.nobadco.dev`) are created by the seed scripts and are not real members — they are never
+enriched and never reported as an unknown domain. Edit `SEED_EMAIL_DOMAINS` in the script to adjust.
+The summary reports a `Skipped (seed/demo data)` count.
+
 ## Running it
 
 Dry run (default — prints everything it WOULD write, writes nothing):
