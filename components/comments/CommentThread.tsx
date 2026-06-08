@@ -83,9 +83,13 @@ function formatRelative(iso: string): string {
 export function CommentThread({
   entityType,
   entityId,
+  flush = false,
 }: {
   entityType: 'application' | 'member' | 'event' | 'rsvp';
   entityId: string;
+  /** When true, drop the top divider/spacing so the thread reads as a standalone panel
+   *  (e.g. its own card) instead of a section appended below other content. */
+  flush?: boolean;
 }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
@@ -220,7 +224,7 @@ export function CommentThread({
   }, [body, entityType, entityId, operators, load]);
 
   return (
-    <section className="mt-6 border-t border-border pt-5">
+    <section className={flush ? '' : 'mt-6 border-t border-border pt-5'}>
       <div className="flex items-center justify-between">
         <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">
           Notes
