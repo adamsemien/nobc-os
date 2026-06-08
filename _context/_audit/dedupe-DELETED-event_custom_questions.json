@@ -1,0 +1,53 @@
+{
+  "deletedAt": "2026-05-31",
+  "table": "EventCustomQuestion",
+  "reason": "Dedupe: kept newest per (eventId, label, showToMember, showToGuest); deleted older siblings.",
+  "deletedRowCount": 3,
+  "rows": [
+    {
+      "id": "cmpn45hfc000b04kv4y5d5q7h",
+      "eventId": "cmpfs7x3j001i04kw6ezjp3uz",
+      "workspaceId": "cmpd6xckn000004jl47xpwghx",
+      "label": "How did you hear about No Bad Company?",
+      "fieldType": "TEXT",
+      "options": [],
+      "required": false,
+      "order": 2,
+      "createdAt": "2026-05-26T20:54:24.888Z",
+      "updatedAt": "2026-05-26T20:54:24.888Z",
+      "showToGuest": true,
+      "showToMember": true,
+      "whenInFlow": "BEFORE_SUBMIT"
+    },
+    {
+      "id": "cmpn45hfc000904kv56aksinn",
+      "eventId": "cmpfs7x3j001i04kw6ezjp3uz",
+      "workspaceId": "cmpd6xckn000004jl47xpwghx",
+      "label": "What are you currently building?",
+      "fieldType": "TEXTAREA",
+      "options": [],
+      "required": true,
+      "order": 0,
+      "createdAt": "2026-05-26T20:54:24.888Z",
+      "updatedAt": "2026-05-26T20:54:24.888Z",
+      "showToGuest": true,
+      "showToMember": true,
+      "whenInFlow": "BEFORE_SUBMIT"
+    },
+    {
+      "id": "cmpn45hfc000d04kvi76c0lyf",
+      "eventId": "cmpfs7x3j001i04kw6ezjp3uz",
+      "workspaceId": "cmpd6xckn000004jl47xpwghx",
+      "label": "What's one connection we could make for you at this event?",
+      "fieldType": "TEXTAREA",
+      "options": [],
+      "required": false,
+      "order": 4,
+      "createdAt": "2026-05-26T20:54:24.888Z",
+      "updatedAt": "2026-05-26T20:54:24.888Z",
+      "showToGuest": false,
+      "showToMember": true,
+      "whenInFlow": "BEFORE_SUBMIT"
+    }
+  ]
+}
