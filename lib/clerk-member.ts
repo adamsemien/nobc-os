@@ -1,5 +1,6 @@
 import { clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
+import { resolveMember } from '@/lib/member-identity';
 
 export type ClerkMemberRow = {
   id: string;
@@ -35,16 +36,22 @@ export async function getOrCreateMemberFromClerk(
   const firstName = u.firstName?.trim() || 'Guest';
   const lastName = u.lastName?.trim() || '';
 
-  return db.member.create({
-    data: {
-      workspaceId,
-      clerkUserId,
-      email,
-      firstName,
-      lastName,
-      approved: false,
-      status: 'PENDING',
-    },
-    select: { id: true, approved: true, memberQrCode: true, firstName: true, lastName: true, email: true },
+  // Mint through the canonical path so the row gets a memberQrCode (QR law) and a
+  // consistent GUEST status. The email-taken guard above preserves the prior
+  // behavior of not attaching a new Clerk user onto an existing member's email.
+  const resolved = await resolveMember({
+    workspaceId,
+    email,
+    name: `${firstName} ${lastName}`.trim(),
+    clerkUserId,
+    source: 'clerk_open_rsvp',
   });
+  return {
+    id: resolved.id,
+    approved: resolved.approved,
+    memberQrCode: resolved.memberQrCode,
+    firstName: resolved.firstName,
+    lastName: resolved.lastName,
+    email: resolved.email,
+  };
 }

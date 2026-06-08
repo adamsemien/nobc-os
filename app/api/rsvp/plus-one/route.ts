@@ -1,8 +1,27 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
+import { resolveMember } from '@/lib/member-identity';
+import { logEngagementEvent } from '@/lib/engagement';
 import { resend } from '@/lib/resend';
+
+const BodySchema = z.object({
+  eventId: z.string().min(1),
+  guestName: z.string().trim().min(1, 'guestName required').max(100, 'guestName too long'),
+  guestEmail: z.string().trim().email('Valid guestEmail required').max(200),
+});
+
+/** Escape user-supplied strings before interpolating into transactional email HTML. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -11,17 +30,17 @@ export async function POST(req: NextRequest) {
   const workspaceId = await getMemberWorkspaceId(userId);
   if (!workspaceId) return NextResponse.json({ error: 'No workspace' }, { status: 403 });
 
-  let body: { eventId: string; guestName: string; guestEmail: string };
+  let raw: unknown;
   try {
-    body = (await req.json()) as { eventId: string; guestName: string; guestEmail: string };
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
-
-  const { eventId, guestName, guestEmail } = body;
-  if (!eventId || !guestName?.trim() || !guestEmail?.trim()) {
-    return NextResponse.json({ error: 'eventId, guestName, and guestEmail required' }, { status: 400 });
+  const parsed = BodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 422 });
   }
+  const { eventId, guestName, guestEmail } = parsed.data;
 
   const event = await db.event.findFirst({
     where: { id: eventId, workspaceId, status: 'PUBLISHED', plusOnesAllowed: true },
@@ -47,34 +66,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Already have a plus-one for this event' }, { status: 409 });
   }
 
-  const guestMember = await db.member.findFirst({
-    where: { workspaceId, email: guestEmail.trim().toLowerCase() },
-  });
-
-  let guestMemberId: string;
-  if (guestMember) {
-    guestMemberId = guestMember.id;
-  } else {
-    const [guestFirst, ...guestRest] = guestName.trim().split(' ');
-    const newGuest = await db.member.create({
-      data: {
-        workspaceId,
-        clerkUserId: `guest:${eventId}:${Date.now()}`,
-        email: guestEmail.trim().toLowerCase(),
-        firstName: guestFirst,
-        lastName: guestRest.join(' ') || '',
-        status: 'APPROVED',
-        approved: true,
-      },
-    });
-    guestMemberId = newGuest.id;
-  }
+  // Resolve the guest through the canonical path — a plus-one is a GUEST, never
+  // APPROVED. (Closes the approval-bypass: this route previously minted the guest
+  // with status=APPROVED, approved=true.)
+  const guest = await resolveMember({ workspaceId, email: guestEmail, name: guestName, source: 'plus_one' });
 
   const rsvp = await db.rSVP.create({
     data: {
       workspaceId,
       eventId,
-      memberId: guestMemberId,
+      memberId: guest.id,
       status: 'CONFIRMED',
       ticketStatus: 'confirmed',
       origin: 'plus_one',
@@ -92,16 +93,24 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // CRM timeline signal for the guest — isolated, fire-and-forget.
+  void logEngagementEvent({
+    workspaceId,
+    memberId: guest.id,
+    eventType: 'plus_one_added',
+    eventId,
+  });
+
   if (process.env.RESEND_API_KEY) {
     const hostName = `${member.firstName} ${member.lastName}`.trim();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
     const eventUrl = `${appUrl}/m/events/${event.slug}`;
     await resend.emails.send({
       from: 'NoBC <team@thenobadcompany.com>',
-      to: guestEmail.trim(),
+      to: guestEmail,
       subject: `You're on the guest list for ${event.title}`,
-      html: `<p>Hi ${guestName.trim()},</p>
-<p>You've been added to the guest list for <strong>${event.title}</strong> by ${hostName}.</p>
+      html: `<p>Hi ${escapeHtml(guestName)},</p>
+<p>You've been added to the guest list for <strong>${escapeHtml(event.title)}</strong> by ${escapeHtml(hostName)}.</p>
 <p>Date: ${new Date(event.startAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
 <p><a href="${eventUrl}">View event →</a></p>
 <p>— No Bad Company</p>`,

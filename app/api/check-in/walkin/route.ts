@@ -49,13 +49,8 @@ export async function POST(req: NextRequest) {
   });
   const member = memberFull ?? { ...memberSlim, status: 'GUEST' as const, phone: null as string | null };
 
-  // Promote to APPROVED so they show up in the members list (walk-ins are de-facto members).
-  if (member.status !== 'APPROVED') {
-    await db.member.update({
-      where: { id: member.id },
-      data: { status: 'APPROVED', approved: true, approvedAt: new Date() },
-    });
-  }
+  // Walk-ins resolve to GUEST and are checked in — they are NOT auto-approved.
+  // APPROVED is assigned only through the approval gate (locked decision 2026-06-06).
   if (phone && !member.phone) {
     await db.member.update({ where: { id: member.id }, data: { phone } });
   }

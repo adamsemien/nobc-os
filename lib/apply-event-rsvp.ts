@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { MemberStatus } from '@prisma/client';
+import { resolveMember } from '@/lib/member-identity';
 
 type AttachParams = {
   workspaceId: string;
@@ -34,27 +34,16 @@ export async function attachEventRsvpAfterApply(p: AttachParams): Promise<void> 
   });
   if (!event) return;
 
-  const [firstName, ...rest] = fullName.trim().split(' ');
-  const lastName = rest.join(' ') || '';
-
-  const member = await db.member.upsert({
-    where: { workspaceId_clerkUserId: { workspaceId, clerkUserId } },
-    create: {
-      workspaceId,
-      clerkUserId,
-      email: email.trim().toLowerCase(),
-      firstName,
-      lastName,
-      phone: phone?.trim() || undefined,
-      status: MemberStatus.PENDING,
-      approved: false,
-    },
-    update: {
-      email: email.trim().toLowerCase(),
-      firstName,
-      lastName,
-      phone: phone?.trim() || undefined,
-    },
+  // Resolve through the canonical path — GUEST + a minted QR (QR law). The
+  // applicant's Application carries the "applied" signal; the Member stays GUEST
+  // until the approval gate promotes it.
+  const member = await resolveMember({
+    workspaceId,
+    email,
+    name: fullName,
+    clerkUserId,
+    phone,
+    source: 'apply_event_rsvp',
   });
 
   const existing = await db.rSVP.findFirst({

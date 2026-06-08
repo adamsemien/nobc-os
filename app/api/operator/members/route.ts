@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     where: {
       workspaceId,
       status: { not: 'GUEST' },
+      mergedIntoId: null,
       ...(q
         ? {
             OR: [

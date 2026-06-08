@@ -1,6 +1,7 @@
 import { db } from './db';
 import { getSvix } from './svix';
-import type { AuditActorType } from '@prisma/client';
+import { logEngagementEvent } from './engagement';
+import type { AuditActorType, MemberEngagementEventType } from '@prisma/client';
 
 interface EmitEventInput {
   workspaceId: string;
@@ -11,13 +12,28 @@ interface EmitEventInput {
   entityType: string;
   entityId: string;
   metadata?: Record<string, string | number | boolean | null>;
+  /**
+   * Optional CRM dual-write. When a memberId is resolvable at the call site, the
+   * same operational event is also appended to the member's engagement timeline
+   * (MemberEngagementEvent). This is the canonical funnel/timeline source.
+   *
+   * Isolated by design: the AuditEvent write happens first and unconditionally,
+   * and logEngagementEvent swallows its own errors — so a failing engagement
+   * write (e.g. an enum value not yet migrated) can never break the audit emit.
+   */
+  engagement?: {
+    memberId: string;
+    eventType: MemberEngagementEventType;
+    eventId?: string;
+  };
 }
 
 export async function emitEvent(input: EmitEventEventInput): Promise<void>;
 export async function emitEvent(input: EmitEventInput): Promise<void> {
-  const { workspaceId, actorId, actorType, action, entityType, entityId, metadata } = input;
+  const { workspaceId, actorId, actorType, action, entityType, entityId, metadata, engagement } = input;
 
-  // Always write to local audit log
+  // Always write to local audit log — this is the compliance record and must
+  // never be gated on the CRM dual-write below.
   await db.auditEvent.create({
     data: {
       workspaceId,
@@ -29,6 +45,18 @@ export async function emitEvent(input: EmitEventInput): Promise<void> {
       metadata: metadata ?? undefined,
     },
   });
+
+  // CRM dual-write — fire only when a member is known. logEngagementEvent is
+  // self-catching, so this cannot throw past here.
+  if (engagement) {
+    await logEngagementEvent({
+      workspaceId,
+      memberId: engagement.memberId,
+      eventType: engagement.eventType,
+      eventId: engagement.eventId,
+      metadata: metadata ?? undefined,
+    });
+  }
 
   // Deliver to Svix if workspace has a svixAppId and Svix is configured
   const svix = getSvix();

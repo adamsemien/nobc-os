@@ -67,7 +67,7 @@ export async function GET() {
     db.application.count({ where: { workspaceId, status: 'APPROVED' } }),
     db.application.count({ where: { workspaceId, status: 'REJECTED' } }),
     db.application.count({ where: { workspaceId, status: 'WAITLISTED' } }),
-    db.member.count({ where: { workspaceId, status: 'APPROVED' } }),
+    db.member.count({ where: { workspaceId, status: 'APPROVED', mergedIntoId: null } }),
     db.application.findMany({
       where: { workspaceId, status: 'APPROVED' },
       select: { aiScore: true },

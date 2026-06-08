@@ -2,9 +2,9 @@
  *  `applications.approve` tool, so both go through identical logic:
  *  flip status → APPROVED, upsert the Member, fire wallet pass + welcome
  *  email, emit audit events. */
-import { randomBytes } from 'crypto';
 import { MemberStatus, type Application, type AuditActorType, type Member } from '@prisma/client';
 import { db } from '@/lib/db';
+import { resolveMember } from '@/lib/member-identity';
 import { emitEvent } from '@/lib/emit-event';
 import { welcomeEmail } from '@/lib/email-templates';
 import { generateMemberPass } from '@/lib/wallet-pass';
@@ -28,42 +28,40 @@ export async function approveApplication(params: {
   if (app.workspaceId !== workspaceId) return { ok: false, error: 'forbidden' };
   if (app.status === 'APPROVED') return { ok: false, error: 'already_approved' };
 
-  const memberQrCode = randomBytes(8).toString('hex');
   const now = new Date();
-  const [firstName, ...rest] = app.fullName.trim().split(' ');
-  const lastName = rest.join(' ') || '';
 
-  // Check before upsert so we can emit member.created vs nothing.
+  // Check before resolve so we can emit member.created vs nothing.
   const existingMember = await db.member.findUnique({
     where: { workspaceId_email: { workspaceId, email: app.email } },
     select: { id: true },
   });
 
+  // Resolve the canonical GUEST member (mints QR if new), then promote it in the
+  // same transaction and link the Application to it. This preserves the existing
+  // Member row + all RSVP/engagement history — a GUEST becomes APPROVED in place.
+  const resolved = await resolveMember({
+    workspaceId,
+    email: app.email,
+    name: app.fullName,
+    clerkUserId: `applicant:${app.id}`,
+    phone: app.phone ?? undefined,
+    source: 'approval',
+  });
+
   const [application, member] = await db.$transaction([
     db.application.update({
       where: { id: applicationId },
-      data: { status: 'APPROVED', reviewedAt: now, reviewedBy: actorId, reviewNote: reviewNote ?? null },
+      data: {
+        status: 'APPROVED',
+        reviewedAt: now,
+        reviewedBy: actorId,
+        reviewNote: reviewNote ?? null,
+        memberId: resolved.id,
+      },
     }),
-    db.member.upsert({
-      where: { workspaceId_email: { workspaceId, email: app.email } },
-      create: {
-        workspaceId,
-        clerkUserId: `applicant:${app.id}`,
-        email: app.email,
-        firstName,
-        lastName,
-        phone: app.phone ?? undefined,
-        status: MemberStatus.APPROVED,
-        approved: true,
-        approvedAt: now,
-        memberQrCode,
-      },
-      update: {
-        status: MemberStatus.APPROVED,
-        approved: true,
-        approvedAt: now,
-        memberQrCode: { set: memberQrCode },
-      },
+    db.member.update({
+      where: { id: resolved.id },
+      data: { status: MemberStatus.APPROVED, approved: true, approvedAt: now },
     }),
   ]);
 
@@ -75,6 +73,7 @@ export async function approveApplication(params: {
     entityType: 'APPLICATION',
     entityId: applicationId,
     metadata: { memberId: member.id },
+    engagement: { memberId: member.id, eventType: 'application_approved', eventId: applicationId },
   });
   if (!existingMember) {
     await emitEvent({

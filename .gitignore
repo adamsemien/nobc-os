@@ -52,3 +52,8 @@ next-env.d.ts
 
 # claude code
 .claude/
+.agents/
+.codex/
+
+# nobc-house-phone is its own git repo (Railway standalone service) — never commit it into nobc-os
+/nobc-house-phone/

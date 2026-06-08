@@ -1,0 +1,30 @@
+# Replit run/config for NoBC OS (Next.js 15, App Router).
+# This lets Replit *import this GitHub repo and run it* — Replit has no MCP
+# server to "connect" to; the path onto Replit is GitHub import (see notes).
+
+# Next dev is bound to 0.0.0.0 so Replit's HTTPS proxy can reach it.
+# (Base script is `next dev --turbopack`; the extra flags are appended for Replit.)
+run = "npm run dev -- -H 0.0.0.0 -p 3000"
+
+entrypoint = "app/page.tsx"
+hidden = [".next", "node_modules"]
+
+# Toolchain comes from replit.nix (Node 20 + openssl for Prisma).
+[nix]
+channel = "stable-24_05"
+
+[env]
+NEXT_TELEMETRY_DISABLED = "1"
+# Next dev needs to trust the Replit preview host.
+HOSTNAME = "0.0.0.0"
+
+# Replit forwards the public URL (443) to the dev server on 3000.
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+# Optional: Replit Deployments (Autoscale) build/run commands.
+[deployment]
+deploymentTarget = "autoscale"
+build = ["sh", "-c", "npm install && npm run build"]
+run = ["sh", "-c", "npm run start"]

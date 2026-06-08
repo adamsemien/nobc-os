@@ -6,6 +6,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { scoreApplication } from '@/lib/scoring';
 import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
+import { resolveMember, promoteMemberToApproved } from '@/lib/member-identity';
 import { maybeFireSlack } from '@/lib/comments-notify';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 
@@ -63,25 +64,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (watchMatch?.type === 'PURPLE') {
     const now = new Date();
-    const nameParts = application.fullName.trim().split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
 
-    const member = await db.member.upsert({
-      where: { workspaceId_email: { workspaceId: application.workspaceId, email: application.email } },
-      update: { status: 'APPROVED', approved: true, approvedAt: now },
-      create: {
-        workspaceId: application.workspaceId,
-        clerkUserId: `app_${application.id}`,
-        email: application.email,
-        firstName,
-        lastName,
-        phone: application.phone ?? undefined,
-        status: 'APPROVED',
-        approved: true,
-        approvedAt: now,
-      },
+    // Resolve through the canonical path (mints a QR, GUEST), then promote — the
+    // PURPLE allowlist is a legitimate, operator-curated approval gate.
+    const resolved = await resolveMember({
+      workspaceId: application.workspaceId,
+      email: application.email,
+      name: application.fullName,
+      clerkUserId: `app_${application.id}`,
+      phone: application.phone ?? undefined,
+      source: 'apply_purple',
     });
+    const member = await promoteMemberToApproved(resolved.id, { approvedAt: now });
 
     await db.application.update({
       where: { id },

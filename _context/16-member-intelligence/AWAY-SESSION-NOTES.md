@@ -1,0 +1,184 @@
+# Away-Session Notes — Member Intelligence PR2 + PR3 foundation
+
+_Autonomous session, 2026-06-06 → 06-07. Branch: `feat/member-intelligence`._
+
+Picks-up-instantly summary for Adam. Everything below is committed unless explicitly marked **PARKED** or **YOU RUN**.
+
+---
+
+## Bottom line
+
+- **PR2 is COMPLETE and green** (S1–S10 + provenance write-path + instagram dedup).
+- **PR3 foundation landed** (read-path API + dependency-free data-access layer) — **no rendered UI**, per your instruction.
+- **Test/build state:** `vitest` **140 passing / 0 failing**, `tsc --noEmit` **clean**, `next build` **Errors: 0** (22 pre-existing warnings).
+- **2 writes left for YOU to run** (DB data backfills) + **1 dependency decision PARKED**. None block anything.
+
+---
+
+## Tooling gotcha you'll hit immediately
+
+`npx prisma …` is **broken in this environment** — it resolves to a stale shim and dies with `[rtk: No such file or directory]`. Use the direct binary instead:
+
+```
+node node_modules/prisma/build/index.js <cmd>      # e.g. migrate diff / generate
+DATABASE_URL="$DIRECT" node node_modules/prisma/build/index.js db execute --file <f>
+```
+
+`next build`/`next lint` route through a terse formatter that hides error detail (only prints `Errors: N`). To see the actual error, run ESLint directly: `npx eslint <files>`. (A build regression this session was a single `@typescript-eslint/no-explicit-any` — invisible in the build summary, obvious via eslint. Caught + fixed before commit.)
+
+---
+
+## Commits this session (oldest → newest)
+
+| Commit | What |
+|---|---|
+| `fdee917` | PR2 S1–S7 — Member dimension columns + `MemberPsychographics` + `FieldDefinition` + enum (schema) |
+| `51e6ec5` | PR2 S9 — sponsor firewall gate (type boundary + source-scan test) |
+| `9440c25` | PR2 S10 — remediated the live archetype leak on the sponsor page |
+| `c7aa869` | PR2 S8 — `sponsor_audience_member` firewall view (out-of-band SQL) |
+| `966736c` | PR2 — provenance write-path (PATCH) + psychographics populate script |
+| `430d5ef` | PR2 — lit up instagram dedup in `findMergeCandidates` |
+| `064bc9a` | Route-level test coverage for the PATCH write-path |
+| `313f440` | PR3 — read-path API (`GET …/record`, role-gated psychographics) |
+| `0519628` | PR3 — dependency-free data-access layer (TanStack parked) |
+| `3682a05` | grandfather backfill script (dry-run default) |
+
+---
+
+## DB changes already applied this session (additive, verified)
+
+Applied by me to **Neon (unpooled `DIRECT_URL`)** via `db execute` — never `db push`, `Asset_searchVector_idx` untouched. `migrate diff` now shows **only** the known `DROP INDEX "Asset_searchVector_idx"` line (the out-of-band GIN index), confirming schema ↔ DB are in sync.
+
+1. `prisma/sql/additive_pr2_dimensions.sql` — Member dimension columns, `MemberPsychographics`, `FieldDefinition`, `MemberEnrichmentStatus` enum, FK, dropped the stray `playing_with_neon`.
+2. `prisma/sql/sponsor-audience-view.sql` — the `sponsor_audience_member` view. Verified live: **15 columns, 0 forbidden** (no archetype/psychographics/aiSummary/scores/raw householdIncome), 132 rows.
+
+> These were applied because your `npx`-based run-path was broken (see gotcha above) and they're additive/idempotent/Producer-safe — same takeover pattern as the PR1 migration. If you re-provision a DB, re-run both files with the direct-binary command above.
+
+---
+
+## The firewall (how it's enforced — 3 layers)
+
+Psychographic data (archetype / interests / tasteSignals) must never reach a **sponsor** surface. Operators are trusted and DO see it.
+
+1. **Physical** — psychographics live in a separate `MemberPsychographics` table; the `sponsor_audience_member` view is a single-table projection with **no JOIN**, so it cannot reach it.
+2. **Type** — `lib/intelligence/sponsor-safe.ts`: `SponsorAudienceMember` + a compile-time `Assert<…>` guard (adding a psychographic key fails the build) + `toSponsorAudienceMember()` runtime projection that drops any contaminant.
+3. **Test** — `tests/unit/sponsor-firewall.test.ts`: source-scans every sponsor-facing module for psychographic reads + structural checks on the view SQL. **This is the gate — keep it green before shipping any sponsor surface.**
+
+Note: the sponsor's own `PersonaCriteria.archetypes` *targeting input* (in `brief-assemble.ts`) is a filter, NOT a member-data leak, and is deliberately allowed. The scan targets member-psychographic READ tokens only (`MemberPsychographics`, `archetypeScores`, `archetypeAverages`, `tasteSignals`, `psychographics`).
+
+---
+
+## What I did NOT build (your call)
+
+Per your instruction, **no rendered/design surfaces**: no record page, timeline UI, provenance badges, inline-edit UI, dimension panels, styling. The read-path API + data-access layer are the data those will consume.
+
+---
+
+## YOU RUN (data backfills — I only dry-ran them)
+
+Both are idempotent, dry-run-verified read-only, and currently **no-ops on live data** (nothing to do), but they're ready:
+
+1. **Populate psychographics** from Application archetype → `MemberPsychographics`:
+   ```
+   ./node_modules/.bin/tsx scripts/populate-psychographics.ts --dry-run   # 10 linked scored apps → 10 to create
+   ./node_modules/.bin/tsx scripts/populate-psychographics.ts             # write
+   ```
+2. **Grandfather** legacy bypass-APPROVED members (flag only, no demote) + optional waitlist materialization:
+   ```
+   ./node_modules/.bin/tsx scripts/grandfather-members.ts                                   # dry-run (default)
+   ./node_modules/.bin/tsx scripts/grandfather-members.ts --execute                         # flag pass
+   ./node_modules/.bin/tsx scripts/grandfather-members.ts --execute --materialize-attendees # + orphan waitlist
+   ```
+   Dry-run on current data: **0 bypass-APPROVED, 0 orphan waitlist entries** — clean. Script is ready if that changes.
+
+---
+
+## PARKED — needs your decision
+
+**TanStack Query is not installed.** Task 4 asked for "TanStack Query hooks + optimistic-mutation setup." Installing it adds a dependency + lockfile change + wrapping the **root layout** in a `QueryClientProvider` (an app-shell change). Per your own decision-rule ("real judgment call → STOP, write to NOTES"), I did **not** install it unsupervised.
+
+Instead I built the **dependency-free data-access layer** the hooks wrap: `lib/member-client.ts` (`memberKeys`, `fetchMemberRecord`, `patchMemberFields`, `optimisticApplyFieldWrites`). Dropping TanStack on top is then purely additive. Drop-in hooks once you approve the dependency:
+
+```ts
+// lib/hooks/useMemberRecord.ts  (after: npm i @tanstack/react-query + provider in app/layout)
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { memberKeys, fetchMemberRecord, patchMemberFields, optimisticApplyFieldWrites, type FieldWriteInput } from '@/lib/member-client';
+
+export function useMemberRecord(id: string, limit?: number) {
+  return useQuery({ queryKey: memberKeys.record(id, limit), queryFn: ({ signal }) => fetchMemberRecord(id, { limit, signal }) });
+}
+
+export function usePatchMemberFields(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fields: Record<string, FieldWriteInput>) => patchMemberFields(id, fields),
+    onMutate: async (fields) => {
+      const key = memberKeys.record(id);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData(key);
+      if (prev) qc.setQueryData(key, optimisticApplyFieldWrites(prev as any, fields, new Date().toISOString()));
+      return { prev };
+    },
+    onError: (_e, _f, ctx) => { if (ctx?.prev) qc.setQueryData(memberKeys.record(id), ctx.prev); },
+    onSettled: () => qc.invalidateQueries({ queryKey: memberKeys.record(id) }),
+  });
+}
+```
+Provider needed once in `app/layout.tsx` (or a client `Providers` wrapper): `<QueryClientProvider client={new QueryClient()}>`.
+
+---
+
+## API surface added (for PR3 UI)
+
+- `GET /api/operator/members/[id]/record` — full record: core + grouped firmographic/demographic dimensions + `customFields`/`fieldProvenance` + engagement timeline + psychographics (operator-gated). `requireRole(READ_ONLY)`. Zod `?limit=1..200`. Returns the `MemberRecord` type from `lib/member-record.ts`.
+- `PATCH /api/operator/members/[id]` — dimension write-path. `requireRole(STAFF)`. Body `{ fields: { <stableKey>: { value, source?, confidence? } } }`. Stamps `fieldProvenance[key] = {value, source, confidence?, syncedAt}`; source ∈ `self_reported|operator_entered|ai_inferred|verified_enrichment|producer` (default `operator_entered`). 409 on editing a soft-merged duplicate.
+
+## Tests added (route coverage gap → closed for these)
+
+`sponsor-firewall` (12), `member-provenance` (11), `member-patch-route` (9), `member-record` (6), `member-record-route` (5), `member-client` (7), + 3 new `findMergeCandidates` instagram cases. Money/access regression (GUEST-not-APPROVED, Application links member at submission, promotion preserves row) was already covered by `member-identity` / `member-no-approve-bypass` / `member-promotion`.
+
+---
+
+## PR3 Slice 0 — data layer (2026-06-07, landed)
+
+Non-visual plumbing that unblocks the UI slices. No schema changes; firewall green.
+
+- **`assembleMemberRecord` extended** (additive): `member` core gains `aiSummary`/`energyScore`/`networkValueScore`; new top-level `redList` (WatchList, email-match, PURPLE/BLOCKED) + `intelligence` (latest Application `aiScore`/`aiReasoning`/`aiRecommendation`). **Archetype is excluded from the application select** — it stays in the firewalled psychographics block.
+- **`GET …/record` psychographics tightened to STAFF+**: `includePsychographics = roleAtLeast(gate.role, STAFF)`. READ_ONLY operators view the record without psychographics (was: any operator).
+- **TanStack hooks landed** (dependency + provider now in place): `lib/hooks/useMemberRecord.ts`, `lib/hooks/usePatchMemberFields.ts` (typed `getQueryData<MemberRecord>`, no `any`).
+- **Tests:** `member-record` +2 (redList/intelligence surface, no-archetype-leak, null case), `member-record-route` READ_ONLY→`false` + STAFF→`true`. Suite **143 passing**.
+
+> Slice 0 of the read-experience → write → dimensions → merge → referral sequence. Next: Slice 1 (F1+F2+F3 record page) adds `@tanstack/react-virtual`.
+
+## PR3 Slice 1 — read experience (2026-06-08, landed)
+
+F1 identity/lifecycle + F2 engagement timeline + F3 provenance as a server-assembled RSC shell (`requireRolePage(READ_ONLY)`, `assembleMemberRecord` direct — no self-HTTP, `includePsychographics = roleAtLeast(role, STAFF)`); adds `@tanstack/react-virtual`; no schema changes; firewall green; no psychographic data rendered. New: `MemberRecordHeader`/`LifecycleBadge`/`MemberTimeline` (client island, `react-virtual`, day-grouped, fills the column at `lg+` — no layout void)/`ProvenanceBadge` (5 sources incl. producer) + `lib/engagement-labels.ts` (locked human labels, never "RSVP") + `lib/provenance-display.ts`; notes composer = existing `CommentThread` (already wired to `/api/operator/comments`). Companion demo seed `scripts/seed-member-record-demo.ts` (workspace-by-slug via `DEMO_SEED_WORKSPACE_SLUG`, never defaults to prod; find-or-create Celia + Application + 9 events; direct writes, zero side effects). Suite **151 passing**; tsc 0, eslint clean, build Errors 0.
+
+## PR3 Slice 2 — inline edit (F4) + custom fields (F5) (2026-06-08, built, awaiting approval)
+
+Makes the record editable. No schema migration — F5 activates the dormant `FieldDefinition` model (section=`member`). Firewall green.
+
+- **F4 inline edit** over the existing PATCH path, extended to **first-class Profile columns** (per Adam's re-scope of Q1) + customFields. New `lib/member-editable.ts` is the policy SoT: `EDITABLE_MEMBER_COLUMNS` (firmographic+demographic + aiSummary), `RESERVED_FIELD_KEYS` (archetype/archetypeScores + psychographic set → hard-reject), `READONLY_MEMBER_KEYS` (email/computed/system/identity → reject). The route partitions writes → columns land on the column, customFields via `applyFieldWrites`; **both** stamp `fieldProvenance[key]`.
+- **Provenance:** operator edits stamp `source: operator_entered` (the canonical locked enum value — the spec's `'operator'` mapped to it; the union is NOT forked) + `confidence: 1`. `EditableField` (Attio soft-highlight + provenance badge; the AI/enrichment badge clears to "Operator" on save — LogicGate). Optimistic via `usePatchMemberFields`.
+- **Permissions:** F4 = STAFF+ and disabled on a merged record (`canEdit` from the RSC). F5 management = **ADMIN** (`/operator/settings/member-fields`).
+- **F5:** ADMIN CRUD `GET(STAFF)/PATCH(ADMIN) /api/operator/settings/member-fields` over `FieldDefinition` (slugified stableKey, soft-delete preserves values, audit `settings.member_fields_updated`); reserved-key rejected at API **and** in the editor UI. `assembleMemberRecord` now returns `fieldDefs`; the Fields card renders by definition (label/type/options), defined-but-empty fields editable, legacy keys fall back to humanize.
+- **Tests:** `member-editable` (classification + explicit reserved-key firewall block), `member-fields-route` (ADMIN gate, reserved reject, upsert/soft-delete), extended `member-patch-route` (column vs custom write, reserved/readonly/column-type 400s), `member-record` (fieldDefs). Suite **173 passing**; tsc 0, eslint clean (incl. tightening 3 pre-existing `any` in member-patch-route.test.ts's `call`/mock helpers — incidental, matching the already-fixed sibling test files), build Errors 0. **Not committed — awaiting Adam's review.**
+
+## Clerk appearance — editorial-cream pass (2026-06-08, built, awaiting approval)
+
+`lib/clerk-appearance.ts` rewritten to the NoBC editorial-cream direction: cream `#F5EFE8` canvas, red `#B22E21` the only pop, 3px corners, no shadows, tight type, body font = the app's `Neue Haas Grotesk Display Pro` stack. Tailwind-class element overrides per spec (Clerk renders outside the app token theme → literal NoBC hex is the sanctioned exception). Preserved the UserButton-popover/label/divider overrides so the operator header doesn't regress. Added `localization` to `ClerkProvider` (`app/layout.tsx`): "Sign in to NoBC OS" / "The operator's desk." tsc 0, build Errors 0. Not committed.
+
+## Slice 2 cleanup + quick-add member (2026-06-08, built, awaiting approval)
+
+- **Nav link:** Settings → **Member Fields** card added (`app/operator/settings/page.tsx`) → `/operator/settings/member-fields` (was URL-only).
+- **Save-error toast:** no toast lib in repo; surfaced `usePatchMemberFields` failures via an error-only `role="alert"` fixed toast in `MemberEditablePanels` ("Failed to save changes") using the existing `toast-in` pattern. Success stays silent.
+- **Quick-add member:** extended the existing `AddMemberDrawer` + `POST /api/operator/members/create` (STAFF+). Added **referredBy** (typeahead over the roster → writes the existing `Member.referredByMemberId` self-relation; **no migration needed**), status remap **Member→APPROVED / Guest→GUEST / Comp Access→GUEST+`comp` tag** (no COMP enum value — accepted workaround), **provenance stamping** `{source:'operator_entered',confidence:1,syncedAt}` on every filled field, and audit note "Added manually by operator." Duplicate-email guard (409) + workspace-scoped referrer validation. No Clerk invite, no email. Roster optimistically prepends the new row. tsc 0, eslint clean, 173 tests, build Errors 0.
+
+> **DEFERRED — Comp Access proper fix (Adam runs when slotted):** replace the GUEST+`comp`-tag workaround with a real status via an **additive** `ALTER TYPE "MemberStatus" ADD VALUE 'COMP';` applied through `prisma db execute` (never `db push`, never touch `Asset_searchVector_idx` — Producer shares the DB). Then remap Comp Access → `COMP` in `AddMemberDrawer`'s `STATUS_MAP` and drop the `comp` auto-tag. Postgres `ADD VALUE` is additive and safe; it just needs a deploy slot.
+
+## Suggested next steps (PR3 proper, your review)
+
+1. Approve TanStack dependency → drop in the hooks above + provider.
+2. Build the record page F1–F8 (Attio/Linear-style) against `GET …/record` + the hooks — **your design review**.
+3. Run the two backfills above when you're satisfied with the dry-run counts.
+4. Seed a `FieldDefinition` set (PR3 ships a fixed set; the builder UI is V1.5).
