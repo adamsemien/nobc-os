@@ -9,6 +9,7 @@ import {
   Mail,
   Trophy,
   Users,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { PageHeader } from '../_components/PageHeader';
 import { auth } from '@clerk/nextjs/server';
@@ -27,6 +28,12 @@ const CARDS: Card[] = [
     title: 'Application Form',
     description: 'Edit your member application questions.',
     Icon: ClipboardList,
+  },
+  {
+    href: '/operator/settings/member-fields',
+    title: 'Member Fields',
+    description: 'Define the custom fields shown on every member record.',
+    Icon: SlidersHorizontal,
   },
   {
     href: '/operator/settings/communications',

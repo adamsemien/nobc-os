@@ -142,6 +142,16 @@ export function MemberEditablePanels({
           placeholder="Add a summary"
         />
       </Card>
+
+      {/* Error-only toast: optimistic edits roll back on failure; success is silent. */}
+      {patch.isError ? (
+        <div
+          role="alert"
+          className="toast-in fixed bottom-6 right-6 z-50 rounded-md border border-danger/30 bg-danger-soft px-4 py-2.5 text-sm font-medium text-danger shadow-[0_4px_16px_rgba(0,0,0,0.18)]"
+        >
+          Failed to save changes
+        </div>
+      ) : null}
     </>
   );
 }

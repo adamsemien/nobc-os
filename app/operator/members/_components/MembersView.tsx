@@ -48,7 +48,14 @@ export function MembersView({
       <PageHeader
         title="Members"
         subtitle={`${members.length} approved · sorted by most recently added`}
-        action={canAddMembers ? <AddMemberDrawer onCreated={handleCreated} /> : undefined}
+        action={
+          canAddMembers ? (
+            <AddMemberDrawer
+              onCreated={handleCreated}
+              members={members.map((mem) => ({ id: mem.id, fullName: mem.fullName, email: mem.email }))}
+            />
+          ) : undefined
+        }
       />
 
       {members.length === 0 ? (

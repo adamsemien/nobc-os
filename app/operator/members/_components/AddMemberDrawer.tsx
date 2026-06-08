@@ -14,14 +14,25 @@ export type CreatedMember = {
   createdAt: string;
 };
 
-type MemberFormStatus = 'GUEST' | 'APPROVED' | 'PENDING';
+type MemberFormStatus = 'MEMBER' | 'GUEST' | 'COMP';
 
-// Display labels — never surface the raw enum in the UI (root CLAUDE.md terminology law).
+export type ReferrerOption = { id: string; fullName: string; email: string };
+
+// Display labels — never surface the raw enum (root CLAUDE.md terminology law). These are the
+// three access groups; each maps to a MemberStatus on submit.
 const STATUS_OPTIONS: { value: MemberFormStatus; label: string }[] = [
+  { value: 'MEMBER', label: 'Member' },
   { value: 'GUEST', label: 'Guest' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'PENDING', label: 'Pending' },
+  { value: 'COMP', label: 'Comp Access' },
 ];
+
+// Member → APPROVED, Guest → GUEST. Comp Access has no MemberStatus enum value (adding one
+// is a non-additive enum change on the shared DB), so it lands as GUEST tagged `comp`.
+const STATUS_MAP: Record<MemberFormStatus, { status: 'APPROVED' | 'GUEST'; tag?: string }> = {
+  MEMBER: { status: 'APPROVED' },
+  GUEST: { status: 'GUEST' },
+  COMP: { status: 'GUEST', tag: 'comp' },
+};
 
 const inputCls =
   'w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15';
@@ -32,13 +43,21 @@ const EMPTY = {
   lastName: '',
   email: '',
   phone: '',
-  status: 'GUEST' as MemberFormStatus,
+  status: 'MEMBER' as MemberFormStatus,
   tags: '',
   aiSummary: '',
   note: '',
+  referredById: '',
+  referredByLabel: '',
 };
 
-export function AddMemberDrawer({ onCreated }: { onCreated: (m: CreatedMember) => void }) {
+export function AddMemberDrawer({
+  onCreated,
+  members,
+}: {
+  onCreated: (m: CreatedMember) => void;
+  members: ReferrerOption[];
+}) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +87,7 @@ export function AddMemberDrawer({ onCreated }: { onCreated: (m: CreatedMember) =
     }
 
     setSubmitting(true);
+    const mapped = STATUS_MAP[form.status];
     try {
       const res = await fetch('/api/operator/members/create', {
         method: 'POST',
@@ -78,12 +98,13 @@ export function AddMemberDrawer({ onCreated }: { onCreated: (m: CreatedMember) =
           lastName,
           email,
           phone: form.phone.trim() || undefined,
-          status: form.status,
-          tags: form.tags
-            .split(',')
-            .map((t) => t.trim())
-            .filter(Boolean),
+          status: mapped.status,
+          tags: [
+            ...form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+            ...(mapped.tag ? [mapped.tag] : []),
+          ],
           aiSummary: form.aiSummary.trim() || undefined,
+          referredByMemberId: form.referredById || undefined,
         }),
       });
       const payload = (await res.json().catch(() => ({}))) as {
@@ -103,6 +124,18 @@ export function AddMemberDrawer({ onCreated }: { onCreated: (m: CreatedMember) =
       setSubmitting(false);
     }
   }
+
+  const refQuery = form.referredByLabel.trim().toLowerCase();
+  const referrerMatches =
+    refQuery && !form.referredById
+      ? members
+          .filter(
+            (mem) =>
+              mem.fullName.toLowerCase().includes(refQuery) ||
+              mem.email.toLowerCase().includes(refQuery),
+          )
+          .slice(0, 8)
+      : [];
 
   return (
     <>
@@ -227,6 +260,46 @@ export function AddMemberDrawer({ onCreated }: { onCreated: (m: CreatedMember) =
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="am-ref" className={labelCls}>
+              Referred by
+            </label>
+            <input
+              id="am-ref"
+              value={form.referredByLabel}
+              onChange={(e) => {
+                set('referredByLabel', e.target.value);
+                set('referredById', '');
+              }}
+              placeholder="Search members…"
+              autoComplete="off"
+              className={inputCls}
+            />
+            {refQuery && !form.referredById ? (
+              <ul className="mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-surface text-sm">
+                {referrerMatches.length === 0 ? (
+                  <li className="px-3 py-2 text-text-muted">No matches</li>
+                ) : (
+                  referrerMatches.map((mem) => (
+                    <li key={mem.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          set('referredById', mem.id);
+                          set('referredByLabel', mem.fullName);
+                        }}
+                        className="block w-full px-3 py-1.5 text-left text-text-primary hover:bg-raised"
+                      >
+                        {mem.fullName} <span className="text-text-muted">· {mem.email}</span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            ) : null}
+            {form.referredById ? <p className="text-[11px] text-success">Referrer linked.</p> : null}
           </div>
 
           <div className="space-y-1">
