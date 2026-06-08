@@ -6,6 +6,7 @@ import { requireWorkspaceId } from '@/lib/auth';
 import { requireRole } from '@/lib/operator-role';
 import { emitEvent } from '@/lib/emit-event';
 import { applyFieldWrites, patchMemberSchema, type FieldWrite } from '@/lib/member-provenance';
+import { classifyFieldKey, isReservedKey, isReadOnlyMemberKey } from '@/lib/member-editable';
 
 export async function GET(
   _req: NextRequest,
@@ -134,24 +135,74 @@ export async function PATCH(
   }
 
   const writes = parsed.data.fields as Record<string, FieldWrite>;
+  const keys = Object.keys(writes);
+
+  // Firewall + identity guards, before any write. Reserved keys (archetype/psychographic)
+  // can never be edited or shadow-written; read-only keys (email, computed rollups, system
+  // columns) are owned by the funnel/approval gate, not free-text edits.
+  const reserved = keys.filter(isReservedKey);
+  if (reserved.length) {
+    return NextResponse.json(
+      { error: `Reserved field(s) cannot be edited: ${reserved.join(', ')}` },
+      { status: 400 },
+    );
+  }
+  const readonly = keys.filter(isReadOnlyMemberKey);
+  if (readonly.length) {
+    return NextResponse.json(
+      { error: `Read-only field(s) cannot be edited: ${readonly.join(', ')}` },
+      { status: 400 },
+    );
+  }
+
+  // Partition: first-class Member columns vs operator-defined customFields. Column values
+  // must be text|null (the editable columns are all string columns).
+  const columnWrites: Record<string, FieldWrite> = {};
+  const customWrites: Record<string, FieldWrite> = {};
+  for (const k of keys) {
+    if (classifyFieldKey(k) === 'column') {
+      const v = writes[k].value;
+      if (!(typeof v === 'string' || v === null)) {
+        return NextResponse.json({ error: `Field "${k}" must be text` }, { status: 400 });
+      }
+      columnWrites[k] = writes[k];
+    } else {
+      customWrites[k] = writes[k];
+    }
+  }
+
   const syncedAt = new Date().toISOString();
   const { customFields, fieldProvenance } = applyFieldWrites({
     customFields: member.customFields as Record<string, unknown> | null,
     fieldProvenance: member.fieldProvenance as Record<string, unknown> | null,
-    writes,
+    writes: customWrites,
     syncedAt,
   });
+
+  // First-class column writes: set the column AND stamp provenance into the same blob, so
+  // every operator-editable field — column or custom — carries a uniform provenance record.
+  const columnData: Record<string, unknown> = {};
+  for (const [k, w] of Object.entries(columnWrites)) {
+    columnData[k] = w.value;
+    const rec: { value: unknown; source: string; confidence?: number; syncedAt: string } = {
+      value: w.value,
+      source: w.source,
+      syncedAt,
+    };
+    if (w.confidence !== undefined) rec.confidence = w.confidence;
+    fieldProvenance[k] = rec;
+  }
 
   const updated = await db.member.update({
     where: { id: member.id },
     data: {
+      ...columnData,
       customFields: customFields as Prisma.InputJsonValue,
       fieldProvenance: fieldProvenance as Prisma.InputJsonValue,
     },
     select: { id: true, customFields: true, fieldProvenance: true },
   });
 
-  const keys = Object.keys(writes);
   const isSync = Object.values(writes).some(
     (w) => w.source === 'verified_enrichment' || w.source === 'producer',
   );

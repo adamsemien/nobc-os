@@ -6,6 +6,7 @@ const m = vi.hoisted(() => ({
   engagementFindMany: vi.fn(),
   watchFindFirst: vi.fn(),
   applicationFindFirst: vi.fn(),
+  fieldDefFindMany: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({
   db: {
@@ -14,6 +15,7 @@ vi.mock('@/lib/db', () => ({
     memberEngagementEvent: { findMany: m.engagementFindMany },
     watchList: { findFirst: m.watchFindFirst },
     application: { findFirst: m.applicationFindFirst },
+    fieldDefinition: { findMany: m.fieldDefFindMany },
   },
 }));
 
@@ -44,6 +46,7 @@ beforeEach(() => {
   ]);
   m.watchFindFirst.mockResolvedValue(null);
   m.applicationFindFirst.mockResolvedValue(null);
+  m.fieldDefFindMany.mockResolvedValue([]);
 });
 
 describe('assembleMemberRecord', () => {
@@ -99,6 +102,20 @@ describe('assembleMemberRecord', () => {
     m.memberFindFirst.mockResolvedValue(null);
     const rec = await assembleMemberRecord({ workspaceId: 'w1', memberId: 'nope', includePsychographics: true });
     expect(rec).toBeNull();
+  });
+
+  it('surfaces active member field definitions (F5), ordered, scoped to section=member', async () => {
+    m.fieldDefFindMany.mockResolvedValue([
+      { stableKey: 'dietary', name: 'Dietary', type: 'text', options: [], sponsorVisible: false, order: 0 },
+    ]);
+    const rec = await assembleMemberRecord({ workspaceId: 'w1', memberId: 'M', includePsychographics: true });
+    expect(rec!.fieldDefs).toEqual([
+      { stableKey: 'dietary', name: 'Dietary', type: 'text', options: [], sponsorVisible: false, order: 0 },
+    ]);
+    expect(m.fieldDefFindMany.mock.calls[0][0]).toMatchObject({
+      where: { workspaceId: 'w1', section: 'member', isActive: true },
+      orderBy: { order: 'asc' },
+    });
   });
 
   it('honors the timeline limit', async () => {

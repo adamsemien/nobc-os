@@ -22,28 +22,45 @@ import { PATCH } from '@/app/api/operator/members/[id]/route';
 const STAFF_GATE = { ok: true, userId: 'op1', workspaceId: 'w1', role: 'STAFF' };
 
 function call(body: unknown, id = 'M') {
-  return PATCH({ json: async () => body } as any, { params: Promise.resolve({ id }) } as any);
+  return PATCH(
+    { json: async () => body } as unknown as Parameters<typeof PATCH>[0],
+    { params: Promise.resolve({ id }) } as unknown as Parameters<typeof PATCH>[1],
+  );
 }
 
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
   m.requireRole.mockResolvedValue(STAFF_GATE);
   m.findFirst.mockResolvedValue({ id: 'M', customFields: null, fieldProvenance: null, mergedIntoId: null });
-  m.update.mockImplementation(({ data }: any) => Promise.resolve({ id: 'M', ...data }));
+  m.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+    Promise.resolve({ id: 'M', ...data }),
+  );
   m.emitEvent.mockResolvedValue(undefined);
 });
 
 describe('PATCH /api/operator/members/[id] — provenance write-path', () => {
-  it('stamps fieldProvenance {value, source, confidence, syncedAt} and writes customFields', async () => {
-    const res = await call({ fields: { industry: { value: 'Fashion', confidence: 0.9 } } });
+  it('writes a custom field into customFields and stamps fieldProvenance', async () => {
+    const res = await call({ fields: { vibe: { value: 'high', confidence: 0.9 } } });
     expect(res.status).toBe(200);
 
     const data = m.update.mock.calls[0][0].data;
-    expect(data.customFields).toEqual({ industry: 'Fashion' });
-    const prov = data.fieldProvenance.industry;
-    expect(prov.value).toBe('Fashion');
+    expect(data.customFields).toEqual({ vibe: 'high' });
+    const prov = data.fieldProvenance.vibe;
+    expect(prov.value).toBe('high');
     expect(prov.source).toBe('operator_entered'); // defaulted
     expect(prov.confidence).toBe(0.9);
+    expect(prov.syncedAt).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+  });
+
+  it('writes a first-class Profile column to the column itself, not customFields, and stamps provenance', async () => {
+    const res = await call({ fields: { industry: { value: 'Fashion', confidence: 1 } } });
+    expect(res.status).toBe(200);
+
+    const data = m.update.mock.calls[0][0].data;
+    expect(data.industry).toBe('Fashion'); // first-class column write
+    expect(data.customFields).toEqual({}); // NOT shadowed as a custom field
+    const prov = data.fieldProvenance.industry;
+    expect(prov).toMatchObject({ value: 'Fashion', source: 'operator_entered', confidence: 1 });
     expect(prov.syncedAt).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
   });
 
@@ -64,14 +81,14 @@ describe('PATCH /api/operator/members/[id] — provenance write-path', () => {
   it('preserves existing customFields/provenance keys (additive merge)', async () => {
     m.findFirst.mockResolvedValue({
       id: 'M',
-      customFields: { city: 'NYC' },
-      fieldProvenance: { city: { value: 'NYC', source: 'self_reported', syncedAt: 't0' } },
+      customFields: { vibe: 'high' },
+      fieldProvenance: { vibe: { value: 'high', source: 'self_reported', syncedAt: 't0' } },
       mergedIntoId: null,
     });
-    await call({ fields: { industry: { value: 'Tech' } } });
+    await call({ fields: { dietary: { value: 'veg' } } });
     const data = m.update.mock.calls[0][0].data;
-    expect(data.customFields).toEqual({ city: 'NYC', industry: 'Tech' });
-    expect(data.fieldProvenance.city).toEqual({ value: 'NYC', source: 'self_reported', syncedAt: 't0' });
+    expect(data.customFields).toEqual({ vibe: 'high', dietary: 'veg' });
+    expect(data.fieldProvenance.vibe).toEqual({ value: 'high', source: 'self_reported', syncedAt: 't0' });
   });
 
   it('returns 403 (gate response) for a non-STAFF caller, never touching the DB', async () => {
@@ -105,5 +122,30 @@ describe('PATCH /api/operator/members/[id] — provenance write-path', () => {
   it('returns 400 on an unknown provenance source', async () => {
     const res = await call({ fields: { x: { value: 'v', source: 'guessed' } } });
     expect(res.status).toBe(400);
+  });
+
+  // ── Firewall + identity guards (Slice 2) ──────────────────────────────────
+  it.each(['archetype', 'archetypeScores'])(
+    'hard-rejects the reserved firewall key "%s" before any DB write',
+    async (key) => {
+      const res = await call({ fields: { [key]: { value: 'X' } } });
+      expect(res.status).toBe(400);
+      expect(m.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['email', 'totalEventsAttended', 'energyScore'])(
+    'rejects the read-only key "%s" (identity / computed)',
+    async (key) => {
+      const res = await call({ fields: { [key]: { value: 'x' } } });
+      expect(res.status).toBe(400);
+      expect(m.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects a non-text value written to a first-class column', async () => {
+    const res = await call({ fields: { industry: { value: ['a', 'b'] } } });
+    expect(res.status).toBe(400);
+    expect(m.update).not.toHaveBeenCalled();
   });
 });

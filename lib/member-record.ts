@@ -88,6 +88,20 @@ export interface MemberTimelineEntry {
   metadata: unknown;
 }
 
+/**
+ * Active member custom-field definitions (F5). Lets the Fields card render customFields by
+ * their declared label/type/options instead of raw keys, and surface defined-but-empty
+ * fields as editable rows. Operator-facing metadata — never part of the sponsor projection.
+ */
+export interface MemberFieldDef {
+  stableKey: string;
+  name: string;
+  type: string;
+  options: string[];
+  sponsorVisible: boolean;
+  order: number;
+}
+
 export interface MemberRecord {
   member: MemberRecordCore;
   dimensions: MemberRecordDimensions;
@@ -99,6 +113,8 @@ export interface MemberRecord {
   redList: MemberRecordRedList | null;
   /** Latest Application AI assessment (no archetype — that stays firewalled). */
   intelligence: MemberRecordIntelligence | null;
+  /** Active member custom-field definitions (F5), ordered. Drives the Fields card render. */
+  fieldDefs: MemberFieldDef[];
   timeline: MemberTimelineEntry[];
 }
 
@@ -158,7 +174,7 @@ export async function assembleMemberRecord(args: {
   // never even issues the query. Red List + intelligence are operator-facing (not
   // psychographic) and always read. Both match the canonical email-based lookups the
   // existing member GET endpoint uses, so the two surfaces agree.
-  const [psychoRow, timelineRows, watchRow, applicationRow] = await Promise.all([
+  const [psychoRow, timelineRows, watchRow, applicationRow, fieldDefRows] = await Promise.all([
     includePsychographics
       ? db.memberPsychographics.findUnique({
           where: { memberId },
@@ -181,6 +197,12 @@ export async function assembleMemberRecord(args: {
       // aiScore/aiReasoning/aiRecommendation only — archetype/archetypeScores are
       // psychographic and must NOT be surfaced through this operator-intelligence block.
       select: { aiScore: true, aiReasoning: true, aiRecommendation: true },
+    }),
+    // Active member field definitions (F5) — operator metadata, never sponsor-facing.
+    db.fieldDefinition.findMany({
+      where: { workspaceId, section: 'member', isActive: true },
+      orderBy: { order: 'asc' },
+      select: { stableKey: true, name: true, type: true, options: true, sponsorVisible: true, order: true },
     }),
   ]);
 
@@ -242,6 +264,14 @@ export async function assembleMemberRecord(args: {
           aiRecommendation: applicationRow.aiRecommendation ?? null,
         }
       : null,
+    fieldDefs: fieldDefRows.map((d) => ({
+      stableKey: d.stableKey,
+      name: d.name,
+      type: d.type,
+      options: d.options,
+      sponsorVisible: d.sponsorVisible,
+      order: d.order,
+    })),
     timeline: timelineRows.map((t) => ({
       id: t.id,
       eventType: t.eventType,
