@@ -11,7 +11,7 @@
 | **Last updated** | 2026-06-09 |
 | **Owner** | Adam |
 | **Blocked on** | Compliance pages legal review |
-| **Next** | **2026-06-09:** checkout-flow fix agent dispatched (branch `fix/checkout-flow`, PR to follow — verify + fix the ticketed money path: error map surfaced to the user, double-submit/idempotency, capacity race, past-event purchase gate, webhook-delay UX). Stripe confirmed **test mode** locally (`sk_test`/`pk_test` in `.env.local`); going live remains blocked on compliance-page legal review. — Verify compliance pages are live + legally reviewed before flipping to live Stripe keys. (2026-05-21: the link-only confirmation email now embeds a scannable QR — see Audit findings → "The gap". Test a full purchase in Stripe test mode to confirm the QR arrives + scans.) |
+| **Next** | **2026-06-09:** checkout hardening PR #70 open (past-event purchase gate → 410, Stripe PI `idempotencyKey`, Serializable capacity transaction + dangling-PI cancel; tsc/build/247 unit tests clean) — review + merge. **Finding: ticketed purchases send no transactional confirmation email** (the access submit/payment-intent routes never send one, yet the confirmed-page fallback copy says "Check your email for your registration details" — that copy misleads until an email ships). Stripe confirmed **test mode** locally (`sk_test`/`pk_test` in `.env.local`); going live remains blocked on compliance-page legal review. — Verify compliance pages are live + legally reviewed before flipping to live Stripe keys. (2026-05-21: the link-only confirmation email now embeds a scannable QR — see Audit findings → "The gap". Test a full purchase in Stripe test mode to confirm the QR arrives + scans.) |
 
 ## Scope
 
