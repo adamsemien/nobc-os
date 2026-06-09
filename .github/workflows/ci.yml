@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref so a fast push doesn't queue behind a stale one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # Prisma needs a DATABASE_URL to generate the client. This is a dummy value:
+      # no migrations run and nothing connects to it — generation is offline.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        # npx prisma is broken on this repo — invoke the build entrypoint directly.
+        run: node node_modules/prisma/build/index.js generate
+
+      - name: Typecheck
+        run: node_modules/.bin/tsc --noEmit
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        # Informational for now — surfaces lint debt without blocking PRs until the
+        # backlog is burned down. Flip to a hard gate once lint is clean.
+        run: npm run lint
+        continue-on-error: true
