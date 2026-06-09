@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import { OperatorRole, Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
 import type { McpTool } from '../types';
@@ -34,6 +34,7 @@ const tagMemberSchema = z.object({
 export const memberTools: McpTool[] = [
   {
     name: 'nobc_get_members',
+    minRole: OperatorRole.READ_ONLY,
     description:
       'List members in the workspace. Filter by status (approved | pending | all) and an optional name/email search. Returns id, name, email, archetype, approvedAt, totalEventsAttended.',
     inputSchema: getMembersSchema,
@@ -100,6 +101,7 @@ export const memberTools: McpTool[] = [
   },
   {
     name: 'nobc_get_member',
+    minRole: OperatorRole.READ_ONLY,
     description:
       'Get a single member by id or email. Returns the full member record plus their application answers, archetype, AI score, and RSVP history.',
     inputSchema: getMemberSchema,

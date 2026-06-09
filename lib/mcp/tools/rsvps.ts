@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type RSVPStatus } from '@prisma/client';
+import { OperatorRole, type RSVPStatus } from '@prisma/client';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
 import type { McpContext, McpTool } from '../types';
@@ -52,6 +52,7 @@ async function transitionRsvp(
 export const rsvpTools: McpTool[] = [
   {
     name: 'nobc_get_rsvps',
+    minRole: OperatorRole.READ_ONLY,
     description:
       'List RSVPs (event access) for an event. Returns id, member name/email, ticketStatus, checkedIn, checkedInAt, isComp.',
     inputSchema: listRsvpsSchema,
@@ -102,6 +103,7 @@ export const rsvpTools: McpTool[] = [
   },
   {
     name: 'nobc_get_rsvp',
+    minRole: OperatorRole.READ_ONLY,
     description: 'Get a single RSVP with its member, event, and payment/check-in status.',
     inputSchema: getRsvpSchema,
     handler: async (ctx, rawArgs) => {

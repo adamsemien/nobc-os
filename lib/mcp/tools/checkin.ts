@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
 import type { McpTool } from '../types';
@@ -18,6 +19,7 @@ const checkInSchema = z
 export const checkinTools: McpTool[] = [
   {
     name: 'nobc_get_checkin_status',
+    minRole: OperatorRole.READ_ONLY,
     description:
       'Door view for an event: confirmed RSVP count, how many have checked in, and how many remain.',
     inputSchema: statusSchema,
