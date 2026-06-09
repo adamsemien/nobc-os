@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped |
 | **V1 item** | #9, #10, #21 (comp tickets — payment-side bookkeeping), #25 (compliance pages) |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-06-10 |
 | **Owner** | Adam |
 | **Blocked on** | Compliance pages legal review |
-| **Next** | Verify compliance pages are live + legally reviewed before flipping to live Stripe keys. (2026-05-21: the link-only confirmation email now embeds a scannable QR — see Audit findings → "The gap". Test a full purchase in Stripe test mode to confirm the QR arrives + scans.) |
+| **Next** | (2026-06-10: PR feat/ticket-confirmation-email — QR embed in `rsvpConfirmedEmail`, dedup guard on `amount_capturable_updated` and `checkout.session.completed`, `resolveTicketRecipient` + `shouldSendConfirmationEmail` helpers in `lib/ticket-confirmation.ts`, 15 new unit tests. Test a full purchase in Stripe test mode to confirm QR arrives and scans correctly.) Verify compliance pages are live + legally reviewed before flipping to live Stripe keys. |
 
 ## Scope
 
@@ -30,7 +30,8 @@ app/api/cron/capture-payments/route.ts          ← scheduled capture for confir
 app/terms/page.tsx                              ← compliance page (route: /terms)
 app/privacy/page.tsx                            ← compliance page (route: /privacy)
 app/refund-policy/page.tsx                      ← compliance page (route: /refund-policy)
-lib/email-templates.ts                          ← rsvpConfirmedEmail (purchase, link-only) + compTicketEmail (comp, QR embedded)
+lib/email-templates.ts                          ← rsvpConfirmedEmail (purchase, QR embedded when memberQrCode present + link fallback) + compTicketEmail (comp, QR embedded)
+lib/ticket-confirmation.ts                      ← resolveTicketRecipient + shouldSendConfirmationEmail (pure helpers, unit-tested)
 ```
 
 ## Schema models owned
@@ -89,7 +90,10 @@ End-to-end traced. Two parallel pay paths feed one webhook; both end at a link-o
 
 **Models written on payment:** only `RSVP` + `AuditEvent`. The `Ticket` model (`schema.prisma:450-472`) is **never created** (`db.ticket.create` exists only in the dev reset's `deleteMany`) — the RSVP *is* the ticket. The `Order`/`Payment` models this CONTEXT lists as "owned" are **defined but unwritten** in the purchase path (`ticketing.order.create` is a stub, `lib/mcp/legacy-tools.ts:456`); buyer identity rides on `RSVP.memberId` + `RSVP.stripePaymentIntentId`.
 
-**The gap (the main ask) — FIXED 2026-05-21:** the webhook now computes `QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 })` at both send sites (added `memberQrCode` to the member `select`) and passes it to `rsvpConfirmedEmail`, which embeds the QR `<img>` (mirrors `compTicketEmail`) while keeping the confirmed-page link as a fallback. The QR encodes the buyer's `memberQrCode`, which is exactly what the door scanner matches — see `06-wallet-checkin` → "Fix applied" for the Member-QR minting change (new buyers now always have a `memberQrCode`) and the wallet-button removal.
+**The gap (the main ask) — FIXED 2026-06-10 (PR feat/ticket-confirmation-email):** Three defects confirmed and fixed:
+1. **QR missing from `rsvpConfirmedEmail`** — the 2026-05-21 audit note claimed this was fixed but the template was still link-only. Now: `rsvpConfirmedEmail` accepts an optional `qrDataUrl?: string`; when present, embeds `<img src="…">` (mirrors `compTicketEmail`) with confirmed-page link as fallback. Both webhook branches (`checkout.session.completed` and `payment_intent.amount_capturable_updated`) now compute `QRCode.toDataURL(member.memberQrCode, …)` and pass it in.
+2. **Dedup missing** — webhook had no guard against Stripe retry → duplicate emails. Fixed: `amount_capturable_updated` reads `rsvp.paymentStatus` before writing; `shouldSendConfirmationEmail()` returns false if already `AUTHORIZED`/`CAPTURED`. `checkout.session.completed` reads `ticketStatus` and breaks early if already `'confirmed'`.
+3. **Guest recipient** — `resolveTicketRecipient()` canonicalizes the email address: uses `member.email` (the guest Member row, which `findOrCreateGuestMember` always populates from the typed address) with `rsvp.guestEmail` as a defensive fallback. Both member and guest buyers now receive the email at the correct address.
 
 ## What this stage does NOT own
 

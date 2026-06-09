@@ -14,6 +14,7 @@ export function rsvpConfirmedEmail(
   location: string | null | undefined,
   eventSlug: string,
   rsvpId: string,
+  qrDataUrl?: string,
 ): { subject: string; html: string } {
   const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
   const confirmedUrl = `${appUrl}/m/events/${eventSlug}/confirmed?rsvpId=${rsvpId}`;
@@ -24,6 +25,12 @@ export function rsvpConfirmedEmail(
   const timeStr = startAt.toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
   });
+  const qrBlock = qrDataUrl
+    ? `<p>Show this QR code at the door and staff will scan you in:</p>
+<p><img src="${qrDataUrl}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>
+<p>Can't load the image? Use this link instead:<br><a href="${confirmedUrl}">${confirmedUrl}</a></p>`
+    : `<p>Your ticket and QR code are at the link below — show it at the door and staff will scan you in.</p>
+<p><a href="${confirmedUrl}">${confirmedUrl}</a></p>`;
   return {
     subject: `you're in — ${eventTitle}`,
     html: `<p>Hi ${name},</p>
@@ -32,8 +39,7 @@ export function rsvpConfirmedEmail(
 
 <p><strong>Date:</strong> ${dateStr}<br><strong>Time:</strong> ${timeStr}</p>
 ${locationLine}
-<p>Your ticket and QR code are at the link below — show it at the door and staff will scan you in.</p>
-<p><a href="${confirmedUrl}">${confirmedUrl}</a></p>
+${qrBlock}
 
 <p>— adam &amp; chloe</p>`,
   };
