@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/operator-role';
+import { validateOutboundWebhookUrl } from '@/lib/safe-url';
 
 const BodySchema = z.object({
   key: z.string().trim().min(1),
@@ -30,6 +31,12 @@ export async function PATCH(req: NextRequest) {
   }
   if (existing.type === 'time' && !/^\d{2}:\d{2}$/.test(parsed.data.value)) {
     return NextResponse.json({ error: 'Time must be HH:MM' }, { status: 422 });
+  }
+  // Outbound-webhook URLs (e.g. slack.webhook) are a stored-SSRF surface —
+  // reject private/internal/non-https targets at write time. Empty clears it.
+  if (parsed.data.key.endsWith('.webhook') && parsed.data.value) {
+    const safe = validateOutboundWebhookUrl(parsed.data.value);
+    if (!safe.ok) return NextResponse.json({ error: `Invalid webhook URL: ${safe.reason}` }, { status: 422 });
   }
 
   await db.platformSetting.update({
