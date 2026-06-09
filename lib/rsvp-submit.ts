@@ -122,60 +122,73 @@ export async function submitMemberRsvp(
     }
   }
 
-  if (event.capacity) {
-    const taken = await db.rSVP.count({
-      where: {
-        workspaceId,
-        eventId,
-        ticketStatus: { in: ['confirmed', 'held'] },
-      },
-    });
-    if (taken >= event.capacity) {
-      const maxPos = await db.waitlistEntry.aggregate({
-        where: { workspaceId, eventId },
-        _max: { position: true },
-      });
-      const position = (maxPos._max.position ?? 0) + 1;
-      const client = await clerkClient();
-      const clerkUser = await client.users.getUser(clerkUserId);
-      await db.waitlistEntry.create({
-        data: {
-          workspaceId,
-          eventId,
-          memberId: member.id,
-          email: clerkUser.emailAddresses[0]?.emailAddress ?? '',
-          name: `${member.firstName} ${member.lastName}`.trim(),
-          position,
-        },
-      });
-      // Fire-and-forget engagement signal — must not block or fail the join.
-      logEngagementEvent({
-        workspaceId,
-        memberId: member.id,
-        eventType: 'waitlist_joined',
-        eventId,
-      });
-      return { ok: true, waitlisted: true, position };
-    }
-  }
-
   const ticketStatus = event.approvalRequired ? 'pending_approval' : 'confirmed';
   const rsvpStatus = event.approvalRequired ? 'WAITLISTED' : 'CONFIRMED';
-
   const acceptPlusOne = !!plusOne && event.plusOnesAllowed;
-  const rsvp = await db.rSVP.create({
-    data: {
-      workspaceId,
-      eventId,
-      memberId: member.id,
-      status: rsvpStatus as 'CONFIRMED' | 'WAITLISTED',
-      ticketStatus,
-      tierId: tierId ?? null,
-      customAnswers: customAnswers ?? undefined,
-      plusOneName: acceptPlusOne && plusOne?.name?.trim() ? plusOne.name.trim() : null,
-      plusOneInstagram: acceptPlusOne && plusOne?.instagram?.trim() ? plusOne.instagram.trim() : null,
-    },
+  const memberId = member.id;
+  const memberName = `${member.firstName} ${member.lastName}`.trim();
+
+  // Atomic capacity gate + create. The Event row lock serializes concurrent
+  // submits so count-then-create can't oversell a capped event and waitlist
+  // positions can't collide (audit: non-transactional counters). No network
+  // I/O inside the transaction — the email reuses the red-list Clerk lookup.
+  const outcome = await db.$transaction(async (tx) => {
+    if (event.capacity) {
+      await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
+      const taken = await tx.rSVP.count({
+        where: {
+          workspaceId,
+          eventId,
+          ticketStatus: { in: ['confirmed', 'held'] },
+        },
+      });
+      if (taken >= event.capacity) {
+        const maxPos = await tx.waitlistEntry.aggregate({
+          where: { workspaceId, eventId },
+          _max: { position: true },
+        });
+        const position = (maxPos._max.position ?? 0) + 1;
+        await tx.waitlistEntry.create({
+          data: {
+            workspaceId,
+            eventId,
+            memberId,
+            email: memberEmail,
+            name: memberName,
+            position,
+          },
+        });
+        return { waitlisted: true as const, position };
+      }
+    }
+
+    const rsvp = await tx.rSVP.create({
+      data: {
+        workspaceId,
+        eventId,
+        memberId,
+        status: rsvpStatus as 'CONFIRMED' | 'WAITLISTED',
+        ticketStatus,
+        tierId: tierId ?? null,
+        customAnswers: customAnswers ?? undefined,
+        plusOneName: acceptPlusOne && plusOne?.name?.trim() ? plusOne.name.trim() : null,
+        plusOneInstagram: acceptPlusOne && plusOne?.instagram?.trim() ? plusOne.instagram.trim() : null,
+      },
+    });
+    return { waitlisted: false as const, rsvp };
   });
+
+  if (outcome.waitlisted) {
+    // Fire-and-forget engagement signal — must not block or fail the join.
+    logEngagementEvent({
+      workspaceId,
+      memberId,
+      eventType: 'waitlist_joined',
+      eventId,
+    });
+    return { ok: true, waitlisted: true, position: outcome.position };
+  }
+  const rsvp = outcome.rsvp;
 
   await db.auditEvent.create({
     data: {
@@ -208,7 +221,6 @@ export async function submitMemberRsvp(
       const { rsvpConfirmedEmail } = await import('./email-templates');
       const clerkUserForEmail = await (await clerkClient()).users.getUser(clerkUserId);
       const emailAddress = clerkUserForEmail.emailAddresses[0]?.emailAddress;
-      const memberName = `${member.firstName} ${member.lastName}`.trim();
       if (emailAddress) {
         resend.emails.send({
           from: 'NoBC <team@thenobadcompany.com>',

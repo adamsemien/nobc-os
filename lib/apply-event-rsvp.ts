@@ -51,50 +51,34 @@ export async function attachEventRsvpAfterApply(p: AttachParams): Promise<void> 
   });
   if (existing) return;
 
-  if (event.capacity) {
-    const taken = await db.rSVP.count({
-      where: {
-        workspaceId,
-        eventId: event.id,
-        ticketStatus: { in: ['confirmed', 'held'] },
-      },
-    });
-    if (taken >= event.capacity) return;
-  }
-
-  if (event.approvalRequired) {
-    const rsvp = await db.rSVP.create({
+  // Atomic capacity gate + create — same race class as submitMemberRsvp:
+  // 'held' seats consume capacity, so check-then-create must be one unit.
+  // (SUBMIT_CONFIRMS_ENTRY branch: ticket confirms on successful submit.)
+  const ticketStatus = event.approvalRequired ? 'held' : 'confirmed';
+  const rsvp = await db.$transaction(async (tx) => {
+    if (event.capacity) {
+      await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${event.id} FOR UPDATE`;
+      const taken = await tx.rSVP.count({
+        where: {
+          workspaceId,
+          eventId: event.id,
+          ticketStatus: { in: ['confirmed', 'held'] },
+        },
+      });
+      if (taken >= event.capacity) return null;
+    }
+    return tx.rSVP.create({
       data: {
         workspaceId,
         eventId: event.id,
         memberId: member.id,
-        status: 'WAITLISTED',
-        ticketStatus: 'held',
+        status: event.approvalRequired ? 'WAITLISTED' : 'CONFIRMED',
+        ticketStatus,
       },
     });
-    await db.auditEvent.create({
-      data: {
-        workspaceId,
-        actorId: actorIdForAudit,
-        action: 'rsvp.created',
-        entityType: 'RSVP',
-        entityId: rsvp.id,
-        metadata: { ticketStatus: 'held', origin: 'apply_approval_holds_ticket' },
-      },
-    });
-    return;
-  }
-
-  // SUBMIT_CONFIRMS_ENTRY — ticket confirms on successful application submit.
-  const rsvp = await db.rSVP.create({
-    data: {
-      workspaceId,
-      eventId: event.id,
-      memberId: member.id,
-      status: 'CONFIRMED',
-      ticketStatus: 'confirmed',
-    },
   });
+  if (!rsvp) return;
+
   await db.auditEvent.create({
     data: {
       workspaceId,
@@ -102,7 +86,10 @@ export async function attachEventRsvpAfterApply(p: AttachParams): Promise<void> 
       action: 'rsvp.created',
       entityType: 'RSVP',
       entityId: rsvp.id,
-      metadata: { ticketStatus: 'confirmed', origin: 'apply_submit_confirms_entry' },
+      metadata: {
+        ticketStatus,
+        origin: event.approvalRequired ? 'apply_approval_holds_ticket' : 'apply_submit_confirms_entry',
+      },
     },
   });
 }
