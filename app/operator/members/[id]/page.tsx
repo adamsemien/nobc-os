@@ -54,6 +54,12 @@ export default async function MemberRecordPage({
   // F4 edit affordances: STAFF+ and never on a merged record (PATCH returns 409 for merged).
   const canEdit = roleAtLeast(role, OperatorRole.STAFF) && !m.mergedIntoId;
 
+  // Identity descriptor — who this person is at a glance ("Founder at Stripe · Fintech"),
+  // built from the firmographic dimensions already on the record. Degrades to whatever is set.
+  const fg = record.dimensions.firmographic;
+  const roleLine = [fg.jobFunction, fg.companyName].filter(Boolean).join(' at ');
+  const descriptor = [roleLine || null, fg.industry].filter(Boolean).join(' · ');
+
   return (
     <div className="px-6 pb-16 pt-8 sm:px-10 lg:px-14 xl:px-20">
       <PageHeader
@@ -65,11 +71,16 @@ export default async function MemberRecordPage({
           </span>
         }
         subtitle={
-          <span className="flex flex-wrap items-center gap-2">
-            <a href={`mailto:${m.email}`} className="underline-offset-2 hover:underline">
-              {m.email}
-            </a>
-            {m.phone ? <span>· {m.phone}</span> : null}
+          <span className="flex flex-col gap-0.5">
+            {descriptor ? (
+              <span className="text-sm text-text-secondary">{descriptor}</span>
+            ) : null}
+            <span className="flex flex-wrap items-center gap-2 text-text-muted">
+              <a href={`mailto:${m.email}`} className="underline-offset-2 hover:underline">
+                {m.email}
+              </a>
+              {m.phone ? <span>· {m.phone}</span> : null}
+            </span>
           </span>
         }
       />

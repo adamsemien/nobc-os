@@ -47,7 +47,7 @@ export function MembersView({
     <>
       <PageHeader
         title="Members"
-        subtitle={`${members.length} approved · sorted by most recently added`}
+        subtitle={`${members.length} ${members.length === 1 ? 'person' : 'people'} · search, filter, and sort below`}
         action={
           <div className="flex items-center gap-3">
             <Link
