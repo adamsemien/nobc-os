@@ -97,9 +97,88 @@ Compare that list to `ls prisma/migrations/ | grep '^2026'` (30 dirs after this 
 > ping the author — that's a baseline-adopt scenario (`migrate resolve --applied 20260515000000_baseline`
 > first), still zero-DDL, but worth confirming before proceeding.
 
+### 3a. Existence probe — migrations 7–10 (resolve-vs-execute branch)
+
+§3 answers *"is it recorded in history?"*. This answers the orthogonal *"does the schema actually
+**exist** in prod?"* — and it matters most for **migrations 7–10**. Those four objects come from
+the member-intelligence CRM merge committed **2026-06-09** (PRs #45/#47/#49, same day as the
+audit). The earlier six (1–6) were hand-applied weeks ago, so their objects are almost certainly
+live; but 7–10's `prisma/sql` files may have been **committed to the repo without ever being
+run against Neon**. `resolve --applied` records history *without checking reality* — so resolving
+an object that isn't there writes **false history** (a migration marked applied whose schema is
+missing), and the next `migrate deploy` / fresh build silently skips it.
+
+The two axes are independent:
+
+| recorded in `_prisma_migrations`? | object exists in prod? | action |
+|---|---|---|
+| no | **yes** | `resolve --applied` (the normal reconciliation case — zero DDL) |
+| no | **no** | **execute** the idempotent SQL first, *then* `resolve --applied` |
+| yes | yes | already done — skip |
+| yes | no | ⚠️ corrupt history — STOP, ping the author, do not proceed |
+
+**Probe (read-only — all SELECTs, touch nothing):**
+
+```bash
+psql "$DIRECT_URL" <<'SQL'
+-- #7  20260609010000_member_engagement_enum_values
+SELECT 'm7_enum_values=' || count(*)        -- present = 18, absent/partial < 18
+  FROM pg_enum WHERE enumtypid = 'MemberEngagementEventType'::regtype;
+-- #8  20260609011000_member_merge
+SELECT 'm8_member_merge=' ||
+  (to_regclass('"Member"') IS NOT NULL AND EXISTS (
+     SELECT 1 FROM information_schema.columns
+     WHERE table_name='Member' AND column_name='mergedIntoId'))::text;
+-- #9  20260609012000_member_pr2_dimensions
+SELECT 'm9_psychographics=' || (to_regclass('"MemberPsychographics"') IS NOT NULL)::text;
+SELECT 'm9_field_definition=' || (to_regclass('"FieldDefinition"') IS NOT NULL)::text;
+SELECT 'm9_enrichment_enum=' ||
+  EXISTS (SELECT 1 FROM pg_type WHERE typname='MemberEnrichmentStatus')::text;
+-- #10 20260609013000_sponsor_audience_member_view
+SELECT 'm10_view=' || (to_regclass('"sponsor_audience_member"') IS NOT NULL)::text;
+SQL
+```
+
+**Branch per migration (do this for 7, 8, 9, 10 — in this order; #10's view reads #8/#9 columns):**
+
+- **Probe = present** (enum `=18`; the `=true` rows) → it's the normal "recorded:no / exists:yes"
+  case. Just `resolve --applied <name>` in §4. **Do not execute** — the objects are already there.
+
+- **Probe = absent or partial** (enum `<18`; any `=false`) → the out-of-band SQL never ran (or
+  ran partially). **Execute the idempotent body first, then resolve.** The DDL is additive + fully
+  guarded (`IF NOT EXISTS` / catalog checks / `ADD VALUE IF NOT EXISTS`), so it is safe even from a
+  partial state and safe to re-run. Use `DIRECT_URL` (unpooled — required for `CREATE TYPE` /
+  `ALTER TYPE ADD VALUE` / view creation):
+
+  ```bash
+  # Execute the additive SQL on the UNPOOLED endpoint, then record it. Per migration:
+  #   #7  enum values  — prisma/sql/additive_engagement_enum.sql   (standalone ADD VALUEs; never wrap in a txn)
+  #   #8  member_merge — prisma/sql/additive_member_merge.sql
+  #   #9  dimensions   — prisma/sql/additive_pr2_dimensions.sql
+  #   #10 firewall view— prisma/sql/sponsor-audience-view.sql       (run AFTER #8 + #9 exist)
+  DATABASE_URL="$DIRECT_URL" prisma-cli db execute \
+    --file prisma/sql/<that-file>.sql --schema prisma/schema.prisma
+  prisma-cli migrate resolve --applied <that-migration-name>
+  ```
+
+  > The `prisma/sql/` file and the tracked `prisma/migrations/<name>/migration.sql` body are the
+  > **same idempotent DDL**; executing either is equivalent. (Re §9's source file: it also contains
+  > `DROP TABLE IF EXISTS "playing_with_neon"` — harmless `IF EXISTS` housekeeping; the tracked
+  > migration omits it, but executing the source file in the absent-case is still safe.)
+  >
+  > Do **not** reach for `migrate deploy` here — on this Producer-shared instance, apply exactly the
+  > one file you probed as missing, then resolve it. Targeted beats blanket.
+
+After the branch, every one of 7–10 ends up **recorded** with its schema **present** — then continue
+to §4 for any of 1–6 that were "recorded:no / exists:yes" (resolve-only).
+
 ---
 
 ## 4. Apply — resolve the catch-up migrations (zero DDL, metadata only)
+
+> Migrations **7–10**: only run the bare `resolve` below if §3a probed them **present**. If any
+> probed **absent/partial**, use its §3a execute-then-resolve line instead of the bare `resolve`.
+> Migrations **1–6** are resolve-only (objects long-live in prod; confirm via §3 recording check).
 
 Run in this exact order. Each command writes **one `_prisma_migrations` row** and runs no SQL
 against your tables:
