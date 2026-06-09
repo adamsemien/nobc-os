@@ -15,11 +15,13 @@ import {
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { ScoreBadge } from '../../_components/ScoreBadge';
 import { logQAAction } from '@/lib/dev/qa-action-log';
+import { InlineEditCell } from './InlineEditCell';
 
 export type MembersBulkMember = {
   id: string;
   fullName: string;
   email: string;
+  companyName: string | null;
   archetype: string | null;
   aiScore: number | null;
   totalEventsAttended: number;
@@ -72,7 +74,67 @@ function fmtDate(iso: string | null): string {
   });
 }
 
-export function MembersBulkActions({ members }: { members: MembersBulkMember[] }) {
+// Sortable roster columns (the "filterable roster" foundation, no schema).
+type SortKey = 'name' | 'score' | 'events' | 'lastSeen' | 'joined';
+
+function timeVal(iso: string | null): number {
+  return iso ? new Date(iso).getTime() : 0;
+}
+
+function compareBy(a: MembersBulkMember, b: MembersBulkMember, key: SortKey): number {
+  switch (key) {
+    case 'name':
+      return a.fullName.localeCompare(b.fullName);
+    case 'score':
+      return (a.aiScore ?? -1) - (b.aiScore ?? -1);
+    case 'events':
+      return a.totalEventsAttended - b.totalEventsAttended;
+    case 'lastSeen':
+      return timeVal(a.lastAttendedDate) - timeVal(b.lastAttendedDate);
+    case 'joined':
+      return timeVal(a.createdAt) - timeVal(b.createdAt);
+    default:
+      return 0;
+  }
+}
+
+type SortState = { key: SortKey; dir: 'asc' | 'desc'; onSort: (k: SortKey) => void };
+
+function SortButton({
+  k,
+  sort,
+  reverse,
+  children,
+}: {
+  k: SortKey;
+  sort: SortState;
+  reverse?: boolean;
+  children: React.ReactNode;
+}) {
+  const active = sort.key === k;
+  return (
+    <button
+      type="button"
+      onClick={() => sort.onSort(k)}
+      className={`inline-flex items-center gap-1 ${reverse ? 'flex-row-reverse' : ''} ${
+        active ? 'text-text-primary' : 'hover:text-text-primary'
+      }`}
+    >
+      <span>{children}</span>
+      <span className="text-[8px] leading-none text-text-muted" aria-hidden>
+        {active ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
+      </span>
+    </button>
+  );
+}
+
+export function MembersBulkActions({
+  members,
+  canEdit = false,
+}: {
+  members: MembersBulkMember[];
+  canEdit?: boolean;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Action | null>(null);
   const [confirm, setConfirm] = useState<Action | null>(null);
@@ -81,14 +143,31 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
   const [query, setQuery] = useState('');
   const [facet, setFacet] = useState<Facet>('all');
 
+  const [sortKey, setSortKey] = useState<SortKey>('joined');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return members.filter((m) => {
+    const filtered = members.filter((m) => {
       if (!matchesFacet(m, facet)) return false;
       if (!q) return true;
       return m.fullName.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
     });
-  }, [members, query, facet]);
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return filtered.sort((a, b) => dir * compareBy(a, b, sortKey));
+  }, [members, query, facet, sortKey, sortDir]);
+
+  const onSort = useCallback((key: SortKey) => {
+    setSortKey((prevKey) => {
+      if (prevKey === key) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return prevKey;
+      }
+      // Sensible default direction per column: names A→Z, everything else high→low.
+      setSortDir(key === 'name' ? 'asc' : 'desc');
+      return key;
+    });
+  }, []);
 
   const toggle = useCallback((id: string) => {
     setSelected((prev) => {
@@ -141,6 +220,7 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
 
   const count = selected.size;
   const allCount = members.length;
+  const sort: SortState = { key: sortKey, dir: sortDir, onSort };
 
   return (
     <div className="relative">
@@ -247,12 +327,23 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
       <DataTableShell>
         <DataTableHead>
           <DataTableHeader className="w-8" />
-          <DataTableHeader>Member</DataTableHeader>
+          <DataTableHeader>
+            <SortButton k="name" sort={sort}>Member</SortButton>
+          </DataTableHeader>
+          <DataTableHeader>Company</DataTableHeader>
           <DataTableHeader>Archetype</DataTableHeader>
-          <DataTableHeader>Score</DataTableHeader>
-          <DataTableHeader align="right">Events</DataTableHeader>
-          <DataTableHeader>Last seen</DataTableHeader>
-          <DataTableHeader>Joined</DataTableHeader>
+          <DataTableHeader>
+            <SortButton k="score" sort={sort}>Score</SortButton>
+          </DataTableHeader>
+          <DataTableHeader align="right">
+            <SortButton k="events" sort={sort} reverse>Events</SortButton>
+          </DataTableHeader>
+          <DataTableHeader>
+            <SortButton k="lastSeen" sort={sort}>Last seen</SortButton>
+          </DataTableHeader>
+          <DataTableHeader>
+            <SortButton k="joined" sort={sort}>Joined</SortButton>
+          </DataTableHeader>
         </DataTableHead>
         <DataTableBody>
           {visible.map((m) => (
@@ -297,6 +388,15 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
                     </div>
                   </div>
                 </Link>
+              </DataTableCell>
+              <DataTableCell>
+                <InlineEditCell
+                  memberId={m.id}
+                  field="companyName"
+                  initialValue={m.companyName}
+                  canEdit={canEdit}
+                  placeholder="Add company"
+                />
               </DataTableCell>
               <DataTableCell tone="secondary">
                 {m.archetype ? (
