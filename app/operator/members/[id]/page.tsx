@@ -84,6 +84,12 @@ export default async function MemberRecordPage({
         </section>
 
         <aside className="space-y-5">
+          {/* Running read (Capture) — the operator's own notes, surfaced first so the
+              record opens on what the team knows, not buried below the panels. */}
+          <Card>
+            <CommentThread entityType="member" entityId={m.id} flush />
+          </Card>
+
           {record.intelligence ? (
             <Card>
               <CardLabel>Assessment</CardLabel>
@@ -104,10 +110,6 @@ export default async function MemberRecordPage({
           ) : null}
 
           <MemberEditablePanels id={id} initialData={record} canEdit={canEdit} />
-
-          <Card>
-            <CommentThread entityType="member" entityId={m.id} />
-          </Card>
         </aside>
       </div>
     </div>

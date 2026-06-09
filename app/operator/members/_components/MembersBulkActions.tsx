@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
 import {
   Avatar,
   DataTableShell,
@@ -38,6 +39,30 @@ const ACTION_LABEL: Record<Action, string> = {
   tag: 'Tag',
 };
 
+// Roster facets — the no-schema "filterable roster" foundation (Curate). Pure client-side
+// filtering over the already-loaded rows; no archetype/psychographic facet (firewall + scope).
+type Facet = 'all' | 'vip' | 'blocked' | 'attended';
+
+const FACETS: { key: Facet; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'vip', label: 'Purple list' },
+  { key: 'attended', label: 'Attended' },
+  { key: 'blocked', label: 'Blocked' },
+];
+
+function matchesFacet(m: MembersBulkMember, facet: Facet): boolean {
+  switch (facet) {
+    case 'vip':
+      return m.isVip;
+    case 'blocked':
+      return m.isBlocked;
+    case 'attended':
+      return m.totalEventsAttended > 0;
+    default:
+      return true;
+  }
+}
+
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', {
@@ -53,6 +78,17 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
   const [confirm, setConfirm] = useState<Action | null>(null);
   const [tagValue, setTagValue] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [facet, setFacet] = useState<Facet>('all');
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return members.filter((m) => {
+      if (!matchesFacet(m, facet)) return false;
+      if (!q) return true;
+      return m.fullName.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
+    });
+  }, [members, query, facet]);
 
   const toggle = useCallback((id: string) => {
     setSelected((prev) => {
@@ -168,6 +204,46 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
         </div>
       ) : null}
 
+      {/* Filterable roster (Curate foundation) — search + lifecycle facets over loaded rows. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name or email…"
+            aria-label="Search members"
+            className="h-8 w-full rounded-md border border-border bg-surface pl-8 pr-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Filter members">
+          {FACETS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFacet(f.key)}
+              aria-pressed={facet === f.key}
+              className={
+                facet === f.key
+                  ? 'rounded-full border border-primary bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary'
+                  : 'rounded-full border border-border px-2.5 py-1 text-xs font-medium text-text-secondary hover:bg-muted'
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <span className="ml-auto text-xs text-text-muted">
+          {visible.length === members.length
+            ? `${members.length} member${members.length === 1 ? '' : 's'}`
+            : `${visible.length} of ${members.length}`}
+        </span>
+      </div>
+
       <DataTableShell>
         <DataTableHead>
           <DataTableHeader className="w-8" />
@@ -179,7 +255,7 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
           <DataTableHeader>Joined</DataTableHeader>
         </DataTableHead>
         <DataTableBody>
-          {members.map((m) => (
+          {visible.map((m) => (
             <DataTableRow key={m.id}>
               <DataTableCell>
                 <input
@@ -241,6 +317,12 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
           ))}
         </DataTableBody>
       </DataTableShell>
+
+      {visible.length === 0 ? (
+        <p className="mt-4 text-center text-sm text-text-muted">
+          No members match{query.trim() ? ` “${query.trim()}”` : ' this filter'}.
+        </p>
+      ) : null}
 
       {confirm ? (
         <ConfirmModal
