@@ -3,14 +3,18 @@
  *
  * Sibling of `lib/member-history.ts`: where history aggregates one member's OWN
  * behavior, this derives their RELATIONSHIPS — who they've crossed paths with, who
- * they pulled in, who pulled them in. Pure derivation over rows we already have
- * (RSVP co-attendance + plus-one edges + Member referral edges). No I/O, no schema
- * change: callers fetch the rows, this only derives.
+ * they pulled in, who pulled them in — and what that pull is WORTH in captured revenue.
+ * Pure derivation over rows we already have (RSVP co-attendance + plus-one edges +
+ * Member referral edges + captured payments). No I/O, no schema change.
  *
- * Design intent: this engine exposes the PRIMITIVES an influence model weighs —
- * reach, gravity, proximity — but deliberately does NOT collapse them into a single
- * "influence score". That weighting (and its correlation-vs-causation caveats at small
- * N) is an open product decision, not a fact to hardcode here.
+ * Design intent: expose the PRIMITIVES an influence read is built from — reach, gravity,
+ * proximity, and gravity-in-dollars — but deliberately do NOT collapse them into a single
+ * "influence score". A falsification run (120 members / 6 events) showed co-attendance
+ * "reach" is ~0.85 correlated with raw attendance and flattens (everyone overlaps with
+ * everyone) — it re-states "who comes a lot" and MISSES low-attendance connectors (0/8),
+ * whereas gravity (brought/referred that STUCK) caught 8/8. So the actionable signal is
+ * gravity denominated in revenue, NOT a centrality ranking. The ranking stays unbuilt
+ * until data density makes it more than coincidence.
  *
  * Provable (no inference):
  *  - co-attendance  = two members both `checkedIn` at the same event
@@ -19,6 +23,7 @@
  *  - referred       = a Member whose `referredByMemberId` is the target
  *  - "stuck"        = a brought/referred member who became a repeat attendee
  *                     (>= STUCK_MIN_EVENTS checked-in events of their own)
+ *  - gravity value  = sum of CAPTURED spend of the people the target brought/referred
  *
  * NOT modeled here (firewall + honesty): charisma / "die-hard energy" is not in
  * transactional data — it lives in operator notes/tags and is operator-facing ONLY.
@@ -33,6 +38,9 @@ export interface ConnectionRsvpRow {
   checkedInAt: Date | null;
   /** If set, this RSVP attended as a plus-one OF that member (they were brought). */
   plusOneOfMemberId: string | null;
+  /** 'AUTHORIZED' | 'CAPTURED' | 'COMP' | 'FAILED' | 'REFUNDED' — only CAPTURED is revenue. */
+  paymentStatus: string | null;
+  amountCents: number | null;
 }
 
 /** A Member's referral edge: who referred them (if anyone). */
@@ -54,11 +62,13 @@ export interface CoAttendee {
   medianCheckInGapMinutes: number | null;
 }
 
-/** Someone the target pulled in, and whether they became a regular. */
+/** Someone the target pulled in: did they stick, and what have they spent. */
 export interface BroughtEdge {
   memberId: string;
   /** Became a repeat attendee on their own (>= STUCK_MIN_EVENTS check-ins). */
   stuck: boolean;
+  /** This member's own CAPTURED lifetime spend, in cents — the dollars the target's pull drove. */
+  spendCents: number;
 }
 
 export interface MemberConnections {
@@ -75,6 +85,10 @@ export interface MemberConnections {
   broughtStuckCount: number;
   /** Of `referred`, how many stuck. */
   referredStuckCount: number;
+  /** CAPTURED revenue from the people the target brought — the actionable gravity number. */
+  broughtRevenueCents: number;
+  /** CAPTURED revenue from the people the target referred. */
+  referredRevenueCents: number;
   /** Members who brought the target as their plus-one. */
   broughtBy: string[];
   /** Who referred the target in, if anyone. */
@@ -98,12 +112,17 @@ export function deriveMemberConnections(
   rsvps: ConnectionRsvpRow[],
   referrals: ReferralEdge[] = [],
 ): MemberConnections {
-  // Count each member's own check-ins once, for the "stuck" test.
+  // Per-member: own check-in count (for "stuck") and own CAPTURED spend (for gravity $).
   const checkInsByMember = new Map<string, number>();
+  const capturedByMember = new Map<string, number>();
   for (const r of rsvps) {
     if (r.checkedIn) checkInsByMember.set(r.memberId, (checkInsByMember.get(r.memberId) ?? 0) + 1);
+    if (r.paymentStatus === 'CAPTURED' && r.amountCents != null) {
+      capturedByMember.set(r.memberId, (capturedByMember.get(r.memberId) ?? 0) + r.amountCents);
+    }
   }
   const stuck = (memberId: string) => (checkInsByMember.get(memberId) ?? 0) >= STUCK_MIN_EVENTS;
+  const spend = (memberId: string) => capturedByMember.get(memberId) ?? 0;
 
   // The target's own checked-in events, with their check-in time per event.
   const targetEventTime = new Map<string, Date | null>();
@@ -172,12 +191,16 @@ export function deriveMemberConnections(
     if (r.plusOneOfMemberId === targetMemberId) broughtIds.add(r.memberId);
     if (r.memberId === targetMemberId && r.plusOneOfMemberId) broughtByIds.add(r.plusOneOfMemberId);
   }
-  const brought: BroughtEdge[] = [...broughtIds].map((memberId) => ({ memberId, stuck: stuck(memberId) }));
+  const brought: BroughtEdge[] = [...broughtIds].map((memberId) => ({
+    memberId,
+    stuck: stuck(memberId),
+    spendCents: spend(memberId),
+  }));
 
   // Gravity (outbound): who the target referred in.
   const referred: BroughtEdge[] = referrals
     .filter((e) => e.referredByMemberId === targetMemberId)
-    .map((e) => ({ memberId: e.memberId, stuck: stuck(e.memberId) }));
+    .map((e) => ({ memberId: e.memberId, stuck: stuck(e.memberId), spendCents: spend(e.memberId) }));
 
   const referredBy = referrals.find((e) => e.memberId === targetMemberId)?.referredByMemberId ?? null;
 
@@ -189,6 +212,8 @@ export function deriveMemberConnections(
     referred,
     broughtStuckCount: brought.filter((b) => b.stuck).length,
     referredStuckCount: referred.filter((r) => r.stuck).length,
+    broughtRevenueCents: brought.reduce((sum, b) => sum + b.spendCents, 0),
+    referredRevenueCents: referred.reduce((sum, r) => sum + r.spendCents, 0),
     broughtBy: [...broughtByIds],
     referredBy,
   };
