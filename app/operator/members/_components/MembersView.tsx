@@ -49,12 +49,20 @@ export function MembersView({
         title="Members"
         subtitle={`${members.length} approved · sorted by most recently added`}
         action={
-          canAddMembers ? (
-            <AddMemberDrawer
-              onCreated={handleCreated}
-              members={members.map((mem) => ({ id: mem.id, fullName: mem.fullName, email: mem.email }))}
-            />
-          ) : undefined
+          <div className="flex items-center gap-3">
+            <Link
+              href="/operator/members/connectors"
+              className="text-sm font-medium text-text-secondary underline-offset-4 hover:text-text-primary hover:underline"
+            >
+              Connectors
+            </Link>
+            {canAddMembers ? (
+              <AddMemberDrawer
+                onCreated={handleCreated}
+                members={members.map((mem) => ({ id: mem.id, fullName: mem.fullName, email: mem.email }))}
+              />
+            ) : null}
+          </div>
         }
       />
 
