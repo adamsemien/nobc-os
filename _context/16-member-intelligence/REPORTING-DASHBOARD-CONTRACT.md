@@ -14,12 +14,49 @@ Each report carries one verdict:
 
 | Verdict | Meaning |
 |---|---|
-| **COMPUTABLE-NOW** | Every column/table it reads already exists in the live DB. Pure query work; ships with zero schema change. |
-| **COMPUTABLE-NOW · DRIFT-DEP** | Computable today, but it reads an object that exists in prod **only via out-of-band SQL** and is **not** a tracked migration (per `today-data.md` CRITICAL). Works at runtime; flux must reconcile the object into tracked history. Names the dependency. |
+| **COMPUTABLE-NOW** | Every column/table it reads is confirmed live in prod **independent of the unverified reconciliation set** (§0.1). Pure query work; ships with zero schema change. |
+| **GATED-ON-RECONCILIATION** | Reads an object that is **authored in `prisma/sql/` but NOT confirmed applied in prod** (the migration-7–10 set, §0.1). **Authored ≠ executed** — the query may error at runtime until the coordinated Producer window confirms/lands the object. Names the dependency. Cannot ship before the window. |
 | **NEEDS-SCHEMA** | Requires an additive schema change (named in §4). Not required for v1 unless founder elects the richer branch. |
 | **DEFERRED** | Out of v1 by recommendation; named so it isn't silently dropped. |
 
+> **⚠ Verdict revision (integrator update 2026-06-09).** An earlier draft used a `DRIFT-DEP` verdict that claimed dependent reports "work at runtime." That is **withdrawn.** The reconciliation window surfaced that the member-intelligence schema this BI v1 assumes is live is **authored but not confirmed executed in prod.** Reports reading those objects are **GATED-ON-RECONCILIATION**, not runtime-safe. See §0.1.
+
 **The firewall is a hard server-side branch, not a UI flag.** Every report below is classified **operator-internal** (reads `Member` directly) or **sponsor-facing** (reads the `sponsor_audience_member` view, never `Member`). The two paths never share a query. See §2.
+
+---
+
+## 0.1 Reconciliation gating (integrator update 2026-06-09 — sequence BI v1 AFTER the window)
+
+Flux's migration reconciliation surfaced that the schema this contract assumed live is **authored in `prisma/sql/` but its prod-existence is unverified** — being confirmed in the coordinated Producer window. **Authored ≠ executed.** BI v1 must be **sequenced after the window confirms/lands migrations 7–10.**
+
+### The unverified set (migrations 7–10 — confirm before BI v1)
+| # | Object | Authoring SQL | Reports that HARD-depend on it |
+|---|---|---|---|
+| 7 | 10 added `MemberEngagementEventType` values (18 total) | `additive_engagement_enum.sql` | **none of R1–R11** (no report queries `MemberEngagementEvent`) |
+| 8 | `Member.mergedIntoId` / `mergedAt` (+ indexes) | `additive_member_merge.sql` | the `mergedIntoId IS NULL` dedup filter in R1–R6, R9–R11; **OPEN-DATA-1** |
+| 9 | `MemberPsychographics`, `FieldDefinition`, `Member.{customFields,fieldProvenance,city,country,companyName,companyDomain,linkedinUrl,instagram,enrichmentStatus}` | `additive_pr2_dimensions.sql` | **R1, R3, R4(custom dims), R5, R6(custom slice), R10** |
+| 10 | `sponsor_audience_member` view (= **D1**) | `sponsor-audience-view.sql` | **R9, R10** (the entire sponsor-facing path) |
+
+### Gated vs genuinely dependency-free
+| Report | Status vs the window | Depends on (unverified) |
+|---|---|---|
+| **R1** custom-field breakdown | **GATED** | mig 9 (`customFields`,`FieldDefinition`) + mig 8 (dedup filter) |
+| **R2** firmographic breakdown | **MOSTLY FREE*** | `industry/jobFunction/seniority/companySize/ageRange` are pre-PR2 columns confirmed live (shipped `metrics.ts` already reads them). `city/country/companyName/companyDomain/linkedinUrl/instagram` are mig 9. Dedup filter is mig 8. → *runs today over the live firmographic columns **without** the dedup filter; the PR2 columns + dedup are gated.* |
+| **R3** coverage / provenance | **GATED** | mig 9 (`customFields`,`fieldProvenance`) |
+| **R4** cross-tab | **GATED** (custom dims) | mig 9 for any `customFields` dimension; the field×access-tier RSVP join itself is live |
+| **R5** headline scalar | **GATED** | mig 9 (`customFields`) |
+| **R6** roster drill-down | **PARTIAL** | custom-field slice → mig 9; firmographic slice over live columns → free (minus mig-8 dedup) |
+| **R7** fixed tiles | **FREE** | none — already shipped (reads `Application` + registry) |
+| **R8** trend | **DEFERRED** | n/a |
+| **R9** sponsor firmographic | **GATED** | mig 10 (view). **Must NOT fall back to reading `Member`** — that bypasses the firewall (see §2 note). |
+| **R10** sponsor custom-field | **GATED ×2** | mig 10 (view) **and** mig 9 (`customFields`/`FieldDefinition.sponsorVisible`) |
+| **R11** sponsor headline/persona | **RUNS TODAY / fix GATED** | `computeWorkspaceAudience` is shipped and runs over live columns; its **correctness fix (OPEN-DATA-1, `mergedIntoId: null`) is gated on mig 8** |
+
+**Direct answers to the integrator's two questions:**
+1. **HARD-gated reports:** R1, R3, R5, R9, R10 (fully); R4 for custom dimensions; R6 for the custom-field slice. **Genuinely dependency-free:** R7 (shipped), R2 over the pre-PR2 firmographic columns, R6's firmographic slice, R11's *run* (its dedup *fix* is gated). **No report depends on the migration-7 enum values** — none queries `MemberEngagementEvent` by the new types (a future engagement-trend report would).
+2. **Sponsor firewall:** the **DB-view firewall (Layer 1) is NOT-YET-ENFORCED** until mig 10 lands the `sponsor_audience_member` view. Until then the firewall in effect is the per-call `select` discipline + type boundary (Layer 3) + suppression (Layer 5) + test gate (Layer 6). **R9/R10 stay blocked until the view exists; they must never degrade to reading `Member` directly as a fallback** — that would silently bypass the physical boundary the firewall depends on.
+
+**Schema-authoring sequencing (agreed):** D2–D5 stay **off** the reconciliation path — author them on the clean tracked-migration path **after** the window. D1 (the view) **is** the reconciliation path (= mig 10).
 
 ---
 
@@ -46,7 +83,7 @@ Each report carries one verdict:
   `:stableKey` is **never** raw user input — it is resolved from an existing `FieldDefinition.stableKey` for the workspace (allow-list lookup) and is `[a-z0-9_]`-only by `slugifyFieldKey`. The value is parameterized; only the allow-listed key is interpolated. **OPEN-QRY-1·B fallback:** `db.member.findMany({ where:{ workspaceId, mergedIntoId:null }, select:{ customFields:true } })` then reduce in TypeScript (mirrors `metrics.ts`'s in-code reduce; acceptable at NBC scale).
 - **Result → viz:** `Breakdown` → `horizontal-bar` (default) / `donut` (≤5 buckets). Existing `MetricResult` shape + `charts.tsx`.
 - **Registry metric:** `customfield.breakdown:<stableKey>` (parametric — resolves the key at run time; adding a field never touches code).
-- **Verdict:** **COMPUTABLE-NOW.**
+- **Verdict:** **GATED-ON-RECONCILIATION** — reads `Member.customFields` + `FieldDefinition` (migration 9, unverified) and uses the `mergedIntoId IS NULL` dedup filter (migration 8, unverified). Cannot ship before the window confirms/lands them. (§0.1)
 
 #### R2 — Firmographic / demographic breakdown
 - **Business question:** "How does my room break down by **industry / seniority / company size / job function / city / country / age range**?"
@@ -57,7 +94,7 @@ Each report carries one verdict:
   ```
 - **Result → viz:** `Breakdown` → `horizontal-bar` / `donut`.
 - **Registry metric:** `member.breakdown:<column>` (parametric, allow-listed against `EDITABLE_MEMBER_COLUMNS`).
-- **Verdict:** **COMPUTABLE-NOW.** (`Member` dimension columns exist in prod via `additive_pr2_dimensions.sql` — DRIFT-DEP at the *migration-history* level only; runtime-safe. Same drift bucket flux is already reconciling.)
+- **Verdict:** **MOSTLY FREE / partially GATED.** `industry, jobFunction, seniority, companySize, ageRange` are **pre-PR2 columns confirmed live** (shipped `metrics.ts` already reads them) — breakdowns over those run today **if** the `mergedIntoId` dedup filter is omitted (carrying the §0.1 double-count caveat until migration 8 lands). `city, country, companyName, companyDomain, linkedinUrl, instagram` are **migration 9 (unverified) → GATED**. The dedup filter is **migration 8 (unverified)**. (§0.1)
 
 #### R3 — Field coverage / fill-rate by provenance
 - **Business question:** "What share of members have **{field}** set — and **how trustworthy** is it (who supplied the value)?"
@@ -66,7 +103,7 @@ Each report carries one verdict:
 - **Result → viz:** `Breakdown` → `horizontal-bar` (source = trust signal).
 - **Good/Bad threshold:** **fill-rate ≥ 60%** = a dimension worth reporting/segmenting on; **< 30%** = flag the field as too sparse to trust (advisory copy, not a hard gate). These are the operator's signal that a breakdown is representative.
 - **Registry metric:** `customfield.coverage:<stableKey>`.
-- **Verdict:** **COMPUTABLE-NOW.**
+- **Verdict:** **GATED-ON-RECONCILIATION** — reads `Member.customFields` + `fieldProvenance` (migration 9, unverified). (§0.1)
 
 #### R4 — Cross-tab matrix (field A × field B, or field × access tier)
 - **Business question:** "How does **{field A}** distribute **within each {field B}**?" (e.g. seniority × membership tier).
@@ -74,20 +111,20 @@ Each report carries one verdict:
 - **Aggregation / query shape:** two-key `GROUP BY` (raw SQL) or nested in-code reduce → `Matrix` (`MatrixRow[]`, existing shape).
 - **Result → viz:** `Matrix` → `heatmap` / `table`.
 - **Registry metric:** `customfield.crosstab:<keyA>:<keyB>`.
-- **Verdict:** **COMPUTABLE-NOW to run ad-hoc.** **Saving** a 2-dimension report is **NEEDS-SCHEMA** only under OPEN-RPT-1·B (`reportSpec Json`, §4) — synthetic-id persistence (OPEN-RPT-1·A) cannot cleanly encode two dimensions + a chosen chart type. Recommend: ad-hoc cross-tab in v1; saved cross-tab waits on the founder's RPT-1 choice.
+- **Verdict:** **GATED-ON-RECONCILIATION** for any `customFields` dimension (migration 9, unverified); the field×access-tier RSVP join itself is live. **Saving** a 2-dimension report is additionally **NEEDS-SCHEMA** only under OPEN-RPT-1·B (`reportSpec Json`, §4) — synthetic-id persistence (OPEN-RPT-1·A) cannot cleanly encode two dimensions + a chosen chart type. Recommend: ad-hoc cross-tab in v1; saved cross-tab waits on the founder's RPT-1 choice.
 
 #### R5 — Headline scalar (members with field set)
 - **Business question:** "How many members have a value for **{field}** at all?"
 - **Data source:** `Member.customFields ? key` count, `mergedIntoId IS NULL`.
 - **Result → viz:** scalar `number` (+ optional `sparkline`) — the tile at the top of a report.
-- **Verdict:** **COMPUTABLE-NOW.**
+- **Verdict:** **GATED-ON-RECONCILIATION** — reads `Member.customFields` (migration 9, unverified) + the migration-8 dedup filter. (§0.1)
 
 #### R6 — Roster drill-down slice (the "View these members" expansion)
 - **Business question:** "Show me the actual members behind **{this bucket}**."
 - **Data source:** `Member` rows matching the clicked bucket, `mergedIntoId IS NULL`. **Does not render a roster here** — it deep-links to **`/operator/members`** with the equivalent filter (RESOLVED-IA-1: Members is the operational spine; Intelligence never becomes a second roster).
 - **Result → viz:** `RecordList` → `table` (compact preview) **or** a direct link to the filtered Members surface. Operator scope shows operator columns; **sponsor scope shows firmographic columns only** (§2).
 - **Registry hook:** existing `Metric.drillDown(ctx)` returns `DrillDownRecord[]`; the cell links out.
-- **Verdict:** **COMPUTABLE-NOW.**
+- **Verdict:** **PARTIAL** — a drill-down on a **custom-field** slice is **GATED** (migration 9); a drill-down on a **live firmographic** column is free (minus the migration-8 dedup filter). (§0.1)
 
 #### R7 — Existing fixed metric tiles (unchanged, listed for completeness)
 - The current Community / Pipeline / Engagement / Taste tiles (`listMetrics({category})` → `runMetric`) and the application funnel (`loadFunnel` in `page.tsx`) **stay exactly as they are.** This contract **adds** the Reports builder family; it does not re-spec existing tiles. The psychographic/taste tiles remain in the **operator-only** region and never enter any sponsor path.
@@ -107,7 +144,7 @@ Each report carries one verdict:
 - **Data source:** `sponsor_audience_member` view columns **only**: `industry, jobFunction, seniority, companySize, companyName, companyDomain, linkedinUrl, city, country, ageRange, customFields, fieldProvenance` — scoped to `status = 'APPROVED' AND mergedIntoId IS NULL` by the view itself.
 - **Aggregation / query shape:** `GROUP BY` the firmographic field over the view (`db.$queryRaw` against `sponsor_audience_member` — there is **no Prisma model** for the view), then `toDistribution(counts, total)` from `metrics.ts` to apply `MIN_CELL = 5` small-cell suppression (sub-5 cells roll into a suppressed "Other").
 - **Result → viz:** `Breakdown` → `horizontal-bar` with suppressed "Other" cell.
-- **Verdict:** **COMPUTABLE-NOW · DRIFT-DEP.** The view exists in prod via `prisma/sql/sponsor-audience-view.sql` but is **not a tracked migration** (`today-data.md` CRITICAL) and currently has **zero runtime readers** — this report is its **first consumer**. Flux must reconcile the view into tracked history (§4-D1). Until then the report works at runtime but the migration path is the open risk.
+- **Verdict:** **GATED-ON-RECONCILIATION (migration 10 = D1).** The `sponsor_audience_member` view is **authored** in `prisma/sql/sponsor-audience-view.sql` but its **prod-existence is unverified** — it has zero runtime readers and this report would be its **first consumer**. **Until the window confirms/lands the view, the DB-view firewall (Layer 1) is NOT enforced and this report cannot run.** It must **never** fall back to reading `Member` directly — that bypasses the physical firewall boundary (§0.1, §2).
 
 #### R10 — Sponsor-visible custom-field breakdown
 - **Business question:** "Break this audience down by **{a custom field the operator marked sponsor-visible}**."
@@ -116,13 +153,13 @@ Each report carries one verdict:
 - **Aggregation / query shape:** read view → project to allow-set keys → filter by provenance → `GROUP BY` value → `toDistribution` (MIN_CELL=5).
 - **Result → viz:** `Breakdown` → `horizontal-bar`, suppressed.
 - **Dimension picker constraint (Layer 2):** in sponsor scope the "Break down by" picker offers **only** the `sponsorVisible` allow-set + firmographic view columns. An operator literally cannot select a non-sponsor-visible field while the sponsor-safe view is on.
-- **Verdict:** **COMPUTABLE-NOW · DRIFT-DEP** (same view dependency as R9).
+- **Verdict:** **GATED-ON-RECONCILIATION ×2** — depends on **migration 10** (the view) **and migration 9** (`customFields` + `FieldDefinition.sponsorVisible`), both unverified. The doubly-gated report. (§0.1)
 
 #### R11 — Sponsor audience headline + persona match
 - **Business question:** "How big is the addressable audience, and what share matches the sponsor's persona criteria?"
 - **Data source:** existing `computeWorkspaceAudience()` in `metrics.ts` (already PII-safe, suppression-aware) — **with the audit fix folded in** (see ⚠ below).
-- **Verdict:** **COMPUTABLE-NOW (already shipped)** — but inherit the §2 dedup-fix requirement.
-- **⚠ Required correctness fix (carried from `today-data.md` WARNING):** `metrics.ts:254` (`computeWorkspaceAudience`) filters `status:'APPROVED'` but **omits `mergedIntoId: null`**, so soft-merged duplicates inflate sponsor audience size. Any sponsor report reusing this path **MUST** add `mergedIntoId: null` to the `where` (or read the view, which already enforces it). This is the exact invariant the view was written to guarantee.
+- **Verdict:** **RUNS TODAY (already shipped); correctness fix GATED on migration 8.** `computeWorkspaceAudience` runs over live firmographic columns now. Its dedup correctness fix (OPEN-DATA-1) is **parked** — see below.
+- **⚠ Correctness fix (OPEN-DATA-1) — HELD, gated on migration 8.** `metrics.ts:254` (`computeWorkspaceAudience`) filters `status:'APPROVED'` but **omits `mergedIntoId: null`**, so soft-merged duplicates inflate sponsor audience size. The fix is to add `mergedIntoId: null` — **but that column is migration 8, in the unverified set.** Adding the filter before `Member.mergedIntoId` is confirmed live in prod **errors at runtime**. Per the integrator (2026-06-09): the fix stays **parked**; once flux's probe confirms/deploys migration 8, OPEN-DATA-1 lands on its own branch. The report therefore continues to run today with the known double-count, and the fix sequences after the window — it is **not** folded into reconciliation.
 
 ---
 
@@ -145,8 +182,10 @@ Each report carries one verdict:
 **The single firewall rule (load-bearing):**
 > **Operator scope** reads `Member` (and may read `MemberPsychographics` for existing internal taste tiles). **Sponsor scope** reads `sponsor_audience_member`, projects `customFields` to `sponsorVisible` keys, restricts provenance to `self_reported`+`verified_enrichment`, types every row as `SponsorAudienceMember` via `toSponsorAudienceMember`, and suppresses sub-`MIN_CELL` cells. Scope is a **server-side hard branch**, chosen on the server, never a client flag the client can flip to widen access.
 
+> **⚠ Layer 1 is NOT-YET-ENFORCED (integrator update 2026-06-09).** The `sponsor_audience_member` view's prod-existence is **unverified** (migration 10, §0.1). Until the window confirms/lands it, the physical-view boundary does not exist in prod, so **R9/R10 stay blocked** and the firewall in effect is Layers 3+5+6 (type boundary, suppression, test gate) over the per-call `select` discipline. R9/R10 must **never** degrade to reading `Member` directly as a fallback.
+
 **Six enforcement layers (all already have repo precedent; this contract is the first aggregation consumer of layers 2 + 4):**
-1. **Physical table boundary** — psychographics live in `MemberPsychographics`; the view has no JOIN and an explicit column list.
+1. **Physical table boundary** — psychographics live in `MemberPsychographics`; the view has no JOIN and an explicit column list. *(Gated: view prod-existence unverified — see warning above.)*
 2. **`customFields` sub-filter by `sponsorVisible`** — reader projects to the allow-set (R10). *New enforcement this contract introduces.*
 3. **Type boundary** — sponsor rows typed `SponsorAudienceMember`; `_SponsorSafe` compile assertion fails the build if a psychographic key is added.
 4. **Provenance restriction** — sponsor counts only `self_reported` + `verified_enrichment`. *New enforcement this contract introduces.*
@@ -191,18 +230,19 @@ Implementing the three parametric metrics (`customfield.breakdown`, `customfield
 
 ## 4. Schema Needs for Flux (additive-only — SPEC for flux, no SQL written here)
 
-> **Recommended v1 path = ZERO new schema.** R1–R11 (minus deferred R8 and the saved-cross-tab case) ship on the **existing** `SavedReport` model and `/api/intelligence/reports` route, reusing `metricIds String[]` via synthetic ids (OPEN-RPT-1·A). The items below are (a) **drift reconciliation** the sponsor path depends on, and (b) **optional** additive changes gated on founder decisions. Flux owns the migration; this section is the spec.
+> **Recommended v1 path = ZERO *net-new* schema — but NOT zero-dependency (integrator update 2026-06-09).** R1–R11 (minus deferred R8 and the saved-cross-tab case) add **no new tables/columns** — they ship on the **existing** `SavedReport` model + `/api/intelligence/reports` route, reusing `metricIds String[]` via synthetic ids (OPEN-RPT-1·A). **However, BI v1 is GATED on the reconciliation window confirming/landing migrations 7–10 (§0.1)** — the member-intelligence schema it reads is authored but not confirmed executed in prod. So: *zero schema this contract asks flux to author for v1*, but a **hard dependency on the unverified set being landed first.** D1 below is **part of that reconciliation set** (= migration 10), not a new ask. D2 is reconciliation context. D3–D5 are optional net-new, authored on the clean path **after** the window.
 
-### D1 — [DEPENDENCY · reconcile, do not create] `sponsor_audience_member` view
-- **What:** the existing `prisma/sql/sponsor-audience-view.sql` view (JOIN-free, explicit column list, `status='APPROVED' AND mergedIntoId IS NULL`).
-- **Action for flux:** **reconcile into tracked migration history** (it exists in prod, untracked — `today-data.md` CRITICAL). Do **not** re-create. Record via the resolve-as-applied path the migration-reconciliation window is already using.
-- **Why:** R9/R10/R11 are the **first runtime consumers** of this view. The sponsor firewall's defense-in-depth depends on it being a stable, tracked object.
-- **Indexes:** none new (the view reads `Member`, already `@@index([workspaceId])`, `@@index([mergedIntoId])`).
+### D1 — [RECONCILIATION DEPENDENCY = migration 10 · prod-existence UNVERIFIED] `sponsor_audience_member` view
+- **What:** the `prisma/sql/sponsor-audience-view.sql` view (JOIN-free, explicit column list, `status='APPROVED' AND mergedIntoId IS NULL`).
+- **Status (revised):** **authored, prod-existence UNVERIFIED** — being confirmed in the coordinated Producer window. **Authored ≠ executed.** This is on the reconciliation path; flux owns confirming/landing + recording it as a tracked migration. Do **not** re-create blindly.
+- **Why:** R9/R10 are the **first runtime consumers** of this view and the **Layer-1 firewall depends on it existing.** Until the window lands it, R9/R10 are blocked and Layer 1 is not enforced (§0.1, §2).
+- **Indexes:** none new (the view reads `Member`, which already carries `@@index([workspaceId])`, `@@index([mergedIntoId])` — *also part of the unverified migration-8 set*).
 
-### D2 — [DEPENDENCY · reconcile] `Member` dimension columns + `FieldDefinition` + `MemberPsychographics`
-- **What:** `Member.customFields/fieldProvenance/city/country/companyName/companyDomain/linkedinUrl/instagram/ageRange/...`, the `FieldDefinition` table, the `MemberPsychographics` table — all live in prod via `additive_pr2_dimensions.sql`, untracked.
-- **Action for flux:** reconcile into tracked history (same CRITICAL bucket). No DDL change — record-as-applied only.
-- **Why:** R1–R3, R10 read these. Runtime-safe today; the risk is purely migration-history drift.
+### D2 — [RECONCILIATION CONTEXT = migrations 8–9 · prod-existence UNVERIFIED] `Member` dimension columns + `FieldDefinition` + `MemberPsychographics` + `mergedIntoId`
+- **What:** `Member.{customFields,fieldProvenance,city,country,companyName,companyDomain,linkedinUrl,instagram,enrichmentStatus}` + `FieldDefinition` + `MemberPsychographics` (migration 9); `Member.mergedIntoId/mergedAt` + indexes (migration 8) — authored in `additive_pr2_dimensions.sql` / `additive_member_merge.sql`.
+- **Status (revised):** **prod-existence UNVERIFIED** (same window). Not "runtime-safe today" — the earlier draft's claim is withdrawn.
+- **Action for flux:** confirm/land + record-as-applied on the reconciliation path. No DDL *change* (objects are authored); the work is verification + history reconciliation.
+- **Why:** R1, R3, R4(custom), R5, R6(custom), R10 read migration 9; the dedup filter across R1–R6/R9–R11 and **OPEN-DATA-1** read migration 8.
 
 ### D3 — [OPTIONAL · NEEDS-SCHEMA, gated on OPEN-RPT-1·B] `SavedReport.reportSpec`
 - **Table:** `SavedReport` (already tracked).
@@ -223,7 +263,7 @@ Implementing the three parametric metrics (`customfield.breakdown`, `customfield
 - **What:** a per-workspace `(stableKey, bucket, n)` materialized rollup of custom-field counts, refreshed nightly.
 - **Why / when:** only if interactive `GROUP BY` over `customFields` becomes too slow at large scale **and** D4's GIN index is insufficient. **Not in v1.** Named so it isn't reinvented later.
 
-**Net for v1 (recommended):** D1 + D2 are **reconciliation, not new schema** (flux is already doing this). D3/D4/D5 are **optional and gated**. The buildable v1 contract is **zero net-new schema**.
+**Net for v1 (recommended):** D1 + D2 are **reconciliation of the unverified set (migrations 8–10), not new schema** — flux owns confirming/landing them, and **BI v1 sequences after that.** D3/D4/D5 are **optional, net-new, and authored on the clean tracked-migration path AFTER the window** (kept off the reconciliation path as agreed). The buildable v1 contract asks flux to **author zero net-new schema**, but is **hard-gated on the reconciliation window** — *zero schema ≠ zero dependency.*
 
 ---
 
@@ -304,7 +344,8 @@ If a natural-language "ask a question" entry is wired into Reports, it reuses th
 | **OPEN-CHT-1** | Custom-field time-series date axis (`syncedAt` vs `createdAt` vs none) | **None in v1** (R8 deferred). |
 | **OPEN-CHT-2** | Auto default chart per `FieldDefinition.type` + whether to add a histogram viz | **Auto-default with manual override; no histogram in v1.** |
 | **OPEN-SCHEMA-1** | D4 GIN index — express in `schema.prisma` (`@@index(type: Gin)`) or keep out-of-band like `Asset_searchVector_idx`? | Defer until first SaaS-scale tenant; **out-of-band + recorded migration** matches current convention. |
-| **OPEN-DATA-1** | The `mergedIntoId: null` dedup fix at `metrics.ts:254` (`computeWorkspaceAudience`) — fold into this work or leave for the data-audit remediation window? | **Must be present** before any sponsor report reuses that path; recommend the data-audit window owns the fix and this contract depends on it. |
+| **OPEN-DATA-1** | The `mergedIntoId: null` dedup fix at `metrics.ts:254` (`computeWorkspaceAudience`) | **RESOLVED by integrator (2026-06-09): HELD / parked.** The fix needs `Member.mergedIntoId` (migration 8, unverified) — adding the filter before it is confirmed live errors at runtime. Lands on its own branch **after** flux's probe confirms/deploys migration 8. Not folded into reconciliation; sequenced after the window. |
+| **OPEN-SEQ-1** *(new)* | BI v1 build start | **Sequence AFTER the reconciliation window confirms/lands migrations 7–10 (§0.1).** Dependency-free work (R7, R2-over-live-columns, R11 run) could begin earlier, but the custom-field + sponsor core (R1/R3/R5/R9/R10) is gated. |
 
 ---
 
@@ -313,9 +354,10 @@ If a natural-language "ask a question" entry is wired into Reports, it reuses th
 - **Tokens only, no hex** — all charts/tiles/controls use existing semantic tokens + `charts.tsx`.
 - **Locked terminology** — Member / Guest / Comp Access / Event Access (never "RSVP" in UI); "Registration fields" = the application-form name; no raw enum values surfaced.
 - **AI model** — any report-narration uses `claude-sonnet-4-20250514` (no new model; reuses `composer.ts`). No AI required for v1.
-- **Additive schema only, never `prisma db push`** — recommended v1 is zero net-new schema; any optional column/index follows the additive `db execute` path, is recorded as a tracked migration, and never touches `Asset_searchVector_idx`.
+- **Additive schema only, never `prisma db push`** — recommended v1 asks flux to author zero net-new schema; any optional column/index (D3–D5) follows the additive `db execute` path on the clean tracked-migration path after the window, is recorded as a tracked migration, and never touches `Asset_searchVector_idx`.
+- **Sequencing (integrator update 2026-06-09)** — BI v1 is **hard-gated on the reconciliation window** confirming/landing migrations 7–10. *Zero net-new schema ≠ zero dependency.* See §0.1 for the gated/free split per report.
 - **Workspace scoping** — every query references `workspaceId`; the registry refuses any metric that doesn't.
-- **No migrations written here** — D1–D5 are a spec handed to flux; this contract edits nothing under `prisma/`.
+- **No migrations written here** — D1–D5 are a spec handed to flux; this contract edits nothing under `prisma/`. OPEN-DATA-1 stays parked with flux (gated on migration 8).
 
 ## 8. Out of scope
 - Defining `FieldDefinition`s / editing fields (Slice 2 F5 + Settings → member-fields; this surface only **reports** and deep-links to setup).
