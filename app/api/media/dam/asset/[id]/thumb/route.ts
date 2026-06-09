@@ -25,5 +25,11 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
   const url = await presignGet(asset.thumbnailUrl, DISPLAY_URL_TTL);
   if (!url) return NextResponse.json({ error: 'Storage unavailable' }, { status: 503 });
-  return NextResponse.redirect(url, 302);
+  // Cache the redirect for the render session so a grid scroll doesn't re-mint a
+  // signed URL + re-hit R2 on every tile remount. Kept well under DISPLAY_URL_TTL
+  // (15m) so a cached redirect never outlives its signature.
+  return NextResponse.redirect(url, {
+    status: 302,
+    headers: { 'Cache-Control': 'private, max-age=600' },
+  });
 }
