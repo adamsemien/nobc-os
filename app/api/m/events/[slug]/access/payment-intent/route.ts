@@ -13,6 +13,7 @@ import {
   findOrCreateOperatorMember,
   hasCapacity,
 } from '@/lib/event-access-submit';
+import { selectTierPriceCents } from '@/lib/ticketing/pricing';
 
 const BodySchema = z.object({
   guestEmail: z.string().email().optional(),
@@ -155,7 +156,7 @@ export async function POST(
       select: { memberPriceCents: true, nonMemberPriceCents: true },
     });
     if (!tier) return NextResponse.json({ error: 'Ticket tier not found' }, { status: 404 });
-    const price = resolved.kind === 'guest' ? tier.nonMemberPriceCents : tier.memberPriceCents;
+    const price = selectTierPriceCents(resolved.kind, tier);
     if (price == null) return NextResponse.json({ error: 'Tier not available for this access level' }, { status: 403 });
     amountCents = price;
   } else {

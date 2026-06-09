@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/operator-role';
 import { stripe } from '@/lib/stripe';
 import { emitEvent } from '@/lib/emit-event';
+import { refundActionForStatus } from '@/lib/ticketing/pricing';
 
 const BodySchema = z.object({
   rsvpId: z.string(),
@@ -34,16 +35,17 @@ export async function POST(req: NextRequest) {
   }
 
   const pi = await stripe.paymentIntents.retrieve(rsvp.stripePaymentIntentId);
+  const action = refundActionForStatus(pi.status);
   let refundAmountCents: number;
 
-  if (pi.status === 'requires_capture') {
+  if (action.kind === 'cancel') {
     await stripe.paymentIntents.cancel(rsvp.stripePaymentIntentId);
     refundAmountCents = pi.amount;
-  } else if (pi.status === 'succeeded') {
+  } else if (action.kind === 'refund') {
     const refund = await stripe.refunds.create({ payment_intent: rsvp.stripePaymentIntentId });
     refundAmountCents = refund.amount;
   } else {
-    return NextResponse.json({ error: `Cannot refund payment in status: ${pi.status}` }, { status: 400 });
+    return NextResponse.json({ error: action.reason }, { status: 400 });
   }
 
   await db.rSVP.update({
