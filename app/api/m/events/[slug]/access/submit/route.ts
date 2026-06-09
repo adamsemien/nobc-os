@@ -120,7 +120,7 @@ export async function POST(
   // count + upsert pair so only one of them can succeed at capacity.
   type UpsertResult =
     | { full: true }
-    | { full: false; rsvpId: string; alreadyConfirmed: boolean };
+    | { full: false; rsvpId: string; alreadyConfirmed: boolean; existingTicketStatus?: string };
 
   const txResult = await db.$transaction<UpsertResult>(
     async (tx) => {
@@ -138,7 +138,7 @@ export async function POST(
 
       if (existing) {
         if (existing.ticketStatus === 'confirmed' || existing.ticketStatus === 'pending_approval') {
-          return { full: false, rsvpId: existing.id, alreadyConfirmed: true };
+          return { full: false, rsvpId: existing.id, alreadyConfirmed: true, existingTicketStatus: existing.ticketStatus };
         }
         const updated = await tx.rSVP.update({
           where: { id: existing.id },
@@ -178,7 +178,11 @@ export async function POST(
 
   const rsvpId = txResult.rsvpId;
   if (txResult.alreadyConfirmed) {
-    return NextResponse.json({ rsvpId, ticketStatus, memberQrCode: rsvpMember.memberQrCode });
+    return NextResponse.json({
+      rsvpId,
+      ticketStatus: txResult.existingTicketStatus ?? ticketStatus,
+      memberQrCode: rsvpMember.memberQrCode,
+    });
   }
 
   await emitEvent({
