@@ -784,13 +784,15 @@ export default function MembershipForm() {
     setError('');
     setIsLoading(true);
     try {
+      // Upload returns a private R2 object key (not a public URL); the operator
+      // review surfaces resolve it through the role-gated presign proxy.
       const uploadedUrls: string[] = [];
       for (const file of photoFiles) {
         try {
           const fd = new FormData();
           fd.append('file', file);
           const r = await fetch('/api/apply/membership/upload', { method: 'POST', body: fd });
-          uploadedUrls.push(r.ok ? (await r.json()).url : '');
+          uploadedUrls.push(r.ok ? (await r.json()).key : '');
         } catch { uploadedUrls.push(''); }
       }
 

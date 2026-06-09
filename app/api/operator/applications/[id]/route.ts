@@ -5,6 +5,7 @@ import { requireWorkspaceId } from '@/lib/auth';
 import { answerQuestions } from '@/lib/apply-config';
 import { referrerLines } from '@/lib/operator-application-display';
 import { resolveAnswerLabel } from '@/lib/legacy-answer-labels';
+import { isPortraitRef, portraitSrc } from '@/lib/apply-photo';
 
 const QUESTION_ORDER = new Map(answerQuestions.map((q, i) => [q.key, i]));
 
@@ -74,8 +75,10 @@ export async function GET(
       };
     });
 
-  // Portrait URLs: the live form stores a JSON array under `photos.urls`; older
-  // seed rows used the synthetic `_photos` key. The detail UI renders up to 5.
+  // Portraits: the live form stores a JSON array under `photos.urls`; older seed
+  // rows used the synthetic `_photos` key. Each entry is either a private R2 key
+  // (served via the presign proxy) or a full URL (legacy/demo). The detail UI
+  // renders up to 5.
   let photos: string[] = [];
   const photoRow =
     app.answers.find((a) => a.questionKey === 'photos.urls') ??
@@ -84,9 +87,7 @@ export async function GET(
     try {
       const parsed = JSON.parse(photoRow.answer) as unknown;
       if (Array.isArray(parsed)) {
-        photos = parsed
-          .filter((v): v is string => typeof v === 'string' && /^https?:\/\//.test(v))
-          .slice(0, 5);
+        photos = parsed.filter(isPortraitRef).map(portraitSrc).slice(0, 5);
       }
     } catch {}
   }
