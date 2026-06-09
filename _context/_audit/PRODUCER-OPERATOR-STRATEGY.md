@@ -44,6 +44,13 @@
 
 ---
 
+## Companion analyses
+
+- `CRM-SPINE-MAP.md` — Phase 2 CRM duplication map + proposed canonical model (updated for the #62 separate-DB/Clerk reality; cross-app person key is now email, not `clerkUserId`).
+- `AUDIT-MERGE-TRIAGE.md` — the overnight platform audit mapped onto merge phases (notes which P0/P1 items shipped via #50/#51/#53).
+
+---
+
 ## 1. What these two systems are
 
 - **NoBC Operator** (this repo, `nobc-os`) — member-facing + operator dashboard.
