@@ -6,6 +6,44 @@
 
 ---
 
+> ## ⚠️ 2026-06-09 UPDATE — CORE PREMISE CONTRADICTED BY LIVE CONFIG (read first)
+>
+> This doc's load-bearing factual claim — that Producer and Operator **share one
+> Postgres and infrastructure** (§2, §4) — is **not backed by the live config.**
+> Verified the same day from both sides:
+>
+> - **Clerk: SEPARATE — confirmed (dashboard + key decode).** Two distinct Clerk
+>   *applications*. NoBC OS → `allowed-zebra-34` (dev) and `app.thenobadcompany.com`
+>   (**Production / live**). Producer → `firm-weevil-76` in the Clerk dashboard,
+>   **No Production Environment**; the publishable key in Replit's env decodes to a
+>   *different* instance, `maximum-chipmunk-4`. No shared identity; Producer has no
+>   Clerk prod instance at all. (The `firm-weevil-76` vs `maximum-chipmunk-4`
+>   mismatch is its own reconciliation item.)
+> - **Neon (dev): SEPARATE.** Producer's configured `DATABASE_URL` → `helium/heliumdb`
+>   (Replit-managed Postgres), NOT NoBC's `ep-twilight-forest-…neon.tech`.
+> - **Producer ≈ a standalone, dev-stage tool.** Own login, own DB, own tenancy, no
+>   Orgs. Only link to NoBC = the one-way inbound event webhook + Airtable RSVP counts.
+>
+> **One fact still unverified:** Producer's *production* `DATABASE_URL` (Doppler
+> prod). But Producer has **no Clerk prod environment**, so a real prod deploy may
+> not exist yet. Until confirmed, treat "shared Postgres" as **false in every
+> environment we can see.**
+>
+> **Implications:**
+> 1. The §4 "house on fire" `db push` landmine is **NOT active** in the verified
+>    environments — different databases can't drop each other's tables. The
+>    companion `PHASE-0-PRODUCER-DB-PUSH-MITIGATION.md` is downgraded from
+>    emergency to cheap insurance.
+> 2. The destination below (shared core + two role-scoped surfaces) may still be
+>    the right *goal*, but it is a **greenfield merge of two separate systems** —
+>    real cross-DB data migration + Clerk consolidation — NOT the "untangle a
+>    shared DB" refactor this doc assumes. The CRM/Event "spine" phases are bigger
+>    than sized here; re-scope before committing.
+> 3. There is **no fire**, so the strategy can be designed deliberately rather than
+>    under the §8 "don't design the marriage while the house is on fire" urgency.
+
+---
+
 ## 1. What these two systems are
 
 - **NoBC Operator** (this repo, `nobc-os`) — member-facing + operator dashboard.

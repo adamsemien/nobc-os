@@ -1,35 +1,37 @@
 # Phase 0 — Producer `db push` Landmine: Mitigation Runbook
 
-> **Handoff for the Producer (Replit) session.** This neutralizes the most urgent
-> cross-app risk in `PRODUCER-OPERATOR-STRATEGY.md` §4. It is **safe to adopt
-> immediately, regardless of the Phase 0 schema-isolation verdict.** Drafted
-> 2026-06-09. Owner: Adam.
+> **Handoff for the Producer (Replit) session.** Cheap insurance against a
+> cross-app `db push` accident. Drafted 2026-06-09. Owner: Adam.
+>
+> **⚠️ 2026-06-09 UPDATE — DOWNGRADED FROM EMERGENCY TO INSURANCE.** Live config
+> shows Producer and Operator are on **separate databases** (Producer dev →
+> `helium/heliumdb` Replit-managed; NoBC → `ep-twilight-forest-…neon.tech`) and
+> **separate Clerk apps**. So the original "shared Postgres → mutual `db push`
+> destruction" threat is **NOT active in any verified environment** — different
+> DBs can't drop each other's objects. The only unverified gap is Producer's
+> *production* `DATABASE_URL` (Doppler prod), and Producer has **no prod
+> environment** yet. **Adopt the immediate `db push` ban below anyway** — it costs
+> nothing, it's correct practice on a Replit-managed DB regardless, and it makes
+> the shared-DB scenario safe *if* prod is ever wired that way. Just don't treat
+> it as a fire.
 
 ---
 
-## The threat in one sentence
+## The risk (conditional — only bites if prod is shared)
 
-Producer and NoBC Operator share **one physical Postgres** (Neon `neondb`), and
-Producer's documented schema workflow is **`prisma db push --skip-generate`** —
-a command that reconciles the database toward *Producer's* Prisma schema and
-**deletes any object it considers drift**, which on a shared schema includes
-Operator's tables and indexes.
+`prisma db push` reconciles a database toward the calling app's Prisma schema and
+**deletes any object it considers drift** (proven on Operator's side: it drops the
+`Asset_searchVector_idx` DAM GIN index, which exists only in prod). **IF** Producer
+were ever pointed at NoBC's database with no distinct `?schema=`, its documented
+`db push --skip-generate` could drop Operator's tables and indexes. As verified
+today that is **not** the case (separate DBs), so this is precautionary.
 
-## What's already confirmed (Operator side, verified locally)
+## What's confirmed (both sides, 2026-06-09)
 
-- Operator's `DATABASE_URL` has **no `?schema=`** → it uses the default **`public`** schema.
-- Operator's `schema.prisma` has **no `multiSchema` / `schemas[]`** → everything is in `public`.
-- Operator connects as **`neondb_owner`** — the database owner role (full DDL rights).
-- Operator's `CLAUDE.md` proves the destructive behavior: a `db push` "treats
-  `Asset_searchVector_idx` as drift and removes it" — that GIN index powers DAM
-  full-text search and exists **only in prod** (created out-of-band via
-  `prisma/sql/dam-search-vector.sql`, not representable in `schema.prisma`).
-
-**Therefore:** if Producer connects with the same `DATABASE_URL` (no distinct
-`?schema=`), the two apps collide in `public` as the same owner role, and
-Producer's `db push` can drop Operator's objects — and Operator's would drop
-Producer's. The Phase 0 query (below) confirms this against the live DB; **the
-mitigation does not wait on it.**
+- **Separate databases (dev):** Producer → `helium/heliumdb`; NoBC → Neon `ep-twilight-forest-…`.
+- **Separate Clerk apps:** Producer (`firm-weevil-76` / key `maximum-chipmunk-4`, no prod env) ≠ NoBC (`allowed-zebra-34` dev / `app.thenobadcompany.com` prod).
+- Operator side: `DATABASE_URL` has no `?schema=` (uses `public`), no `multiSchema`, connects as `neondb_owner`. Relevant only *if* the two ever share a DB.
+- **Unverified:** Producer's *production* `DATABASE_URL`. Confirm before anyone wires the two together.
 
 ---
 
