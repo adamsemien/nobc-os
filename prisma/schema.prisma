@@ -1440,6 +1440,11 @@ model SmsMessage {
   direction      SmsDirection
   body           String          @db.Text
   aiGenerated    Boolean         @default(false)
+  // Twilio MessageSid for INBOUND rows — the idempotency key. A retried Twilio
+  // webhook reuses the same SID, so a UNIQUE constraint turns a retry into a
+  // no-op (nobc-house-phone routes/inbound.js). Nullable: OUTBOUND rows and
+  // pre-existing rows stay NULL (NULLs are distinct under a UNIQUE index).
+  twilioSid      String?         @unique
   // AI topic label for inbound messages (e.g. "Parking", "Guest List").
   // Null until the categorization job (GET /api/sms/categorize) processes it.
   category       String?
