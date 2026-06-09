@@ -178,34 +178,44 @@ export async function POST(
     rsvpMember = { id: member.id, email: member.email };
   }
 
-  if (!(await hasCapacity(workspaceId, evt.id, event.capacity))) {
-    return NextResponse.json({ error: 'Event is full' }, { status: 409 });
-  }
-
-  // Reuse existing held PI if present.
-  const existing = await db.rSVP.findFirst({
+  // Reuse existing held PI if present — handle idempotent retries before
+  // touching capacity, so a retry for an in-progress payment never re-counts
+  // against capacity.
+  const existingRsvp = await db.rSVP.findFirst({
     where: { workspaceId, eventId: evt.id, memberId: rsvpMember.id },
     select: { id: true, ticketStatus: true, stripePaymentIntentId: true },
   });
-  if (existing?.ticketStatus === 'confirmed') {
+  if (existingRsvp?.ticketStatus === 'confirmed') {
     return NextResponse.json({ error: 'Already reserved' }, { status: 409 });
   }
-  if (existing?.stripePaymentIntentId) {
-    const pi = await stripe.paymentIntents.retrieve(existing.stripePaymentIntentId);
+  if (existingRsvp?.stripePaymentIntentId) {
+    const pi = await stripe.paymentIntents.retrieve(existingRsvp.stripePaymentIntentId);
     if (['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(pi.status)) {
       return NextResponse.json({
         clientSecret: pi.client_secret,
-        rsvpId: existing.id,
+        rsvpId: existingRsvp.id,
         amountCents: pi.amount ?? amountCents,
       });
     }
     if (pi.status !== 'canceled' && pi.status !== 'succeeded') {
-      await stripe.paymentIntents.cancel(existing.stripePaymentIntentId).catch(() => {});
+      await stripe.paymentIntents.cancel(existingRsvp.stripePaymentIntentId).catch(() => {});
     }
   }
 
-  // Idempotency key: scoped to the (workspace, event, member) tuple so a
-  // double-submit or client retry of this exact request returns the same PI.
+  // Capacity check + RSVP write in a transaction to prevent the TOCTOU race
+  // where two concurrent first-time buyers both pass the count check and both
+  // write, overselling the last spot.
+  if (!existingRsvp && event.capacity) {
+    const taken = await db.rSVP.count({
+      where: { workspaceId, eventId: evt.id, ticketStatus: { in: ['confirmed', 'held'] } },
+    });
+    if (taken >= event.capacity) {
+      return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+    }
+  }
+
+  // Idempotency key: scoped to (workspace, event, member) so concurrent
+  // double-submits resolve to the same Stripe PaymentIntent.
   const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}`;
   const pi = await stripe.paymentIntents.create(
     {
@@ -220,10 +230,12 @@ export async function POST(
     { idempotencyKey },
   );
 
+  // Write RSVP inside a serializable transaction — the capacity count and RSVP
+  // insert are now a single atomic unit, preventing oversell on the last spot.
   let rsvpId: string;
-  if (existing) {
+  if (existingRsvp) {
     const updated = await db.rSVP.update({
-      where: { id: existing.id },
+      where: { id: existingRsvp.id },
       data: {
         stripePaymentIntentId: pi.id,
         paymentStatus: 'AUTHORIZED',
@@ -237,22 +249,49 @@ export async function POST(
     });
     rsvpId = updated.id;
   } else {
-    const created = await db.rSVP.create({
-      data: {
-        workspaceId,
-        eventId: evt.id,
-        memberId: rsvpMember.id,
-        status: 'CONFIRMED',
-        ticketStatus: 'held',
-        stripePaymentIntentId: pi.id,
-        paymentStatus: 'AUTHORIZED',
-        amountCents,
-        tierId: resolvedTierId ?? null,
-        customAnswers: body.customAnswers ?? undefined,
-        guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
-        guestName: resolved.kind === 'guest' ? body.guestName : null,
-      },
-    });
+    let created: { id: string };
+    try {
+      created = await db.$transaction(
+        async (tx) => {
+          // Re-check capacity inside the transaction to close the race window.
+          if (event.capacity) {
+            const taken = await tx.rSVP.count({
+              where: { workspaceId, eventId: evt.id, ticketStatus: { in: ['confirmed', 'held'] } },
+            });
+            if (taken >= event.capacity) {
+              throw Object.assign(new Error('Event is full'), { code: 'FULL' });
+            }
+          }
+          return tx.rSVP.create({
+            data: {
+              workspaceId,
+              eventId: evt.id,
+              memberId: rsvpMember.id,
+              status: 'CONFIRMED',
+              ticketStatus: 'held',
+              stripePaymentIntentId: pi.id,
+              paymentStatus: 'AUTHORIZED',
+              amountCents,
+              tierId: resolvedTierId ?? null,
+              customAnswers: body.customAnswers ?? undefined,
+              guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
+              guestName: resolved.kind === 'guest' ? body.guestName : null,
+            },
+          });
+        },
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (err) {
+      if (err instanceof Error && (err as { code?: string }).code === 'FULL') {
+        // Cancel the PI we just created so it doesn't dangle.
+        await stripe.paymentIntents.cancel(pi.id).catch((e) =>
+          console.error('[payment-intent] failed to cancel dangling PI after capacity race', { piId: pi.id, err: e }),
+        );
+        return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+      }
+      console.error('[payment-intent] RSVP create transaction failed', { workspaceId, eventId: evt.id, err });
+      throw err;
+    }
     rsvpId = created.id;
   }
 
