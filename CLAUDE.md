@@ -72,7 +72,7 @@ A May-2026 session added the House Phone SMS inbox (Runtype evaluated and **scra
 - Set `PASSNINJA_API_KEY` + `PASSNINJA_ACCOUNT_ID` + `PASSNINJA_PASS_TYPE` in Vercel (wallet passes go live)
 - Set `SVIX_API_KEY` in Vercel (outbound webhooks go live)
 - Verify application review QA bugs — could not reproduce in code, needs live confirmation
-- Operator RBAC coverage is essentially complete — every `/api/operator/*` write, `/api/stripe/refund`, `/api/agent/*`, and `/api/intelligence/{compose,reports}` are `requireRole`-gated, and a Clerk-org floor keeps org admins from being locked out. Only the `/api/mcp` write path remains ungated (it uses `Bearer` auth — needs its own design). (House Phone `/api/sms/*` is intentionally Clerk-org-membership-gated and `/api/check-in/*` uses `CHECKIN_SECRET` — both by design. See Roles & Permissions.)
+- Operator RBAC coverage is essentially complete — every `/api/operator/*` write, `/api/stripe/refund`, `/api/agent/*`, and `/api/intelligence/{compose,reports}` are `requireRole`-gated, and a Clerk-org floor keeps org admins from being locked out. The `/api/mcp` **Clerk-session** path is now role-gated (default-deny to STAFF, PR #51); only its **external `Bearer`** write path still needs its own auth design (in flight — see STATE-OF-PLAY). (House Phone `/api/sms/*` is intentionally Clerk-org-membership-gated. `/api/check-in/*` now uses **event-scoped signed tokens** minted server-side for STAFF+, NOT the old `CHECKIN_SECRET` browser bearer — changed PR #59. See Roles & Permissions.)
 - Set `TWILIO_*` + `HOUSE_PHONE_WORKSPACE_ID` in Vercel and deploy the Railway inbound service to take House Phone live end-to-end
 
 ### What shipped beyond V1 scope (already live)
@@ -158,7 +158,7 @@ Hierarchy: `ADMIN > STAFF > READ_ONLY`. Guards: `requireRole(minRole)` (route ha
 
 Rules:
 1. UI hide/disable is UX only; the `requireRole` check is the real security boundary.
-2. **Coverage (audited 2026-05-26).** `requireRole` gates **every `/api/operator/*` write** — STAFF for operational writes (applications approve/reject/hold/waitlist, events CRUD + comp + promote-waitlist + bulk-delete, rsvps approve/cancel/reject, tiers, series, comments, lists, notifications, members/create), ADMIN for sensitive ones (settings/*, team/*, members/bulk) — plus `/api/stripe/refund` (ADMIN), the `requireRolePage(ADMIN)` settings pages, and `/api/agent/*` + `/api/intelligence/{compose,reports}` POST (STAFF). **Still ungated:** the `/api/mcp` write path (external clients authenticate via `Bearer`, not a Clerk session — needs its own design) and `/api/check-in/*` (intentionally on a `CHECKIN_SECRET` bearer, not a Clerk session). GET/read routes stay open to any resolved member.
+2. **Coverage (audited 2026-05-26; updated 2026-06-09).** `requireRole` gates **every `/api/operator/*` write** — STAFF for operational writes (applications approve/reject/hold/waitlist, events CRUD + comp + promote-waitlist + bulk-delete, rsvps approve/cancel/reject, tiers, series, comments, lists, notifications, members/create), ADMIN for sensitive ones (settings/*, team/*, members/bulk) — plus `/api/stripe/refund` (ADMIN), the `requireRolePage(ADMIN)` settings pages, and `/api/agent/*` + `/api/intelligence/{compose,reports}` POST (STAFF). `/api/mcp` is now role-gated for **Clerk-session** callers (default-deny to STAFF, PR #51); its **external `Bearer`** write path still needs its own auth design (in flight). `/api/check-in/*` now authenticates via **event-scoped signed tokens** minted server-side for STAFF+ (PR #59), replacing the old `CHECKIN_SECRET` browser bearer. GET/read routes stay open to any resolved member.
 3. **House Phone (`/api/sms/*`) is intentionally NOT `requireRole`-gated.** It authorizes by Clerk org membership (`auth()` + `getMemberWorkspaceId`): any member of the resolved workspace's Clerk org may view + reply + toggle AI; no `WorkspaceMember` row required. Fixed 2026-05-26 — `requireRole(STAFF)` had drifted onto three of the routes (`/api/sms/conversations`, `/reply`, `/conversation/[id]`) and 403'd a legitimate Clerk org admin who had no `WorkspaceMember` row, blanking the inbox. Clerk org membership is the single source of truth for this shared live-event tool (avoids `WorkspaceMember`-vs-Clerk drift); workspace scoping on the data is unchanged.
 
 > An earlier draft of this section described five roles (owner/admin/manager/staff/readonly) "enforced on every route." That was aspirational and never built — the three roles above are what shipped. Update this section, not your memory, if the model changes.
@@ -189,6 +189,8 @@ Producer (Replit) ←Phase J HMAC webhook→ NoBC OS (Vercel)
 ```
 
 **Critical:** Producer and NoBC OS share the SAME Postgres instance. This is why schema changes are production-affecting and must NEVER auto-push — they could break Producer.
+
+> ⚠️ **2026-06-09 — this "shared Postgres" claim is contradicted by live config and is under verification.** Verified: separate databases in dev (Producer → `helium/heliumdb`; NoBC → Neon `ep-twilight-forest-…`) and **separate Clerk apps**. Producer is effectively a standalone dev-stage tool (no prod env yet). The only unconfirmed gap is Producer's *production* `DATABASE_URL`. Until that's confirmed, do NOT assume a shared DB. The `db push` ban stands regardless (it's correct on any DB). See `_context/_audit/PRODUCER-OPERATOR-STRATEGY.md` + `STATE-OF-PLAY.md`.
 
 Phase J details:
 - HMAC-SHA256 with shared secret
@@ -306,6 +308,11 @@ Define success criteria before coding, then loop until verified. Here, "verified
 - `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` — House Phone outbound reply sends from nobc-os (`POST /api/sms/reply`). See the Twilio override note in Absolute Rules.
 - `HOUSE_PHONE_WORKSPACE_ID` — the workspace that owns the House Phone SMS inbox. Used to scope conversations where there is no Clerk session (the Railway inbound service; reserved for any nobc-os SMS path that lacks a session).
 
+**Optional:**
+
+- `APPLY_DEFAULT_WORKSPACE_ID` — workspace for the slug-less public membership apply form (`/api/apply/membership`). Unset → falls back to the oldest workspace (single-tenant safe). Set it before onboarding a second tenant (PR #60).
+- `CHECKIN_SECRET` — server-only HMAC key for minting/verifying event-scoped check-in tokens (PR #59). If unset, check-in mint/verify fail closed (door scanning unavailable). NOT exposed to the browser.
+
 Stage-specific env vars live in each stage's `CONTEXT.md`.
 
 ---
@@ -327,6 +334,7 @@ Stage-specific env vars live in each stage's `CONTEXT.md`.
 
 ## Where things live
 
+- **▶ RESUME HERE (live session state, read first): `_context/_audit/STATE-OF-PLAY.md`** — what shipped, in-flight agents, open gates, ownership.
 - Stage contracts: `_context/NN-stage-name/CONTEXT.md`
 - Stage map + how-to: `_context/README.md`
 - Methodology + template: the `nobc-icm` skill
