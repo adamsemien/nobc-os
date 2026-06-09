@@ -9,6 +9,7 @@ import { CommentThread } from '@/components/comments/CommentThread';
 import { MemberRecordHeader } from '../_components/MemberRecordHeader';
 import { MemberTimeline } from '../_components/MemberTimeline';
 import { MemberEditablePanels } from '../_components/MemberEditablePanels';
+import { SphereOfInfluence } from '../_components/SphereOfInfluence';
 
 // PR3 Slice 1+2 — record read experience (F1 identity/status, F2 timeline, F3 provenance) +
 // inline edit (F4) / custom fields (F5). Server shell: role-gates the page, assembles the
@@ -110,6 +111,12 @@ export default async function MemberRecordPage({
           ) : null}
 
           <MemberEditablePanels id={id} initialData={record} canEdit={canEdit} />
+
+          {/* Influence Model — Layer 1 referral spine: who referred this person, and who
+              they referred. Operator-curation knowledge, never sponsor-facing. */}
+          <Card>
+            <SphereOfInfluence memberId={m.id} canEdit={canEdit} />
+          </Card>
         </aside>
       </div>
     </div>
