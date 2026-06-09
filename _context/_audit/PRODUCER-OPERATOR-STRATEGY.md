@@ -270,3 +270,80 @@ shared-CRM platform; (c) lead segment, lead layer, ship sequence; (d) is the §9
 comms-intelligence layer the lead differentiator, or a later moat-deepener; (e)
 de-risk or reposition the sponsor-as-SaaS assumption. Competitive teardowns: Lu.ma,
 Glue Up, Peoplevine, SevenRooms, Tripleseat, Planning Pod.
+
+---
+
+## 10. Thesis v2 — sharpened by Adam (2026-06-09). SUPERSEDES the framing above.
+
+§9 framed the wedge as the intelligence/sponsor stack. Adam course-corrected. This
+is the current thesis; crest should decide against THIS.
+
+### 10.1 The wedge is INDISPENSABILITY, not intelligence
+
+> "If I make the best tool for operators and event producers — that they couldn't
+> ever imagine doing an event the old way without it again — that's a HUGE win."
+
+- **Intelligence is demoted.** "So many brands deliver analytics without insight…
+  too many insights is a trap." Only **actionable insight that solves their biggest
+  problem** counts. Intelligence is a *supporting* layer, not the headline.
+- The driving factor is **product excellence → indispensability**, born from a real
+  founder pain: *"this started because I was sick of the disjointed systems I have
+  to use and pay for that do 1/10 of what I need."* Founder-market fit is the asset.
+
+### 10.2 ICP — narrowed (important)
+
+**NOT** Swarovski / Louis Vuitton / enterprise luxury. **Mostly local, fast-paced,
+growing brands** — the mid-market creator too big for Posh, not served by (or not
+able to justify) enterprise venue tools. This narrowing is a strength; hold it.
+
+### 10.3 Three constituencies, with a sequence
+
+1. **Event creators (primary).** "That's who I am, that's who Chloe is." Build the
+   tool the founder wishes existed. Founder-led.
+2. **Members / guests (the growth engine).** Make the attendee experience beat Lu.ma
+   and Posh → *"if people like my experience more than Luma and Posh, the people will
+   make it known."* This is **bottom-up / product-led growth** — the *proven* motion
+   (it is how Lu.ma itself grew: attendee → organizer). Member experience is #1 for
+   growth, deliberately.
+3. **Sponsors (monetization).** Served, but should likely be a **fast-follow**, not
+   co-equal at launch, or it dilutes the creator+member wedge.
+
+### 10.4 The sharp positioning (recommended articulation)
+
+**Lu.ma-grade front-of-house experience + the entire back-of-house production +
+sponsor operation that Lu.ma/Posh will never build — for local growing brands.**
+Indispensability comes from being the *only* tool that does BOTH the consumer-facing
+experience and the production back-end for that mid-market creator. The moat vs Lu.ma
+is not "nicer UI" (they're good, free, network-effected) — it is the production +
+sponsor back-end they have no reason to build.
+
+### 10.5 Rating of thesis v2 (vs §9.4)
+
+**≈ 7.5–8 / 10 for the thesis** — up from ~7. The lift comes from: founder-market
+fit, a focused ICP, and a *proven* bottom-up growth motion (experience → word of
+mouth). **Build rating unchanged (~6)** — the execution gap is the same; v2 sharpens
+the strategy, not the code.
+
+Holes that keep it from higher:
+1. **You're now fighting Lu.ma/Posh on their turf (front-of-house).** They're very
+   good and free. The wedge MUST be front-parity + the back-end they lack — not
+   experience alone.
+2. **"Indispensable" requires breadth** (replacing the disjointed stack), which
+   re-introduces the scope/execution risk. Tension: focused wedge vs indispensable-
+   =-broad. Resolve by picking the *narrowest* end-to-end slice that still makes a
+   creator unable to go back.
+3. **Revenue model not explicit.** If growth is bottom-up/free-ish and members are
+   the engine, where's early revenue — ticketing fees (Lu.ma/Posh model), creator
+   subscription, or sponsor cut? Name it.
+4. **Three constituencies is still a lot at once** — sequence member-led, sponsor
+   fast-follow.
+
+### 10.6 For crest — decide against v2
+
+(a) Validate the wedge: is "the indispensable end-to-end tool for local growing
+event brands (Lu.ma-grade front + production/sponsor back-end)" defensible vs Lu.ma,
+Posh, Partiful, Tripleseat? (b) Define the **narrowest end-to-end slice** that makes
+a creator never go back. (c) Sequence the three constituencies (member-led growth,
+sponsor fast-follow). (d) Name the **revenue model**. (e) Confirm Producer+Operator
+convergence as the means. Intelligence + the §9.5 comms layer are *later moat-
+deepeners*, not the wedge — confirm or challenge.
