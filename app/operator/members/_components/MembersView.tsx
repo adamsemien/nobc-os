@@ -30,6 +30,7 @@ export function MembersView({
         id: m.id,
         fullName: m.fullName,
         email: m.email,
+        companyName: null,
         archetype: null,
         aiScore: null,
         totalEventsAttended: 0,
@@ -81,7 +82,7 @@ export function MembersView({
           }
         />
       ) : (
-        <MembersBulkActions members={members} />
+        <MembersBulkActions members={members} canEdit={canAddMembers} />
       )}
 
       {toast ? (

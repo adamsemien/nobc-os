@@ -15,11 +15,13 @@ import {
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { ScoreBadge } from '../../_components/ScoreBadge';
 import { logQAAction } from '@/lib/dev/qa-action-log';
+import { InlineEditCell } from './InlineEditCell';
 
 export type MembersBulkMember = {
   id: string;
   fullName: string;
   email: string;
+  companyName: string | null;
   archetype: string | null;
   aiScore: number | null;
   totalEventsAttended: number;
@@ -126,7 +128,13 @@ function SortButton({
   );
 }
 
-export function MembersBulkActions({ members }: { members: MembersBulkMember[] }) {
+export function MembersBulkActions({
+  members,
+  canEdit = false,
+}: {
+  members: MembersBulkMember[];
+  canEdit?: boolean;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Action | null>(null);
   const [confirm, setConfirm] = useState<Action | null>(null);
@@ -322,6 +330,7 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
           <DataTableHeader>
             <SortButton k="name" sort={sort}>Member</SortButton>
           </DataTableHeader>
+          <DataTableHeader>Company</DataTableHeader>
           <DataTableHeader>Archetype</DataTableHeader>
           <DataTableHeader>
             <SortButton k="score" sort={sort}>Score</SortButton>
@@ -379,6 +388,15 @@ export function MembersBulkActions({ members }: { members: MembersBulkMember[] }
                     </div>
                   </div>
                 </Link>
+              </DataTableCell>
+              <DataTableCell>
+                <InlineEditCell
+                  memberId={m.id}
+                  field="companyName"
+                  initialValue={m.companyName}
+                  canEdit={canEdit}
+                  placeholder="Add company"
+                />
               </DataTableCell>
               <DataTableCell tone="secondary">
                 {m.archetype ? (

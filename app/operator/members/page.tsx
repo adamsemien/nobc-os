@@ -9,6 +9,7 @@ type MemberRow = {
   fullName: string;
   email: string;
   status: string;
+  companyName: string | null;
   archetype: string | null;
   aiScore: number | null;
   totalEventsAttended: number;
@@ -42,6 +43,7 @@ export default async function MembersPage() {
             id: m.id,
             fullName: m.fullName,
             email: m.email,
+            companyName: m.companyName,
             archetype: m.archetype,
             aiScore: m.aiScore,
             totalEventsAttended: m.totalEventsAttended,
