@@ -15,6 +15,7 @@ import {
 import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
 import { defaultEventAccess, type EventAccess } from '@/lib/event-access-schema';
 import type { Gate, GateType } from '@/lib/event-gates';
+import { warmClosedCopy } from '@/app/m/events/[slug]/_components/event-format';
 
 // The event-access gate is the eligibility + CTA decision layer for every event.
 // It is pure (no I/O), so the decision table IS the contract. These tests also
@@ -257,5 +258,27 @@ describe('deriveLegacyFromAccess (gate config -> legacy Event columns)', () => {
       guest: { enabled: true, gates: [gate('ticket')], priceCents: 8000 },
     });
     expect(deriveLegacyFromAccess(a).nonMemberPriceInCents).toBe(8000);
+  });
+});
+
+describe('warmClosedCopy (past-event gate copy)', () => {
+  it('past event: eyebrow is the canonical passed heading', () => {
+    const copy = warmClosedCopy({ kind: 'closed', reason: 'This gathering has passed' });
+    expect(copy.eyebrow).toBe('This gathering has passed');
+  });
+  it('past event: body thanks attendees and points to the calendar', () => {
+    const copy = warmClosedCopy({ kind: 'closed', reason: 'This gathering has passed' });
+    expect(copy.body).toMatch(/thanks to everyone who came/i);
+    expect(copy.showApply).toBe(false);
+  });
+  it('members-only event: apply nudge is present', () => {
+    const copy = warmClosedCopy({ kind: 'closed', reason: 'This event is open to members only.' });
+    expect(copy.showApply).toBe(true);
+    expect(copy.eyebrow).toBe('By membership');
+  });
+  it('generic closed event: no apply nudge', () => {
+    const copy = warmClosedCopy({ kind: 'closed', reason: 'Access is not open at this time.' });
+    expect(copy.showApply).toBe(false);
+    expect(copy.eyebrow).toBe('By invitation');
   });
 });
