@@ -6,6 +6,7 @@ import { ArrowLeft, Check, Clock, Loader2, Mail, MapPin, Phone, Search, X, XCirc
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { LEGACY_ANSWER_LABELS } from '@/lib/legacy-answer-labels';
 import { DEFAULT_TIER_NAMES, type TierNames } from '@/lib/score-display';
+import { isPortraitRef, portraitSrc } from '@/lib/apply-photo';
 import { EmptyState } from '../../_components/EmptyState';
 import { useTheme } from '../../_components/ThemeToggle';
 import { Avatar } from '../../_components/Avatar';
@@ -141,17 +142,16 @@ const HIDDEN_ANSWER_KEYS = new Set([
 ]);
 
 /** Parse the JSON-encoded photo array. The live form stores it under
- *  `photos.urls`; older seed rows used the synthetic `_photos` key. Returns up
- *  to 5 valid http(s) URLs, or [] if absent/malformed. */
+ *  `photos.urls`; older seed rows used the synthetic `_photos` key. Each entry
+ *  is a private R2 key (served via the presign proxy) or a full URL
+ *  (legacy/demo). Returns up to 5 renderable `<img src>` values. */
 function readPhotos(answers: Record<string, string>): string[] {
   const raw = answers['photos.urls'] ?? answers._photos;
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((v): v is string => typeof v === 'string' && /^https?:\/\//.test(v))
-      .slice(0, 5);
+    return parsed.filter(isPortraitRef).map(portraitSrc).slice(0, 5);
   } catch {
     return [];
   }
