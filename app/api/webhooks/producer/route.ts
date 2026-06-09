@@ -60,6 +60,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Missing event fields' }, { status: 400 });
       }
 
+      // Workspace-ownership guard (mirror the event.cancelled branch): a
+      // producerEventId is globally unique, so a mis-targeted payload must not
+      // be allowed to rewrite an event that already belongs to another
+      // workspace. Create-when-absent is unaffected.
+      const existing = await db.event.findUnique({
+        where: { producerEventId: data.producerEventId },
+        select: { workspaceId: true },
+      });
+      if (existing && existing.workspaceId !== data.workspaceId) {
+        return NextResponse.json({ error: 'Workspace mismatch' }, { status: 403 });
+      }
+
       await db.event.upsert({
         where: { producerEventId: data.producerEventId },
         update: {
