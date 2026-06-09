@@ -8,10 +8,14 @@
 |---|---|
 | **State** | 🔶 Partial |
 | **V1 item** | #11, #12 |
-| **Last updated** | 2026-05-28 |
+| **Last updated** | 2026-06-09 |
 | **Owner** | Adam |
 | **Blocked on** | `PASSNINJA_*` keys unset in Vercel (Apple/Google passes still 503; deferred). The QR-in-email + door-scan path no longer depends on PassNinja — it works via the plain `memberQrCode` QR. |
-| **Next** | Set `PASSNINJA_*` in Vercel to light up native wallet passes, then re-introduce the (now removed) "Add to Wallet" buttons as POST forms (the 405 was not fixed — buttons were removed). Optional: one-time backfill `memberQrCode` for Members created before 2026-05-21 (see Fix applied note). |
+| **Next** | Set `CHECKIN_SECRET` in Vercel (server signing key for the new check-in tokens) and REMOVE the now-unused `NEXT_PUBLIC_CHECKIN_SECRET`. Set `PASSNINJA_*` to light up native wallet passes. Optional: one-time backfill `memberQrCode` for Members created before 2026-05-21. |
+
+## Check-in auth (changed 2026-06-09, `fix/checkin-session-token`)
+
+`/api/check-in/*` no longer authenticates with a static global `NEXT_PUBLIC_CHECKIN_SECRET` bearer (which shipped a never-expiring master key to every browser — anyone could read/modify any event's guest list in any workspace). It now uses an **event-scoped, expiring, HMAC-signed token** minted server-side (`lib/check-in-token.ts` + `lib/check-in-session.ts`) only for a **STAFF+** operator, on the Clerk-gated `/check-in/[slug]` page and the operator event check-in tab. The token carries `{workspaceId, eventId, slug, exp}`; the routes verify the signature + that the requested RSVP/event is in scope, so a token for one event cannot touch another or another workspace. Expiry = event end + a settable buffer (`PlatformSetting checkin.passValidHours`, default 4, hard-capped 72), long enough to run a full event offline. `CHECKIN_SECRET` is now the server-only HMAC signing key.
 
 ## Scope
 

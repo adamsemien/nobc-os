@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 
-const CHECKIN_SECRET = process.env.NEXT_PUBLIC_CHECKIN_SECRET ?? '';
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^[\d\s\-().+ ]{10,}$/;
 
@@ -15,12 +13,15 @@ export function WalkinModal({
   onClose,
   eventSlug,
   workspaceSlug,
+  token,
   onSuccess,
 }: {
   open: boolean;
   onClose: () => void;
   eventSlug: string;
   workspaceSlug: string;
+  /** Event-scoped check-in token, minted server-side for a STAFF+ operator. */
+  token: string | null;
   onSuccess: (memberName: string) => void;
 }) {
   const [name, setName] = useState('');
@@ -59,7 +60,7 @@ export function WalkinModal({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${CHECKIN_SECRET}`,
+          Authorization: `Bearer ${token ?? ''}`,
         },
         body: JSON.stringify({
           eventSlug,
