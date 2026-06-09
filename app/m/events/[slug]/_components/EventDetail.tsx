@@ -45,6 +45,8 @@ export type EventDetailDTO = {
   viewer: ViewerKind;
   resolved: ResolvedAccess;
   steps: StepId[];
+  /** True when the event's startAt is in the past — CTAs are suppressed. */
+  isPastEvent?: boolean;
   capacity: number | null;
   capacityUsedCount: number;
   showCapacity: boolean;
@@ -65,7 +67,10 @@ export type EventDetailDTO = {
 type PreviewViewer = 'guest' | 'member';
 
 function deriveForViewer(event: EventDetailDTO, viewer: PreviewViewer): EventDetailDTO {
-  const resolved = resolveAccessForViewer(event.eventAccess, viewer);
+  // Past events: keep the closed resolved so templates suppress the CTA.
+  const resolved = event.isPastEvent
+    ? ({ kind: 'closed', reason: 'This gathering has passed' } as const)
+    : resolveAccessForViewer(event.eventAccess, viewer);
   const steps = buildSteps(
     resolved,
     viewer,
