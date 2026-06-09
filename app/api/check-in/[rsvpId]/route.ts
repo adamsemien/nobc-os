@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { logEngagementEvent } from '@/lib/engagement';
+import { bearerToken, verifyCheckInToken } from '@/lib/check-in-token';
 
-// Idempotent check-in endpoint — safe to call multiple times offline/online
+// Idempotent check-in endpoint — safe to call multiple times offline/online.
+// Authenticated by the event-scoped check-in token; the RSVP must belong to the
+// token's event + workspace, so a token for one event cannot check in another's.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ rsvpId: string }> },
 ) {
-  const auth = req.headers.get('authorization');
-  if (!auth || auth !== `Bearer ${process.env.CHECKIN_SECRET}`) {
+  const scope = verifyCheckInToken(bearerToken(req.headers.get('authorization')));
+  if (!scope) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -19,6 +22,10 @@ export async function POST(
     select: { id: true, workspaceId: true, memberId: true, eventId: true, checkedIn: true, ticketStatus: true },
   });
   if (!rsvp) return NextResponse.json({ error: 'RSVP not found' }, { status: 404 });
+  // Scope check: the token may only act on RSVPs for its own event + workspace.
+  if (rsvp.workspaceId !== scope.workspaceId || rsvp.eventId !== scope.eventId) {
+    return NextResponse.json({ error: 'Out of scope' }, { status: 403 });
+  }
   if (!['confirmed', 'held'].includes(rsvp.ticketStatus)) {
     return NextResponse.json({ error: 'Invalid ticket status' }, { status: 422 });
   }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { findOrCreateGuestMember } from '@/lib/event-access-submit';
 import { sendTemplatedEmail } from '@/lib/email';
+import { bearerToken, verifyCheckInToken } from '@/lib/check-in-token';
 
 /** Walk-in registration from the check-in PWA.
  *
@@ -19,8 +20,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization');
-  if (!auth || auth !== `Bearer ${process.env.CHECKIN_SECRET}`) {
+  const scope = verifyCheckInToken(bearerToken(req.headers.get('authorization')));
+  if (!scope) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -30,13 +31,13 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 422 });
   }
-  const { eventSlug, workspaceSlug, name, email, phone, plusOne, plusOneName } = parsed.data;
+  const { name, email, phone, plusOne, plusOneName } = parsed.data;
 
-  const workspace = await db.workspace.findUnique({ where: { slug: workspaceSlug }, select: { id: true } });
-  if (!workspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
-
+  // Event + workspace come from the token scope, not the request body — a token
+  // can only register walk-ins for its own event in its own workspace.
+  const workspace = { id: scope.workspaceId };
   const event = await db.event.findFirst({
-    where: { slug: eventSlug, workspaceId: workspace.id },
+    where: { id: scope.eventId, workspaceId: scope.workspaceId },
     select: { id: true, title: true, plusOnesAllowed: true },
   });
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });

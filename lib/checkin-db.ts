@@ -22,15 +22,29 @@ export interface PendingCheckIn {
   synced: boolean;
 }
 
+/** Small key/value store — holds the event-scoped check-in token so a cold,
+ *  offline reopen of the PWA can still sync queued check-ins within the token's
+ *  validity window (the server can't mint a fresh one with no connection). */
+export interface CheckinMeta {
+  key: string;
+  value: string;
+}
+
 class CheckInDb extends Dexie {
   rsvps!: Table<CachedRsvp>;
   pending!: Table<PendingCheckIn>;
+  meta!: Table<CheckinMeta>;
 
   constructor() {
     super('checkin');
     this.version(1).stores({
       rsvps: 'id, memberId, memberQrCode, checkedIn',
       pending: 'rsvpId, synced',
+    });
+    this.version(2).stores({
+      rsvps: 'id, memberId, memberQrCode, checkedIn',
+      pending: 'rsvpId, synced',
+      meta: 'key',
     });
   }
 }
