@@ -9,8 +9,13 @@
 --
 -- SAFETY: Producer shares this Neon instance. This file is ADDITIVE ONLY —
 -- no DROP, no ALTER TYPE, no RENAME, no data loss. Do NOT use `prisma db push`
--- (it would drop the out-of-band Asset_searchVector_idx GIN index). Apply with:
---   npx prisma db execute --file prisma/sql/series-defaults.sql --schema prisma/schema.prisma
+-- (it would drop the out-of-band Asset_searchVector_idx GIN index).
+-- Reconciled: mirrored by tracked migration
+-- prisma/migrations/20260530170000_event_series_defaults. Run on the UNPOOLED endpoint
+-- (DIRECT_URL = Neon unpooled host, defined in .env.local.example; DDL must not go through
+-- PgBouncer). `npx prisma` is broken in this repo — use the build entrypoint:
+--   DATABASE_URL="$DIRECT_URL" node node_modules/prisma/build/index.js db execute \
+--     --file prisma/sql/series-defaults.sql --schema prisma/schema.prisma
 -- IF NOT EXISTS makes it idempotent / safe to re-run.
 
 ALTER TABLE "EventSeries" ADD COLUMN IF NOT EXISTS "defaultCapacity" INTEGER;

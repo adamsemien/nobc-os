@@ -4,6 +4,9 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Connection URLs live in prisma.config.ts (Prisma 7 no longer accepts `url`/`directUrl`
+  // here): `url` = pooled DATABASE_URL (PgBouncer), `directUrl` = unpooled DIRECT_URL that
+  // `prisma migrate` / `migrate resolve` uses so DDL runs off the pooler. See .env.local.example.
 }
 
 model Workspace {
