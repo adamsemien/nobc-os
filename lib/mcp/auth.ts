@@ -1,7 +1,9 @@
 import type { NextRequest } from 'next/server';
+import { OperatorRole } from '@prisma/client';
 import { verifyToken } from '@clerk/backend';
 import { auth } from '@clerk/nextjs/server';
 import { requireWorkspaceId } from '@/lib/auth';
+import { getEffectiveRole } from '@/lib/operator-role';
 import type { McpContext } from './types';
 
 /**
@@ -24,7 +26,11 @@ export async function authenticateMcp(req: NextRequest): Promise<McpContext | nu
 
   try {
     const workspaceId = await requireWorkspaceId(userId);
-    return { userId, workspaceId };
+    // Effective role (explicit WorkspaceMember grant or Clerk-org floor); same
+    // resolution the REST guards use. Defaults to READ_ONLY when unresolved, so
+    // an authenticated-but-ungranted member can read but never write.
+    const role = (await getEffectiveRole(userId, workspaceId)) ?? OperatorRole.READ_ONLY;
+    return { userId, workspaceId, role };
   } catch {
     // Authenticated, but no resolvable workspace (no org membership).
     return null;

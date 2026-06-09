@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EventAccessMode, type EventStatus, Prisma } from '@prisma/client';
+import { EventAccessMode, OperatorRole, type EventStatus, Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
 import type { McpTool } from '../types';
@@ -50,6 +50,7 @@ const eventIdSchema = z.object({ eventId: z.string().describe('Event id') });
 export const eventTools: McpTool[] = [
   {
     name: 'nobc_get_events',
+    minRole: OperatorRole.READ_ONLY,
     description:
       'List events. Filter by status (PUBLISHED | DRAFT | CANCELLED | all) and upcoming (boolean). Returns id, name, slug, date, accessMode, capacity, confirmedCount.',
     inputSchema: getEventsSchema,
@@ -101,6 +102,7 @@ export const eventTools: McpTool[] = [
   },
   {
     name: 'nobc_get_event',
+    minRole: OperatorRole.READ_ONLY,
     description: 'Get a single event by id, including its confirmed RSVP count.',
     inputSchema: getEventSchema,
     handler: async (ctx, rawArgs) => {

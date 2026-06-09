@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
-import { MemberStatus, type ApplicationStatus } from '@prisma/client';
+import { MemberStatus, OperatorRole, type ApplicationStatus } from '@prisma/client';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
 import type { McpContext, McpTool } from '../types';
@@ -145,6 +145,7 @@ async function setApplicationStatus(
 export const applicationTools: McpTool[] = [
   {
     name: 'nobc_get_applications',
+    minRole: OperatorRole.READ_ONLY,
     description:
       'List applications. Filter by status (PENDING | APPROVED | REJECTED | HOLD | WAITLISTED | DECLINED | all; default PENDING). Returns id, applicantName, email, status, aiScore, archetype, submittedAt.',
     inputSchema: getApplicationsSchema,
@@ -198,6 +199,7 @@ export const applicationTools: McpTool[] = [
   },
   {
     name: 'nobc_get_application',
+    minRole: OperatorRole.READ_ONLY,
     description: 'Get a single application by id, including all question answers and AI scoring.',
     inputSchema: getApplicationSchema,
     handler: async (ctx, rawArgs) => {
