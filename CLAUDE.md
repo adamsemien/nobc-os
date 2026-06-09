@@ -332,3 +332,4 @@ Stage-specific env vars live in each stage's `CONTEXT.md`.
 - Methodology + template: the `nobc-icm` skill
 - Schema: `prisma/schema.prisma`
 - Singletons: `lib/db.ts`, `lib/auth.ts`
+- **Producer↔Operator architecture decision + the shared-Postgres `db push` landmine: `_context/_audit/PRODUCER-OPERATOR-STRATEGY.md`** — read before any cross-app or schema work.
