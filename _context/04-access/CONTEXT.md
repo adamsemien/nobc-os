@@ -1,0 +1,87 @@
+# Stage 04 — Access
+
+> Event Access submission across all access modes, approval-required handling, capacity enforcement, waitlist + auto-promotion. (The internal schema model is still named `RSVP`; the product-facing term is **Access** / **Event Access**.)
+
+## Status
+
+| Field | Value |
+|---|---|
+| **State** | ✅ Shipped |
+| **V1 item** | #7, #8, #14 (waitlist auto-promote portion), #21 (comp tickets — issuance + member-facing flow) |
+| **Last updated** | 2026-06-09 |
+| **Owner** | Adam |
+| **Blocked on** | Nothing |
+| **Next** | **2026-06-09 UX audit (`_context/_audit/UX-FRICTION-AUDIT.md`, PR #65) + checkout-fix agent dispatched (branch `fix/checkout-flow`):** walk + fix the guest ticketed checkout end-to-end (double-submit, capacity race, error-map surfacing, past-event gate — audit §3.3 + #2); fix terminology-law violations in member nav/FAQ ("RSVPs"/"My RSVPs"/"How do I RSVP?" → "My Events" / Event Access copy, audit #10, fixes C1–C4). — Polish + V1.5 enhancements. (2026-05-23: **operator access bypass + preview** — an operator can complete the access flow on behalf of a guest and preview it, for both **free** and **paid** events (`app/api/m/events/[slug]/access/{submit,payment-intent}/route.ts` + `EventAccessFlow.tsx` + `lib/event-access-submit.ts`). 2026-05-22: **guest-flow fix** — a signed-in non-member is no longer blocked from the guest flow; the over-restrictive member check was removed from both access routes. Non-member buyers now also mint a `memberQrCode` so the door scan works — see `06-wallet-checkin`. 2026-05-21: member events **calendar** `app/m/events/_components/MemberEventsExplorer.tsx` brought onto the ivory editorial brand system; the warm access-state copy in `RsvpCard.tsx` is part of the 2026-05-24 event-page redesign (Stage 03). Access-mode badge shows display labels ("Open"/"Ticketed"), never the raw enum.) |
+
+> **Architecture note (2026-05-20):** `apply_or_pay` was removed as a standalone `AccessMode` enum value. It was not a real third mode — it is now expressed as `TICKETED` + `approvalRequired: true`. Migration `20260520000000_remove_apply_or_pay` applied. The `applyMode` column and `EventApplyMode` enum were dropped entirely. Workflow template key renamed `apply_or_pay` → `ticketed_approval`.
+
+## Scope
+
+Everything from a member clicking "RSVP" on an event to a confirmed RSVP row. Handles:
+- Two composable access modes: `OPEN` and `TICKETED`
+- `approvalRequired` toggle (operator approves each RSVP before confirmation)
+- Capacity enforcement
+- Waitlist queue
+- Auto-promotion from waitlist when capacity opens (cancellation, refund, capacity raise)
+- Custom question answers captured at RSVP time
+- Plus-ones add-ons
+
+## Files in play
+
+```
+app/m/events/[slug]/_components/EventAccessFlow.tsx  ← access flow UI (no separate `/rsvp` page — the flow renders inside the event-detail page)
+app/m/events/[slug]/_components/EventAccessFlow.tsx ← member/guest access flow UI (+ operator bypass/preview entry)
+app/api/m/events/[slug]/access/submit/route.ts  ← access submit (free path; guest-flow fix + operator bypass)
+app/api/m/events/[slug]/access/payment-intent/route.ts ← paid access PaymentIntent (guest-flow fix + operator paid bypass)
+lib/event-access-submit.ts                      ← shared access-submit logic; findOrCreateGuestMember mints memberQrCode
+app/api/rsvp/route.ts                           ← create RSVP
+app/api/rsvp/[id]/route.ts                      ← read/cancel
+app/api/operator/rsvps/[id]/approve/route.ts    ← operator approve (if required)
+app/api/operator/rsvps/[id]/reject/route.ts     ← operator reject
+app/api/operator/rsvps/[id]/cancel/route.ts     ← operator cancel
+app/api/operator/rsvps/[id]/refund/route.ts     ← operator refund (ADMIN-gated)
+app/api/operator/events/[id]/rsvps/route.ts     ← operator RSVP list for an event (renders inside `/operator/events/[id]`, no standalone `/rsvps` page)
+# capacity check + waitlist enqueue/promote happens inline in lib/event-access-submit.ts above; no separate lib/rsvp/ modules
+app/api/m/profile/route.ts                      ← member profile read/update (used during Access flow)
+app/api/m/rsvps/route.ts                        ← member-facing list of their own Access entries
+```
+
+## Inputs
+
+- Approved `Member` clicking RSVP on an `Event`
+- Operator approve/reject action (if `Event.approvalRequired = true`)
+- Event capacity changes (operator raises capacity → triggers waitlist promote)
+- RSVP cancellation (frees a seat → triggers waitlist promote)
+
+## Outputs
+
+- `RSVP` row with status: `pending | confirmed | waitlisted | cancelled | rejected`
+- For ticketed events: triggers Stripe authorize → stage 05
+- Capacity decrement on Event
+- `AuditEvent` for every status transition
+
+## Schema fields
+
+- **RSVP**: workspaceId, eventId, memberId, status, plusOnesCount, customAnswers (JSON), waitlistPosition, stripePaymentIntentId, walletPassId, checkedInAt, refundedAt — the schema name stays `RSVP` even though the product term is "Access"
+- **WaitlistEntry**: structured waitlist position rows (back-reference to the RSVP they promoted from)
+- Indexes: (eventId, status), (memberId, eventId) unique
+
+## Rules — DO NOT VIOLATE
+
+1. **Respect access mode.**
+   - `OPEN`: confirm immediately (subject to capacity)
+   - `TICKETED`: confirm only after Stripe authorize succeeds
+   - `TICKETED` + `approvalRequired: true`: members apply (wait for approval) OR pay non-member price to skip the queue
+2. **Capacity is atomic.** Use a DB transaction or row lock — never check-then-write. Two simultaneous RSVPs on the last seat must not both succeed.
+3. **Waitlist auto-promote runs on every seat-opening event.** Cancellation, refund, capacity raise. Promote in FIFO order by `waitlistPosition`.
+4. **`approvalRequired` overrides everything except waitlisting.** Even paid RSVPs need operator approval if the flag is set.
+5. **Plus-ones consume capacity.** A member RSVPing +2 consumes 3 seats.
+6. **Workspace-scoped.** Every query checks `workspaceId`.
+
+## What this stage does NOT own
+
+- Event creation / capacity field itself → `03-events/`
+- Stripe authorize/capture/refund logic → `05-payments/`
+- Wallet pass generation on confirm → `06-wallet-checkin/`
+- Check-in at the door → `06-wallet-checkin/`
+- Operator dashboard shell → `07-operator-dashboard/`
