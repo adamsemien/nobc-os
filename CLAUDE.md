@@ -8,6 +8,14 @@ NoBC OS is the member-facing platform for No Bad Company — a premium curated m
 
 ---
 
+## Product source of truth
+
+Before proposing product or feature work, read `_context/NoBC_OS_Operating_Doc.md`. It holds the Constitution, locked decisions, and the four-layer model. Decisions there are authoritative. Items marked OPEN are unsettled. Ask first.
+
+> If `_context/NoBC_OS_Operating_Doc.md` is missing from the repo, treat product/feature work as blocked on it: ask Adam to add it rather than proposing from memory.
+
+---
+
 ## How to use this file
 
 This is the **L0 router**. For any task, identify the stage in `_context/` and tell Claude Code where to work:
