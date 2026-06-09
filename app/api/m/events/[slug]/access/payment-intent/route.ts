@@ -204,15 +204,21 @@ export async function POST(
     }
   }
 
-  const pi = await stripe.paymentIntents.create({
-    amount: amountCents,
-    currency: 'usd',
-    capture_method: 'manual',
-    description: event.title,
-    receipt_email: rsvpMember.email,
-    automatic_payment_methods: { enabled: true },
-    metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug },
-  });
+  // Idempotency key: scoped to the (workspace, event, member) tuple so a
+  // double-submit or client retry of this exact request returns the same PI.
+  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}`;
+  const pi = await stripe.paymentIntents.create(
+    {
+      amount: amountCents,
+      currency: 'usd',
+      capture_method: 'manual',
+      description: event.title,
+      receipt_email: rsvpMember.email,
+      automatic_payment_methods: { enabled: true },
+      metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug },
+    },
+    { idempotencyKey },
+  );
 
   let rsvpId: string;
   if (existing) {
