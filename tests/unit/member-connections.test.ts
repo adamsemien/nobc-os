@@ -7,8 +7,9 @@ import {
 } from '@/lib/member-connections';
 
 // The "sphere of influence" substrate. These pin the provable relationship edges —
-// co-attendance, proximity, who-brought-whom, who-stuck — so the influence model built
-// on top can never silently change who counts as connected or who pulled whom in.
+// co-attendance, proximity, who-brought-whom, who-stuck, and gravity-in-dollars — so the
+// influence read built on top can never silently change who counts as connected, who
+// pulled whom in, or how much that pull was worth.
 
 function rsvp(over: Partial<ConnectionRsvpRow>): ConnectionRsvpRow {
   return {
@@ -17,6 +18,8 @@ function rsvp(over: Partial<ConnectionRsvpRow>): ConnectionRsvpRow {
     checkedIn: true,
     checkedInAt: null,
     plusOneOfMemberId: null,
+    paymentStatus: null,
+    amountCents: null,
     ...over,
   };
 }
@@ -132,13 +135,41 @@ describe('deriveMemberConnections — gravity (brought / referred / stuck)', () 
     ];
     const refs: ReferralEdge[] = [{ memberId: 'sarah', referredByMemberId: 'billy' }];
     const c = deriveMemberConnections('billy', rows, refs);
-    expect(c.referred).toEqual([{ memberId: 'sarah', stuck: true }]);
+    expect(c.referred).toEqual([{ memberId: 'sarah', stuck: true, spendCents: 0 }]);
     expect(c.referredStuckCount).toBe(1);
   });
 
   it('reports who referred the target in', () => {
     const refs: ReferralEdge[] = [{ memberId: 'billy', referredByMemberId: 'founder' }];
     expect(deriveMemberConnections('billy', [], refs).referredBy).toBe('founder');
+  });
+});
+
+describe('deriveMemberConnections — gravity in dollars (the actionable number)', () => {
+  it("attributes a brought member's captured lifetime spend to the connector", () => {
+    const rows = [
+      rsvp({ memberId: 'priya', eventId: 'e1', plusOneOfMemberId: 'billy', paymentStatus: 'CAPTURED', amountCents: 5000 }),
+      rsvp({ memberId: 'priya', eventId: 'e2', checkedIn: true, paymentStatus: 'CAPTURED', amountCents: 3000 }), // came back, paid again
+    ];
+    const c = deriveMemberConnections('billy', rows);
+    expect(c.brought.find((b) => b.memberId === 'priya')?.spendCents).toBe(8000);
+    expect(c.broughtRevenueCents).toBe(8000);
+  });
+
+  it('only CAPTURED counts toward gravity revenue (not authorized/refunded holds)', () => {
+    const rows = [
+      rsvp({ memberId: 'priya', plusOneOfMemberId: 'billy', paymentStatus: 'AUTHORIZED', amountCents: 5000 }),
+      rsvp({ memberId: 'ned', plusOneOfMemberId: 'billy', paymentStatus: 'REFUNDED', amountCents: 4000 }),
+    ];
+    expect(deriveMemberConnections('billy', rows).broughtRevenueCents).toBe(0);
+  });
+
+  it('attributes referred-member revenue to the referrer', () => {
+    const rows = [rsvp({ memberId: 'sarah', eventId: 'e1', paymentStatus: 'CAPTURED', amountCents: 9000 })];
+    const refs: ReferralEdge[] = [{ memberId: 'sarah', referredByMemberId: 'billy' }];
+    const c = deriveMemberConnections('billy', rows, refs);
+    expect(c.referredRevenueCents).toBe(9000);
+    expect(c.referred[0].spendCents).toBe(9000);
   });
 });
 
@@ -152,6 +183,8 @@ describe('deriveMemberConnections — empty', () => {
       referred: [],
       broughtStuckCount: 0,
       referredStuckCount: 0,
+      broughtRevenueCents: 0,
+      referredRevenueCents: 0,
       broughtBy: [],
       referredBy: null,
     });
