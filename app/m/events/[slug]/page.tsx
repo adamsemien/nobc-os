@@ -73,7 +73,13 @@ export default async function EventDetailPage({
 
   const eventAccess = parseEventAccess(event.eventAccess);
   const viewer = resolveViewer(member, userId);
-  const resolved = resolveAccessForViewer(eventAccess, viewer);
+  // Past events: override resolved to closed so no live CTA is rendered.
+  // The server-side guard in loadAccessContext blocks submission too.
+  const resolvedFromAccess = resolveAccessForViewer(eventAccess, viewer);
+  const isPastEvent = event.startAt < new Date();
+  const resolved = isPastEvent
+    ? ({ kind: 'closed', reason: 'This gathering has passed' } as const)
+    : resolvedFromAccess;
 
   const customQuestions = event.customQuestions.map((q) => ({
     id: q.id,
@@ -153,6 +159,7 @@ export default async function EventDetailPage({
     // Member pages are org-gated, so any viewer who isn't an approved member
     // is an operator previewing the page.
     isOperator: viewer !== 'member',
+    isPastEvent,
     workflowPaths,
   };
 

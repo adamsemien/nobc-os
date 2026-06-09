@@ -36,12 +36,19 @@ export type WarmClosedCopy = {
   showApply: boolean;
 };
 
-/** Warm, invitation-style copy for a closed access state — replaces the
+/** Warm, invitation-style copy for a closed access state -- replaces the
  *  clinical "THIS EVENT IS OPEN TO MEMBERS ONLY". Members-only closures get a
  *  gentle Apply nudge; other closures stay graceful without a CTA. */
 export function warmClosedCopy(
   resolved: Extract<ResolvedAccess, { kind: 'closed' }>,
 ): WarmClosedCopy {
+  if (/passed/i.test(resolved.reason)) {
+    return {
+      eyebrow: 'This gathering has passed',
+      body: "Thanks to everyone who came. See what's next on the calendar.",
+      showApply: false,
+    };
+  }
   if (/member/i.test(resolved.reason)) {
     return {
       eyebrow: 'By membership',
@@ -52,7 +59,7 @@ export function warmClosedCopy(
   }
   return {
     eyebrow: 'By invitation',
-    body: 'This gathering isn’t open for registration right now.',
+    body: "This gathering isn't open for registration right now.",
     showApply: false,
   };
 }
