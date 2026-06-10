@@ -93,7 +93,8 @@ const DEV_IDS = (process.env.DEV_USER_IDS ?? '')
 
 export default async function SettingsLandingPage() {
   const { userId } = await auth();
-  const isDev = !!userId && DEV_IDS.includes(userId);
+  // Local dev always sees the Developer tools; production requires an explicit DEV_USER_IDS allowlist.
+  const isDev = process.env.NODE_ENV !== 'production' || (!!userId && DEV_IDS.includes(userId));
 
   return (
     <div className="px-6 pb-16 pt-8 lg:px-10">
