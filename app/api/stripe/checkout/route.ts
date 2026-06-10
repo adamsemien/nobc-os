@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
+import { alert } from '@/lib/alerting';
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -84,22 +85,40 @@ export async function POST(req: NextRequest) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
 
-  const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
-    payment_method_types: ['card'],
-    line_items: [{
-      price_data: {
-        currency: 'usd',
-        product_data: { name: event.title },
-        unit_amount: amountCents,
+  let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: event.title },
+          unit_amount: amountCents,
+        },
+        quantity: 1,
+      }],
+      success_url: `${appUrl}/m/events/${event.slug}?rsvp=success`,
+      cancel_url: `${appUrl}/m/events/${event.slug}`,
+      customer_email: member.email,
+      metadata: { rsvpId: rsvp.id, workspaceId, memberId: member.id, eventId: event.id },
+    });
+  } catch (err) {
+    void alert({
+      severity: 'critical',
+      event: 'stripe.checkout.session_create_failed',
+      workspaceId,
+      context: {
+        rsvpId: rsvp.id,
+        eventId: event.id,
+        amountCents,
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
       },
-      quantity: 1,
-    }],
-    success_url: `${appUrl}/m/events/${event.slug}?rsvp=success`,
-    cancel_url: `${appUrl}/m/events/${event.slug}`,
-    customer_email: member.email,
-    metadata: { rsvpId: rsvp.id, workspaceId, memberId: member.id, eventId: event.id },
-  });
+    });
+    console.error('[checkout] stripe.checkout.sessions.create failed', { workspaceId, eventId: event.id, err });
+    return NextResponse.json({ error: 'Checkout setup failed' }, { status: 502 });
+  }
 
   await db.rSVP.update({
     where: { id: rsvp.id },
