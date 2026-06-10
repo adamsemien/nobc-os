@@ -17,9 +17,10 @@ const SHORT_LABELS: Record<ThemeId, string> = {
   aim:      'AIM',
   myspace:  'MySpace',
   editorial:'Editorial',
+  darkroom: 'Darkroom',
 };
 
-const EASTER_EGG = new Set<ThemeId>(['aim', 'myspace']);
+const EASTER_EGG = new Set<ThemeId>(['aim', 'myspace', 'darkroom']);
 
 export default function ThemePage() {
   const { theme: active, setTheme } = useTheme();
