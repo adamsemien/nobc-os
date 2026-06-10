@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
 import { ExternalLink } from 'lucide-react';
 import { getMemberWorkspaceId } from '@/lib/auth';
@@ -25,6 +26,7 @@ export default async function OperatorLayout({
 }>) {
   const { userId } = await auth();
   const workspaceId = (await getMemberWorkspaceId(userId)) ?? '';
+  if (!workspaceId) redirect('/');
   const operatorIsAdmin = await isAdmin(userId, workspaceId);
 
   // Events feed the Cmd+K palette — workspace-scoped, soonest first.
