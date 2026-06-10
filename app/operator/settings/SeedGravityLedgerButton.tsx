@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 
@@ -54,12 +55,12 @@ export function SeedGravityLedgerButton() {
         {state === 'busy' ? 'Seeding…' : state === 'done' ? 'Re-seed' : 'Seed now'}
       </button>
       {state === 'done' && (
-        <a
+        <Link
           href="/operator/members/connectors"
           className="text-sm font-medium text-primary hover:underline"
         >
           Seeded ✓ — open the Connectors ledger →
-        </a>
+        </Link>
       )}
       {state === 'error' && <p className="text-sm text-text-secondary">Couldn’t seed. {detail}</p>}
     </div>
