@@ -14,6 +14,7 @@ import {
 import { PageHeader } from '../_components/PageHeader';
 import { auth } from '@clerk/nextjs/server';
 import { OpenDevToolbarButton } from './OpenDevToolbarButton';
+import { SeedGravityLedgerButton } from './SeedGravityLedgerButton';
 
 type Card = {
   href: string;
@@ -131,7 +132,10 @@ export default async function SettingsLandingPage() {
             <p className="mb-4 text-sm text-text-secondary">
               Internal tooling — visible only to developers.
             </p>
-            <OpenDevToolbarButton />
+            <div className="flex flex-col gap-4">
+              <OpenDevToolbarButton />
+              <SeedGravityLedgerButton />
+            </div>
           </section>
         )}
       </div>
