@@ -33,15 +33,28 @@ const E2E_SLUG = 'e2e-stripe-ticket';
 const PRICE_CENTS = 2500;
 
 /**
- * Guest access uses the legacy gate format accepted by parseEventAccess()
- * in lib/event-access.ts (LEGACY_GUEST_GATE maps "pay" → ["pay"] flow).
+ * Guest access uses the canonical Gates[] shape that the operator event builder
+ * writes (app/operator/events/new/page.tsx line ~367).
+ *
+ * IMPORTANT — do NOT use the legacy { gate: 'pay' } string shape here.
+ * EventAccessSchema uses z.array(GateSchema).default([]) for the 'gates' field,
+ * so Zod's safeParse SUCCEEDS on the legacy shape (it strips the unknown 'gate'
+ * string and fills 'gates' with the default []). migrateLegacyAccess is then
+ * never reached, leaving guest.gates=[] → deriveFlow([])=[] → priceForResolved=0
+ * → 400 "This path is free". Root-caused 2026-06-10.
+ *
  * Member access is disabled so a non-member Clerk user definitely hits
  * the guest path.
  */
 const EVENT_ACCESS = {
-  member: { enabled: false, gate: 'auto_confirm', priceCents: 0 },
-  guest: { enabled: true, gate: 'pay', priceCents: PRICE_CENTS },
+  member: { enabled: false, gates: [], priceCents: 0 },
+  guest: {
+    enabled: true,
+    gates: [{ id: 'g-ticket-e2e', type: 'ticket', label: 'Ticket Purchase', approvalRequired: false }],
+    priceCents: PRICE_CENTS,
+  },
   comp: { enabled: false, budgetCap: null },
+  registrationStyle: 'all_at_once',
 };
 
 async function main() {

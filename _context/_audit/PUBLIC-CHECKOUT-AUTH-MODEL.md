@@ -186,22 +186,13 @@ anonymous callers correctly. Trace:
 7. `isOperator = false` (operatorWorkspaceId is null) → bypass skipped.
 8. Guest branch: requires `body.guestEmail` + `body.guestName` → `findOrCreateGuestMember` → PaymentIntent.
 
-**Gap found:** `resolveViewer` in `lib/event-access.ts` maps `"anon"` as:
+**Gap found (resolved 2026-06-10):** `resolveViewer` in `lib/event-access.ts` maps `"anon"` as:
 ```ts
 if (clerkUserId || member) return "guest"
 return "anon"
 ```
 `resolveAccessForViewer` handles `"anon"` the same as `"guest"` — it falls
 through to the `access.guest.enabled` check. This works. No bug.
-
-**One actual gap:** `resolveViewer` is called with `(member, userId)` where both
-are null → returns `"anon"`. Then `resolveAccessForViewer` is called with viewer
-`"anon"`. Looking at the implementation:
-
-```ts
-if (viewer === "member") { ... }
-if (access.guest.enabled) { ... }   // "anon" falls through to here
-```
 
 `"anon"` is NOT in the `ViewerKind` type union — the type is `"member" | "guest" |
 "anon"`, but `resolveAccessForViewer` only has branches for `"member"` and then
@@ -210,39 +201,26 @@ anonymous visitor can purchase a guest ticket if `access.guest.enabled` is true.
 
 **No code changes needed in the payment-intent route for anonymous checkout.**
 
-The route is NOT behind the middleware `isProtectedRoute` matcher (`/m(.*)` — the
-route is at `/api/m/events/...` which IS matched). Wait — let me clarify:
+**PROVEN: `/api/m/*` routes are NOT blocked for anonymous callers.** A live probe
+(anonymous POST to `/api/m/events/e2e-stripe-ticket/access/payment-intent`) reached
+the route handler and returned HTTP 400 — not 401. The middleware `isProtectedRoute`
+matcher does NOT match `/api/m/(.*)`. Only UI routes under `/m(.*)` (no `/api/`
+prefix) require Clerk session. The existing endpoint is fully reachable by anonymous
+clients; a new public wrapper route is optional (rate-limiting / URL clarity only,
+not a security requirement).
 
-The middleware protects `/m(.*)` which matches `/api/m/...` paths. However
-`clerkMiddleware` without `auth.protect()` call on a path does NOT block the
-request — it only enriches it with session data. The `isProtectedRoute` check
-calls `auth.protect()` only for the listed patterns. `/api/m/events/[slug]/access/
-payment-intent` does match `/m(.*)`. This means `auth.protect()` IS called on it.
-
-**This IS a gap.** An anonymous caller to the payment-intent route will hit
+~~This IS a gap. An anonymous caller to the payment-intent route will hit
 `auth.protect()` from the middleware and receive a 401/redirect before the handler
-runs.
+runs.~~ **RETRACTED — proven false by live probe.**
 
-**Minimal fix (do not implement yet — warden review first):**
-
-Either:
-
-(a) **Preferred:** Add the payment-intent route to a public API path
-`/api/e/[slug]/payment-intent` that is not under `/m(.*)` in middleware — this
-is the cleaner solution since the public page lives at `/e/[slug]` anyway. The
-existing `/api/m/...` route is untouched.
-
-(b) **Risky:** Exclude the specific path from `isProtectedRoute`. Surgical but
-adds a carve-out into a security-critical matcher.
-
-Option (a) is strongly preferred. The new public page at `/e/[slug]` should call
+~~Option (a) is strongly preferred. The new public page at `/e/[slug]` should call
 a new API route at `/api/e/[slug]/payment-intent` (or `/api/public/events/[slug]/
-payment-intent`) that is structurally outside the `/m(.*)` protection. This new
-route can delegate to the same `findOrCreateGuestMember` + Stripe logic.
+payment-intent`) that is structurally outside the `/m(.*)` protection.~~ **RETRACTED.**
 
-**This is the second item for Warden to review.** The anonymous path to the
-existing `/api/m/.../payment-intent` is blocked by middleware. A new public API
-surface needs to be carved out cleanly — the exact path prefix matters for security.
+The existing `POST /api/m/events/[slug]/access/payment-intent` is reusable as-is
+for the public checkout surface. A dedicated `/api/e/[slug]/payment-intent` wrapper
+remains optional — useful only if rate-limiting semantics should differ between
+member-session and public-anonymous callers.
 
 ---
 
@@ -250,9 +228,10 @@ surface needs to be carved out cleanly — the exact path prefix matters for sec
 
 1. The Clerk "organizations required" config change — Adam must flip in Clerk
    dashboard before any buyer-facing surface launches.
-2. The public API route for payment-intent (new path outside `/m(.*)`) — do not
-   build until Warden confirms the path prefix is safe and the carve-out in
-   middleware (or new route prefix) is acceptable.
+2. ~~The public API route for payment-intent (new path outside `/m(.*)`)~~ —
+   **RESOLVED: no new route required.** `/api/m/events/[slug]/access/payment-intent`
+   is reachable anonymously (proven by live probe 2026-06-10). A `/api/e/...`
+   wrapper is optional (rate-limiting / clarity), not a security prerequisite.
 3. The post-purchase account-link implementation — `Member.clerkUserId` update
    on buyer sign-in. Safe schema-wise; needs Warden sign-off on the `updateMany`
    scope guard.
