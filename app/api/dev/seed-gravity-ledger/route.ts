@@ -21,7 +21,8 @@ export const maxDuration = 300;
  */
 export async function POST() {
   const { userId } = await auth();
-  if (!userId || !ALLOWED.includes(userId)) {
+  // Local dev can always seed; production requires an explicit DEV_USER_IDS allowlist.
+  if (process.env.NODE_ENV === 'production' && (!userId || !ALLOWED.includes(userId))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
