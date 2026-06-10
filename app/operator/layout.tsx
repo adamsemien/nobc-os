@@ -26,7 +26,7 @@ export default async function OperatorLayout({
 }>) {
   const { userId } = await auth();
   const workspaceId = (await getMemberWorkspaceId(userId)) ?? '';
-  if (!workspaceId) redirect('/');
+  if (!workspaceId) redirect('/onboarding');
   const operatorIsAdmin = await isAdmin(userId, workspaceId);
 
   // Events feed the Cmd+K palette — workspace-scoped, soonest first.
