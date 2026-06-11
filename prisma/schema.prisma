@@ -208,6 +208,9 @@ model Member {
 
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+  // Set when a real Clerk userId is first claimed from a placeholder. Additive — Adam runs
+  // prisma/sql/add-member-claimed-at.sql before this field is in production.
+  claimedAt         DateTime?
 
   rsvps           RSVP[]
   tickets         Ticket[]
