@@ -1,5 +1,6 @@
 import { accessModeLabel } from '@/lib/format-enums';
 import { StatusBadge } from '@/components/ui';
+import { AudienceSummaryPanel } from '@/app/operator/_components/crm/AudienceSummaryPanel';
 
 type EventFull = {
   id: string;
@@ -188,7 +189,7 @@ export function EventOverviewTab({ event, heroImageUrl }: Props) {
       {/* Stat cards */}
       <div className="flex flex-wrap gap-3">
         <StatCard
-          label="Confirmed RSVPs"
+          label="Confirmed Access"
           value={String(_stats.confirmedCount)}
           sub={event.capacity ? `of ${event.capacity} capacity` : 'no capacity cap'}
         />
@@ -209,6 +210,9 @@ export function EventOverviewTab({ event, heroImageUrl }: Props) {
           <StatCard label="Days Until" value={until.value} sub={until.sub} />
         )}
       </div>
+
+      {/* Who's coming / Who came — CRM audience panel */}
+      <AudienceSummaryPanel eventId={event.id} />
 
       {/* Description */}
       {event.description && (

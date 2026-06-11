@@ -727,6 +727,51 @@ button:not(:disabled):active,
   animation: nobc-fade-in 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ============================================================
+   CRM semantic aliases — audience panel + member record surfaces.
+   All values alias existing theme tokens; no new colors introduced.
+   Works across all 7 themes by construction.
+   ============================================================ */
+:root,
+[data-theme="nobc"],
+[data-theme="midnight"],
+[data-theme="obsidian"],
+[data-theme="editorial"],
+[data-theme="y2k"],
+[data-theme="aim"],
+[data-theme="myspace"] {
+  /* Roster rows */
+  --crm-row-hover:              var(--raised);
+  --crm-row-selected:           var(--primary-soft);
+  --crm-row-selected-border:    var(--primary);
+  --crm-row-divider:            var(--border);
+
+  /* Panel cards */
+  --crm-panel-bg:               var(--card);
+  --crm-panel-border:           var(--border);
+  --crm-panel-label:            var(--text-tertiary);
+  --crm-panel-value:            var(--text-primary);
+  --crm-stat-bg:                var(--raised);
+
+  /* Provenance badges */
+  --crm-prov-operator:          var(--primary-soft);
+  --crm-prov-operator-fg:       var(--primary);
+  --crm-prov-ai:                var(--warning-soft);
+  --crm-prov-ai-fg:             var(--warning);
+  --crm-prov-self:              var(--neutral-soft);
+  --crm-prov-self-fg:           var(--text-secondary);
+  --crm-prov-verified:          var(--success-soft);
+  --crm-prov-verified-fg:       var(--success);
+
+  /* Relationship / connections card */
+  --crm-edge-chip-bg:           var(--raised);
+  --crm-edge-chip-fg:           var(--text-secondary);
+
+  /* Skeleton loading */
+  --crm-skeleton-base:          var(--raised);
+  --crm-skeleton-shine:         var(--border);
+}
+
 /* Skeleton shimmer */
 .skeleton {
   background: linear-gradient(
