@@ -12,6 +12,7 @@ import './theme/switch-ember';
 import './theme/switch-y2k';
 import './theme/switch-aim';
 import './theme/switch-myspace';
+import './theme/switch-editorial';
 import './theme/switch-darkroom';
 
 import './navigation/go-to-applications';
