@@ -1,7 +1,11 @@
 -- additive_member_merge.sql  (member-intelligence PR1, commit 5 schema)
 --
--- ADDITIVE ONLY. Run with:
---   prisma db execute --file prisma/sql/additive_member_merge.sql --schema prisma/schema.prisma
+-- ADDITIVE ONLY. Reconciled: mirrored by tracked migration
+-- prisma/migrations/20260609011000_member_merge. Run on the UNPOOLED endpoint
+-- (DIRECT_URL = Neon unpooled host, defined in .env.local.example; DDL must not go through
+-- PgBouncer). `npx prisma` is broken in this repo — use the build entrypoint:
+--   DATABASE_URL="$DIRECT_URL" node node_modules/prisma/build/index.js db execute \
+--     --file prisma/sql/additive_member_merge.sql --schema prisma/schema.prisma
 -- NEVER `prisma db push` (it would drop Asset_searchVector_idx, the out-of-band
 -- DAM GIN index). Review confirms: only ADD COLUMN / CREATE INDEX / ADD CONSTRAINT
 -- below — zero DROP / ALTER TYPE / RENAME / data loss.

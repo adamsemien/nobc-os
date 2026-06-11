@@ -1,18 +1,14 @@
--- additive_pr2_dimensions.sql  (member-intelligence PR2)
+-- RECONCILIATION CATCH-UP MIGRATION
+-- Records the out-of-band SQL in prisma/sql/additive_pr2_dimensions.sql that was hand-applied
+-- to the shared Neon instance but never tracked. Body is the EXACT idempotent SQL already
+-- in prod; apply via `prisma migrate resolve --applied 20260609012000_member_pr2_dimensions`
+-- (writes a _prisma_migrations row only — ZERO DDL). See _context/MIGRATION-RECONCILIATION-RUNBOOK.md.
 --
--- ADDITIVE ONLY. Reconciled: mirrored by tracked migration
--- prisma/migrations/20260609012000_member_pr2_dimensions. Run on the UNPOOLED endpoint
--- (DIRECT_URL = Neon unpooled host, defined in .env.local.example; DDL must not go through
--- PgBouncer). `npx prisma` is broken in this repo — use the build entrypoint:
---   DATABASE_URL="$DIRECT_URL" node node_modules/prisma/build/index.js db execute \
---     --file prisma/sql/additive_pr2_dimensions.sql --schema prisma/schema.prisma
--- NEVER `prisma db push` (would drop Asset_searchVector_idx). The GIN index is
--- intentionally NOT touched here. SQL matches the schema.prisma additions exactly,
--- so post-run `migrate diff` shows only the known Asset_searchVector_idx line.
---
--- Generated from `prisma migrate diff` then curated: GIN-index drop removed; the
--- playing_with_neon drop kept as an explicit housekeeping statement; idempotency
--- guards added (safe to re-run; the FK is the only non-idempotent statement).
+-- DELIBERATE OMISSION: the source file ended with `DROP TABLE IF EXISTS "playing_with_neon"`
+-- (one-time housekeeping of a stray Neon sample table). A DROP is forbidden in authored
+-- migrations for this Producer-shared instance, the table is not in schema.prisma, and it was
+-- already removed out-of-band in prod — so omitting it changes neither prod state nor the
+-- `migrate diff` result. It is intentionally NOT reproduced here.
 
 -- 1. Enrichment status enum (idempotent).
 DO $$ BEGIN
@@ -69,11 +65,12 @@ CREATE INDEX IF NOT EXISTS "MemberPsychographics_workspaceId_idx" ON "MemberPsyc
 CREATE INDEX IF NOT EXISTS "FieldDefinition_workspaceId_idx" ON "FieldDefinition"("workspaceId");
 CREATE UNIQUE INDEX IF NOT EXISTS "FieldDefinition_workspaceId_stableKey_key" ON "FieldDefinition"("workspaceId", "stableKey");
 
--- 6. FK: MemberPsychographics -> Member (1:1). Not idempotent — if it throws
---    "already exists" on a re-run, treat as success and continue.
-ALTER TABLE "MemberPsychographics"
-  ADD CONSTRAINT "MemberPsychographics_memberId_fkey"
-  FOREIGN KEY ("memberId") REFERENCES "Member"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- 7. Housekeeping — drop the stray Neon sample table (explicit, never via db push).
-DROP TABLE IF EXISTS "playing_with_neon";
+-- 6. FK: MemberPsychographics -> Member (1:1). Catalog-guarded so a fresh-DB
+--    `migrate deploy` and a re-run are both safe (schema-identical to prod).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'MemberPsychographics_memberId_fkey') THEN
+    ALTER TABLE "MemberPsychographics"
+      ADD CONSTRAINT "MemberPsychographics_memberId_fkey"
+      FOREIGN KEY ("memberId") REFERENCES "Member"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
