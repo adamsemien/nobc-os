@@ -38,6 +38,8 @@ export type NormalizedContact = {
   emailRaw?: string;
   /** Lightly normalized; the pipeline canonicalizes to E.164. */
   phone?: string;
+  /** Lowercased, no leading `@` — the third identity-match key after email/phone. */
+  instagram?: string;
   firstName?: string;
   lastName?: string;
   website?: string;
