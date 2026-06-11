@@ -13,7 +13,10 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '../_components/PageHeader';
 import { auth } from '@clerk/nextjs/server';
+import { getMemberWorkspaceId } from '@/lib/auth';
+import { isAdmin } from '@/lib/operator-role';
 import { OpenDevToolbarButton } from './OpenDevToolbarButton';
+import { SeedGravityLedgerButton } from './SeedGravityLedgerButton';
 
 type Card = {
   href: string;
@@ -92,7 +95,11 @@ const DEV_IDS = (process.env.DEV_USER_IDS ?? '')
 
 export default async function SettingsLandingPage() {
   const { userId } = await auth();
-  const isDev = !!userId && DEV_IDS.includes(userId);
+  // Local dev always sees the Developer tools; production requires an explicit DEV_USER_IDS allowlist.
+  const isDev = process.env.NODE_ENV !== 'production' || (!!userId && DEV_IDS.includes(userId));
+  // Developer section requires ADMIN role in addition to dev context — seed tool resets demo tenant.
+  const workspaceId = await getMemberWorkspaceId(userId);
+  const operatorIsAdmin = await isAdmin(userId, workspaceId);
 
   return (
     <div className="px-6 pb-16 pt-8 lg:px-10">
@@ -125,13 +132,16 @@ export default async function SettingsLandingPage() {
           ))}
         </div>
 
-        {isDev && (
+        {isDev && operatorIsAdmin && (
           <section className="mt-10 border-t border-border pt-8">
             <h2 className="mb-1 text-base font-semibold text-text-primary">Developer</h2>
             <p className="mb-4 text-sm text-text-secondary">
               Internal tooling — visible only to developers.
             </p>
-            <OpenDevToolbarButton />
+            <div className="flex flex-col gap-4">
+              <OpenDevToolbarButton />
+              <SeedGravityLedgerButton />
+            </div>
           </section>
         )}
       </div>

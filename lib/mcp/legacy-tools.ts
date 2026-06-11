@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
-import { MemberStatus, TagEntityType } from '@prisma/client';
+import { MemberStatus, OperatorRole, TagEntityType } from '@prisma/client';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
 import { mcpMetrics, runMetric } from '@/lib/intelligence';
@@ -46,13 +46,20 @@ type LegacyMap = Record<string, { description: string; handler: LegacyHandler }>
 const passthrough = z.record(z.string(), z.unknown());
 
 function adapt(map: LegacyMap, isDestructive: (name: string) => boolean): McpTool[] {
-  return Object.entries(map).map(([name, t]) => ({
-    name,
-    description: t.description,
-    inputSchema: passthrough,
-    destructive: isDestructive(name),
-    handler: (ctx, args) => t.handler(ctx.workspaceId, args, ctx.userId),
-  }));
+  return Object.entries(map).map(([name, t]) => {
+    const destructive = isDestructive(name);
+    return {
+      name,
+      description: t.description,
+      inputSchema: passthrough,
+      destructive,
+      // Legacy `destructive` accurately tracks write-vs-read, so the auth floor
+      // follows it: writes require STAFF, reads (intelligence.*, .list, .get)
+      // open to READ_ONLY. Mirrors the typed-tool convention.
+      minRole: destructive ? OperatorRole.STAFF : OperatorRole.READ_ONLY,
+      handler: (ctx, args) => t.handler(ctx.workspaceId, args, ctx.userId),
+    };
+  });
 }
 
 function uniqueTools(): LegacyMap {

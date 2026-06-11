@@ -3,6 +3,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 const isProtectedRoute = createRouteMatcher([
   '/m(.*)',
   '/operator(.*)',
+  '/onboarding(.*)',
   '/check-in(.*)',
   '/qa-panel(.*)',
 ]);
@@ -11,7 +12,7 @@ export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
-});
+}, { authorizedParties: ['https://app.thenobadcompany.com'] });
 
 export const config = {
   matcher: [

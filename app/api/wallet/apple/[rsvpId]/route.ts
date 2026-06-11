@@ -14,28 +14,14 @@ export async function POST(
 
   const { rsvpId } = await params;
 
-  // Auth: accept Clerk session OR signed token query param (for email links)
+  // Clerk session only — mirrors the Google wallet route. (A prior base64
+  // `rsvpId:workspaceId` token param was removed: it was unsigned/forgeable and
+  // nothing in the codebase ever minted one, so it was dead, exploitable auth.)
   const { userId } = await auth();
-  const tokenParam = req.nextUrl.searchParams.get('token');
-
-  let workspaceId: string | null = null;
-
-  if (userId) {
-    workspaceId = await getMemberWorkspaceId(userId);
-  } else if (tokenParam) {
-    // Signed token encodes rsvpId:workspaceId as base64 — simple, not secret
-    // For email links: token = btoa(`${rsvpId}:${workspaceId}`)
-    try {
-      const decoded = Buffer.from(tokenParam, 'base64').toString('utf-8');
-      const [tokenRsvpId, tokenWorkspaceId] = decoded.split(':');
-      if (tokenRsvpId === rsvpId && tokenWorkspaceId) {
-        workspaceId = tokenWorkspaceId;
-      }
-    } catch {
-      // invalid token — fall through to 401
-    }
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
+  const workspaceId = await getMemberWorkspaceId(userId);
   if (!workspaceId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -60,7 +46,7 @@ export async function POST(
     await db.auditEvent.create({
       data: {
         workspaceId,
-        actorId: userId ?? tokenParam ?? 'email-link',
+        actorId: userId,
         action: 'wallet.apple_pass_created',
         entityType: 'RSVP',
         entityId: rsvpId,

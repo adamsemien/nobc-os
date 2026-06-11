@@ -13,6 +13,9 @@ import { EventActionBar } from './_components/EventActionBar';
 import { LiveRsvpFeed } from './_components/LiveRsvpFeed';
 import { Breadcrumbs } from '@/app/operator/_components/PageHeader';
 import { getEventHeroDisplayUrl } from '@/lib/event-hero-url';
+import { auth } from '@clerk/nextjs/server';
+import { getMemberWorkspaceId } from '@/lib/auth';
+import { mintCheckInSession } from '@/lib/check-in-session';
 
 const PRODUCER_URL = process.env.NEXT_PUBLIC_PRODUCER_URL ?? null;
 
@@ -157,6 +160,21 @@ export default async function OperatorEventDetailPage({
     }
   }
 
+  // Mint an event-scoped check-in token for the check-in tab (STAFF+ only; null
+  // otherwise). Replaces the browser-exposed NEXT_PUBLIC_CHECKIN_SECRET.
+  let checkinToken: string | null = null;
+  if (tab === 'checkin') {
+    const { userId } = await auth();
+    const workspaceId = userId ? await getMemberWorkspaceId(userId) : null;
+    if (userId && workspaceId) {
+      checkinToken = await mintCheckInSession({
+        clerkUserId: userId,
+        workspaceId,
+        event: { id: event.id, slug: event.slug, startAt: event.startAt, endAt: event.endAt },
+      });
+    }
+  }
+
   const heroImageUrl = getEventHeroDisplayUrl(event.heroImageAssetId);
 
   const formattedDate = new Date(event.startAt).toLocaleDateString('en-US', {
@@ -242,7 +260,7 @@ export default async function OperatorEventDetailPage({
         {tab === 'applications' && (
           <EventApplicationsTab applications={applications} eventId={id} />
         )}
-        {tab === 'checkin' && <EventCheckinTab rsvps={rsvps} eventId={id} />}
+        {tab === 'checkin' && <EventCheckinTab rsvps={rsvps} eventId={id} token={checkinToken} />}
         {tab === 'questions' && (
           <QuestionsTab eventId={id} questions={event.customQuestions} />
         )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Pencil, Sparkles, Upload, X } from 'lucide-react';
+import { getEventHeroDisplayUrl } from '@/lib/event-hero-url';
 
 type Props = {
   value: string;
@@ -45,8 +46,10 @@ export function HeroImageUpload({ value, onChange, compact = false }: Props) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error ?? `Upload failed (${res.status})`);
       }
-      const data = (await res.json()) as { url: string };
-      onChange(data.url);
+      // Upload returns a private R2 object key (not a public URL); the proxy
+      // resolves it for display, both here and on the member-facing event page.
+      const data = (await res.json()) as { key: string };
+      onChange(data.key);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed.');
     } finally {
@@ -86,7 +89,7 @@ export function HeroImageUpload({ value, onChange, compact = false }: Props) {
       {value ? (
         <div className={`group relative w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card ${compact ? 'h-[180px]' : 'aspect-video'}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Hero preview" className="h-full w-full object-cover" />
+          <img src={getEventHeroDisplayUrl(value) ?? ''} alt="Hero preview" className="h-full w-full object-cover" />
 
           {/* Always-visible affordance so it's obvious the photo can be changed —
               the hover-only overlay below was too easy to miss. */}

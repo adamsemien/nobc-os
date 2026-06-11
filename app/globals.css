@@ -727,6 +727,51 @@ button:not(:disabled):active,
   animation: nobc-fade-in 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ============================================================
+   CRM semantic aliases — audience panel + member record surfaces.
+   All values alias existing theme tokens; no new colors introduced.
+   Works across all 7 themes by construction.
+   ============================================================ */
+:root,
+[data-theme="nobc"],
+[data-theme="midnight"],
+[data-theme="obsidian"],
+[data-theme="editorial"],
+[data-theme="y2k"],
+[data-theme="aim"],
+[data-theme="myspace"] {
+  /* Roster rows */
+  --crm-row-hover:              var(--raised);
+  --crm-row-selected:           var(--primary-soft);
+  --crm-row-selected-border:    var(--primary);
+  --crm-row-divider:            var(--border);
+
+  /* Panel cards */
+  --crm-panel-bg:               var(--card);
+  --crm-panel-border:           var(--border);
+  --crm-panel-label:            var(--text-tertiary);
+  --crm-panel-value:            var(--text-primary);
+  --crm-stat-bg:                var(--raised);
+
+  /* Provenance badges */
+  --crm-prov-operator:          var(--primary-soft);
+  --crm-prov-operator-fg:       var(--primary);
+  --crm-prov-ai:                var(--warning-soft);
+  --crm-prov-ai-fg:             var(--warning);
+  --crm-prov-self:              var(--neutral-soft);
+  --crm-prov-self-fg:           var(--text-secondary);
+  --crm-prov-verified:          var(--success-soft);
+  --crm-prov-verified-fg:       var(--success);
+
+  /* Relationship / connections card */
+  --crm-edge-chip-bg:           var(--raised);
+  --crm-edge-chip-fg:           var(--text-secondary);
+
+  /* Skeleton loading */
+  --crm-skeleton-base:          var(--raised);
+  --crm-skeleton-shine:         var(--border);
+}
+
 /* Skeleton shimmer */
 .skeleton {
   background: linear-gradient(
@@ -2245,6 +2290,73 @@ button:not(:disabled):active,
 }
 
 /* ============================================================
+   THEME: Darkroom — safelight on (12th theme)
+   True blacks, warm paper-white type, NBC-red safelight chrome.
+   A love letter to the print side of the platform: the room you
+   develop the night's photos in. Unlocked loudly by The Back Room
+   easter egg ("kill the lights"), available quietly in Cmd+K.
+   NOTE: no image filters anywhere — DAM review needs true color.
+   ============================================================ */
+[data-theme="darkroom"] {
+  --font-mono: 'JetBrains Mono', 'Fira Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg: #0A0908;
+  --surface: #121010;
+  --raised: #1A1616;
+  --card: #141111;
+  --sidebar: #0D0B0B;
+  --sidebar-active-bg: rgba(229, 86, 74, 0.10);
+  --border: rgba(229, 86, 74, 0.13);
+  --border-strong: rgba(229, 86, 74, 0.32);
+  --text-primary: #F4E9E4;
+  --text-secondary: #C4A69B;
+  --text-tertiary: #94786C;
+  --primary: #E5564A;
+  --primary-hover: #F06A5C;
+  --primary-soft: rgba(229, 86, 74, 0.14);
+  --accent: #E5564A;
+  --accent-hover: #F06A5C;
+  --accent-soft: rgba(229, 86, 74, 0.14);
+  --on-primary: #140808;
+  --success: #5CA878;
+  --success-soft: rgba(92, 168, 120, 0.14);
+  --warning: #C89C1A;
+  --warning-soft: rgba(200, 156, 26, 0.14);
+  --danger: #F06060;
+  --danger-soft: rgba(240, 96, 96, 0.14);
+  --neutral-soft: rgba(196, 166, 155, 0.10);
+  --radius-base: 8px;
+  --card-shadow: 0 0 0 1px rgba(229, 86, 74, 0.10), 0 6px 32px rgba(229, 86, 74, 0.05);
+  --card-shadow-hover: 0 0 0 1px rgba(229, 86, 74, 0.26), 0 10px 44px rgba(229, 86, 74, 0.10);
+  --sidebar-shadow: inset -1px 0 0 rgba(229, 86, 74, 0.10);
+  --page-bg: radial-gradient(ellipse at 50% 0%, #170D0B 0%, #0A0908 70%);
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --surface-elevated: var(--raised);
+  --muted: var(--raised);
+  --text-muted: var(--text-tertiary);
+  --primary-foreground: var(--on-primary);
+  --nobc-ivory: var(--bg);
+  --nobc-ink: var(--text-primary);
+  --nobc-hairline: var(--border);
+}
+
+[data-theme="darkroom"] * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(229, 86, 74, 0.22) transparent;
+}
+[data-theme="darkroom"] *::-webkit-scrollbar { width: 3px; height: 3px; }
+[data-theme="darkroom"] *::-webkit-scrollbar-track { background: transparent; }
+[data-theme="darkroom"] *::-webkit-scrollbar-thumb {
+  background: rgba(229, 86, 74, 0.22);
+  border-radius: 2px;
+}
+[data-theme="darkroom"] :focus-visible {
+  outline: 1px solid rgba(229, 86, 74, 0.55);
+  outline-offset: 2px;
+}
+
+/* ============================================================
    Liquid editorial — operator home dashboard
    Frosted-glass material, faint drifting ambient, staggered rise.
    Tokens are scoped to .operator-scope so they never leak to member
@@ -2271,7 +2383,8 @@ button:not(:disabled):active,
 [data-theme="midnight"] .operator-scope,
 [data-theme="obsidian"] .operator-scope,
 [data-theme="void"] .operator-scope,
-[data-theme="ember"] .operator-scope {
+[data-theme="ember"] .operator-scope,
+[data-theme="darkroom"] .operator-scope {
   --glass: color-mix(in srgb, var(--surface) 64%, transparent);
   --glass-strong: color-mix(in srgb, var(--surface) 80%, transparent);
   --glass-edge: color-mix(in srgb, white 12%, transparent);
@@ -2580,5 +2693,537 @@ button:not(:disabled):active,
 /* ---- Crisp print motion: no drift; entrance rise stagger stays. ---- */
 [data-theme="editorial"] .op-blob {
   animation: none;
+}
+
+/* ============================================================
+   THE BACK ROOM — easter egg (BackRoomEasterEgg.tsx)
+   Type the secret knock anywhere in the operator tool and the
+   platform answers. The overlay carries data-theme="darkroom",
+   so every token below resolves to safelight values regardless
+   of the theme behind the door. Pure CSS + WebAudio; no assets.
+   ============================================================ */
+
+/* ---- Overlay + knock ---- */
+.br-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9980;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 28%, color-mix(in srgb, var(--primary) 7%, var(--bg)) 0%, var(--bg) 72%);
+  animation: br-fade 0.35s ease both;
+}
+@keyframes br-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes br-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* The whole room shudders twice, synced to the WebAudio thuds. */
+.br-knocking { animation: br-fade 0.35s ease both, br-shake 0.8s ease 0.05s; }
+@keyframes br-shake {
+  0%, 18%, 50%, 100% { transform: translate(0, 0); }
+  6%  { transform: translate(0, -7px); }
+  12% { transform: translate(0, 3px); }
+  30% { transform: translate(0, -6px); }
+  38% { transform: translate(0, 2px); }
+}
+
+/* ---- Film grain + vignette ---- */
+.br-grain {
+  position: absolute;
+  inset: -60px;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--text-primary) 2.5%, transparent) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--text-primary) 1.5%, transparent) 0 1px, transparent 1px 4px);
+  animation: br-grain 0.5s steps(4) infinite;
+}
+@keyframes br-grain {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-12px, 8px); }
+  50%  { transform: translate(9px, -10px); }
+  75%  { transform: translate(-7px, -6px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ---- The door ---- */
+.br-scene {
+  position: relative;
+  width: min(340px, 80vw);
+  aspect-ratio: 0.52;
+  perspective: 1400px;
+}
+.br-doorframe {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--raised) 60%, black);
+  box-shadow:
+    0 0 0 10px color-mix(in srgb, var(--raised) 35%, black),
+    0 30px 80px color-mix(in srgb, black 80%, transparent);
+}
+.br-door {
+  position: absolute;
+  inset: 6px;
+  border-radius: 3px 3px 0 0;
+  background:
+    linear-gradient(105deg, color-mix(in srgb, var(--raised) 88%, black) 0%, color-mix(in srgb, var(--raised) 55%, black) 60%, color-mix(in srgb, var(--raised) 75%, black) 100%);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
+  transform-origin: left center;
+  transform-style: preserve-3d;
+}
+.br-door::before,
+.br-door::after {
+  content: '';
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
+  border-radius: 2px;
+}
+.br-door::before { top: 7%; height: 22%; }
+.br-door::after { bottom: 8%; height: 34%; }
+.br-door-open { animation: br-swing 0.85s cubic-bezier(0.7, 0, 0.3, 1) forwards; }
+@keyframes br-swing { to { transform: rotateY(-82deg); } }
+
+.br-knob {
+  position: absolute;
+  right: 9%;
+  top: 51%;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--warning) 75%, white), color-mix(in srgb, var(--warning) 55%, black));
+  box-shadow: 0 1px 4px color-mix(in srgb, black 60%, transparent);
+}
+
+/* ---- Peephole slot ---- */
+.br-slot {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 30%;
+  height: 30px;
+  border-radius: 2px;
+  background: color-mix(in srgb, black 88%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  overflow: hidden;
+}
+.br-slot-light {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--primary) 26%, var(--warning) 10%) 50%, transparent 100%);
+  transform: scaleY(0);
+  animation:
+    br-slot-open 0.25s ease 1.05s forwards,
+    br-slot-shut 0.22s ease 2.45s forwards;
+}
+@keyframes br-slot-open { to { transform: scaleY(1); } }
+@keyframes br-slot-shut { to { transform: scaleY(0); } }
+
+.br-eye {
+  width: 22px;
+  height: 12px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-primary) 88%, transparent);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.br-eye::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, black 92%, var(--primary));
+  animation: br-glance 1.1s ease-in-out 1.25s both;
+}
+@keyframes br-glance {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(-5px); }
+  70% { transform: translateX(5px); }
+}
+
+/* ---- Door captions ---- */
+.br-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3.4rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0;
+}
+.br-caption-1 { animation: br-caption 1.1s ease 1.3s both; }
+.br-caption-2 { animation: br-caption 1.2s ease 2.7s both; }
+@keyframes br-caption {
+  0% { opacity: 0; }
+  20%, 80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---- Light flood as the door opens ---- */
+.br-flood {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background: radial-gradient(circle at 40% 50%, color-mix(in srgb, var(--primary) 32%, white) 0%, transparent 65%);
+  opacity: 0;
+  animation: br-flood 0.7s ease 3.55s forwards;
+}
+@keyframes br-flood { to { opacity: 0.9; } }
+
+/* ---- The room ---- */
+.br-room {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  padding-top: 96px;
+}
+.br-smoke {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(60px);
+}
+.br-smoke-a {
+  width: 55vmax; height: 55vmax; top: -20vmax; left: -18vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 16%, transparent) 0%, transparent 60%);
+  opacity: 0.5;
+  animation: br-drift-a 26s ease-in-out infinite alternate;
+}
+.br-smoke-b {
+  width: 48vmax; height: 48vmax; bottom: -22vmax; right: -16vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--text-primary) 9%, transparent) 0%, transparent 60%);
+  opacity: 0.4;
+  animation: br-drift-b 32s ease-in-out infinite alternate;
+}
+@keyframes br-drift-a { to { transform: translate(7vmax, 4vmax) scale(1.12); } }
+@keyframes br-drift-b { to { transform: translate(-6vmax, -5vmax) scale(1.08); } }
+
+/* Hanging bulb + cone, swaying gently from the ceiling. */
+.br-lamp {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform-origin: top center;
+  animation: br-sway 7s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes br-sway {
+  from { transform: translateX(-50%) rotate(-1.7deg); }
+  to   { transform: translateX(-50%) rotate(1.7deg); }
+}
+.br-cord {
+  width: 2px;
+  height: 64px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--text-primary) 30%, transparent), color-mix(in srgb, var(--text-primary) 12%, transparent));
+}
+.br-bulb {
+  width: 18px;
+  height: 18px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, white, color-mix(in srgb, var(--warning) 80%, white) 55%, color-mix(in srgb, var(--warning) 55%, transparent));
+  box-shadow:
+    0 0 18px 6px color-mix(in srgb, var(--warning) 45%, transparent),
+    0 0 70px 30px color-mix(in srgb, var(--warning) 14%, transparent);
+}
+.br-cone {
+  width: 360px;
+  height: 300px;
+  margin: -4px auto 0;
+  clip-path: polygon(46% 0%, 54% 0%, 100% 100%, 0% 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--warning) 16%, transparent) 0%, transparent 78%);
+  filter: blur(5px);
+}
+
+/* Dust motes drifting through the cone. */
+.br-dust {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-primary) 55%, transparent);
+  opacity: 0;
+  animation: br-mote 9s linear infinite;
+}
+@keyframes br-mote {
+  0%   { opacity: 0; transform: translate(0, -10px); }
+  12%  { opacity: 0.7; }
+  88%  { opacity: 0.25; }
+  100% { opacity: 0; transform: translate(14px, 230px); }
+}
+
+/* ---- Membership card (3D parallax wrapper sets --br-rx / --br-ry) ---- */
+.br-card-tilt {
+  transform-style: preserve-3d;
+  transform: perspective(1100px) rotateX(var(--br-rx, 0deg)) rotateY(var(--br-ry, 0deg));
+  transition: transform 0.18s ease-out;
+}
+.br-card {
+  position: relative;
+  width: min(460px, 90vw);
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--card) 94%, var(--primary)) 0%, var(--card) 55%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, black 40%, transparent),
+    0 40px 90px color-mix(in srgb, black 70%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent);
+  padding: 2.4rem 2.6rem 2rem;
+  animation: br-rise 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes br-rise {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.br-stagger > * { animation: br-rise 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.br-stagger > *:nth-child(1) { animation-delay: 0.10s; }
+.br-stagger > *:nth-child(2) { animation-delay: 0.22s; }
+.br-stagger > *:nth-child(3) { animation-delay: 0.34s; }
+.br-stagger > *:nth-child(4) { animation-delay: 0.46s; }
+.br-stagger > *:nth-child(5) { animation-delay: 0.58s; }
+.br-stagger > *:nth-child(6) { animation-delay: 0.70s; }
+.br-stagger > *:nth-child(7) { animation-delay: 0.82s; }
+
+/* ---- Vinyl ---- */
+.br-vinyl-wrap { position: relative; width: 110px; height: 110px; }
+.br-vinyl {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--text-primary) 13%, transparent) 0 1px, transparent 1px 4px),
+    radial-gradient(circle, color-mix(in srgb, black 78%, var(--bg)) 0%, color-mix(in srgb, black 60%, var(--bg)) 100%);
+  box-shadow: 0 6px 24px color-mix(in srgb, black 55%, transparent);
+  animation: br-spin 1.8s linear infinite;
+  display: grid;
+  place-items: center;
+}
+@keyframes br-spin { to { transform: rotate(360deg); } }
+.br-vinyl-label {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  display: grid;
+  place-items: center;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+  line-height: 1.25;
+}
+.br-tonearm {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  width: 56px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 45%, transparent);
+  transform: rotate(38deg);
+  transform-origin: right center;
+}
+.br-tonearm::after {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 60%, transparent);
+}
+
+/* ---- Lights out ---- */
+.br-blackout {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  background: black;
+  animation: br-fade 0.22s ease both;
+}
+.br-blackout-out { animation: br-fade-out 0.5s ease both; }
+
+/* ---- Reduced motion: hold every scene still ---- */
+@media (prefers-reduced-motion: reduce) {
+  .br-overlay, .br-knocking { animation: br-fade 0.01s both; }
+  .br-grain, .br-vinyl, .br-lamp, .br-smoke-a, .br-smoke-b, .br-dust,
+  .br-eye::after, .br-slot-light, .br-caption-1, .br-caption-2,
+  .br-flood, .br-door-open, .br-card, .br-stagger > * {
+    animation: none;
+  }
+  .br-slot-light { transform: scaleY(1); }
+  .br-card, .br-stagger > * { opacity: 1; }
+  .br-card-tilt { transform: none; transition: none; }
+}
+
+/* ---- Small screens: the card breathes, the rules stack ---- */
+.br-title { font-size: clamp(1.8rem, 9vw, 2.25rem); }
+@media (max-width: 430px) {
+  .br-card { padding: 1.5rem 1.3rem 1.1rem; }
+  .br-vinyl-row { flex-direction: column; align-items: flex-start; }
+}
+
+/* Mobile: no double-tap zoom inside the operator tool — keeps the touch
+   knock (tap-tap, pause, tap-tap) and the door-game swipes clean on iOS.
+   Pinch zoom and scrolling are unaffected. */
+.operator-scope {
+  touch-action: manipulation;
+}
+
+/* ---- Matchbook — opens LAST CALL from the membership card ---- */
+.br-matchbook {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: var(--primary);
+  color: var(--on-primary);
+  border-radius: 4px 4px 7px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 35%, transparent);
+  transition: transform 0.15s ease;
+}
+.br-matchbook:hover { transform: translateY(-2px) rotate(-1deg); }
+.br-matchbook::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(circle at 50% 30%, white, color-mix(in srgb, var(--warning) 85%, white) 55%, transparent 82%);
+}
+
+/* ============================================================
+   LAST CALL — the door game (LastCallGame.tsx)
+   Mobile-first: swipe right = let in, swipe left = hold.
+   Desktop: arrow keys or the two buttons. Lives inside the
+   Back Room overlay; all procedural guests, no real data.
+   ============================================================ */
+.lc-stage {
+  position: relative;
+  width: min(440px, 92vw);
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+}
+.lc-topbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.lc-brief {
+  width: min(360px, 88vw);
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--card) 92%, var(--primary)) 0%, var(--card) 55%);
+  padding: 1.8rem 1.6rem 1.5rem;
+  text-align: center;
+  animation: lc-enter 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.lc-guest {
+  position: relative;
+  width: min(340px, 84vw);
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--card) 92%, var(--primary)) 0%, var(--card) 60%);
+  padding: 1.6rem 1.5rem 1.3rem;
+  text-align: center;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 24px 60px color-mix(in srgb, black 60%, transparent);
+  animation: lc-enter 0.26s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.lc-dragging { cursor: grabbing; transition: none; }
+.lc-settle { transition: transform 0.18s ease; }
+.lc-fly-right { animation: lc-fly-right 0.32s ease-in forwards; }
+.lc-fly-left { animation: lc-fly-left 0.32s ease-in forwards; }
+@keyframes lc-fly-right { to { transform: translateX(120vw) rotate(18deg); opacity: 0.4; } }
+@keyframes lc-fly-left { to { transform: translateX(-120vw) rotate(-18deg); opacity: 0.4; } }
+@keyframes lc-enter {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.lc-avatar {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  color: var(--primary);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+}
+.lc-claim {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.lc-timer {
+  width: min(340px, 84vw);
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  overflow: hidden;
+}
+.lc-timer > div {
+  height: 100%;
+  background: var(--primary);
+  transform-origin: left;
+}
+.lc-stamp {
+  position: absolute;
+  top: 12px;
+  padding: 4px 10px;
+  border: 2px solid;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.lc-stamp-in { left: 12px; color: var(--success); border-color: var(--success); transform: rotate(-12deg); }
+.lc-stamp-out { right: 12px; color: var(--primary); border-color: var(--primary); transform: rotate(12deg); }
+@media (prefers-reduced-motion: reduce) {
+  .lc-fly-right, .lc-fly-left, .lc-guest, .lc-brief { animation: none; }
 }
 

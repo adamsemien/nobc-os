@@ -5,6 +5,8 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/operator-role';
 import { stripe } from '@/lib/stripe';
 import { emitEvent } from '@/lib/emit-event';
+import { refundActionForStatus } from '@/lib/ticketing/pricing';
+import { alert } from '@/lib/alerting';
 
 const BodySchema = z.object({
   rsvpId: z.string(),
@@ -34,16 +36,34 @@ export async function POST(req: NextRequest) {
   }
 
   const pi = await stripe.paymentIntents.retrieve(rsvp.stripePaymentIntentId);
+  const action = refundActionForStatus(pi.status);
   let refundAmountCents: number;
 
-  if (pi.status === 'requires_capture') {
-    await stripe.paymentIntents.cancel(rsvp.stripePaymentIntentId);
-    refundAmountCents = pi.amount;
-  } else if (pi.status === 'succeeded') {
-    const refund = await stripe.refunds.create({ payment_intent: rsvp.stripePaymentIntentId });
-    refundAmountCents = refund.amount;
-  } else {
-    return NextResponse.json({ error: `Cannot refund payment in status: ${pi.status}` }, { status: 400 });
+  try {
+    if (action.kind === 'cancel') {
+      await stripe.paymentIntents.cancel(rsvp.stripePaymentIntentId);
+      refundAmountCents = pi.amount;
+    } else if (action.kind === 'refund') {
+      const refund = await stripe.refunds.create({ payment_intent: rsvp.stripePaymentIntentId });
+      refundAmountCents = refund.amount;
+    } else {
+      return NextResponse.json({ error: action.reason }, { status: 400 });
+    }
+  } catch (err) {
+    void alert({
+      severity: 'critical',
+      event: 'stripe.refund.failed',
+      workspaceId,
+      context: {
+        rsvpId: body.rsvpId,
+        stripePaymentIntentId: rsvp.stripePaymentIntentId,
+        actionKind: action.kind,
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      },
+    });
+    console.error('[refund] stripe refund/cancel failed', { workspaceId, rsvpId: body.rsvpId, err });
+    return NextResponse.json({ error: 'Refund failed' }, { status: 502 });
   }
 
   await db.rSVP.update({

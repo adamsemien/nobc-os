@@ -10,9 +10,9 @@ import {
   priceForResolved,
   findOrCreateGuestMember,
   findOrCreateOperatorMember,
-  hasCapacity,
 } from '@/lib/event-access-submit';
 import { emitEvent } from '@/lib/emit-event';
+import { alert } from '@/lib/alerting';
 
 const BodySchema = z.object({
   guestEmail: z.string().email().optional(),
@@ -112,55 +112,98 @@ export async function POST(
 
   // Capacity check (skipped for approval gates — they create pending requests, not held seats).
   const needsApproval = flowNeedsApproval(resolved.flow);
-  if (!needsApproval && !(await hasCapacity(workspaceId, evt.id, event.capacity))) {
-    return NextResponse.json({ error: 'Event is full' }, { status: 409 });
-  }
-
   const ticketStatus = needsApproval ? 'pending_approval' : 'confirmed';
   const rsvpStatus = needsApproval ? 'WAITLISTED' : 'CONFIRMED';
 
-  // Upsert RSVP (memberId is the unique-with-event partner).
-  const existing = await db.rSVP.findFirst({
-    where: { workspaceId, eventId: evt.id, memberId: rsvpMember.id },
-    select: { id: true, ticketStatus: true },
-  });
+  // Wrap capacity check + RSVP write in a transaction to prevent the TOCTOU
+  // race where two concurrent requests both pass the count check and both write,
+  // overselling the last spot. Prisma serializable isolation serializes the
+  // count + upsert pair so only one of them can succeed at capacity.
+  type UpsertResult =
+    | { full: true }
+    | { full: false; rsvpId: string; alreadyConfirmed: boolean; existingTicketStatus?: string };
 
-  let rsvpId: string;
-  if (existing) {
-    if (existing.ticketStatus === 'confirmed' || existing.ticketStatus === 'pending_approval') {
-      return NextResponse.json({
-        rsvpId: existing.id,
-        ticketStatus: existing.ticketStatus,
-        memberQrCode: rsvpMember.memberQrCode,
-      });
-    }
-    const updated = await db.rSVP.update({
-      where: { id: existing.id },
-      data: {
-        status: rsvpStatus,
-        ticketStatus,
-        tierId: body.tierId ?? null,
-        customAnswers: body.customAnswers ?? undefined,
-        guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
-        guestName: resolved.kind === 'guest' ? body.guestName : null,
+  let txResult: UpsertResult;
+  try {
+    txResult = await db.$transaction<UpsertResult>(
+      async (tx) => {
+        if (!needsApproval && event.capacity) {
+          const taken = await tx.rSVP.count({
+            where: { workspaceId, eventId: evt.id, ticketStatus: { in: ['confirmed', 'held'] } },
+          });
+          if (taken >= event.capacity) return { full: true };
+        }
+
+        const existing = await tx.rSVP.findFirst({
+          where: { workspaceId, eventId: evt.id, memberId: rsvpMember.id },
+          select: { id: true, ticketStatus: true },
+        });
+
+        if (existing) {
+          if (existing.ticketStatus === 'confirmed' || existing.ticketStatus === 'pending_approval') {
+            return { full: false, rsvpId: existing.id, alreadyConfirmed: true, existingTicketStatus: existing.ticketStatus };
+          }
+          const updated = await tx.rSVP.update({
+            where: { id: existing.id },
+            data: {
+              status: rsvpStatus,
+              ticketStatus,
+              tierId: body.tierId ?? null,
+              customAnswers: body.customAnswers ?? undefined,
+              guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
+              guestName: resolved.kind === 'guest' ? body.guestName : null,
+            },
+          });
+          return { full: false, rsvpId: updated.id, alreadyConfirmed: false };
+        }
+
+        const created = await tx.rSVP.create({
+          data: {
+            workspaceId,
+            eventId: evt.id,
+            memberId: rsvpMember.id,
+            status: rsvpStatus,
+            ticketStatus,
+            tierId: body.tierId ?? null,
+            customAnswers: body.customAnswers ?? undefined,
+            guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
+            guestName: resolved.kind === 'guest' ? body.guestName : null,
+          },
+        });
+        return { full: false, rsvpId: created.id, alreadyConfirmed: false };
       },
-    });
-    rsvpId = updated.id;
-  } else {
-    const created = await db.rSVP.create({
-      data: {
-        workspaceId,
+      { isolationLevel: 'Serializable' },
+    );
+  } catch (err) {
+    void alert({
+      severity: 'error',
+      event: 'access.submit.transaction_failed',
+      workspaceId,
+      context: {
         eventId: evt.id,
-        memberId: rsvpMember.id,
-        status: rsvpStatus,
+        slug,
+        viewer: String(viewer),
+        flow: String(resolved.flow),
         ticketStatus,
-        tierId: body.tierId ?? null,
-        customAnswers: body.customAnswers ?? undefined,
-        guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
-        guestName: resolved.kind === 'guest' ? body.guestName : null,
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
       },
     });
-    rsvpId = created.id;
+    console.error('[access/submit] RSVP transaction failed', { workspaceId, eventId: evt.id, err });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+
+  if (txResult.full) {
+    return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+  }
+
+  const rsvpId = txResult.rsvpId;
+  if (txResult.alreadyConfirmed) {
+    return NextResponse.json({
+      rsvpId,
+      ticketStatus: txResult.existingTicketStatus ?? ticketStatus,
+      memberQrCode: rsvpMember.memberQrCode,
+    });
   }
 
   await emitEvent({

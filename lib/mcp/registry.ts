@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { OperatorRole } from '@prisma/client';
+import { roleAtLeast } from '@/lib/operator-role';
 import type { McpContext, McpTool } from './types';
 import { memberTools } from './tools/members';
 import { applicationTools } from './tools/applications';
@@ -53,7 +55,8 @@ export function listToolSchemas() {
 }
 
 /** Validate args against the tool's schema and execute it. Throws on unknown
- *  tool or validation failure (the route maps that to a JSON-RPC error). */
+ *  tool, insufficient role, or validation failure (the route maps each to a
+ *  JSON-RPC error). */
 export async function callTool(
   name: string,
   ctx: McpContext,
@@ -61,6 +64,14 @@ export async function callTool(
 ): Promise<unknown> {
   const tool = getToolMap().get(name);
   if (!tool) throw new ToolNotFoundError(name);
+
+  // Default-deny: a tool with no declared floor requires STAFF, so a write can
+  // never leak through as a read. Read-only tools opt down to READ_ONLY.
+  const required = tool.minRole ?? OperatorRole.STAFF;
+  if (!roleAtLeast(ctx.role, required)) {
+    throw new ToolForbiddenError(name, required);
+  }
+
   const parsed = tool.inputSchema.parse(args ?? {});
   return tool.handler(ctx, parsed as Record<string, unknown>);
 }
@@ -69,5 +80,12 @@ export class ToolNotFoundError extends Error {
   constructor(name: string) {
     super(`Unknown tool: ${name}`);
     this.name = 'ToolNotFoundError';
+  }
+}
+
+export class ToolForbiddenError extends Error {
+  constructor(name: string, required: OperatorRole) {
+    super(`Forbidden: tool "${name}" requires ${required}`);
+    this.name = 'ToolForbiddenError';
   }
 }

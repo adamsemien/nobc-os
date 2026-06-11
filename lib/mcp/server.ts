@@ -1,5 +1,5 @@
 import type { McpContext } from './types';
-import { callTool, listToolSchemas, ToolNotFoundError } from './registry';
+import { callTool, listToolSchemas, ToolForbiddenError, ToolNotFoundError } from './registry';
 
 const SERVER_INFO = { name: 'nobc-os', version: '1.0.0' };
 const DEFAULT_PROTOCOL_VERSION = '2025-06-18';
@@ -26,6 +26,7 @@ const ERR = {
   METHOD_NOT_FOUND: -32601,
   INVALID_PARAMS: -32602,
   INTERNAL: -32603,
+  FORBIDDEN: -32004,
 } as const;
 
 function ok(id: JsonRpcId, result: JsonValue): JsonRpcResponse {
@@ -91,6 +92,11 @@ async function handleOne(msg: unknown, ctx: McpContext): Promise<JsonRpcResponse
       } catch (err) {
         if (err instanceof ToolNotFoundError) {
           return fail(id, ERR.INVALID_PARAMS, err.message);
+        }
+        // Authorization failures are protocol errors, not tool results — the
+        // caller lacks the role, so don't hand the model a retryable result.
+        if (err instanceof ToolForbiddenError) {
+          return fail(id, ERR.FORBIDDEN, err.message);
         }
         // Tool execution / validation errors are returned as tool results with
         // isError per the MCP spec, so the model can read and react to them.

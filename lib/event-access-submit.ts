@@ -62,6 +62,12 @@ export async function loadAccessContext(
   })
   if (!event) return { ok: false, status: 404, error: "Event not found" }
 
+  // Block ticket purchase for past events — startAt in the past means the
+  // gathering has already happened. Operator bypass does not exempt this check.
+  if (event.startAt < new Date()) {
+    return { ok: false, status: 410, error: "This gathering has passed" }
+  }
+
   const access = parseEventAccess(event.eventAccess)
   const resolved = resolveAccessForViewer(access, viewer)
 

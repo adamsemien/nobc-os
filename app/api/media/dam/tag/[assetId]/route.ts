@@ -1,8 +1,10 @@
 /**
  * DAM async tag + score (internal). Invoked fire-and-forget by the upload route
- * AFTER the upload response, so AI work never blocks upload. Optionally guarded
- * by DAM_TAG_SECRET (x-dam-tag-secret header). Writes Asset.aiTags + energyLevel
- * (+ heuristic qualityScore/qualityScores). All failures are logged, not thrown.
+ * AFTER the upload response, so AI work never blocks upload. Guarded by
+ * DAM_TAG_SECRET (x-dam-tag-secret header), fail CLOSED: when the secret is unset
+ * the endpoint is disabled (503), never reachable unauthenticated. Writes
+ * Asset.aiTags + energyLevel (+ heuristic qualityScore/qualityScores). All
+ * failures are logged, not thrown.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
@@ -14,8 +16,14 @@ import { inferEnergyLevel, tagImage } from '@/lib/dam/tagging';
 export const runtime = 'nodejs'; // Sharp (scoreImage) requires the Node runtime.
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ assetId: string }> }) {
+  // Fail CLOSED: an unset secret disables the endpoint rather than leaving it open.
+  // The upload caller only sends the header when DAM_TAG_SECRET is set, so tagging
+  // simply no-ops (best-effort, logged not thrown) until the secret is configured.
   const secret = process.env.DAM_TAG_SECRET;
-  if (secret && req.headers.get('x-dam-tag-secret') !== secret) {
+  if (!secret) {
+    return NextResponse.json({ error: 'Tagging not configured' }, { status: 503 });
+  }
+  if (req.headers.get('x-dam-tag-secret') !== secret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

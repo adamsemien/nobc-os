@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { bearerToken, verifyCheckInToken } from '@/lib/check-in-token';
 
-// Staff check-in: fetch guest list for an event by slug
-// Protected by a simple bearer token (CHECKIN_SECRET) so offline PWA can authenticate
+// Staff check-in: fetch the guest list for an event.
+// Authenticated by the event-scoped check-in token (minted server-side for a
+// STAFF+ operator) — scope comes from the token, NOT from query params, so a
+// token for one event can only ever read that event in its own workspace.
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization');
-  if (!auth || auth !== `Bearer ${process.env.CHECKIN_SECRET}`) {
+  const scope = verifyCheckInToken(bearerToken(req.headers.get('authorization')));
+  if (!scope) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const slug = req.nextUrl.searchParams.get('slug');
-  const workspaceSlug = req.nextUrl.searchParams.get('workspace');
-  if (!slug || !workspaceSlug) {
-    return NextResponse.json({ error: 'slug and workspace required' }, { status: 400 });
-  }
-
-  const workspace = await db.workspace.findUnique({ where: { slug: workspaceSlug } });
-  if (!workspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
-
   const event = await db.event.findFirst({
-    where: { slug, workspaceId: workspace.id },
+    where: { id: scope.eventId, workspaceId: scope.workspaceId },
     select: { id: true, title: true, startAt: true, capacity: true },
   });
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -27,7 +21,7 @@ export async function GET(req: NextRequest) {
   const rsvps = await db.rSVP.findMany({
     where: {
       eventId: event.id,
-      workspaceId: workspace.id,
+      workspaceId: scope.workspaceId,
       ticketStatus: { in: ['confirmed', 'held'] },
     },
     select: {

@@ -19,11 +19,11 @@ type RsvpRow = {
 type Props = {
   rsvps: RsvpRow[];
   eventId: string;
+  /** Event-scoped check-in token, minted server-side for STAFF+; null otherwise. */
+  token: string | null;
 };
 
-const CHECKIN_SECRET = process.env.NEXT_PUBLIC_CHECKIN_SECRET;
-
-export function EventCheckinTab({ rsvps: initialRsvps, eventId: _eventId }: Props) {
+export function EventCheckinTab({ rsvps: initialRsvps, eventId: _eventId, token }: Props) {
   const [rsvps, setRsvps] = useState(initialRsvps);
   const [search, setSearch] = useState('');
   const [pending, setPending] = useState<string | null>(null);
@@ -45,10 +45,10 @@ export function EventCheckinTab({ rsvps: initialRsvps, eventId: _eventId }: Prop
 
   const checkedInCount = confirmed.filter(r => r.checkedIn).length;
 
-  if (!CHECKIN_SECRET) {
+  if (!token) {
     return (
       <div className="rounded-lg border border-border bg-muted p-4 text-sm text-text-secondary">
-        Check-in not configured — set <code className="font-mono">NEXT_PUBLIC_CHECKIN_SECRET</code>
+        Check-in isn’t available for your account — it requires a STAFF role.
       </div>
     );
   }
@@ -59,7 +59,7 @@ export function EventCheckinTab({ rsvps: initialRsvps, eventId: _eventId }: Prop
     try {
       const res = await fetch(`/api/check-in/${rsvpId}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${CHECKIN_SECRET ?? ''}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Check-in failed (${res.status})`);
       setRsvps(prev =>

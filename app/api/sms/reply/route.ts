@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { sendSms } from '@/lib/twilio';
+import { alert } from '@/lib/alerting';
 
 // Operator manual reply from the shared inbox. Authorized by Clerk org
 // membership: any member of the resolved workspace's Clerk org may reply (no
@@ -40,6 +41,16 @@ export async function POST(req: NextRequest) {
   try {
     await sendSms(conversation.phone, text);
   } catch (e) {
+    void alert({
+      severity: 'error',
+      event: 'sms.reply.twilio_send_failed',
+      workspaceId,
+      context: {
+        conversationId: conversation.id,
+        errorClass: e instanceof Error ? e.constructor.name : 'unknown',
+        errorMessage: e instanceof Error ? e.message : String(e),
+      },
+    });
     console.error('[sms/reply] Twilio send failed', e);
     return NextResponse.json({ error: 'Failed to send SMS' }, { status: 502 });
   }

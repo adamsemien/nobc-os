@@ -64,6 +64,7 @@ model Workspace {
   smsConversations     SmsConversation[]
   workspaceMembers     WorkspaceMember[]
   memberEngagementEvents MemberEngagementEvent[]
+  contactSources       ContactSource[]
 
   // Digital Asset Manager (Stage 15)
   assets         Asset[]
@@ -152,6 +153,57 @@ enum MemberStatus {
   GUEST
 }
 
+/// CRM contact roles — multi-valued and ORTHOGONAL to the MemberStatus lifecycle.
+/// A person can hold several at once (e.g. member + subscriber + sponsor_contact).
+/// "Member"/"Guest" are also derivable from status; the explicit roles cover the
+/// relationships status can't express. See
+/// _context/16-member-intelligence/crm-spine/CRM-TERMINOLOGY-AND-ROLES.md.
+enum ContactRole {
+  member
+  guest
+  subscriber
+  lead
+  vendor
+  sponsor_contact
+}
+
+/// Which system a contact (or one of their identities) came from. Drives the
+/// ContactSource provenance rows + the connector ingestion pipeline.
+enum ContactSourceSystem {
+  operator
+  beehiiv
+  activecampaign
+  producer
+  csv
+  tenur
+}
+
+/// CRM provenance — one row per (member, source) system a person appears in.
+/// The ingestion pipeline writes these during identity resolution; the merge-review
+/// UI reads rawSnapshot to resolve cross-source conflicts. Workspace-scoped.
+model ContactSource {
+  id           String              @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id])
+  memberId     String
+  member       Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  source       ContactSourceSystem
+  /// Stable id of this person in the source system (email / opaque id) — the key
+  /// the ingestion match chain dedupes on.
+  externalId   String?
+  /// active | conflict | merged — set by the ingestion pipeline.
+  syncStatus   String              @default("active")
+  /// Full source record at last sync (powers the merge-review UI).
+  rawSnapshot  Json?
+  firstSeenAt  DateTime            @default(now())
+  lastSyncedAt DateTime            @default(now())
+
+  @@unique([workspaceId, memberId, source])
+  @@index([workspaceId])
+  @@index([workspaceId, source, externalId])
+  @@index([memberId])
+}
+
 model Member {
   id                String       @id @default(cuid())
   workspaceId       String
@@ -163,6 +215,10 @@ model Member {
   phone             String?
   status            MemberStatus @default(PENDING)
   tags              String[]
+  /// Multi-valued CRM roles. Orthogonal to `status` (the membership lifecycle) —
+  /// a person can be e.g. member + subscriber + sponsor_contact at once. Additive;
+  /// default empty so existing rows are unaffected.
+  roles             ContactRole[] @default([])
   energyScore       Int?
   networkValueScore Int?
   aiSummary         String?
@@ -211,6 +267,9 @@ model Member {
 
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+  // Set when a real Clerk userId is first claimed from a placeholder. Additive — Adam runs
+  // prisma/sql/add-member-claimed-at.sql before this field is in production.
+  claimedAt         DateTime?
 
   rsvps           RSVP[]
   tickets         Ticket[]
@@ -228,6 +287,9 @@ model Member {
 
   // Psychographic data — separate table, firewalled from sponsor surfaces.
   psychographics   MemberPsychographics?
+
+  // CRM provenance — which source systems this person came from.
+  contactSources   ContactSource[]
 
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])

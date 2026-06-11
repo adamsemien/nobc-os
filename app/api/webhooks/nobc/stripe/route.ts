@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { resend } from '@/lib/resend';
 import { rsvpConfirmedEmail } from '@/lib/email-templates';
 import { emitEvent } from '@/lib/emit-event';
+import { resolveTicketRecipient, shouldSendConfirmationEmail } from '@/lib/ticket-confirmation';
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -31,9 +32,12 @@ export async function POST(req: NextRequest) {
 
       const rsvp = await db.rSVP.findUnique({
         where: { id: rsvpId },
-        select: { id: true, eventId: true },
+        select: { id: true, eventId: true, ticketStatus: true, guestEmail: true, guestName: true },
       });
       if (!rsvp) break;
+
+      // Dedup: if already confirmed, Stripe is retrying — skip all writes + email.
+      if (rsvp.ticketStatus === 'confirmed') break;
 
       const eventRecord = await db.event.findUnique({
         where: { id: rsvp.eventId },
@@ -68,20 +72,27 @@ export async function POST(req: NextRequest) {
       if (process.env.RESEND_API_KEY && eventRecord) {
         const member = await db.member.findFirst({
           where: { id: memberId },
-          select: { email: true, firstName: true, lastName: true },
+          select: { email: true, firstName: true, lastName: true, memberQrCode: true },
         });
         if (member) {
+          const { email: toEmail, name } = resolveTicketRecipient(member, rsvp);
+          let qrDataUrl: string | undefined;
+          if (member.memberQrCode) {
+            const QRCode = (await import('qrcode')).default;
+            qrDataUrl = await QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 });
+          }
           const { subject, html } = rsvpConfirmedEmail(
-            `${member.firstName} ${member.lastName}`.trim(),
+            name,
             eventRecord.title,
             eventRecord.startAt,
             eventRecord.location,
             eventRecord.slug,
             rsvpId,
+            qrDataUrl,
           );
           resend.emails.send({
             from: 'NoBC <team@thenobadcompany.com>',
-            to: member.email,
+            to: toEmail,
             subject,
             html,
           }).catch(err => console.error('[stripe-webhook] rsvp email failed:', err));
@@ -96,12 +107,18 @@ export async function POST(req: NextRequest) {
       const { workspaceId, memberId } = pi.metadata as { workspaceId: string; memberId: string };
       const rsvp = await db.rSVP.findFirst({
         where: { stripePaymentIntentId: pi.id },
-        select: { id: true, eventId: true },
+        select: { id: true, eventId: true, paymentStatus: true, guestEmail: true, guestName: true },
       });
+
+      // Dedup: check prior paymentStatus BEFORE writing. If already AUTHORIZED or CAPTURED,
+      // Stripe is retrying a delivered webhook — skip writes and do NOT re-send email.
+      const isFirstAuthorization = shouldSendConfirmationEmail(rsvp?.paymentStatus ?? null);
+
       await db.rSVP.updateMany({
         where: { stripePaymentIntentId: pi.id },
         data: { ticketStatus: 'confirmed', status: 'CONFIRMED', paymentStatus: 'AUTHORIZED' },
       });
+
       if (rsvp && workspaceId) {
         await db.auditEvent.create({
           data: {
@@ -123,8 +140,8 @@ export async function POST(req: NextRequest) {
           metadata: { paymentPath: 'authorize' },
         }).catch(err => console.error('[stripe-webhook] rsvp.confirmed emit failed:', err));
 
-        // Send confirmation email
-        if (process.env.RESEND_API_KEY) {
+        // Send confirmation email — only on the first authorization, never on retries.
+        if (process.env.RESEND_API_KEY && isFirstAuthorization) {
           const eventRecord = await db.event.findUnique({
             where: { id: rsvp.eventId },
             select: { title: true, slug: true, startAt: true, location: true },
@@ -132,22 +149,27 @@ export async function POST(req: NextRequest) {
           const member = memberId
             ? await db.member.findFirst({
                 where: { id: memberId },
-                select: { email: true, firstName: true, lastName: true },
+                select: { email: true, firstName: true, lastName: true, memberQrCode: true },
               })
             : null;
           if (eventRecord && member) {
-            const { resend } = await import('@/lib/resend');
-            const { rsvpConfirmedEmail } = await import('@/lib/email-templates');
+            const { email: toEmail, name } = resolveTicketRecipient(member, rsvp);
+            let qrDataUrl: string | undefined;
+            if (member.memberQrCode) {
+              const QRCode = (await import('qrcode')).default;
+              qrDataUrl = await QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 });
+            }
             const { subject, html } = rsvpConfirmedEmail(
-              `${member.firstName} ${member.lastName}`.trim(),
+              name,
               eventRecord.title,
               eventRecord.startAt,
               eventRecord.location,
               eventRecord.slug,
               rsvp.id,
+              qrDataUrl,
             );
             resend.emails
-              .send({ from: 'NoBC <team@thenobadcompany.com>', to: member.email, subject, html })
+              .send({ from: 'NoBC <team@thenobadcompany.com>', to: toEmail, subject, html })
               .catch((err) => console.error('[stripe-webhook] confirmation email failed:', err));
           }
         }

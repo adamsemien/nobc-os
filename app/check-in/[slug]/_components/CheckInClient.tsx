@@ -6,8 +6,6 @@ import { checkinDb, type CachedRsvp } from '@/lib/checkin-db';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import { WalkinModal } from './WalkinModal';
 
-const CHECKIN_SECRET = process.env.NEXT_PUBLIC_CHECKIN_SECRET ?? '';
-
 interface EventInfo {
   id: string;
   title: string;
@@ -50,9 +48,12 @@ function formatPaymentStatus(ps: string | null | undefined): string {
 export function CheckInClient({
   eventSlug,
   workspaceSlug,
+  token,
 }: {
   eventSlug: string;
   workspaceSlug: string;
+  /** Event-scoped check-in token, minted server-side for a STAFF+ operator. */
+  token: string | null;
 }) {
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [rsvps, setRsvps] = useState<CachedRsvp[]>([]);
@@ -67,6 +68,19 @@ export function CheckInClient({
   const [walkinOpen, setWalkinOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // Auth token for the check-in API. Persisted to IndexedDB so a cold, offline
+  // reopen of the PWA can still sync queued check-ins within the token's window
+  // (the server can't mint a fresh one with no connection).
+  const tokenRef = useRef<string | null>(token);
+  useEffect(() => {
+    if (token) {
+      tokenRef.current = token;
+      checkinDb.meta.put({ key: 'token', value: token }).catch(() => {});
+    } else {
+      checkinDb.meta.get('token').then(m => { if (m?.value) tokenRef.current = m.value; }).catch(() => {});
+    }
+  }, [token]);
 
   // Register service worker for offline asset caching
   useEffect(() => {
@@ -96,7 +110,7 @@ export function CheckInClient({
     try {
       const res = await fetch(
         `/api/check-in/event?slug=${eventSlug}&workspace=${workspaceSlug}`,
-        { headers: { Authorization: `Bearer ${CHECKIN_SECRET}` } },
+        { headers: { Authorization: `Bearer ${tokenRef.current ?? ''}` } },
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -138,7 +152,7 @@ export function CheckInClient({
 
     fetch(`/api/check-in/${rsvpId}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${CHECKIN_SECRET}` },
+      headers: { Authorization: `Bearer ${tokenRef.current ?? ''}` },
     })
       .then(r => { if (r.ok) checkinDb.pending.update(rsvpId, { synced: true }); })
       .catch(() => {/* stays pending, synced on reconnect */});
@@ -204,7 +218,7 @@ export function CheckInClient({
         try {
           const r = await fetch(`/api/check-in/${p.rsvpId}`, {
             method: 'POST',
-            headers: { Authorization: `Bearer ${CHECKIN_SECRET}` },
+            headers: { Authorization: `Bearer ${tokenRef.current ?? ''}` },
           });
           if (r.ok) await checkinDb.pending.update(p.rsvpId, { synced: true });
         } catch { /* still offline */ }
@@ -567,6 +581,7 @@ export function CheckInClient({
         onClose={() => setWalkinOpen(false)}
         eventSlug={eventSlug}
         workspaceSlug={workspaceSlug}
+        token={token}
         onSuccess={(memberName) => {
           setScanResult({ name: memberName, status: 'success' });
           setTimeout(() => setScanResult(null), 3000);

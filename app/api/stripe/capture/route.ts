@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
+import { alert } from '@/lib/alerting';
 
 const BodySchema = z.object({
   rsvpId: z.string(),
@@ -44,7 +45,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await stripe.paymentIntents.capture(rsvp.stripePaymentIntentId);
+  try {
+    await stripe.paymentIntents.capture(rsvp.stripePaymentIntentId);
+  } catch (err) {
+    void alert({
+      severity: 'critical',
+      event: 'stripe.payment_intent.capture_failed',
+      workspaceId,
+      context: {
+        rsvpId: body.rsvpId,
+        stripePaymentIntentId: rsvp.stripePaymentIntentId,
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      },
+    });
+    console.error('[capture] stripe.paymentIntents.capture failed', { workspaceId, rsvpId: body.rsvpId, err });
+    return NextResponse.json({ error: 'Capture failed' }, { status: 502 });
+  }
 
   await db.rSVP.update({
     where: { id: body.rsvpId },

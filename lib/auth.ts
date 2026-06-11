@@ -1,4 +1,5 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
+import { MemberStatus } from '@prisma/client';
 import { db } from './db';
 
 export async function getOrCreateWorkspaceForUser(clerkUserId: string) {
@@ -68,6 +69,176 @@ export async function getMemberWorkspaceId(
     const workspace = await getOrCreateWorkspaceForUser(clerkUserId);
     return workspace.id;
   } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Member-portal identity resolution
+// ---------------------------------------------------------------------------
+// Member-portal only — do NOT use for operator routes.
+// Operator routes (/operator/*, /api/operator/*, /api/sms/*, /api/agent/*,
+// /api/intelligence/*) must continue to use getMemberWorkspaceId, which
+// resolves via Clerk org membership.
+// ---------------------------------------------------------------------------
+
+export type MemberPortalContext = {
+  workspaceId: string;
+  memberId: string;
+  status: MemberStatus;
+  firstName: string;
+};
+
+/**
+ * Placeholder prefixes written by the four member-creation paths that do NOT
+ * have a real Clerk userId at creation time. Any row whose clerkUserId starts
+ * with one of these is safe to claim; any other value is a real Clerk user id
+ * and must never be overwritten.
+ */
+const PLACEHOLDER_PREFIXES = ['app_', 'applicant:', 'guest:', 'manual:'] as const;
+
+function isPlaceholder(clerkUserId: string): boolean {
+  return PLACEHOLDER_PREFIXES.some((prefix) => clerkUserId.startsWith(prefix));
+}
+
+/**
+ * Lazily links a real Clerk user to their Member row(s) by verified primary
+ * email address. Runs inside getMemberPortalContext on first portal access.
+ *
+ * Safety invariants:
+ *  - Only claims rows whose clerkUserId is a placeholder (isPlaceholder guard).
+ *  - Only proceeds with a verified email (Risk #3 — unverified-email claim).
+ *  - The WHERE clause includes both email + placeholder value, making the
+ *    update idempotent and race-safe (concurrent claim → one wins, one is 0-row
+ *    no-op, both re-read the now-claimed row). (Risk #4)
+ *  - Workspace-scoped: returns the most-recently-created claimed member so a
+ *    multi-workspace member always gets a deterministic context. (Risk #2)
+ */
+async function claimMemberIdentity(
+  clerkUserId: string,
+): Promise<MemberPortalContext | null> {
+  try {
+    const client = await clerkClient();
+    const user = await client.users.getUser(clerkUserId);
+
+    // Require verified primary email — unverified email claim is a security hole.
+    const primaryEmail = user.primaryEmailAddress;
+    if (!primaryEmail || primaryEmail.verification?.status !== 'verified') {
+      return null;
+    }
+    const email = primaryEmail.emailAddress.trim().toLowerCase();
+    if (!email) return null;
+
+    // Find all Member rows matching this email with a placeholder clerkUserId.
+    // May span multiple workspaces (multi-tenant). We claim each one that is
+    // eligible (placeholder clerkUserId + APPROVED or GUEST status).
+    const candidates = await db.member.findMany({
+      where: { email },
+      select: {
+        id: true,
+        workspaceId: true,
+        clerkUserId: true,
+        status: true,
+        firstName: true,
+        createdAt: true,
+      },
+    });
+
+    const eligible = candidates.filter(
+      (c) =>
+        isPlaceholder(c.clerkUserId) &&
+        (c.status === MemberStatus.APPROVED || c.status === MemberStatus.GUEST),
+    );
+
+    if (eligible.length === 0) return null;
+
+    // Claim each eligible row atomically. The WHERE guards on both id and the
+    // exact placeholder value — a concurrent claim updates 0 rows (idempotent).
+    await Promise.all(
+      eligible.map((candidate) =>
+        db.member.updateMany({
+          where: {
+            id: candidate.id,
+            clerkUserId: candidate.clerkUserId, // guard on exact placeholder value
+          },
+          data: { clerkUserId, claimedAt: new Date() },
+        }),
+      ),
+    );
+
+    // Re-read the claimed rows to get the final state. Pick the portal context
+    // from the most-recently-created Member (deterministic across workspaces).
+    // TODO(member-portal): multi-workspace switcher — when a member belongs to
+    // more than one workspace, surface a picker instead of silently picking one.
+    const claimed = await db.member.findMany({
+      where: { clerkUserId, id: { in: eligible.map((c) => c.id) } },
+      select: { id: true, workspaceId: true, status: true, firstName: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (eligible.length > 1) {
+      console.warn(
+        '[getMemberPortalContext] multi-workspace claim: clerkUserId=%s claimed %d rows across workspaces. Returning most-recent.',
+        clerkUserId,
+        claimed.length,
+      );
+    }
+
+    const primary = claimed[0];
+    if (!primary) return null;
+
+    return {
+      workspaceId: primary.workspaceId,
+      memberId: primary.id,
+      status: primary.status,
+      firstName: primary.firstName,
+    };
+  } catch (err) {
+    console.error('[claimMemberIdentity] unexpected error for clerkUserId=%s', clerkUserId, err);
+    return null;
+  }
+}
+
+/**
+ * Resolves member portal context for the signed-in user.
+ *
+ * Resolution order:
+ *  1. Direct lookup by clerkUserId on the Member table (instant for returning members).
+ *  2. Lazy claim: fetches verified primary email from Clerk and links the Member
+ *     row if it holds a placeholder clerkUserId (first portal access after approval).
+ *
+ * Returns null only when no Member row can be found or claimed — the caller
+ * renders MemberWorkspaceGate in that case.
+ *
+ * Never throws. Mirror's getMemberWorkspaceId's null-on-failure contract.
+ *
+ * Member-portal only — do NOT use for operator routes.
+ */
+export async function getMemberPortalContext(
+  clerkUserId: string | null | undefined,
+): Promise<MemberPortalContext | null> {
+  if (!clerkUserId) return null;
+  try {
+    // Fast path: row already claims this real Clerk user id.
+    const existing = await db.member.findFirst({
+      where: { clerkUserId },
+      select: { id: true, workspaceId: true, status: true, firstName: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing) {
+      return {
+        workspaceId: existing.workspaceId,
+        memberId: existing.id,
+        status: existing.status,
+        firstName: existing.firstName,
+      };
+    }
+
+    // Slow path: first visit — try to claim via verified email.
+    return await claimMemberIdentity(clerkUserId);
+  } catch (err) {
+    console.error('[getMemberPortalContext] unexpected error for clerkUserId=%s', clerkUserId, err);
     return null;
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
+import { alert } from '@/lib/alerting';
 
 type ProducerPayload = {
   type: string;
@@ -58,6 +59,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (type === 'event.published' || type === 'event.updated') {
       if (!data.title || !data.slug || !data.startDatetime) {
         return NextResponse.json({ error: 'Missing event fields' }, { status: 400 });
+      }
+
+      // Workspace-ownership guard (mirror the event.cancelled branch): a
+      // producerEventId is globally unique, so a mis-targeted payload must not
+      // be allowed to rewrite an event that already belongs to another
+      // workspace. Create-when-absent is unaffected.
+      const existing = await db.event.findUnique({
+        where: { producerEventId: data.producerEventId },
+        select: { workspaceId: true },
+      });
+      if (existing && existing.workspaceId !== data.workspaceId) {
+        return NextResponse.json({ error: 'Workspace mismatch' }, { status: 403 });
       }
 
       await db.event.upsert({
@@ -132,6 +145,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    void alert({
+      severity: 'error',
+      event: 'producer_webhook.processing_failed',
+      workspaceId: data.workspaceId,
+      context: {
+        eventType: type,
+        producerEventId: data.producerEventId,
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      },
+    });
     console.error('[producer-webhook] DB error:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }

@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
 import { ExternalLink } from 'lucide-react';
 import { getMemberWorkspaceId } from '@/lib/auth';
@@ -10,6 +11,7 @@ import { ObsidianIdleEgg } from './_components/ObsidianIdleEgg';
 import { AimEasterEgg } from './_components/AimEasterEgg';
 import { MyspaceEasterEgg } from './_components/MyspaceEasterEgg';
 import { KonamiEasterEgg } from './_components/KonamiEasterEgg';
+import { BackRoomEasterEgg } from './_components/BackRoomEasterEgg';
 import { CommandPaletteProvider } from '@/components/command-palette/CommandPaletteProvider';
 import { CommandKPill } from '@/components/command-palette/CommandKPill';
 import { CountsProvider } from '@/components/counts/CountsProvider';
@@ -25,6 +27,7 @@ export default async function OperatorLayout({
 }>) {
   const { userId } = await auth();
   const workspaceId = (await getMemberWorkspaceId(userId)) ?? '';
+  if (!workspaceId) redirect('/onboarding');
   const operatorIsAdmin = await isAdmin(userId, workspaceId);
 
   // Events feed the Cmd+K palette — workspace-scoped, soonest first.
@@ -94,6 +97,7 @@ export default async function OperatorLayout({
         <AimEasterEgg />
         <MyspaceEasterEgg />
         <KonamiEasterEgg />
+        <BackRoomEasterEgg />
         <CommandKPill />
         <OperatorTopBar />
         <HelpPanel />
