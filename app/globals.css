@@ -3074,3 +3074,156 @@ button:not(:disabled):active,
   .br-card-tilt { transform: none; transition: none; }
 }
 
+/* ---- Small screens: the card breathes, the rules stack ---- */
+.br-title { font-size: clamp(1.8rem, 9vw, 2.25rem); }
+@media (max-width: 430px) {
+  .br-card { padding: 1.5rem 1.3rem 1.1rem; }
+  .br-vinyl-row { flex-direction: column; align-items: flex-start; }
+}
+
+/* Mobile: no double-tap zoom inside the operator tool — keeps the touch
+   knock (tap-tap, pause, tap-tap) and the door-game swipes clean on iOS.
+   Pinch zoom and scrolling are unaffected. */
+.operator-scope {
+  touch-action: manipulation;
+}
+
+/* ---- Matchbook — opens LAST CALL from the membership card ---- */
+.br-matchbook {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: var(--primary);
+  color: var(--on-primary);
+  border-radius: 4px 4px 7px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 35%, transparent);
+  transition: transform 0.15s ease;
+}
+.br-matchbook:hover { transform: translateY(-2px) rotate(-1deg); }
+.br-matchbook::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(circle at 50% 30%, white, color-mix(in srgb, var(--warning) 85%, white) 55%, transparent 82%);
+}
+
+/* ============================================================
+   LAST CALL — the door game (LastCallGame.tsx)
+   Mobile-first: swipe right = let in, swipe left = hold.
+   Desktop: arrow keys or the two buttons. Lives inside the
+   Back Room overlay; all procedural guests, no real data.
+   ============================================================ */
+.lc-stage {
+  position: relative;
+  width: min(440px, 92vw);
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+}
+.lc-topbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.lc-brief {
+  width: min(360px, 88vw);
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--card) 92%, var(--primary)) 0%, var(--card) 55%);
+  padding: 1.8rem 1.6rem 1.5rem;
+  text-align: center;
+  animation: lc-enter 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.lc-guest {
+  position: relative;
+  width: min(340px, 84vw);
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--card) 92%, var(--primary)) 0%, var(--card) 60%);
+  padding: 1.6rem 1.5rem 1.3rem;
+  text-align: center;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 24px 60px color-mix(in srgb, black 60%, transparent);
+  animation: lc-enter 0.26s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.lc-dragging { cursor: grabbing; transition: none; }
+.lc-settle { transition: transform 0.18s ease; }
+.lc-fly-right { animation: lc-fly-right 0.32s ease-in forwards; }
+.lc-fly-left { animation: lc-fly-left 0.32s ease-in forwards; }
+@keyframes lc-fly-right { to { transform: translateX(120vw) rotate(18deg); opacity: 0.4; } }
+@keyframes lc-fly-left { to { transform: translateX(-120vw) rotate(-18deg); opacity: 0.4; } }
+@keyframes lc-enter {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.lc-avatar {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  color: var(--primary);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+}
+.lc-claim {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.lc-timer {
+  width: min(340px, 84vw);
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  overflow: hidden;
+}
+.lc-timer > div {
+  height: 100%;
+  background: var(--primary);
+  transform-origin: left;
+}
+.lc-stamp {
+  position: absolute;
+  top: 12px;
+  padding: 4px 10px;
+  border: 2px solid;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.lc-stamp-in { left: 12px; color: var(--success); border-color: var(--success); transform: rotate(-12deg); }
+.lc-stamp-out { right: 12px; color: var(--primary); border-color: var(--primary); transform: rotate(12deg); }
+@media (prefers-reduced-motion: reduce) {
+  .lc-fly-right, .lc-fly-left, .lc-guest, .lc-brief { animation: none; }
+}
+

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import type { ThemeId } from '@/lib/theme';
 import { useTheme } from './ThemeToggle';
+import { LastCallGame } from './LastCallGame';
 
 /**
  * THE BACK ROOM — type the secret knock ("knockknock", spaces allowed) anywhere
@@ -21,12 +22,14 @@ import { useTheme } from './ThemeToggle';
 const KNOCK = 'knockknock';
 const DOOR_MS = 4300;
 
-type Phase = 'closed' | 'door' | 'room' | 'lightsout';
+type Phase = 'closed' | 'door' | 'room' | 'game' | 'lightsout';
 
 type BackRoomAudio = {
   knock: () => void;
   startRecord: () => void;
   click: () => void;
+  pluck: () => void;
+  buzz: () => void;
   setMuted: (muted: boolean) => void;
   dispose: () => void;
 };
@@ -160,6 +163,36 @@ function createBackRoomAudio(): BackRoomAudio | null {
       osc.stop(at + 0.06);
     };
 
+    // Last Call scoring sounds — a soft pluck for the right call, a dull buzz for the wrong one.
+    const pluck = () => {
+      const at = ctx.currentTime + 0.01;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = 392;
+      gain.gain.setValueAtTime(0.07, at);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
+      osc.connect(gain).connect(master);
+      osc.start(at);
+      osc.stop(at + 0.16);
+    };
+
+    const buzz = () => {
+      const at = ctx.currentTime + 0.01;
+      const osc = ctx.createOscillator();
+      const lp = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 98;
+      lp.type = 'lowpass';
+      lp.frequency.value = 420;
+      gain.gain.setValueAtTime(0.06, at);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.2);
+      osc.connect(lp).connect(gain).connect(master);
+      osc.start(at);
+      osc.stop(at + 0.22);
+    };
+
     const setMuted = (muted: boolean) => {
       master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.02);
     };
@@ -176,7 +209,7 @@ function createBackRoomAudio(): BackRoomAudio | null {
       void ctx.close();
     };
 
-    return { knock, startRecord, click, setMuted, dispose };
+    return { knock, startRecord, click, pluck, buzz, setMuted, dispose };
   } catch (err) {
     console.warn('[back-room] WebAudio unavailable — the room will be silent', err);
     return null;
@@ -260,6 +293,36 @@ export function BackRoomEasterEgg() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  // The touch knock — knock on the glass: tap-tap, pause, tap-tap on any
+  // non-interactive surface. Phones have no keyboard to type the knock with.
+  useEffect(() => {
+    let taps: number[] = [];
+    const onPointerDown = (e: PointerEvent) => {
+      if (phaseRef.current !== 'closed') return;
+      if (e.pointerType !== 'touch') return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        t.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"]')
+      ) {
+        taps = [];
+        return;
+      }
+      const now = e.timeStamp;
+      taps = [...taps.filter((x) => now - x < 2200), now].slice(-4);
+      if (taps.length === 4) {
+        const [a, b, c, d] = taps;
+        const knock = b - a < 420 && d - c < 420 && c - b > 160 && c - b < 1200;
+        if (knock) {
+          taps = [];
+          open(); // inside the touch gesture, so iOS lets the audio through
+        }
+      }
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
   // Door cinematic → room.
   useEffect(() => {
     if (phase !== 'door') return;
@@ -275,11 +338,13 @@ export function BackRoomEasterEgg() {
     if (!prefersReducedMotion()) audioRef.current?.startRecord();
   }, [phase]);
 
-  // Escape closes from any open phase.
+  // Escape: leaves the game for the room first, then closes everything.
   useEffect(() => {
     if (phase === 'closed') return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key !== 'Escape') return;
+      if (phaseRef.current === 'game') setPhase('room');
+      else close();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -363,7 +428,7 @@ export function BackRoomEasterEgg() {
         onClick={(e) => {
           if (e.target !== e.currentTarget) return;
           if (phase === 'door') setPhase('room'); // impatient click fast-forwards
-          else close();
+          else if (phase === 'room') close(); // never on a stray tap mid-game
         }}
       >
         <div className="br-grain" aria-hidden />
@@ -386,11 +451,26 @@ export function BackRoomEasterEgg() {
           </div>
         )}
 
-        {phase === 'room' && (
+        {(phase === 'room' || phase === 'game') && (
           <>
             <div className="br-smoke br-smoke-a" aria-hidden />
             <div className="br-smoke br-smoke-b" aria-hidden />
+          </>
+        )}
 
+        {phase === 'game' && (
+          <LastCallGame
+            sfx={
+              audioRef.current
+                ? { pluck: audioRef.current.pluck, buzz: audioRef.current.buzz }
+                : null
+            }
+            onExit={() => setPhase('room')}
+          />
+        )}
+
+        {phase === 'room' && (
+          <>
             <div className="br-room">
               <div className="br-lamp" aria-hidden>
                 <div className="br-cord" />
@@ -447,7 +527,7 @@ export function BackRoomEasterEgg() {
                   </p>
 
                   <h2
-                    className="mt-2 text-4xl"
+                    className="br-title mt-2"
                     style={{
                       fontFamily: "var(--font-display, 'PP Editorial New', Georgia, serif)",
                       fontStyle: 'italic',
@@ -461,7 +541,7 @@ export function BackRoomEasterEgg() {
                     You knocked. We remembered.
                   </p>
 
-                  <div className="mt-6 flex items-center gap-6">
+                  <div className="br-vinyl-row mt-6 flex items-center gap-6">
                     <div className="br-vinyl-wrap" aria-hidden>
                       <div className="br-vinyl">
                         <span className="br-vinyl-label">
@@ -482,7 +562,7 @@ export function BackRoomEasterEgg() {
                     </ul>
                   </div>
 
-                  <div className="mt-7 flex items-center gap-4">
+                  <div className="mt-7 flex flex-wrap items-center gap-4">
                     <button
                       type="button"
                       onClick={killLights}
@@ -505,6 +585,10 @@ export function BackRoomEasterEgg() {
                       ? 'Brings the dashboard back to daylight.'
                       : 'Leaves the dashboard in the Darkroom theme.'}
                   </p>
+
+                  <button type="button" className="br-matchbook" onClick={() => setPhase('game')}>
+                    Working the door tonight?
+                  </button>
 
                   <p
                     className="mt-6 border-t pt-3 text-[11px]"
