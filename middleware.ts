@@ -12,7 +12,7 @@ export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
-});
+}, { authorizedParties: ['https://app.thenobadcompany.com'] });
 
 export const config = {
   matcher: [
