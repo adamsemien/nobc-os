@@ -1446,6 +1446,10 @@ model SmsMessage {
   // AI topic label for inbound messages (e.g. "Parking", "Guest List").
   // Null until the categorization job (GET /api/sms/categorize) processes it.
   category       String?
+  // Twilio MessageSid of the inbound webhook that created this row. Unique so a
+  // retried Twilio delivery (same Sid) is a no-op — no double AI-reply, no double-text.
+  // Set by the nobc-house-phone inbound service; null for outbound + pre-existing rows.
+  twilioSid      String?         @unique
   createdAt      DateTime        @default(now())
 
   @@index([conversationId, createdAt])
