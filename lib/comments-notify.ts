@@ -1,4 +1,5 @@
 import { db } from './db';
+import { validateOutboundWebhookUrl } from './safe-url';
 
 type CommentLike = {
   id: string;
@@ -89,6 +90,13 @@ export async function maybeFireSlack({
     ]);
     const webhookUrl = webhookSetting?.value?.trim();
     if (!webhookUrl) return;
+    // SSRF guard at the choke point: never POST to a private/internal/non-https
+    // target, even if a bad value was stored before write-time validation existed.
+    const safe = validateOutboundWebhookUrl(webhookUrl);
+    if (!safe.ok) {
+      console.error(`[comments-notify] refusing unsafe webhook URL: ${safe.reason}`);
+      return;
+    }
     const enabled =
       !toggleSetting
         ? type !== 'comment' // default: comments OFF, everything else ON
