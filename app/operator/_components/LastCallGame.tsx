@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * LAST CALL — the door game. You work the door for one shift: 18 procedurally
- * generated guests over 3 rounds, each round adding a rule (members only →
- * plus-ones welcome → Red List in effect). Swipe right to let in, swipe left
- * to hold; arrow keys or the buttons on desktop. Entered from the Back Room
- * matchbook; rendered inside that overlay.
+ * LAST CALL — the door game. You work the door for one shift: 18 guests over
+ * 3 rounds, each round adding a rule (members only → plus-ones welcome → Red
+ * List in effect). Swipe right to let in, swipe left to hold; arrow keys or
+ * the buttons on desktop. Entered from the Back Room matchbook.
  *
- * Every guest is fake and generated on the client — no member data is read,
- * no network, no writes. High score only, in localStorage.
+ * The guests are YOUR ROOM: drawn live from the workspace roster (the same
+ * operator-authed GET /api/operator/members the Members page reads), with the
+ * Red List round briefing real BLOCKED watch-list names and flavor lines from
+ * real attendance history. Display-only: nothing is written, nothing leaves
+ * the operator surface, sponsor firewall untouched. High score only, in
+ * localStorage. If the roster is too small or unreachable, the door falls
+ * back to procedurally generated rehearsal stock.
  */
 
 const BEST_KEY = 'nobc-lastcall-best';
@@ -133,6 +137,90 @@ const asGuestAccess = () => 'Guest Access';
 const asCompAccess = () => 'Comp Access';
 const asPlusOne = (_: string, exclude: Set<string>) => `Plus-one of ${makeName(exclude)}`;
 
+/** A row from GET /api/operator/members — only the fields the door reads. */
+interface RosterPerson {
+  fullName: string;
+  totalEventsAttended?: number | null;
+  companyName?: string | null;
+  isVip?: boolean;
+  isBlocked?: boolean;
+}
+
+const MIN_REAL_POOL = 8;
+
+function realFlavor(p: RosterPerson): string {
+  const attended = p.totalEventsAttended ?? 0;
+  if (attended >= 1) return `${attended} event${attended === 1 ? '' : 's'} on the book`;
+  if (p.isVip) return 'Purple List — handle with care';
+  if (p.companyName) return `from ${p.companyName}`;
+  return pick(FLAVORS);
+}
+
+function realGuest(p: RosterPerson, claim: string, shouldAdmit: boolean, redList = false): Guest {
+  return {
+    name: p.fullName,
+    initials: initialsOf(p.fullName),
+    claim,
+    flavor: realFlavor(p),
+    shouldAdmit,
+    redList,
+  };
+}
+
+/** Build the shift from the actual workspace roster. Same rules and claim mix
+ *  as the rehearsal path — but every face is someone from your room, and the
+ *  Red List round uses your real BLOCKED names when you have them. */
+function buildRoundsFromPool(pool: RosterPerson[]): RoundSpec[] {
+  const eligible = shuffle(pool.filter((p) => !p.isBlocked && p.fullName.trim()));
+  let cursor = 0;
+  const next = (): RosterPerson => {
+    const p = eligible[cursor % eligible.length];
+    cursor += 1;
+    return p;
+  };
+  const plusOneOf = () => `Plus-one of ${next().fullName}`;
+
+  const r1 = shuffle([
+    realGuest(next(), 'Member', true),
+    realGuest(next(), 'Member', true),
+    realGuest(next(), 'Member', true),
+    realGuest(next(), 'Member', true),
+    realGuest(next(), 'Guest Access', false),
+    realGuest(next(), 'Comp Access', false),
+  ]);
+
+  const r2 = shuffle([
+    realGuest(next(), 'Member', true),
+    realGuest(next(), 'Member', true),
+    realGuest(next(), plusOneOf(), true),
+    realGuest(next(), plusOneOf(), true),
+    realGuest(next(), 'Guest Access', false),
+    realGuest(next(), 'Comp Access', false),
+  ]);
+
+  // Real Red List first; if the workspace has fewer than two BLOCKED names,
+  // tonight's briefing designates real members to fill the list (still fair —
+  // the briefing shows the names either way).
+  const reds = shuffle(pool.filter((p) => p.isBlocked && p.fullName.trim())).slice(0, 2);
+  while (reds.length < 2) reds.push(next());
+  const redNames = reds.map((p) => p.fullName);
+
+  const r3 = shuffle([
+    realGuest(reds[0], 'Member', false, true),
+    realGuest(reds[1], 'Comp Access', false, true),
+    realGuest(next(), 'Member', true),
+    realGuest(next(), plusOneOf(), true),
+    realGuest(next(), 'Comp Access', true),
+    realGuest(next(), 'Comp Access', true),
+  ]);
+
+  return [
+    { rule: 'Members only. Everyone else waits.', redNames: [], guests: r1, msPerGuest: 4000 },
+    { rule: 'Plus-ones welcome tonight. The comp list is closed.', redNames: [], guests: r2, msPerGuest: 3200 },
+    { rule: 'Comp Access reopens. Two names never make it in:', redNames, guests: r3, msPerGuest: 2700 },
+  ];
+}
+
 function buildRounds(): RoundSpec[] {
   const used = new Set<string>();
 
@@ -184,7 +272,9 @@ function verdictFor(t: Tally, lost: boolean): string {
 
 export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
   const [rounds, setRounds] = useState<RoundSpec[]>(buildRounds);
-  const [mode, setMode] = useState<'briefing' | 'guest' | 'report'>('briefing');
+  const [mode, setMode] = useState<'loading' | 'briefing' | 'guest' | 'report'>('loading');
+  const [realCount, setRealCount] = useState<number | null>(null);
+  const poolRef = useRef<RosterPerson[] | null>(null);
   const [roundIdx, setRoundIdx] = useState(0);
   const [guestIdx, setGuestIdx] = useState(0);
   const [tally, setTally] = useState<Tally>(ZERO_TALLY);
@@ -214,6 +304,32 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
     } catch {
       // localStorage unavailable — best score simply hidden
     }
+  }, []);
+
+  // Pull tonight's list — the real workspace roster. Falls back to rehearsal
+  // stock if the room is too small or the fetch fails (the door stays open).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/operator/members');
+        if (!res.ok) throw new Error(`roster fetch ${res.status}`);
+        const data = (await res.json()) as { members?: RosterPerson[] };
+        const pool = (data.members ?? []).filter((m) => m.fullName?.trim());
+        if (!cancelled && pool.filter((p) => !p.isBlocked).length >= MIN_REAL_POOL) {
+          poolRef.current = pool;
+          setRounds(buildRoundsFromPool(pool));
+          setRealCount(pool.length);
+        }
+      } catch (err) {
+        console.warn('[last-call] roster unavailable — rehearsal stock tonight', err);
+      } finally {
+        if (!cancelled) setMode('briefing');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const advance = useCallback(() => {
@@ -306,7 +422,7 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
   }, [mode, resolve]);
 
   const restart = useCallback(() => {
-    setRounds(buildRounds());
+    setRounds(poolRef.current ? buildRoundsFromPool(poolRef.current) : buildRounds());
     setTally(ZERO_TALLY);
     setRoundIdx(0);
     setGuestIdx(0);
@@ -370,6 +486,17 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
         </span>
       </div>
 
+      {mode === 'loading' && (
+        <div className="lc-brief">
+          <p
+            className="text-[10px] font-semibold uppercase"
+            style={{ color: 'var(--text-muted)', letterSpacing: '0.32em' }}
+          >
+            Pulling tonight&rsquo;s list&hellip;
+          </p>
+        </div>
+      )}
+
       {mode === 'briefing' && (
         <div className="lc-brief">
           <p
@@ -388,6 +515,13 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
           >
             Last Call
           </h3>
+          {roundIdx === 0 && (
+            <p className="mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {realCount !== null
+                ? `Tonight's list is your room — ${realCount} names from the book.`
+                : 'Rehearsal stock tonight — the book was light.'}
+            </p>
+          )}
           <p className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {round.rule}
           </p>
