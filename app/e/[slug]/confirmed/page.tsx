@@ -2,20 +2,28 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import QRCode from 'qrcode';
+import { resolvePublishedEventBySlug } from '@/lib/public-event-loader';
 
 type Props = {
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ rsvpId?: string }>;
 };
 
-export default async function PublicConfirmedPage({ searchParams }: Props) {
+export default async function PublicConfirmedPage({ params, searchParams }: Props) {
+  const { slug } = await params;
   const { rsvpId } = await searchParams;
 
   if (!rsvpId) notFound();
 
-  // Resolve RSVP — capability URL pattern (CUID is unguessable).
-  // workspaceId is derived from the RSVP row itself (F4 — never from client).
+  // F4: workspaceId is derived server-side from the slug, then the RSVP lookup
+  // is scoped to it. The CUID is still required (capability URL), but a
+  // foreign-workspace rsvpId can never resolve here.
+  const eventRef = await resolvePublishedEventBySlug(slug);
+  if (!eventRef) notFound();
+  const { workspaceId } = eventRef;
+
   const rsvp = await db.rSVP.findFirst({
-    where: { id: rsvpId },
+    where: { id: rsvpId, workspaceId },
     select: {
       id: true,
       workspaceId: true,
@@ -43,13 +51,6 @@ export default async function PublicConfirmedPage({ searchParams }: Props) {
   });
 
   if (!rsvp) notFound();
-
-  // Workspace-scope verification — confirm the RSVP belongs to its own workspace.
-  const eventCheck = await db.event.findFirst({
-    where: { id: rsvp.event.id, workspaceId: rsvp.workspaceId },
-    select: { id: true },
-  });
-  if (!eventCheck) notFound();
 
   const { ticketStatus, member, event } = rsvp;
   const displayName = member
