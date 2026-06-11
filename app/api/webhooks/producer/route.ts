@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
+import { alert } from '@/lib/alerting';
 
 type ProducerPayload = {
   type: string;
@@ -144,6 +145,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    void alert({
+      severity: 'error',
+      event: 'producer_webhook.processing_failed',
+      workspaceId: data.workspaceId,
+      context: {
+        eventType: type,
+        producerEventId: data.producerEventId,
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      },
+    });
     console.error('[producer-webhook] DB error:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }

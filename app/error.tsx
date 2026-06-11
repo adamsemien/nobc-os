@@ -15,6 +15,19 @@ export default function GlobalError({
       digest: error.digest,
       stack: error.stack,
     });
+    // Fire-and-forget relay to server-side alert dispatcher. Never throws —
+    // errors here would suppress the existing log, which must not happen.
+    void fetch('/api/alerting/client-error', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        boundary: 'error',
+        message: error.message,
+        digest: error.digest ?? 'none',
+      }),
+    }).catch(() => {
+      // Swallow — the console.error above already captured the event.
+    });
   }, [error]);
 
   return (

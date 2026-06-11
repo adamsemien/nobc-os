@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { getOrCreateMemberFromClerk } from '@/lib/clerk-member';
 import { stripe } from '@/lib/stripe';
+import { alert } from '@/lib/alerting';
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -95,14 +96,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const pi = await stripe.paymentIntents.create({
-    amount: amountCents,
-    currency: 'usd',
-    capture_method: 'manual',
-    description: event.title,
-    receipt_email: member.email,
-    metadata: { workspaceId, eventId, memberId: member.id },
-  });
+  let pi: Awaited<ReturnType<typeof stripe.paymentIntents.create>>;
+  try {
+    pi = await stripe.paymentIntents.create({
+      amount: amountCents,
+      currency: 'usd',
+      capture_method: 'manual',
+      description: event.title,
+      receipt_email: member.email,
+      metadata: { workspaceId, eventId, memberId: member.id },
+    });
+  } catch (err) {
+    void alert({
+      severity: 'critical',
+      event: 'stripe.payment_intent.create_failed',
+      workspaceId,
+      context: {
+        eventId,
+        amountCents,
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      },
+    });
+    console.error('[create-payment-intent] stripe.paymentIntents.create failed', { workspaceId, eventId, err });
+    return NextResponse.json({ error: 'Payment setup failed' }, { status: 502 });
+  }
 
   if (existing) {
     await db.rSVP.update({

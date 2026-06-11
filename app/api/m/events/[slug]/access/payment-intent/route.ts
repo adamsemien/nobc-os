@@ -14,6 +14,7 @@ import {
   hasCapacity,
 } from '@/lib/event-access-submit';
 import { selectTierPriceCents } from '@/lib/ticketing/pricing';
+import { alert } from '@/lib/alerting';
 
 const BodySchema = z.object({
   guestEmail: z.string().email().optional(),
@@ -218,18 +219,37 @@ export async function POST(
   // Idempotency key: scoped to (workspace, event, member) so concurrent
   // double-submits resolve to the same Stripe PaymentIntent.
   const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}`;
-  const pi = await stripe.paymentIntents.create(
-    {
-      amount: amountCents,
-      currency: 'usd',
-      capture_method: 'manual',
-      description: event.title,
-      receipt_email: rsvpMember.email,
-      automatic_payment_methods: { enabled: true },
-      metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug },
-    },
-    { idempotencyKey },
-  );
+  let pi: Awaited<ReturnType<typeof stripe.paymentIntents.create>>;
+  try {
+    pi = await stripe.paymentIntents.create(
+      {
+        amount: amountCents,
+        currency: 'usd',
+        capture_method: 'manual',
+        description: event.title,
+        receipt_email: rsvpMember.email,
+        automatic_payment_methods: { enabled: true },
+        metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug },
+      },
+      { idempotencyKey },
+    );
+  } catch (err) {
+    void alert({
+      severity: 'critical',
+      event: 'stripe.payment_intent.create_failed',
+      workspaceId,
+      context: {
+        eventId: evt.id,
+        slug,
+        amountCents,
+        viewer: String(viewer),
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      },
+    });
+    console.error('[payment-intent] stripe.paymentIntents.create failed', { workspaceId, eventId: evt.id, err });
+    return NextResponse.json({ error: 'Payment setup failed' }, { status: 502 });
+  }
 
   // Write RSVP inside a serializable transaction — the capacity count and RSVP
   // insert are now a single atomic unit, preventing oversell on the last spot.
@@ -290,6 +310,17 @@ export async function POST(
         );
         return NextResponse.json({ error: 'Event is full' }, { status: 409 });
       }
+      void alert({
+        severity: 'error',
+        event: 'payment_intent.rsvp_transaction_failed',
+        workspaceId,
+        context: {
+          eventId: evt.id,
+          piId: pi.id,
+          errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+          errorMessage: err instanceof Error ? err.message : String(err),
+        },
+      });
       console.error('[payment-intent] RSVP create transaction failed', { workspaceId, eventId: evt.id, err });
       throw err;
     }

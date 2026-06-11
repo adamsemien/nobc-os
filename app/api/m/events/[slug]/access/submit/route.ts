@@ -12,6 +12,7 @@ import {
   findOrCreateOperatorMember,
 } from '@/lib/event-access-submit';
 import { emitEvent } from '@/lib/emit-event';
+import { alert } from '@/lib/alerting';
 
 const BodySchema = z.object({
   guestEmail: z.string().email().optional(),
@@ -122,27 +123,45 @@ export async function POST(
     | { full: true }
     | { full: false; rsvpId: string; alreadyConfirmed: boolean; existingTicketStatus?: string };
 
-  const txResult = await db.$transaction<UpsertResult>(
-    async (tx) => {
-      if (!needsApproval && event.capacity) {
-        const taken = await tx.rSVP.count({
-          where: { workspaceId, eventId: evt.id, ticketStatus: { in: ['confirmed', 'held'] } },
-        });
-        if (taken >= event.capacity) return { full: true };
-      }
-
-      const existing = await tx.rSVP.findFirst({
-        where: { workspaceId, eventId: evt.id, memberId: rsvpMember.id },
-        select: { id: true, ticketStatus: true },
-      });
-
-      if (existing) {
-        if (existing.ticketStatus === 'confirmed' || existing.ticketStatus === 'pending_approval') {
-          return { full: false, rsvpId: existing.id, alreadyConfirmed: true, existingTicketStatus: existing.ticketStatus };
+  let txResult: UpsertResult;
+  try {
+    txResult = await db.$transaction<UpsertResult>(
+      async (tx) => {
+        if (!needsApproval && event.capacity) {
+          const taken = await tx.rSVP.count({
+            where: { workspaceId, eventId: evt.id, ticketStatus: { in: ['confirmed', 'held'] } },
+          });
+          if (taken >= event.capacity) return { full: true };
         }
-        const updated = await tx.rSVP.update({
-          where: { id: existing.id },
+
+        const existing = await tx.rSVP.findFirst({
+          where: { workspaceId, eventId: evt.id, memberId: rsvpMember.id },
+          select: { id: true, ticketStatus: true },
+        });
+
+        if (existing) {
+          if (existing.ticketStatus === 'confirmed' || existing.ticketStatus === 'pending_approval') {
+            return { full: false, rsvpId: existing.id, alreadyConfirmed: true, existingTicketStatus: existing.ticketStatus };
+          }
+          const updated = await tx.rSVP.update({
+            where: { id: existing.id },
+            data: {
+              status: rsvpStatus,
+              ticketStatus,
+              tierId: body.tierId ?? null,
+              customAnswers: body.customAnswers ?? undefined,
+              guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
+              guestName: resolved.kind === 'guest' ? body.guestName : null,
+            },
+          });
+          return { full: false, rsvpId: updated.id, alreadyConfirmed: false };
+        }
+
+        const created = await tx.rSVP.create({
           data: {
+            workspaceId,
+            eventId: evt.id,
+            memberId: rsvpMember.id,
             status: rsvpStatus,
             ticketStatus,
             tierId: body.tierId ?? null,
@@ -151,26 +170,28 @@ export async function POST(
             guestName: resolved.kind === 'guest' ? body.guestName : null,
           },
         });
-        return { full: false, rsvpId: updated.id, alreadyConfirmed: false };
-      }
-
-      const created = await tx.rSVP.create({
-        data: {
-          workspaceId,
-          eventId: evt.id,
-          memberId: rsvpMember.id,
-          status: rsvpStatus,
-          ticketStatus,
-          tierId: body.tierId ?? null,
-          customAnswers: body.customAnswers ?? undefined,
-          guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
-          guestName: resolved.kind === 'guest' ? body.guestName : null,
-        },
-      });
-      return { full: false, rsvpId: created.id, alreadyConfirmed: false };
-    },
-    { isolationLevel: 'Serializable' },
-  );
+        return { full: false, rsvpId: created.id, alreadyConfirmed: false };
+      },
+      { isolationLevel: 'Serializable' },
+    );
+  } catch (err) {
+    void alert({
+      severity: 'error',
+      event: 'access.submit.transaction_failed',
+      workspaceId,
+      context: {
+        eventId: evt.id,
+        slug,
+        viewer: String(viewer),
+        flow: String(resolved.flow),
+        ticketStatus,
+        errorClass: err instanceof Error ? err.constructor.name : 'unknown',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      },
+    });
+    console.error('[access/submit] RSVP transaction failed', { workspaceId, eventId: evt.id, err });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
 
   if (txResult.full) {
     return NextResponse.json({ error: 'Event is full' }, { status: 409 });
