@@ -1,8 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import QRCode from 'qrcode';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
-import Image from 'next/image';
 
 export default async function MemberPassPage() {
   const { userId } = await auth();
@@ -24,10 +24,13 @@ export default async function MemberPassPage() {
 
   if (!member?.approved) redirect('/apply/thanks');
 
-  // Build QR image URL via a public QR service (no external SDK needed on client)
+  // Generate the pass QR server-side with the in-repo qrcode dep (the single
+  // mint path used everywhere else) rather than a third-party image service —
+  // keeps the member's QR token off an external host and removes an external
+  // dependency on the door check-in path. Mirrors the confirmed-RSVP page.
   const qrValue = member.memberQrCode ?? '';
   const qrImageUrl = qrValue
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrValue)}`
+    ? await QRCode.toDataURL(qrValue, { width: 200, margin: 2, color: { dark: '#1a1a1a', light: '#F9F7F2' } })
     : null;
 
   return (
