@@ -4,9 +4,12 @@ _Last updated: 2026-06-11_
 
 ---
 
-## 1. What the Slack alerting layer covers (shipped)
+## 1. What the Resend email alerting layer covers (shipped)
 
-`lib/alerting.ts` is a dependency-free Slack alert dispatcher (plain `fetch`, no packages).
+`lib/alerting.ts` is a dependency-free alert dispatcher that sends via the existing
+`lib/resend.ts` singleton (`resend.emails.send`). No new packages — Resend is already
+in the project for transactional email.
+
 It is wired into the following failure points:
 
 | Route | Event name | Severity | Trigger |
@@ -30,37 +33,43 @@ names, phone numbers, card data, tokens, full request bodies.
 **Redaction guard:** any `context` key matching `/email|phone|name|token|card|secret|password|ssn|dob|address/i`
 is replaced with `[redacted]` before the payload leaves the process.
 
-**No-op contract:** if `SLACK_ALERT_WEBHOOK_URL` is unset, the dispatcher logs to `console.error` only
+**No-op contract:** if `RESEND_API_KEY` is unset, the dispatcher logs to `console.error` only
 and returns — no exception, no change to the caller's response. Mirrors the Svix `getSvix()` pattern.
 
 **Non-blocking contract:** every `alert()` call in a route handler is `void alert(...)` — the
-promise is not awaited in the response path. The dispatcher itself sets a 3-second `AbortController`
-timeout and swallows all errors internally.
+promise is not awaited in the response path. The dispatcher swallows all errors internally.
+
+**Relay route hardening (`/api/alerting/client-error`):** per-IP fixed-window rate limit
+(5 req / 60 s, in-process Map, best-effort / per-instance). Excess requests return
+`200 {ok:true}` silently — no alert fires, no 429, no 500. Message body is truncated
+to 500 chars before reaching the dispatcher.
 
 ---
 
-## 2. New env var
+## 2. Env vars
 
-**`SLACK_ALERT_WEBHOOK_URL`** — Slack incoming webhook URL.
-Add to the "code-complete, value-not-yet-set in Vercel" list in `CLAUDE.md`'s env section alongside
-`PASSNINJA_API_KEY`, `SVIX_API_KEY`, and `TWILIO_*`.
+| Var | Required | Default | Purpose |
+|---|---|---|---|
+| `RESEND_API_KEY` | Yes (gates all email including alerts) | — | Existing Resend key; alerting no-ops if unset |
+| `ALERT_EMAIL_TO` | No | `team@thenobadcompany.com` | Destination address for alert emails |
 
-To create one: Slack → App Directory → Incoming Webhooks → Add to workspace → choose `#alerts` (or
-a dedicated `#nobc-alerts` channel) → copy the URL.
+`from` is always `NoBC Alerts <team@thenobadcompany.com>` (locked address per CLAUDE.md).
+
+Alert subjects take the form `[CRITICAL] stripe.payment_intent.create_failed`.
 
 ---
 
 ## 3. Sentry — proposed next step (NEW DEPENDENCY, requires Adam's sign-off)
 
-### What Sentry adds beyond Slack webhooks
+### What Sentry adds beyond Resend email alerts
 
-| Capability | Slack alerting (now) | Sentry (proposed) |
+| Capability | Resend alerting (now) | Sentry (proposed) |
 |---|---|---|
 | Real-time notification | Yes | Yes |
 | Full stack traces | No (message + class only) | Yes |
 | Source map resolution | No | Yes (maps minified frames to source) |
 | Release tracking | No | Yes (`SENTRY_RELEASE` per deploy) |
-| Error grouping / dedup | No (every throw = one message) | Yes (fingerprinted issues) |
+| Error grouping / dedup | No (every throw = one email) | Yes (fingerprinted issues) |
 | Regression detection | No | Yes (issue resurfaces after mark-resolved) |
 | Performance tracing | No | Yes (transaction spans, Web Vitals) |
 | Session replay | No | Yes (optional, PII risk — review before enabling) |
@@ -132,4 +141,4 @@ This adds `instrumentation.ts`, `sentry.client.config.ts`, `sentry.server.config
 Define a payment-path SLI: "% of PaymentIntent create + capture calls that complete without a 5xx".
 Target: 99.9% over 7 days (≈ 10 minutes of budget per week). Alert at 14.4x burn rate (exhausts
 monthly budget in 2 hours). This requires a metrics layer (Sentry performance or Vercel Analytics
-`unstable_after`) — not possible with Slack-only alerting today.
+`unstable_after`) — not possible with email-only alerting today.

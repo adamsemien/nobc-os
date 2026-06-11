@@ -1,19 +1,19 @@
 /**
  * lib/alerting.ts
  *
- * Dependency-free Slack alert dispatcher.
- *
- * No-op until SLACK_ALERT_WEBHOOK_URL is set — mirrors the established
+ * Resend email alert dispatcher. Reuses lib/resend.ts singleton — no new
+ * dependencies. No-op until RESEND_API_KEY is set, mirroring the established
  * "code-complete, env-unset" pattern used by getSvix() and wallet-pass.ts.
  *
  * Rules:
  *  - Never throws. All errors are swallowed internally.
- *  - Never blocks the caller. Fire-and-forget via void (or awaited with a
- *    short AbortController timeout that swallows errors).
+ *  - Never blocks the caller. Fire-and-forget via void.
  *  - Never logs PII. A redaction guard strips any context key whose name
  *    matches the PII_KEYS pattern before the payload leaves this module.
  *  - Additive only — calling this never alters control flow in the caller.
  */
+
+import { resend } from './resend';
 
 export type AlertSeverity = 'critical' | 'error' | 'warn';
 
@@ -38,34 +38,33 @@ function redact(ctx: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-const SEVERITY_EMOJI: Record<AlertSeverity, string> = {
-  critical: ':red_circle:',
-  error: ':large_orange_circle:',
-  warn: ':large_yellow_circle:',
-};
+const FROM = 'NoBC Alerts <team@thenobadcompany.com>';
 
-function buildSlackMessage(payload: AlertPayload): string {
+function buildEmailBody(payload: AlertPayload): { subject: string; text: string } {
   const ts = new Date().toISOString();
-  const emoji = SEVERITY_EMOJI[payload.severity];
   const ctx = payload.context ? redact(payload.context) : undefined;
 
+  const subject = `[${payload.severity.toUpperCase()}] ${payload.event}`;
+
   const lines: string[] = [
-    `${emoji} *[${payload.severity.toUpperCase()}]* \`${payload.event}\``,
-    `• *time:* ${ts}`,
+    `severity: ${payload.severity.toUpperCase()}`,
+    `event:    ${payload.event}`,
+    `time:     ${ts}`,
   ];
 
   if (payload.workspaceId) {
-    lines.push(`• *workspace:* \`${payload.workspaceId}\``);
+    lines.push(`workspace: ${payload.workspaceId}`);
   }
 
   if (ctx && Object.keys(ctx).length > 0) {
-    lines.push('• *context:*');
+    lines.push('');
+    lines.push('context:');
     for (const [k, v] of Object.entries(ctx)) {
-      lines.push(`  - \`${k}\`: ${String(v)}`);
+      lines.push(`  ${k}: ${String(v)}`);
     }
   }
 
-  return lines.join('\n');
+  return { subject, text: lines.join('\n') };
 }
 
 /**
@@ -74,11 +73,9 @@ function buildSlackMessage(payload: AlertPayload): string {
  * resolves (never rejects).
  */
 export async function alert(payload: AlertPayload): Promise<void> {
-  const webhookUrl = process.env.SLACK_ALERT_WEBHOOK_URL;
-
-  if (!webhookUrl) {
+  if (!process.env.RESEND_API_KEY) {
     // No-op: env not set. Log locally so failures are visible in Vercel logs.
-    console.error('[alerting] alert fired but SLACK_ALERT_WEBHOOK_URL is unset', {
+    console.error('[alerting] alert fired but RESEND_API_KEY is unset', {
       severity: payload.severity,
       event: payload.event,
       workspaceId: payload.workspaceId,
@@ -86,18 +83,11 @@ export async function alert(payload: AlertPayload): Promise<void> {
     return;
   }
 
+  const to = process.env.ALERT_EMAIL_TO ?? 'team@thenobadcompany.com';
+  const { subject, text } = buildEmailBody(payload);
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-
-    await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: buildSlackMessage(payload) }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
+    await resend.emails.send({ from: FROM, to, subject, text });
   } catch (err) {
     // Swallow — a failed alert must never surface to the user.
     console.error('[alerting] failed to deliver alert', {
