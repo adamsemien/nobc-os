@@ -42,6 +42,8 @@ interface Tally {
   correct: number;
   redMisses: number;
   timeouts: number;
+  strikes: number;
+  served: number;
 }
 
 const ZERO_TALLY: Tally = {
@@ -53,7 +55,13 @@ const ZERO_TALLY: Tally = {
   correct: 0,
   redMisses: 0,
   timeouts: 0,
+  strikes: 0,
+  served: 0,
 };
+
+/** Three wrong calls and the manager pulls you. A Red List admit costs two. */
+const STRIKES_MAX = 3;
+const PERFECT_BONUS = 500;
 
 const FIRST_NAMES = [
   'Marcus', 'Dana', 'Priya', 'Jordan', 'Maya', 'Theo', 'Nina', 'Andre',
@@ -166,11 +174,12 @@ function buildRounds(): RoundSpec[] {
   ];
 }
 
-function verdictFor(t: Tally): string {
-  if (t.correct >= 16) return 'The door is in good hands. Same time tomorrow.';
+function verdictFor(t: Tally, lost: boolean): string {
+  if (lost) return 'The manager saw that. We found your name on the schedule — we crossed it out.';
+  if (t.correct === 18) return 'Flawless. The Back Room keeps your name.';
+  if (t.correct >= 15) return 'The door is in good hands. Same time tomorrow.';
   if (t.correct >= 12) return 'Tight enough. Watch the comp line.';
-  if (t.correct >= 8) return 'The room noticed. The room remembers.';
-  return 'We found your name on the schedule. We crossed it out.';
+  return 'You survived. The room noticed.';
 }
 
 export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
@@ -184,6 +193,7 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
   const [dragging, setDragging] = useState(false);
   const [outcome, setOutcome] = useState<'in' | 'out' | null>(null);
   const [announce, setAnnounce] = useState('');
+  const [endedEarly, setEndedEarly] = useState(false);
 
   const round = rounds[roundIdx];
   const current = round.guests[guestIdx];
@@ -210,7 +220,10 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
     setOutcome(null);
     setDrag(0);
     resolvedRef.current = false;
-    if (guestIdx + 1 < round.guests.length) {
+    if (tallyRef.current.strikes >= STRIKES_MAX) {
+      setEndedEarly(true);
+      setMode('report'); // the manager pulls you mid-shift
+    } else if (guestIdx + 1 < round.guests.length) {
       setGuestIdx((i) => i + 1);
     } else if (roundIdx + 1 < rounds.length) {
       setRoundIdx((r) => r + 1);
@@ -218,14 +231,6 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
       setMode('briefing');
     } else {
       setMode('report');
-      const score = tallyRef.current.score;
-      try {
-        const stored = Number(localStorage.getItem(BEST_KEY)) || 0;
-        if (score > stored) localStorage.setItem(BEST_KEY, String(score));
-        setBest(Math.max(score, stored));
-      } catch {
-        // best score not persisted — fine
-      }
     }
   }, [guestIdx, roundIdx, round.guests.length, rounds.length]);
 
@@ -239,6 +244,7 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
       if (correct) sfx?.pluck();
       else sfx?.buzz();
 
+      const redMiss = action === 'admit' && current.redList;
       setTally((t) => {
         const streak = correct ? t.streak + 1 : 0;
         return {
@@ -248,8 +254,10 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
           admitted: t.admitted + (action === 'admit' ? 1 : 0),
           held: t.held + (action === 'hold' ? 1 : 0),
           correct: t.correct + (correct ? 1 : 0),
-          redMisses: t.redMisses + (action === 'admit' && current.redList ? 1 : 0),
+          redMisses: t.redMisses + (redMiss ? 1 : 0),
           timeouts: t.timeouts + (action === null ? 1 : 0),
+          strikes: t.strikes + (correct ? 0 : redMiss ? 2 : 1),
+          served: t.served + 1,
         };
       });
 
@@ -304,9 +312,23 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
     setGuestIdx(0);
     setOutcome(null);
     setDrag(0);
+    setEndedEarly(false);
     resolvedRef.current = false;
     setMode('briefing');
   }, []);
+
+  // Shift over — bank the score. A perfect 18/18 earns the house bonus.
+  const finalScore = tally.score + (tally.correct === 18 ? PERFECT_BONUS : 0);
+  useEffect(() => {
+    if (mode !== 'report') return;
+    try {
+      const stored = Number(localStorage.getItem(BEST_KEY)) || 0;
+      if (finalScore > stored) localStorage.setItem(BEST_KEY, String(finalScore));
+      setBest(Math.max(finalScore, stored));
+    } catch {
+      // best score not persisted — fine
+    }
+  }, [mode, finalScore]);
 
   const cardClass = [
     'lc-guest',
@@ -325,6 +347,23 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
 
       <div className="lc-topbar">
         <span>Guest {Math.min(guestNumber, 18)} / 18</span>
+        <span aria-label={`${tally.strikes} of ${STRIKES_MAX} strikes`}>
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              aria-hidden
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                marginLeft: i === 0 ? 0 : 5,
+                background: i < tally.strikes ? 'var(--primary)' : 'transparent',
+                border: '1px solid var(--border-strong)',
+              }}
+            />
+          ))}
+        </span>
         <span>
           Score {tally.score}
           {tally.streak >= 3 ? ` · streak ×${tally.streak}` : ''}
@@ -359,7 +398,11 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
           )}
           <p className="mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
             Swipe right to let in, left to hold. Arrows or buttons work too. Hesitate and they
-            decide for you.
+            decide for you.{' '}
+            <strong style={{ color: 'var(--text-secondary)' }}>
+              Three wrong calls and the manager pulls you off the door.
+            </strong>
+            {round.redNames.length > 0 ? ' A Red List name getting past you costs two.' : ''}
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-4">
             <button
@@ -482,9 +525,12 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
         <div className="lc-brief">
           <p
             className="text-[10px] font-semibold uppercase"
-            style={{ color: 'var(--text-muted)', letterSpacing: '0.32em' }}
+            style={{
+              color: endedEarly ? 'var(--primary)' : 'var(--text-muted)',
+              letterSpacing: '0.32em',
+            }}
           >
-            Shift report
+            {endedEarly ? 'Shift ended early' : 'Shift cleared'}
           </p>
           <h3
             className="br-title mt-2"
@@ -494,24 +540,31 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
               color: 'var(--text-primary)',
             }}
           >
-            {tally.score} points
+            {finalScore} points
           </h3>
           <p className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {endedEarly ? `The manager pulled you at guest ${tally.served} of 18. ` : ''}
             You let in {tally.admitted}, held {tally.held}
-            {tally.timeouts > 0 ? `, froze on ${tally.timeouts}` : ''}. {tally.correct} of 18
-            calls were right{tally.bestStreak >= 3 ? ` — best streak ${tally.bestStreak}` : ''}.
+            {tally.timeouts > 0 ? `, froze on ${tally.timeouts}` : ''}. {tally.correct} of{' '}
+            {tally.served} calls were right
+            {tally.bestStreak >= 3 ? ` — best streak ${tally.bestStreak}` : ''}.
           </p>
+          {tally.correct === 18 && (
+            <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--success)' }}>
+              Perfect shift — the house adds {PERFECT_BONUS}.
+            </p>
+          )}
           {tally.redMisses > 0 && (
             <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--primary)' }}>
               {tally.redMisses} from the Red List got past you.
             </p>
           )}
           <p className="mt-3 text-sm italic" style={{ color: 'var(--text-primary)' }}>
-            {verdictFor(tally)}
+            {verdictFor(tally, endedEarly)}
           </p>
           {best !== null && (
             <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-              Best shift on this door: {Math.max(best, tally.score)}
+              Best shift on this door: {Math.max(best, finalScore)}
             </p>
           )}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-4">
