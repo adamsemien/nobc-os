@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * LAST CALL — the door game. You work the door for one shift: 18 guests over
- * 3 rounds, each round adding a rule (members only → plus-ones welcome → Red
- * List in effect). Swipe right to let in, swipe left to hold; arrow keys or
- * the buttons on desktop. Entered from the Back Room matchbook.
+ * 3 rounds, each round adding a rule (members only → plus-ones welcome →
+ * Blocked List in effect). Swipe right to let in, swipe left to hold; arrow
+ * keys or the buttons on desktop. Entered from the Back Room matchbook.
  *
  * The guests are YOUR ROOM: drawn live from the workspace roster (the same
  * operator-authed GET /api/operator/members the Members page reads), with the
- * Red List round briefing real BLOCKED watch-list names and flavor lines from
- * real attendance history. Display-only: nothing is written, nothing leaves
+ * final round briefing real Blocked List (WatchList BLOCKED) names and flavor
+ * lines from real attendance history. Display-only: nothing is written, nothing leaves
  * the operator surface, sponsor firewall untouched. High score only, in
  * localStorage. If the roster is too small or unreachable, the door falls
  * back to procedurally generated rehearsal stock.
@@ -27,12 +27,12 @@ interface Guest {
   claim: string; // display string — canonical access language only
   flavor: string;
   shouldAdmit: boolean;
-  redList: boolean;
+  blocked: boolean;
 }
 
 interface RoundSpec {
   rule: string;
-  redNames: string[];
+  blockedNames: string[];
   guests: Guest[];
   msPerGuest: number;
 }
@@ -44,7 +44,7 @@ interface Tally {
   admitted: number;
   held: number;
   correct: number;
-  redMisses: number;
+  blockedMisses: number;
   timeouts: number;
   strikes: number;
   served: number;
@@ -57,13 +57,13 @@ const ZERO_TALLY: Tally = {
   admitted: 0,
   held: 0,
   correct: 0,
-  redMisses: 0,
+  blockedMisses: 0,
   timeouts: 0,
   strikes: 0,
   served: 0,
 };
 
-/** Three wrong calls and the manager pulls you. A Red List admit costs two. */
+/** Three wrong calls and the manager pulls you. A Blocked List admit costs two. */
 const STRIKES_MAX = 3;
 const PERFECT_BONUS = 500;
 
@@ -118,7 +118,7 @@ function guest(
   exclude: Set<string>,
   claim: (name: string, exclude: Set<string>) => string,
   shouldAdmit: boolean,
-  redList = false,
+  blocked = false,
   forcedName?: string,
 ): Guest {
   const name = forcedName ?? makeName(exclude);
@@ -128,7 +128,7 @@ function guest(
     claim: claim(name, exclude),
     flavor: pick(FLAVORS),
     shouldAdmit,
-    redList,
+    blocked,
   };
 }
 
@@ -150,26 +150,26 @@ const MIN_REAL_POOL = 8;
 
 function realFlavor(p: RosterPerson): string {
   const attended = p.totalEventsAttended ?? 0;
+  if (p.isVip) return 'Purple List — house VIP';
   if (attended >= 1) return `${attended} event${attended === 1 ? '' : 's'} on the book`;
-  if (p.isVip) return 'Purple List — handle with care';
   if (p.companyName) return `from ${p.companyName}`;
   return pick(FLAVORS);
 }
 
-function realGuest(p: RosterPerson, claim: string, shouldAdmit: boolean, redList = false): Guest {
+function realGuest(p: RosterPerson, claim: string, shouldAdmit: boolean, blocked = false): Guest {
   return {
     name: p.fullName,
     initials: initialsOf(p.fullName),
     claim,
     flavor: realFlavor(p),
     shouldAdmit,
-    redList,
+    blocked,
   };
 }
 
 /** Build the shift from the actual workspace roster. Same rules and claim mix
  *  as the rehearsal path — but every face is someone from your room, and the
- *  Red List round uses your real BLOCKED names when you have them. */
+ *  final round uses your real Blocked List names when you have them. */
 function buildRoundsFromPool(pool: RosterPerson[]): RoundSpec[] {
   const eligible = shuffle(pool.filter((p) => !p.isBlocked && p.fullName.trim()));
   let cursor = 0;
@@ -198,16 +198,16 @@ function buildRoundsFromPool(pool: RosterPerson[]): RoundSpec[] {
     realGuest(next(), 'Comp Access', false),
   ]);
 
-  // Real Red List first; if the workspace has fewer than two BLOCKED names,
-  // tonight's briefing designates real members to fill the list (still fair —
-  // the briefing shows the names either way).
-  const reds = shuffle(pool.filter((p) => p.isBlocked && p.fullName.trim())).slice(0, 2);
-  while (reds.length < 2) reds.push(next());
-  const redNames = reds.map((p) => p.fullName);
+  // Real Blocked List first; if the workspace has fewer than two BLOCKED
+  // names, tonight's briefing designates real members to fill the list (still
+  // fair — the briefing shows the names either way).
+  const barred = shuffle(pool.filter((p) => p.isBlocked && p.fullName.trim())).slice(0, 2);
+  while (barred.length < 2) barred.push(next());
+  const blockedNames = barred.map((p) => p.fullName);
 
   const r3 = shuffle([
-    realGuest(reds[0], 'Member', false, true),
-    realGuest(reds[1], 'Comp Access', false, true),
+    realGuest(barred[0], 'Member', false, true),
+    realGuest(barred[1], 'Comp Access', false, true),
     realGuest(next(), 'Member', true),
     realGuest(next(), plusOneOf(), true),
     realGuest(next(), 'Comp Access', true),
@@ -215,9 +215,9 @@ function buildRoundsFromPool(pool: RosterPerson[]): RoundSpec[] {
   ]);
 
   return [
-    { rule: 'Members only. Everyone else waits.', redNames: [], guests: r1, msPerGuest: 4000 },
-    { rule: 'Plus-ones welcome tonight. The comp list is closed.', redNames: [], guests: r2, msPerGuest: 3200 },
-    { rule: 'Comp Access reopens. Two names never make it in:', redNames, guests: r3, msPerGuest: 2700 },
+    { rule: 'Members only. Everyone else waits.', blockedNames: [], guests: r1, msPerGuest: 4000 },
+    { rule: 'Plus-ones welcome tonight. The comp list is closed.', blockedNames: [], guests: r2, msPerGuest: 3200 },
+    { rule: 'Comp Access reopens. Two names never make it in:', blockedNames, guests: r3, msPerGuest: 2700 },
   ];
 }
 
@@ -245,10 +245,10 @@ function buildRounds(): RoundSpec[] {
   ]);
 
   // Round 3 — comps reopen, but two names never make it in.
-  const redNames = [makeName(used), makeName(used)];
+  const blockedNames = [makeName(used), makeName(used)];
   const r3 = shuffle([
-    guest(used, asMember, false, true, redNames[0]),
-    guest(used, asCompAccess, false, true, redNames[1]),
+    guest(used, asMember, false, true, blockedNames[0]),
+    guest(used, asCompAccess, false, true, blockedNames[1]),
     guest(used, asMember, true),
     guest(used, asPlusOne, true),
     guest(used, asCompAccess, true),
@@ -256,9 +256,9 @@ function buildRounds(): RoundSpec[] {
   ]);
 
   return [
-    { rule: 'Members only. Everyone else waits.', redNames: [], guests: r1, msPerGuest: 4000 },
-    { rule: 'Plus-ones welcome tonight. The comp list is closed.', redNames: [], guests: r2, msPerGuest: 3200 },
-    { rule: 'Comp Access reopens. Two names never make it in:', redNames, guests: r3, msPerGuest: 2700 },
+    { rule: 'Members only. Everyone else waits.', blockedNames: [], guests: r1, msPerGuest: 4000 },
+    { rule: 'Plus-ones welcome tonight. The comp list is closed.', blockedNames: [], guests: r2, msPerGuest: 3200 },
+    { rule: 'Comp Access reopens. Two names never make it in:', blockedNames, guests: r3, msPerGuest: 2700 },
   ];
 }
 
@@ -360,7 +360,7 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
       if (correct) sfx?.pluck();
       else sfx?.buzz();
 
-      const redMiss = action === 'admit' && current.redList;
+      const blockedMiss = action === 'admit' && current.blocked;
       setTally((t) => {
         const streak = correct ? t.streak + 1 : 0;
         return {
@@ -370,9 +370,9 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
           admitted: t.admitted + (action === 'admit' ? 1 : 0),
           held: t.held + (action === 'hold' ? 1 : 0),
           correct: t.correct + (correct ? 1 : 0),
-          redMisses: t.redMisses + (redMiss ? 1 : 0),
+          blockedMisses: t.blockedMisses + (blockedMiss ? 1 : 0),
           timeouts: t.timeouts + (action === null ? 1 : 0),
-          strikes: t.strikes + (correct ? 0 : redMiss ? 2 : 1),
+          strikes: t.strikes + (correct ? 0 : blockedMiss ? 2 : 1),
           served: t.served + 1,
         };
       });
@@ -525,9 +525,9 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
           <p className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {round.rule}
           </p>
-          {round.redNames.length > 0 && (
+          {round.blockedNames.length > 0 && (
             <p className="mt-2 text-base font-semibold" style={{ color: 'var(--primary)' }}>
-              {round.redNames.join(' · ')}
+              {round.blockedNames.join(' · ')}
             </p>
           )}
           <p className="mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -536,7 +536,7 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
             <strong style={{ color: 'var(--text-secondary)' }}>
               Three wrong calls and the manager pulls you off the door.
             </strong>
-            {round.redNames.length > 0 ? ' A Red List name getting past you costs two.' : ''}
+            {round.blockedNames.length > 0 ? ' A Blocked List name getting past you costs two.' : ''}
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-4">
             <button
@@ -688,9 +688,9 @@ export function LastCallGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) 
               Perfect shift — the house adds {PERFECT_BONUS}.
             </p>
           )}
-          {tally.redMisses > 0 && (
+          {tally.blockedMisses > 0 && (
             <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--primary)' }}>
-              {tally.redMisses} from the Red List got past you.
+              {tally.blockedMisses} from the Blocked List got past you.
             </p>
           )}
           <p className="mt-3 text-sm italic" style={{ color: 'var(--text-primary)' }}>
