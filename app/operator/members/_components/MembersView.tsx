@@ -58,10 +58,18 @@ export function MembersView({
               Connectors
             </Link>
             {canAddMembers ? (
-              <AddMemberDrawer
-                onCreated={handleCreated}
-                members={members.map((mem) => ({ id: mem.id, fullName: mem.fullName, email: mem.email }))}
-              />
+              <>
+                <Link
+                  href="/operator/members/import"
+                  className="text-sm font-medium text-text-secondary underline-offset-4 hover:text-text-primary hover:underline"
+                >
+                  Import
+                </Link>
+                <AddMemberDrawer
+                  onCreated={handleCreated}
+                  members={members.map((mem) => ({ id: mem.id, fullName: mem.fullName, email: mem.email }))}
+                />
+              </>
             ) : null}
           </div>
         }
