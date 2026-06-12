@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
       });
 
       await db.rSVP.update({
-        where: { id: rsvpId },
+        // Workspace-scope the write (defense in depth) — workspaceId comes from
+        // the Stripe-signed session metadata, so this never widens the gate.
+        where: { id: rsvpId, workspaceId },
         data: { ticketStatus: 'confirmed', status: 'CONFIRMED' },
       });
 
