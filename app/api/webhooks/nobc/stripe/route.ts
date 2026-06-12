@@ -235,8 +235,15 @@ export async function POST(req: NextRequest) {
 
           const rsvp = await tx.rSVP.findFirst({
             where: { stripePaymentIntentId: pi.id },
-            select: { id: true },
+            select: { id: true, eventId: true, paymentStatus: true, guestEmail: true, guestName: true },
           });
+
+          // Decide email eligibility from the prior paymentStatus BEFORE the write.
+          // For immediate-capture ticketed purchases, amount_capturable_updated never
+          // fires, so succeeded is the only confirm signal and must send the email here.
+          // For apply-required (manual capture), paymentStatus was already AUTHORIZED at
+          // authorize time, so this returns false and we do NOT double-email.
+          const isFirstConfirmation = shouldSendConfirmationEmail(rsvp?.paymentStatus ?? null);
 
           // Money-state write.
           await tx.rSVP.updateMany({
@@ -256,6 +263,17 @@ export async function POST(req: NextRequest) {
                 },
               });
             });
+            // Confirmation email on the immediate-capture path only. False for
+            // apply-required (already emailed at authorize time) and on retries.
+            if (isFirstConfirmation) {
+              deferConfirmationEmail(deferred, {
+                eventId: rsvp.eventId,
+                memberId,
+                rsvpId: rsvp.id,
+                guestEmail: rsvp.guestEmail,
+                guestName: rsvp.guestName,
+              });
+            }
           }
           break;
         }

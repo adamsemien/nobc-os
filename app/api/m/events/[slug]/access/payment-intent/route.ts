@@ -226,7 +226,10 @@ export async function POST(
       {
         amount: amountCents,
         currency: 'usd',
-        capture_method: 'manual',
+        // approvalRequired -> 'manual' (authorize-and-hold, captured on operator
+        // approval); ticketed no-approval -> 'automatic' (immediate capture,
+        // captured by Stripe on payment_intent.succeeded).
+        capture_method: event.approvalRequired ? 'manual' : 'automatic',
         description: event.title,
         receipt_email: rsvpMember.email,
         automatic_payment_methods: { enabled: true },

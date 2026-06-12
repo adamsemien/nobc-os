@@ -101,7 +101,10 @@ export async function POST(req: NextRequest) {
     pi = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: 'usd',
-      capture_method: 'manual',
+      // approvalRequired -> 'manual' (authorize-and-hold, captured on operator
+      // approval); ticketed no-approval -> 'automatic' (immediate capture,
+      // captured by Stripe on payment_intent.succeeded).
+      capture_method: event.approvalRequired ? 'manual' : 'automatic',
       description: event.title,
       receipt_email: member.email,
       metadata: { workspaceId, eventId, memberId: member.id },

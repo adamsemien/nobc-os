@@ -153,8 +153,11 @@ export async function POST(
     }
   }
 
-  // Authorize-and-hold: capture_method: 'manual' — payment is held, not captured.
-  // Operator approves → capture; operator rejects → cancel PI.
+  // Capture method depends on the approval gate:
+  //   - approvalRequired === true  -> 'manual' (authorize-and-hold; apply-or-pay).
+  //     Operator approves -> capture; operator rejects -> cancel PI.
+  //   - approvalRequired === false -> 'automatic' (immediate capture; ticketed).
+  //     Captured by Stripe on payment_intent.succeeded.
   //
   // Idempotency key scoped to (workspace, event, member) so a guest double-tap
   // or network retry resolves to the same Stripe PaymentIntent instead of
@@ -165,7 +168,7 @@ export async function POST(
     {
       amount: amountCents,
       currency: 'usd',
-      capture_method: 'manual',
+      capture_method: event.approvalRequired ? 'manual' : 'automatic',
       description: event.title,
       receipt_email: rsvpMember.email,
       automatic_payment_methods: { enabled: true },
