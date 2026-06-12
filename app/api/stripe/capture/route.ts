@@ -1,8 +1,8 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireWorkspaceId } from '@/lib/auth';
+import { requireRole } from '@/lib/operator-role';
 import { stripe } from '@/lib/stripe';
 import { alert } from '@/lib/alerting';
 
@@ -11,10 +11,13 @@ const BodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const workspaceId = await requireWorkspaceId(userId);
+  // Capture is an operational money write — gate to STAFF+ so a READ_ONLY org
+  // member can't settle a held payment. Mirrors the refund route's requireRole
+  // gating (refund is ADMIN; capture is the STAFF-level operational equivalent
+  // of approving a held RSVP).
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { userId, workspaceId } = gate;
 
   let body: z.infer<typeof BodySchema>;
   try {
