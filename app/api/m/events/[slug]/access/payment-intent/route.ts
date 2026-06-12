@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { runSerializable } from '@/lib/serializable-retry';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { isStaff } from '@/lib/operator-role';
 import { stripe } from '@/lib/stripe';
@@ -272,36 +273,33 @@ export async function POST(
   } else {
     let created: { id: string };
     try {
-      created = await db.$transaction(
-        async (tx) => {
-          // Re-check capacity inside the transaction to close the race window.
-          if (event.capacity) {
-            const taken = await tx.rSVP.count({
-              where: { workspaceId, eventId: evt.id, ticketStatus: { in: ['confirmed', 'held'] } },
-            });
-            if (taken >= event.capacity) {
-              throw Object.assign(new Error('Event is full'), { code: 'FULL' });
-            }
-          }
-          return tx.rSVP.create({
-            data: {
-              workspaceId,
-              eventId: evt.id,
-              memberId: rsvpMember.id,
-              status: 'CONFIRMED',
-              ticketStatus: 'held',
-              stripePaymentIntentId: pi.id,
-              paymentStatus: 'AUTHORIZED',
-              amountCents,
-              tierId: resolvedTierId ?? null,
-              customAnswers: body.customAnswers ?? undefined,
-              guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
-              guestName: resolved.kind === 'guest' ? body.guestName : null,
-            },
+      created = await runSerializable(db, async (tx) => {
+        // Re-check capacity inside the transaction to close the race window.
+        if (event.capacity) {
+          const taken = await tx.rSVP.count({
+            where: { workspaceId, eventId: evt.id, ticketStatus: { in: ['confirmed', 'held'] } },
           });
-        },
-        { isolationLevel: 'Serializable' },
-      );
+          if (taken >= event.capacity) {
+            throw Object.assign(new Error('Event is full'), { code: 'FULL' });
+          }
+        }
+        return tx.rSVP.create({
+          data: {
+            workspaceId,
+            eventId: evt.id,
+            memberId: rsvpMember.id,
+            status: 'CONFIRMED',
+            ticketStatus: 'held',
+            stripePaymentIntentId: pi.id,
+            paymentStatus: 'AUTHORIZED',
+            amountCents,
+            tierId: resolvedTierId ?? null,
+            customAnswers: body.customAnswers ?? undefined,
+            guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
+            guestName: resolved.kind === 'guest' ? body.guestName : null,
+          },
+        });
+      });
     } catch (err) {
       if (err instanceof Error && (err as { code?: string }).code === 'FULL') {
         // Cancel the PI we just created so it doesn't dangle.
