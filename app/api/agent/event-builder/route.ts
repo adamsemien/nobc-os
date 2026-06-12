@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/operator-role';
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { alert } from '@/lib/alerting';
 
 // AI Event Builder — single structured generation. The model proposes a draft
 // event scaffold; it writes nothing to the DB and registers no tools. The operator
@@ -107,10 +108,12 @@ export async function POST(req: NextRequest) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-20250514'),
-    schema: EventDraftSchema,
-    prompt: `You are a creative director for No Bad Company, a premium curated member club. Today is ${today}.
+  let object: z.infer<typeof EventDraftSchema>;
+  try {
+    const result = await generateObject({
+      model: anthropic('claude-sonnet-4-20250514'),
+      schema: EventDraftSchema,
+      prompt: `You are a creative director for No Bad Company, a premium curated member club. Today is ${today}.
 
 Generate a complete event draft for this concept: "${prompt}"
 
@@ -140,7 +143,45 @@ Announcement rules (the announcementDraft field) — follow exactly:
 - Say "Access" or "Get Access", never "RSVP".
 - Refer to the club as "No Bad Company" or "NoBC". Never write "NBC".
 - Keep it to at most three short paragraphs. It is a draft for an operator to review, not a sent message.`,
-  });
+    });
+    object = result.object;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const statusCode =
+      err != null && typeof err === 'object' && 'statusCode' in err
+        ? (err as { statusCode: number }).statusCode
+        : undefined;
+
+    console.error('[event-builder] generateObject failed', {
+      statusCode,
+      workspaceId: gate.workspaceId,
+      message,
+    });
+
+    // Fire-and-forget alert (no-op if RESEND_API_KEY unset).
+    void alert({
+      severity: 'error',
+      event: 'ai.event_builder.failed',
+      workspaceId: gate.workspaceId,
+      context: { statusCode, message },
+    });
+
+    // Distinguish retryable (rate-limit / overloaded) from hard config errors
+    // so the operator sees a useful message rather than a generic 500.
+    const isRetryable = statusCode === 429 || statusCode === 529;
+    const isBilling = statusCode === 402;
+    const isAuth = statusCode === 401 || statusCode === 403;
+
+    const userMessage = isRetryable
+      ? 'AI is temporarily unavailable. Please try again in a moment.'
+      : isBilling
+        ? 'AI generation is unavailable due to a billing issue. Contact the workspace admin.'
+        : isAuth
+          ? 'AI generation failed due to a configuration error. Contact the workspace admin.'
+          : 'AI generation failed. Please try again.';
+
+    return NextResponse.json({ error: userMessage }, { status: isRetryable ? 503 : 500 });
+  }
 
   // status is never taken from the model — the draft is always reviewed and
   // committed as DRAFT through the existing create flow.
