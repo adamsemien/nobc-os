@@ -9,7 +9,8 @@
 > second-brain capture and have **not** been independently re-verified in code here —
 > confirm before relying on them.
 
-`main` is synced to **`origin/main` @ `991043c` (#101)** as of 2026-06-12.
+`main` is at **`origin/main` @ `f7c0b3e` (#105)** as of 2026-06-12 (this worktree's
+`chore/sync-state-2026-06-12` branch was cut at `#101`; the two money-path PRs below landed after).
 
 ---
 
@@ -26,6 +27,7 @@ nothing to its first live surfaces:
 | **Member intelligence / memory** | `#68` cross-event guest-memory aggregation (Phase C) |
 | **Operator** | `#88` The Back Room (knock easter egg, Darkroom theme, Last Call door game) · `#93` Editorial theme in Cmd+K |
 | **Hardening / fixes** | `#100` AI Event Builder hardened vs Anthropic API errors · `#101` DAM + House Phone mobile-usable |
+| **Money-path hardening** (for the June 20 all-guest paid event) | `#104` capture route gated to STAFF+ (was settle-by-anyone) · guest PI idempotency key · webhook RSVP workspace-scope · P2034 serializable-retry helper · `#105` **guest-checkout oversell race closed** (`/e/[slug]` Serializable capacity re-check + dangling-PI cancel, keeps the idempotency key) + promote-waitlist oversell lock |
 | **Data** | **`#57` migration-history drift reconciled** — the open flux gate from the last doc is **CLOSED** |
 
 Earlier in the same window (already on `main`): `#70`/`#72` ticketed money-path
@@ -89,6 +91,12 @@ as product source-of-truth — **⚠️ that file is currently MISSING from the 
   already-merged money-path coverage before merging — avoid duplicate/ conflicting specs.
 - **G6 / RLS** (tenant-isolation multiplier) — still not started; revisit after the spine
   round-trip proves out.
+- **Money-path for the June 20 event is hardened** (`#104` + `#105`, both merged). Remaining
+  oversell hardening for the **approve** and **plus-one** routes is *deferred* (not needed for an
+  all-guest event) — that stranded WIP is preserved in `_context/_audit/STRANDED-money-path-wip.patch`.
+  Earlier note retracted: the audit's oversell findings were **not** false positives — the prior
+  "already fixed" read was off an unmerged branch's working tree; real `main` lacked the guest +
+  promote-waitlist transactions until `#105`.
 - **`docs/session-state` branch is a STALE REVERT-BOMB** — it branched off an old `main` and
   merging it would delete ~162 files / ~16k lines (the entire connector-test suite). **Do not
   merge it.** This doc supersedes it.
