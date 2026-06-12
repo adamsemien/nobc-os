@@ -54,6 +54,7 @@ next-env.d.ts
 
 # claude code
 .claude/
+.claire/
 .agents/
 .codex/
 
