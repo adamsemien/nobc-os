@@ -74,8 +74,8 @@ export function MediaToolbar({
   } as const;
 
   return (
-    <div className="flex items-center gap-3 py-3">
-      <div className="relative max-w-md flex-1">
+    <div className="flex flex-wrap items-center gap-2 py-3 md:gap-3">
+      <div className="relative w-full min-w-0 flex-1 sm:max-w-md">
         <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
         <input
           value={q}

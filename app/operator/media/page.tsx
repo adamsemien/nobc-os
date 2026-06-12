@@ -29,7 +29,7 @@ export default async function MediaPage() {
 
   return (
     <div className="flex h-screen flex-col font-[family-name:var(--font-dm-sans)]">
-      <div className="shrink-0 px-6 pt-8 lg:px-10">
+      <div className="shrink-0 px-4 pt-6 md:px-6 md:pt-8 lg:px-10">
         <PageHeader
           title="Media"
           action={
