@@ -155,15 +155,24 @@ export async function POST(
 
   // Authorize-and-hold: capture_method: 'manual' — payment is held, not captured.
   // Operator approves → capture; operator rejects → cancel PI.
-  const pi = await stripe.paymentIntents.create({
-    amount: amountCents,
-    currency: 'usd',
-    capture_method: 'manual',
-    description: event.title,
-    receipt_email: rsvpMember.email,
-    automatic_payment_methods: { enabled: true },
-    metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug },
-  });
+  //
+  // Idempotency key scoped to (workspace, event, member) so a guest double-tap
+  // or network retry resolves to the same Stripe PaymentIntent instead of
+  // minting a second live 7-day card hold. Mirrors the member route
+  // (app/api/m/events/[slug]/access/payment-intent/route.ts).
+  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}`;
+  const pi = await stripe.paymentIntents.create(
+    {
+      amount: amountCents,
+      currency: 'usd',
+      capture_method: 'manual',
+      description: event.title,
+      receipt_email: rsvpMember.email,
+      automatic_payment_methods: { enabled: true },
+      metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug },
+    },
+    { idempotencyKey },
+  );
 
   let rsvpId: string;
   if (existing) {
