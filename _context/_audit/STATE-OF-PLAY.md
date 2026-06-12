@@ -1,106 +1,130 @@
 # State of Play — Resume Here
 
 > **If you are a fresh Claude Code session, read this first.** It is the live
-> handoff for the in-flight security + strategy work. Single owner: the "Apex /
-> security-and-strategy" session (Opus 4.8). Last updated: **2026-06-09**.
-> Update this file whenever the state below changes — it is the resume point.
+> handoff. Single owner: the "Apex / security-and-strategy" session (Opus 4.8).
+> Last updated: **2026-06-12**. Update this file whenever the state below changes.
+>
+> **Provenance note:** items tied to a merged PR number are code-verified against
+> `origin/main`. Items marked _(session notes)_ come from working memory / the
+> second-brain capture and have **not** been independently re-verified in code here —
+> confirm before relying on them.
+
+`main` is synced to **`origin/main` @ `991043c` (#101)** as of 2026-06-12.
 
 ---
 
-## 1. What just shipped (merged to `main`, 2026-06-09)
+## 1. What shipped since the 2026-06-09 doc (`#62` → `#101`, all merged)
 
-The overnight audit (warden + zero + apex eval) remediation is **fully merged**.
-`main` is at/after commit `c0199f7`. Seven PRs:
+The 06-09 doc stopped at the security remediation (`#50`–`#62`). Since then the
+**CRM-spine build** — the moat the strategy doc said was "barely built" — went from
+nothing to its first live surfaces:
 
-| PR | Ships | Audit finding |
-|---|---|---|
-| #50 | membership + event-hero uploads → **private R2** | H1 / WARNING-9 (IDOR) |
-| #51 | `/api/mcp` Clerk-session path **role-gated, default-deny to STAFF** | **C1** (CRITICAL) |
-| #53 | producer-webhook verifies **workspace ownership** | H3 |
-| #59 | check-in uses **event-scoped signed tokens** (killed the browser `CHECKIN_SECRET`) | H2 |
-| #60 | slug-less apply resolves tenant **deterministically** (env `APPLY_DEFAULT_WORKSPACE_ID` → oldest fallback) | M2 |
-| #61 | **CI gate** (`.github/workflows/ci.yml`): tsc + vitest + build + lint on every PR | durability |
-| #62 | strategy doc + Phase 0 mitigation docs + CLAUDE.md pointer | strategy |
+| Theme | Merged PRs |
+|---|---|
+| **CRM connectors** (pure, testable adapters) | `#90` Producer vendor connector · `#91` CSV connector (RFC-4180) · `#95` ingestion identity-resolution · `#96` CSV import preview (dry-run) · `#98` beehiiv · `#99` ActiveCampaign |
+| **CRM spine schema + surface** | `#92` Contact-spine schema (roles + `ContactSource`, additive) · `#89` "Who's coming" audience panel (first visible CRM surface) |
+| **Member intelligence / memory** | `#68` cross-event guest-memory aggregation (Phase C) |
+| **Operator** | `#88` The Back Room (knock easter egg, Darkroom theme, Last Call door game) · `#93` Editorial theme in Cmd+K |
+| **Hardening / fixes** | `#100` AI Event Builder hardened vs Anthropic API errors · `#101` DAM + House Phone mobile-usable |
+| **Data** | **`#57` migration-history drift reconciled** — the open flux gate from the last doc is **CLOSED** |
 
-**The entire CRITICAL + HIGH tier is closed.** CI now guards `main`.
+Earlier in the same window (already on `main`): `#70`/`#72` ticketed money-path
+hardening + purchase confirmation email, `#76` Gravity Ledger, `#71` member-connections
+graph, `#82`/`#83`/`#86` operator-access hardening + intentional org creation +
+member-portal identity S-slice, `#87` public `/e/[slug]` buyer page for orgless buyers.
 
-## 2. The strategy thesis (where the product is going)
+**Security:** the CRITICAL + HIGH audit tier remains closed (`#50`–`#62`); CI gate
+(`#61`) still guards `main`.
 
-Source of truth: **`_context/_audit/PRODUCER-OPERATOR-STRATEGY.md`** — read §10 (thesis
-v2), which supersedes §9.
+## 2. Strategy thesis (where the product is going)
+
+Source of truth: **`_context/_audit/PRODUCER-OPERATOR-STRATEGY.md`** (§10 thesis v2,
+supersedes §9). Also note CLAUDE.md now points to `_context/NoBC_OS_Operating_Doc.md`
+as product source-of-truth — **⚠️ that file is currently MISSING from the repo** (see §7).
 
 - **Wedge:** product **indispensability** for **local, fast-paced growing event brands**
-  (NOT enterprise luxury, NOT intelligence-led). "The tool they can't imagine doing an
-  event without."
-- **Constituencies, sequenced:** creators (primary, founder-led) → members/guests
-  (bottom-up growth — must beat Lu.ma/Posh on experience) → sponsors (fast-follow).
-- **Means:** converge Producer (back-of-house: vendors/SOW/run-of-show) + Operator
-  (front-of-house: member page/portal/registration) into **one shared community-CRM
-  spine** (member/guest/vendor/sponsor = roles, not separate tables).
-- **Ratings (2026-06-09):** thesis v2 = **8/10**; current build vs. thesis = **6/10**
-  (operator half strong + live; the moat — converged spine + comms-intelligence — barely
-  built). Path to 9: pick lead segment, converge the spine, prove ONE cross-layer payoff
-  with a real customer, name the revenue model.
+  (NOT enterprise luxury, NOT intelligence-led).
+- **Constituencies, sequenced:** creators (primary) → members/guests (bottom-up; must beat
+  Lu.ma/Posh on experience) → sponsors (fast-follow). _(session notes add sponsor sales
+  pipeline as a third CRM pillar.)_
+- **Means:** converge Producer (back-of-house) + Operator (front-of-house) into **one shared
+  community-CRM spine** (member/guest/vendor/sponsor = roles, not separate tables). The
+  connector wave above is the first real construction of that spine.
+- **Build-vs-thesis:** the 06-09 doc rated this 6/10 with the moat "barely built." That has
+  moved — the spine schema (`#92`), first connectors (`#90`/`#91`/`#95`/`#96`/`#98`/`#99`),
+  and the first member-facing surface (`#89`) are now merged. Re-rate after `#97` lands.
 
-### Critical factual correction (verified 2026-06-09)
-The "**Producer and Operator share one Postgres**" claim in CLAUDE.md and older docs is
-**contradicted by live config**: separate databases (Producer dev → `helium/heliumdb`;
-NoBC → Neon `ep-twilight-forest-…`) and **separate Clerk apps** (Producer `firm-weevil-76`
-/ key `maximum-chipmunk-4`, NO prod env; NoBC `allowed-zebra-34` dev / `app.thenobadcompany.com`
-prod). Producer is effectively a **standalone, dev-stage tool**; the only link is a one-way
-event webhook + Airtable RSVP counts. **One fact still unverified:** Producer's *production*
-`DATABASE_URL` (Doppler prod). Until confirmed, treat "shared Postgres" as false.
+### Producer integration — contract confirmed _(session notes)_
+- Producer ↔ Operator run on **separate databases** (the old "shared Postgres" claim is
+  false). `#57` reconciled Operator's **own** migration history — the last open data gate.
+- Producer CRM export contract confirmed: `DirectoryCompany` field shape, **HMAC
+  canonicalization** signing recipe, separate DB. `#90` Producer connector verified live
+  (12 demo vendors pulled E2E) _(session notes)_.
+- **Airtable = retire** direction. **Tenur** (Eric): MCP-only, teams account, **no API yet**.
 
-## 3. Agents dispatched (2026-06-09) — lanes, no collisions
+### Clerk _(session notes)_
+- Clerk **production flip verified; config batches 1–3 live.** This closes most of the
+  pre-launch items in `CLERK-CONFIG-AUDIT.md` (now landed in `_context/_audit/`). Re-audit
+  the remaining "Adam decision" rows (MFA policy, org-creation limits) against the live dashboard.
 
-Each owns a distinct surface and PRs to its own branch — **none merge without Adam.**
+## 3. Open PRs (authoritative, `gh pr list` 2026-06-12)
 
-| Agent | Task | Branch (PR, no-merge) |
-|---|---|---|
-| **crest** | Decide thesis v2: wedge, narrowest end-to-end slice, segment sequence, **revenue model**, confirm convergence. Appends "§11 — Decision" to the strategy doc. **Gates the build.** | `docs/crest-decision` |
-| **proof** | Money-path (Stripe) + access-gate test coverage; make capacity/waitlist counters transactional (race fix). Stays OUT of `lib/mcp`. | `test/money-path-coverage` |
-| **draft** | Read-only UX friction audit of member-facing flows vs Lu.ma/Posh → `_context/_audit/UX-FRICTION-AUDIT.md`. No code. | `docs/ux-friction-audit` |
-| **warden** | Design (+ maybe implement) auth for the `/api/mcp` **Bearer** write path (the one gap #51 didn't cover) → `_context/_audit/MCP-BEARER-AUTH-DESIGN.md`. | `fix/mcp-bearer-auth` |
-| Replit/Producer chat (not tonone) | Confirm Producer **prod** `DATABASE_URL` + `?schema=`; adopt the `db push` ban; reconcile `firm-weevil-76` vs `maximum-chipmunk-4`. | — |
+| PR | Title | Branch | Note |
+|---|---|---|---|
+| `#102` | House Phone: SMS opt-out (STOP) as compliance, not error | `fix/sms-optout-handling` | recent |
+| `#97` | **CRM ingestion persist layer + CSV/Producer commit + Save UI** | `feature/crm-ingest-persist` | **active build front** — wires the merged connectors to the DB |
+| `#94` | Last Call draws guests from the real workspace roster | `last-call-real-room` | follow-on to `#88` |
+| `#80` | Stripe test-mode validation harness | `chore/validate-stripe-harness` | owns `scripts/validate-stripe.ts` — do NOT duplicate elsewhere |
+| `#73` | additive `SmsMessage.twilioSid` for SMS idempotency | `chore/sms-twilio-sid` | additive schema |
+| `#64` | event-access gate + ticketing coverage (+ merge-prep docs) | `tests/money-path-access-gate` | test backlog — may overlap merged coverage |
+| `#54` | media QR in-repo + DAM thumb cache header | `fix/infra-audit-warnings` | audit infra WARNING/INFO |
+| `#52` | money-path + event-access gate coverage (audit CRITICAL #7/#8) | `test/critical-path-coverage` | test backlog — may overlap merged coverage |
+| `#46` | [draft] world-class pass #1 — `next/image` on member surfaces | `polish/world-class-pass` | WIP draft |
 
-## 4. Open gates / what's blocked on what
+## 4. Open gates / next
 
-- **The build is gated on crest's decision.** Once crest names the wedge + narrowest
-  slice, the owner starts building it (that's the next time code gets written here).
-- **Phase 0 last gate:** Producer's prod `DATABASE_URL` (Replit chat).
-- **flux #57** (`chore/reconcile-migration-history`) — Operator's own migration-history
-  reconciliation, **file-only done, awaits Adam's `migrate resolve` in a coordinated
-  window.** Still valid even though Producer is a separate DB (it's Operator-internal).
-  Do NOT let any agent re-author this — it exists.
-- **G6 / RLS** (zero's tenant-isolation multiplier) — gated on the convergence decision
-  + the Producer window. Not started.
-- **Migration-drift CI guard** — deferred until flux #57 lands (would false-positive on
-  current drift).
+- **Build front is `#97`** (CRM ingest-persist) — once it lands, ingestion is end-to-end
+  (connector → identity-resolve → persist → Save UI) and the spine has its first round-trip.
+- **Triage the test-coverage PRs** (`#52`, `#64`): confirm whether they're superseded by the
+  already-merged money-path coverage before merging — avoid duplicate/ conflicting specs.
+- **G6 / RLS** (tenant-isolation multiplier) — still not started; revisit after the spine
+  round-trip proves out.
+- **`docs/session-state` branch is a STALE REVERT-BOMB** — it branched off an old `main` and
+  merging it would delete ~162 files / ~16k lines (the entire connector-test suite). **Do not
+  merge it.** This doc supersedes it.
 
-## 5. Other open PRs (triage backlog, NOT this session's stack)
-
-`#58` (DAM tag fail-closed + wallet token), `#57` (flux, above), `#46 #48 #52 #54 #55 #56`
-(pre-session, untriaged). Owner to triage when the active lanes clear.
-
-## 6. Ownership + working rules
+## 5. Ownership + working rules
 
 - **Single owner** of: Operator security/correctness, `PRODUCER-OPERATOR-STRATEGY.md`,
-  this STATE doc, merge management, and the eventual convergence build.
+  this STATE doc, merge management, and the convergence build.
 - Work happens in **git worktrees** under `.claude/worktrees/` (branch per concern).
   New worktree deps: symlink `node_modules` + `.env.local` from repo root. Verify with
-  `node_modules/.bin/tsc --noEmit` + `node_modules/.bin/vitest run` (Turbopack build
-  fails on cross-root symlinks — use `node_modules/.bin/next build` (webpack) locally).
-- **Hard rules (unchanged):** never `prisma db push` (shared/▲ schema; use additive
-  `migrate diff` → `db execute`, file-only, Adam runs DB steps); `npx prisma` broken →
-  `node node_modules/prisma/build/index.js`; locked AI model `claude-sonnet-4-20250514`;
-  email from `team@thenobadcompany.com`; never touch `/apply` screen-7 legal copy or
-  archetype config; workspace-scope every query; semantic tokens only (no hex);
-  terminology law (Access not RSVP, etc.); branch per concern; **no merge without Adam**
-  (the owner may merge with Adam's standing authorization — confirm per batch).
+  `node_modules/.bin/tsc --noEmit` + `node_modules/.bin/vitest run` (Turbopack build fails on
+  cross-root symlinks — use `node_modules/.bin/next build` (webpack) locally).
+- **Hard rules (unchanged):** never `prisma db push` (additive `migrate diff` → `db execute`,
+  file-only, Adam runs DB steps); `npx prisma` broken → `node node_modules/prisma/build/index.js`;
+  locked AI model `claude-sonnet-4-20250514`; email from `team@thenobadcompany.com`; never touch
+  `/apply` screen-7 legal copy or archetype config; workspace-scope every query; semantic tokens
+  only (no hex); terminology law (Access not RSVP, etc.); branch per concern; **no merge without
+  Adam** (owner may merge with standing authorization — confirm per batch).
 
-## 7. Immediate next actions (for the owner)
+## 6. Immediate next actions (for the owner)
 
-1. Finish updating CLAUDE.md stale facts (this PR).
-2. When crest's decision lands → read it, then build the narrowest slice.
-3. When Replit returns the prod `DATABASE_URL` → close Phase 0, update §2 above.
-4. As proof/draft/warden PRs land → review, verify (tsc + tests green), merge.
+1. Review + merge this sync branch (`chore/sync-state-2026-06-12`): refreshed STATE doc,
+   landed audit docs, `.claire/` ignore, `inspect-stripe-test.ts`.
+2. **Add `_context/NoBC_OS_Operating_Doc.md`** — CLAUDE.md treats product/feature work as
+   blocked until it exists (see §7).
+3. Review `#97` (CRM ingest-persist) — the active build front.
+4. Triage the backlog test PRs (`#52`, `#64`) for overlap before merging.
+
+## 7. Loose ends folded in by this sync (2026-06-12)
+
+- Landed three previously-untracked audit docs into `_context/_audit/`: `CLERK-CONFIG-AUDIT.md`,
+  `MEMBER-PORTAL-IDENTITY-SCOPE.md` (Option B plan; `#86` shipped its S-slice),
+  `PUBLIC-CHECKOUT-SECURITY-REVIEW.md` (F1/F2 findings since shipped — now a historical record).
+- `scripts/validate-stripe.ts` left untracked on `main` — it is byte-identical to PR `#80`'s
+  copy; that PR owns it.
+- `scripts/inspect-stripe-test.ts` landed (the only orphaned, un-backed-up script).
+- `.claire/` (local worktree tooling) added to `.gitignore`.
+- **⚠️ `_context/NoBC_OS_Operating_Doc.md` is referenced by CLAUDE.md but does not exist in the
+  repo.** Not authored here (no source content). Owner must add it.

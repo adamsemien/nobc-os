@@ -44,7 +44,7 @@ Methodology: see the `nobc-icm` skill.
 
 ## Current Build State
 
-**As of 2026-05-28 — V1 is functionally complete.**
+**V1 is functionally complete (since 2026-05-28).** Build has since moved past V1 onto the CRM-spine convergence — `main` is at `#101` (2026-06-12), with the connector wave (`#90`/`#91`/`#92`/`#95`/`#96`/`#98`/`#99`) and first CRM surface (`#89`) merged. **For live state, read `_context/_audit/STATE-OF-PLAY.md` first** — the table below is the V1 baseline, not the current frontier.
 17/20 V1 items are DONE in code. 2 are PARTIAL (credentials only, not code). 0 are NOT STARTED.
 A May-2026 session added the House Phone SMS inbox (Runtype evaluated and **scratched** — final architecture is a standalone Node.js service on Railway), the member-QR rollout, the editorial event-page redesign, operator roles, the House Phone Intelligence tab, and the Digital Asset Manager through Phase 4 — see "What shipped beyond V1 scope" below.
 
