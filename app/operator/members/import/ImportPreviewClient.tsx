@@ -58,11 +58,22 @@ Devin Hsu,devin@example.com,512-555-0143,@devinhsu,vendor
 Amara Cole,,(512) 555-0199,amaracole,
 Jordan Lee,jordan@example.com,,,vip`;
 
+type CommitResponse = {
+  ok: true;
+  created: number;
+  attached: number;
+  deferred: number;
+  skipped: number;
+};
+
 export function ImportPreviewClient() {
   const [csv, setCsv] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PreviewResponse | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<CommitResponse | null>(null);
 
   async function readFile(file: File) {
     const text = await file.text();
@@ -73,6 +84,8 @@ export function ImportPreviewClient() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setSaved(null);
+    setSaveError(null);
     try {
       const res = await fetch('/api/operator/crm/import/preview', {
         method: 'POST',
@@ -89,6 +102,29 @@ export function ImportPreviewClient() {
       setError('Could not reach the server. Try again.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function runCommit() {
+    setSaving(true);
+    setSaveError(null);
+    setSaved(null);
+    try {
+      const res = await fetch('/api/operator/crm/import/commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSaveError(data?.error ?? 'Import failed.');
+        return;
+      }
+      setSaved(data as CommitResponse);
+    } catch {
+      setSaveError('Could not reach the server. Try again.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -148,6 +184,41 @@ export function ImportPreviewClient() {
 
       {/* ── Result ── */}
       {result && <PreviewResult result={result} />}
+
+      {/* ── Save bar ── */}
+      {result && (result.summary.create > 0 || result.summary.match > 0) && (
+        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-4">
+          {saved ? (
+            <p className="text-sm text-text-primary">
+              ✓ Imported — <strong>{saved.created}</strong> created,{' '}
+              <strong>{saved.attached}</strong> linked to existing
+              {saved.deferred > 0 && `, ${saved.deferred} left for review`}.
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={runCommit}
+                disabled={saving}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {saving
+                  ? 'Importing…'
+                  : `Import ${result.summary.create + result.summary.match} contact${
+                      result.summary.create + result.summary.match === 1 ? '' : 's'
+                    }`}
+              </button>
+              <span className="text-xs text-text-muted">
+                {result.summary.create} new · {result.summary.match} linked
+                {result.summary.review > 0 && ` · ${result.summary.review} held for review`}
+              </span>
+            </>
+          )}
+          {saveError && (
+            <p className="w-full rounded-md bg-danger-soft px-3 py-2 text-sm text-text-primary">{saveError}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
