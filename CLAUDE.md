@@ -198,7 +198,7 @@ Producer (Replit) ←Phase J HMAC webhook→ NoBC OS (Vercel)
 
 **Critical:** Producer and NoBC OS share the SAME Postgres instance. This is why schema changes are production-affecting and must NEVER auto-push — they could break Producer.
 
-> ⚠️ **2026-06-09 — this "shared Postgres" claim is contradicted by live config and is under verification.** Verified: separate databases in dev (Producer → `helium/heliumdb`; NoBC → Neon `ep-twilight-forest-…`) and **separate Clerk apps**. Producer is effectively a standalone dev-stage tool (no prod env yet). The only unconfirmed gap is Producer's *production* `DATABASE_URL`. Until that's confirmed, do NOT assume a shared DB. The `db push` ban stands regardless (it's correct on any DB). See `_context/_audit/PRODUCER-OPERATOR-STRATEGY.md` + `STATE-OF-PLAY.md`.
+> ⚠️ **2026-06-09 — this "shared Postgres" claim is contradicted by live config and is under verification.** Verified: separate databases in dev (Producer → `helium/heliumdb`; NoBC → Neon `ep-twilight-forest-…`) and **separate Clerk apps**. Producer is effectively a standalone dev-stage tool (no prod env yet). **Confirmed 2026-06-12** (Producer-side audit + `migrate diff`): Producer is **dev-stage only** — single Replit-managed `heliumdb`, **dev Clerk only, no production DB or Clerk**. The shared-Postgres premise is **definitively false in every environment**. The `db push` ban stands regardless (it's correct on any DB). See `_context/_audit/PRODUCER-OPERATOR-STRATEGY.md` + `STATE-OF-PLAY.md`.
 
 Phase J details:
 - HMAC-SHA256 with shared secret

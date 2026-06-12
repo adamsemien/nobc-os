@@ -56,7 +56,7 @@ as product source-of-truth — **⚠️ that file is currently MISSING from the 
 
 ### Producer integration — contract confirmed _(session notes)_
 - Producer ↔ Operator run on **separate databases** (the old "shared Postgres" claim is
-  false). `#57` reconciled Operator's **own** migration history — the last open data gate.
+  false) — **CONFIRMED 2026-06-12: Producer is dev-stage, no prod DB or Clerk** (Producer-side audit + `migrate diff`). `#57` reconciled Operator's **own** migration history — the last open data gate.
 - Producer CRM export contract confirmed: `DirectoryCompany` field shape, **HMAC
   canonicalization** signing recipe, separate DB. `#90` Producer connector verified live
   (12 demo vendors pulled E2E) _(session notes)_.
