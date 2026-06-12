@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
-import { sendSms } from '@/lib/twilio';
+import { sendSms, SmsOptedOutError } from '@/lib/twilio';
 import { alert } from '@/lib/alerting';
 
 // Operator manual reply from the shared inbox. Authorized by Clerk org
@@ -41,6 +41,18 @@ export async function POST(req: NextRequest) {
   try {
     await sendSms(conversation.phone, text);
   } catch (e) {
+    // Opt-out is an expected compliance outcome, not a system failure: surface
+    // it plainly to the operator and do NOT fire an error alert.
+    if (e instanceof SmsOptedOutError) {
+      return NextResponse.json(
+        {
+          error:
+            'This contact has opted out of SMS (they replied STOP). They can text START to opt back in.',
+          code: 'opted_out',
+        },
+        { status: 409 },
+      );
+    }
     void alert({
       severity: 'error',
       event: 'sms.reply.twilio_send_failed',
