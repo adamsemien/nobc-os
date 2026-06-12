@@ -86,7 +86,7 @@ export function BulkActionBar({
   return (
     <>
       <div
-        className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-[10px] px-3 py-2 font-[family-name:var(--font-dm-sans)]"
+        className="fixed bottom-4 left-1/2 z-40 flex w-[min(calc(100vw-2rem),640px)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-[10px] px-3 py-2 font-[family-name:var(--font-dm-sans)]"
         style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: '0 8px 30px rgba(0,0,0,0.18)' }}
       >
         <span className="px-1 text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -179,7 +179,7 @@ export function BulkActionBar({
       {confirmPurge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmPurge(false)}>
           <div
-            className="w-[340px] rounded-[12px] p-5 font-[family-name:var(--font-dm-sans)]"
+            className="w-[min(340px,calc(100vw-2rem))] rounded-[12px] p-5 font-[family-name:var(--font-dm-sans)]"
             style={{ background: 'var(--card)' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -195,7 +195,7 @@ export function BulkActionBar({
               </button>
               <button
                 className={btn}
-                style={{ background: 'var(--primary)', color: '#fff' }}
+                style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
                 disabled={busy}
                 onClick={() => { setConfirmPurge(false); run(() => bulk('permanentDelete', selectedIds)); }}
               >

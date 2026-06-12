@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Folders } from 'lucide-react';
 import { useDensity } from './useDensity';
 import { useViewMode } from './useViewMode';
 import { MediaToolbar } from './MediaToolbar';
@@ -28,6 +29,8 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [isWide, setIsWide] = useState(true);
+  // Mobile folder drawer open/close state.
+  const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
   const lastClicked = useRef<number | null>(null);
 
   // Force grid mode below the md: breakpoint — the list view is desktop-only.
@@ -36,7 +39,11 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mq = window.matchMedia('(min-width: 768px)');
-    const update = () => setIsWide(mq.matches);
+    const update = () => {
+      setIsWide(mq.matches);
+      // Close the mobile drawer when resizing to desktop.
+      if (mq.matches) setFolderDrawerOpen(false);
+    };
     update();
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
@@ -100,9 +107,25 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
 
   return (
     <div className="flex h-full w-full overflow-hidden">
-      <FolderTree />
+      <FolderTree
+        mobileOpen={folderDrawerOpen}
+        onMobileClose={() => setFolderDrawerOpen(false)}
+      />
       <UploadDropzone onDone={reload}>
-        <div className="flex h-full min-w-0 flex-col overflow-y-auto px-4">
+        <div className="flex h-full min-w-0 flex-col overflow-y-auto px-3 md:px-4">
+          {/* Mobile folder button — visible only below md breakpoint */}
+          <div className="flex items-center gap-2 pt-3 md:hidden">
+            <button
+              type="button"
+              aria-label="Open folders"
+              className="flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[13px]"
+              style={{ borderColor: 'var(--border)', background: 'var(--card)', color: 'var(--text-secondary)' }}
+              onClick={() => setFolderDrawerOpen(true)}
+            >
+              <Folders className="h-4 w-4" />
+              Folders
+            </button>
+          </div>
           <MediaToolbar
             onDensity={setDensity}
             viewMode={viewMode}

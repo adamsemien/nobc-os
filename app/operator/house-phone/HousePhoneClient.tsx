@@ -6,10 +6,14 @@
  *  inbound SMS arrive via a separate Railway service that writes to the same
  *  Postgres). Replies POST /api/sms/reply (Twilio REST send). The per-
  *  conversation AI auto-reply toggle and event association PATCH
- *  /api/sms/conversation/[id]. No client-side hex — semantic CSS vars only. */
+ *  /api/sms/conversation/[id]. No client-side hex — semantic CSS vars only.
+ *
+ *  Mobile layout: single-pane. Conversation list is the default view; tapping
+ *  a row navigates to the thread. A back chevron in the thread header returns
+ *  to the list. Desktop keeps the classic two-pane side-by-side. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, Send, MessageSquare, Pencil, Check } from 'lucide-react';
+import { Sparkles, Send, MessageSquare, Pencil, Check, ChevronLeft } from 'lucide-react';
 
 type Direction = 'INBOUND' | 'OUTBOUND';
 
@@ -55,6 +59,10 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+
+  // Mobile single-pane navigation: 'list' shows the conversation list,
+  // 'thread' shows the selected conversation. On md+ both panes are visible.
+  const [mobileView, setMobileView] = useState<'list' | 'thread'>('list');
 
   // Inline contact-name editing in the thread header (tap-to-edit).
   const [editingName, setEditingName] = useState(false);
@@ -186,14 +194,30 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
     savedTimer.current = setTimeout(() => setNameSaved(false), 1800);
   }
 
+  // On mobile, tap a conversation row → show its thread.
+  function openConversation(id: string) {
+    setSelectedId(id);
+    setMobileView('thread');
+  }
+
   return (
     <div
       className="flex h-screen overflow-hidden font-[family-name:var(--font-dm-sans)]"
       style={{ background: 'var(--bg)' }}
     >
-      {/* ── Left: conversation list ───────────────────────────── */}
+      {/* ── Left: conversation list ───────────────────────────────────────
+          Mobile: full-width, visible only when mobileView === 'list'.
+          Desktop (md+): always visible, fixed 1/3 width (280–400px). */}
       <aside
-        className="flex w-1/3 min-w-[280px] max-w-[400px] flex-col border-r"
+        className={[
+          'flex flex-col border-r',
+          // Mobile: full-width; show/hide via display.
+          mobileView === 'list' ? 'flex' : 'hidden',
+          // Desktop: always show, constrained width.
+          'md:flex md:w-1/3 md:min-w-[280px] md:max-w-[400px]',
+          // On mobile take full width when visible.
+          'w-full',
+        ].join(' ')}
         style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
       >
         <header
@@ -227,7 +251,7 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => setSelectedId(c.id)}
+                  onClick={() => openConversation(c.id)}
                   className="flex w-full flex-col gap-1 border-b px-4 py-3 text-left transition-colors"
                   style={{
                     borderColor: 'var(--border)',
@@ -267,8 +291,17 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
         </div>
       </aside>
 
-      {/* ── Right: thread ─────────────────────────────────────── */}
-      <section className="flex min-w-0 flex-1 flex-col" style={{ background: 'var(--bg)' }}>
+      {/* ── Right: thread ─────────────────────────────────────────────────
+          Mobile: full-width, visible only when mobileView === 'thread'.
+          Desktop (md+): always visible, fills remaining space. */}
+      <section
+        className={[
+          'flex min-w-0 flex-1 flex-col',
+          mobileView === 'thread' ? 'flex' : 'hidden',
+          'md:flex',
+        ].join(' ')}
+        style={{ background: 'var(--bg)' }}
+      >
         {!selected ? (
           <div className="flex flex-1 items-center justify-center px-6 text-center">
             <p className="text-[13px]" style={{ color: 'var(--text-tertiary)' }}>
@@ -278,10 +311,20 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
         ) : (
           <>
             <header
-              className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-5 py-3"
+              className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 md:px-5"
               style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
             >
-              <div className="min-w-0">
+              {/* Back button — mobile only */}
+              <button
+                type="button"
+                aria-label="Back to conversations"
+                className="mr-1 flex shrink-0 items-center rounded-[6px] p-1 md:hidden"
+                onClick={() => setMobileView('list')}
+              >
+                <ChevronLeft className="h-5 w-5" style={{ color: 'var(--text-secondary)' }} />
+              </button>
+
+              <div className="min-w-0 flex-1">
                 {editingName ? (
                   <input
                     autoFocus
@@ -299,7 +342,7 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
                     }}
                     placeholder={selected.phone}
                     aria-label="Contact name"
-                    className="w-full max-w-[260px] rounded-[6px] border px-2 py-1 text-[15px] font-semibold leading-tight outline-none"
+                    className="w-full rounded-[6px] border px-2 py-1 text-[15px] font-semibold leading-tight outline-none"
                     style={{
                       borderColor: 'var(--primary)',
                       background: 'var(--bg)',
@@ -340,11 +383,11 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
                 ) : null}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={selected.eventId ?? ''}
                   onChange={(e) => assignEvent(e.target.value)}
-                  className="max-w-[200px] rounded-[8px] border px-2.5 py-1.5 text-[12px]"
+                  className="min-w-0 flex-1 rounded-[8px] border px-2.5 py-1.5 text-[12px] sm:flex-none sm:max-w-[200px]"
                   style={{
                     borderColor: 'var(--border)',
                     background: 'var(--bg)',
@@ -363,7 +406,7 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
                 <button
                   type="button"
                   onClick={toggleAi}
-                  className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
+                  className="flex shrink-0 items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
                   style={{
                     borderColor: selected.aiEnabled ? 'var(--primary)' : 'var(--border)',
                     background: selected.aiEnabled ? 'var(--primary)' : 'transparent',
@@ -377,7 +420,7 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
               </div>
             </header>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 py-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-4 md:px-5">
               {selected.messages.map((m) => {
                 const outbound = m.direction === 'OUTBOUND';
                 return (
@@ -445,11 +488,11 @@ export function HousePhoneClient({ events }: { events: EventOption[] }) {
                 <button
                   type="submit"
                   disabled={sending || !replyText.trim()}
-                  className="flex h-[40px] items-center gap-1.5 rounded-[10px] px-4 text-[13px] font-semibold transition-opacity disabled:opacity-40"
+                  className="flex h-[40px] shrink-0 items-center gap-1.5 rounded-[10px] px-4 text-[13px] font-semibold transition-opacity disabled:opacity-40"
                   style={{ background: 'var(--primary)', color: 'var(--on-primary)' }}
                 >
                   <Send className="h-[15px] w-[15px]" />
-                  {sending ? 'Sending…' : 'Send'}
+                  <span className="sr-only sm:not-sr-only">{sending ? 'Sending…' : 'Send'}</span>
                 </button>
               </div>
             </form>

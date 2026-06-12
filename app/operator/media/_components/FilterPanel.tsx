@@ -25,7 +25,7 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
   const lblStyle = { color: 'var(--text-secondary)' } as const;
 
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col gap-4 p-3">
+    <aside className="hidden w-[220px] shrink-0 flex-col gap-4 p-3 lg:flex">
       <div>
         <label className={lbl} style={lblStyle}>Event</label>
         <select className={ctl} style={ctlStyle} value={sp.get('eventId') ?? ''} onChange={(e) => set('eventId', e.target.value)}>

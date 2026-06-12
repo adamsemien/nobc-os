@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Folder, Star, Video, Megaphone, Image as ImageIcon, Trash2, FolderPlus } from 'lucide-react';
+import { Folder, Star, Video, Megaphone, Image as ImageIcon, Trash2, FolderPlus, X } from 'lucide-react';
 
 interface FolderNode {
   id: string;
@@ -19,8 +19,20 @@ const TYPE_ICON: Record<string, typeof Folder> = {
   BRAND: Folder,
 };
 
-/** Evergreen folder sidebar. Sets ?folderId / ?view=trash on the URL. */
-export function FolderTree() {
+/** Evergreen folder sidebar.
+ *
+ *  Desktop (md+): always-visible left rail.
+ *  Mobile: rendered as a fixed full-screen overlay drawer when `mobileOpen` is
+ *  true. The parent (MediaWorkspace) controls open/close state.
+ *
+ *  Sets ?folderId / ?view=trash on the URL. */
+export function FolderTree({
+  mobileOpen = false,
+  onMobileClose,
+}: {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -59,6 +71,8 @@ export function FolderTree() {
       else next.set(k, v);
     }
     router.push(`${pathname}?${next.toString()}`);
+    // Close mobile drawer after navigation.
+    onMobileClose?.();
   };
 
   const createFolder = async () => {
@@ -86,9 +100,9 @@ export function FolderTree() {
     }
   };
 
-  return (
+  const navContent = (
     <nav
-      className="flex h-full w-[240px] shrink-0 flex-col gap-1 overflow-y-auto p-3 pb-24 font-[family-name:var(--font-dm-sans)] text-[13px]"
+      className="flex h-full flex-col gap-1 overflow-y-auto p-3 pb-24 font-[family-name:var(--font-dm-sans)] text-[13px]"
       style={{ background: 'var(--sidebar)', color: 'var(--text-secondary)', boxShadow: 'var(--sidebar-shadow)' }}
     >
       <button
@@ -172,5 +186,47 @@ export function FolderTree() {
         ) : null}
       </button>
     </nav>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible at md+ */}
+      <div className="hidden h-full w-[240px] shrink-0 md:block">
+        {navContent}
+      </div>
+
+      {/* Mobile drawer overlay — controlled by mobileOpen prop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          onClick={onMobileClose}
+          aria-modal="true"
+          role="dialog"
+          aria-label="Folders"
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" />
+          {/* Drawer panel */}
+          <div
+            className="absolute inset-y-0 left-0 w-64"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute right-2 top-2 z-10">
+              <button
+                aria-label="Close folders"
+                className="rounded-full p-2"
+                onClick={onMobileClose}
+                style={{ background: 'var(--card)', color: 'var(--text-secondary)' }}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="h-full">
+              {navContent}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
