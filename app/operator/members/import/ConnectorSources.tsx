@@ -16,7 +16,7 @@ type SourceResult = {
 };
 
 type Source = {
-  key: 'producer' | 'beehiiv';
+  key: 'producer' | 'beehiiv' | 'activecampaign';
   label: string;
   blurb: string;
   endpoint: string;
@@ -34,6 +34,12 @@ const SOURCES: Source[] = [
     label: 'beehiiv subscribers',
     blurb: 'Your newsletter audience — matched to members by email, phone or Instagram.',
     endpoint: '/api/operator/crm/import/beehiiv',
+  },
+  {
+    key: 'activecampaign',
+    label: 'ActiveCampaign contacts',
+    blurb: 'Email contacts — matched to members by email or phone.',
+    endpoint: '/api/operator/crm/import/activecampaign',
   },
 ];
 
