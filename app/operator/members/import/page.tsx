@@ -2,6 +2,7 @@ import { OperatorRole } from '@prisma/client';
 import { requireRolePage } from '@/lib/operator-role';
 import { PageHeader } from '../../_components/PageHeader';
 import { ImportPreviewClient } from './ImportPreviewClient';
+import { ConnectorSources } from './ConnectorSources';
 
 // CSV import — preview (dry-run). STAFF+ (READ_ONLY operators cannot import).
 // The preview composes the CSV adapter + identity-resolution engine against live
@@ -17,6 +18,7 @@ export default async function ImportPage() {
         subtitle="Preview a CSV against your members before anything is saved."
       />
       <ImportPreviewClient />
+      <ConnectorSources />
     </div>
   );
 }
