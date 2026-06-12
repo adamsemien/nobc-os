@@ -191,22 +191,52 @@ export async function POST(
     });
     rsvpId = updated.id;
   } else {
-    const created = await db.rSVP.create({
-      data: {
-        workspaceId,
-        eventId: evt.id,
-        memberId: rsvpMember.id,
-        status: 'CONFIRMED',
-        ticketStatus: 'held',
-        stripePaymentIntentId: pi.id,
-        paymentStatus: 'AUTHORIZED',
-        amountCents,
-        tierId: resolvedTierId ?? null,
-        customAnswers: body.customAnswers ?? undefined,
-        guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
-        guestName: resolved.kind === 'guest' ? body.guestName : null,
-      },
-    });
+    // Capacity re-check + RSVP create in one serializable transaction — closes
+    // the TOCTOU race where two concurrent guest checkouts both pass the earlier
+    // hasCapacity() check and both write, overselling the last seat. Mirrors
+    // app/api/m/events/[slug]/access/payment-intent/route.ts.
+    let created: { id: string };
+    try {
+      created = await db.$transaction(
+        async (tx) => {
+          if (event.capacity) {
+            const taken = await tx.rSVP.count({
+              where: { workspaceId, eventId: evt.id, ticketStatus: { in: ['confirmed', 'held'] } },
+            });
+            if (taken >= event.capacity) {
+              throw Object.assign(new Error('Event is full'), { code: 'FULL' });
+            }
+          }
+          return tx.rSVP.create({
+            data: {
+              workspaceId,
+              eventId: evt.id,
+              memberId: rsvpMember.id,
+              status: 'CONFIRMED',
+              ticketStatus: 'held',
+              stripePaymentIntentId: pi.id,
+              paymentStatus: 'AUTHORIZED',
+              amountCents,
+              tierId: resolvedTierId ?? null,
+              customAnswers: body.customAnswers ?? undefined,
+              guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
+              guestName: resolved.kind === 'guest' ? body.guestName : null,
+            },
+          });
+        },
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (err) {
+      if (err instanceof Error && (err as { code?: string }).code === 'FULL') {
+        // Cancel the PI we just created so it doesn't dangle as a 7-day hold.
+        await stripe.paymentIntents.cancel(pi.id).catch((e) =>
+          console.error('[public payment-intent] failed to cancel dangling PI after capacity race', { piId: pi.id, err: e }),
+        );
+        return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+      }
+      console.error('[public payment-intent] RSVP create transaction failed', { workspaceId, eventId: evt.id, err });
+      throw err;
+    }
     rsvpId = created.id;
   }
 
