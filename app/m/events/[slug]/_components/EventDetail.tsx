@@ -9,6 +9,7 @@ import { TemplateEditorial } from './TemplateEditorial';
 import { TemplateSplit } from './TemplateSplit';
 import { TemplateMinimal } from './TemplateMinimal';
 import { EventPageStyleWrapper } from './EventPageStyleWrapper';
+import { PageStyleEditor } from './PageStyleEditor';
 import type { PageStyle } from '@/lib/page-style';
 
 export type TicketTierDTO = {
@@ -102,9 +103,12 @@ export function EventDetail({ event }: { event: EventDetailDTO }) {
   // Operators preview the page; everyone else sees their real resolved view.
   // Default to the guest path — NoBC has no members yet.
   const [previewViewer, setPreviewViewer] = useState<PreviewViewer>('guest');
-  // Operator-only live page-style state. The editor (added next) drives this so
-  // changes preview instantly; members render the saved style read-only.
-  const [pageStyle] = useState<PageStyle>(event.pageStyle);
+  // Operator-only live page-style state. The editor drives `pageStyle` so changes
+  // preview instantly; `savedStyle` is the last-persisted baseline (dirty check +
+  // discard). Members render the saved style read-only (branch below).
+  const [pageStyle, setPageStyle] = useState<PageStyle>(event.pageStyle);
+  const [savedStyle, setSavedStyle] = useState<PageStyle>(event.pageStyle);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   if (!event.isOperator) {
     return (
@@ -119,6 +123,24 @@ export function EventDetail({ event }: { event: EventDetailDTO }) {
   return (
     <>
       <ViewToggle value={previewViewer} onChange={setPreviewViewer} />
+      <button
+        type="button"
+        onClick={() => setEditorOpen((o) => !o)}
+        className="fixed right-3 top-14 z-40 rounded-sm border border-[var(--apply-rule)] bg-events-paper-card/95 px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)] shadow-[0_1px_4px_rgba(28,16,8,0.12)] backdrop-blur transition-colors hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+      >
+        {editorOpen ? 'Close design' : 'Edit design'}
+      </button>
+      {editorOpen ? (
+        <PageStyleEditor
+          eventId={event.eventId}
+          template={event.template}
+          value={pageStyle}
+          saved={savedStyle}
+          onChange={setPageStyle}
+          onSaved={setSavedStyle}
+          onClose={() => setEditorOpen(false)}
+        />
+      ) : null}
       <EventPageStyleWrapper style={pageStyle}>
         {renderTemplate(displayEvent)}
       </EventPageStyleWrapper>
