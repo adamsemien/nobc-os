@@ -183,7 +183,7 @@ export async function POST(
       where: { id: existing.id },
       data: {
         stripePaymentIntentId: pi.id,
-        paymentStatus: 'AUTHORIZED',
+        paymentStatus: 'PENDING',
         amountCents,
         ticketStatus: 'held',
         tierId: resolvedTierId ?? null,
@@ -218,7 +218,7 @@ export async function POST(
               status: 'CONFIRMED',
               ticketStatus: 'held',
               stripePaymentIntentId: pi.id,
-              paymentStatus: 'AUTHORIZED',
+              paymentStatus: 'PENDING',
               amountCents,
               tierId: resolvedTierId ?? null,
               customAnswers: body.customAnswers ?? undefined,

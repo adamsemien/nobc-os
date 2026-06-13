@@ -184,7 +184,11 @@ export async function POST(req: NextRequest) {
 
           // Money-state write.
           await tx.rSVP.updateMany({
-            where: { stripePaymentIntentId: pi.id },
+            where: {
+              stripePaymentIntentId: pi.id,
+              ...(workspaceId ? { workspaceId } : {}),
+              paymentStatus: { notIn: ['CAPTURED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'DISPUTED'] },
+            },
             data: { ticketStatus: 'confirmed', status: 'CONFIRMED', paymentStatus: 'AUTHORIZED' },
           });
 
@@ -247,8 +251,12 @@ export async function POST(req: NextRequest) {
 
           // Money-state write.
           await tx.rSVP.updateMany({
-            where: { stripePaymentIntentId: pi.id },
-            data: { ticketStatus: 'confirmed', paymentStatus: 'CAPTURED', capturedAt: new Date() },
+            where: {
+              stripePaymentIntentId: pi.id,
+              ...(workspaceId ? { workspaceId } : {}),
+              paymentStatus: { notIn: ['CAPTURED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'DISPUTED'] },
+            },
+            data: { ticketStatus: 'confirmed', status: 'CONFIRMED', paymentStatus: 'CAPTURED', capturedAt: new Date() },
           });
 
           if (rsvp && workspaceId) {
@@ -294,7 +302,11 @@ export async function POST(req: NextRequest) {
 
           // Money-state write - only flips RSVPs still in the 'held' state.
           await tx.rSVP.updateMany({
-            where: { stripePaymentIntentId: pi.id, ticketStatus: { in: ['held'] } },
+            where: {
+              stripePaymentIntentId: pi.id,
+              ...(piWorkspaceId ? { workspaceId: piWorkspaceId } : {}),
+              ticketStatus: { in: ['held'] },
+            },
             data: { ticketStatus: 'payment_failed', status: 'DECLINED', paymentStatus: 'FAILED' },
           });
 
@@ -331,22 +343,36 @@ export async function POST(req: NextRequest) {
           const fully = charge.amount_refunded >= charge.amount;
           const refundAmountCents = charge.amount_refunded;
 
-          // Money-state write.
-          await tx.rSVP.updateMany({
-            where: { stripePaymentIntentId: piId },
-            data: fully
-              ? {
-                  paymentStatus: 'REFUNDED',
-                  ticketStatus: 'refunded',
-                  refundedAt: new Date(),
-                  refundAmountCents,
-                }
-              : {
-                  paymentStatus: 'PARTIALLY_REFUNDED',
-                  refundedAt: new Date(),
-                  refundAmountCents,
-                },
-          });
+          // Money-state write. Workspace-scoped + do-not-regress guards. The
+          // partial branch reserves refundedAt for full refunds so the operator
+          // refund route's refundedAt guard is not tripped by a partial.
+          if (fully) {
+            await tx.rSVP.updateMany({
+              where: {
+                stripePaymentIntentId: piId,
+                ...(rsvp ? { workspaceId: rsvp.workspaceId } : {}),
+                paymentStatus: { notIn: ['REFUNDED'] },
+              },
+              data: {
+                paymentStatus: 'REFUNDED',
+                ticketStatus: 'refunded',
+                refundedAt: new Date(),
+                refundAmountCents,
+              },
+            });
+          } else {
+            await tx.rSVP.updateMany({
+              where: {
+                stripePaymentIntentId: piId,
+                ...(rsvp ? { workspaceId: rsvp.workspaceId } : {}),
+                paymentStatus: { notIn: ['REFUNDED', 'PARTIALLY_REFUNDED'] },
+              },
+              data: {
+                paymentStatus: 'PARTIALLY_REFUNDED',
+                refundAmountCents,
+              },
+            });
+          }
 
           if (rsvp) {
             resolvedWorkspaceId = rsvp.workspaceId;
@@ -397,7 +423,10 @@ export async function POST(req: NextRequest) {
 
           // Money-state write.
           await tx.rSVP.updateMany({
-            where: { stripePaymentIntentId: piId },
+            where: {
+              stripePaymentIntentId: piId,
+              ...(rsvp ? { workspaceId: rsvp.workspaceId } : {}),
+            },
             data: { paymentStatus: 'DISPUTED' },
           });
 

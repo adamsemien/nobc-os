@@ -130,6 +130,7 @@ export async function POST(req: NextRequest) {
       where: { id: existing.id },
       data: {
         stripePaymentIntentId: pi.id,
+        paymentStatus: 'PENDING',
         ticketStatus: 'held',
         customAnswers: customAnswers ?? undefined,
       },
@@ -145,6 +146,7 @@ export async function POST(req: NextRequest) {
       status: 'CONFIRMED',
       ticketStatus: 'held',
       stripePaymentIntentId: pi.id,
+      paymentStatus: 'PENDING',
       customAnswers: customAnswers ?? undefined,
     },
   });
