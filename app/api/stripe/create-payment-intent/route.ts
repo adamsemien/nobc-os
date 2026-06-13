@@ -96,19 +96,27 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Idempotency key scoped to (workspace, event, member) so a double-click or a
+  // network retry resolves to the same Stripe PaymentIntent instead of creating
+  // a second live authorized hold that dangles for 7 days. Mirrors the member
+  // route (app/api/m/events/[slug]/access/payment-intent/route.ts).
+  const idempotencyKey = `pi-${workspaceId}-${eventId}-${member.id}`;
   let pi: Awaited<ReturnType<typeof stripe.paymentIntents.create>>;
   try {
-    pi = await stripe.paymentIntents.create({
-      amount: amountCents,
-      currency: 'usd',
-      // approvalRequired -> 'manual' (authorize-and-hold, captured on operator
-      // approval); ticketed no-approval -> 'automatic' (immediate capture,
-      // captured by Stripe on payment_intent.succeeded).
-      capture_method: event.approvalRequired ? 'manual' : 'automatic',
-      description: event.title,
-      receipt_email: member.email,
-      metadata: { workspaceId, eventId, memberId: member.id },
-    });
+    pi = await stripe.paymentIntents.create(
+      {
+        amount: amountCents,
+        currency: 'usd',
+        // approvalRequired -> 'manual' (authorize-and-hold, captured on operator
+        // approval); ticketed no-approval -> 'automatic' (immediate capture,
+        // captured by Stripe on payment_intent.succeeded).
+        capture_method: event.approvalRequired ? 'manual' : 'automatic',
+        description: event.title,
+        receipt_email: member.email,
+        metadata: { workspaceId, eventId, memberId: member.id },
+      },
+      { idempotencyKey },
+    );
   } catch (err) {
     void alert({
       severity: 'critical',
