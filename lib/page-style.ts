@@ -27,6 +27,10 @@ export const PageStyleSchema = z.object({
   // Hero title color, chosen against the photo: white (default), ink, or brand red.
   // Independent of heroTextMode so the title can be red while the nav/date stay light.
   heroTitleColor: z.enum(['light', 'dark', 'red']).default('light'),
+  // When on, a leading "No Bad" in the title renders brand red (the wordmark
+  // treatment), the rest stays heroTitleColor. Off by default — no-op for titles
+  // that don't start with "No Bad".
+  heroTitleAccent: z.boolean().default(false),
   // Display title size multiplier (Cormorant stays the family — size only).
   titleScale: z.number().min(0.8).max(1.2).default(1),
   heroHeight: z.enum(['compact', 'standard', 'tall']).default('standard'),

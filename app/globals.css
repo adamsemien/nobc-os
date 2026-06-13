@@ -506,6 +506,12 @@
   --hero-title-fg: var(--nobc-red);
 }
 
+/* Brand accent — reddens a leading "No Bad" in the hero title when on. Off (default)
+   leaves the accent span inheriting the title color, so the title is single-color. */
+[data-hero-title-accent='on'] .ev-title-accent {
+  color: var(--nobc-red);
+}
+
 /* Access card elevation — set by EventPageStyleWrapper via data-card-shadow.
    'raised' (default) keeps the card's built-in Tailwind shadow, so the default
    look is unchanged; only 'flat' and 'lifted' override it. */

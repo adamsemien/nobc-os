@@ -15,6 +15,7 @@ describe('PAGE_STYLE_DEFAULTS', () => {
       heroScrimBottom: 0.65,
       heroTextMode: 'light',
       heroTitleColor: 'light',
+      heroTitleAccent: false,
       titleScale: 1,
       heroHeight: 'standard',
       textureOn: false,

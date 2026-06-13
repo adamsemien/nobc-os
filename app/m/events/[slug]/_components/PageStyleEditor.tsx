@@ -117,6 +117,12 @@ export function PageStyleEditor({
               onChange={(v) => set('heroTitleColor', v)}
             />
             <SegRow
+              label="Accent 'No Bad'"
+              options={['off', 'on'] as const}
+              value={value.heroTitleAccent ? 'on' : 'off'}
+              onChange={(v) => set('heroTitleAccent', v === 'on')}
+            />
+            <SegRow
               label="Nav & date"
               options={['light', 'dark'] as const}
               value={value.heroTextMode}

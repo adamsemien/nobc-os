@@ -7,6 +7,22 @@ import { EventHeroFallback } from './EventHeroFallback';
 import { parseDate, formatDateLine } from './event-format';
 import type { EventDetailDTO } from './EventDetail';
 
+/**
+ * Render the hero title, wrapping a leading "No Bad" in an accent span. The span
+ * only turns red when data-hero-title-accent is on (set by the page-style editor);
+ * otherwise it inherits the title color, so the title reads as one color.
+ */
+function renderHeroTitle(title: string) {
+  const m = /^no bad\b/i.exec(title);
+  if (!m) return title;
+  return (
+    <>
+      <span className="ev-title-accent">{title.slice(0, m[0].length)}</span>
+      {title.slice(m[0].length)}
+    </>
+  );
+}
+
 export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
   const applyHref = useMemberApplyHref();
   const start = parseDate(event.startAt);
@@ -61,7 +77,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
                 color: 'var(--hero-title-fg, var(--hero-fg, white))',
               }}
             >
-              {event.title}
+              {renderHeroTitle(event.title)}
             </h1>
             <p
               className="mt-4 text-[12px] font-medium uppercase tracking-[0.2em] font-[family-name:var(--font-dm-sans)]"

@@ -20,6 +20,7 @@ export function EventPageStyleWrapper({
       className="event-page-root"
       data-hero-text={style.heroTextMode}
       data-hero-title={style.heroTitleColor}
+      data-hero-title-accent={style.heroTitleAccent ? 'on' : 'off'}
       data-card-shadow={style.cardShadow}
       data-footer-scale={style.footerScale}
       style={
