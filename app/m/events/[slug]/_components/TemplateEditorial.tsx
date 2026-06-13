@@ -40,12 +40,12 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-40"
-          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,var(--hero-scrim-top,0.55)), rgba(0,0,0,0))' }}
+          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,max(0.3, var(--hero-scrim-top,0.55))), rgba(0,0,0,0))' }}
         />
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-1/2"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,var(--hero-scrim-bottom,0.65)), rgba(0,0,0,0))' }}
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,max(0.45, var(--hero-scrim-bottom,0.65))), rgba(0,0,0,0))' }}
         />
 
         <div className="absolute inset-x-0 top-0 z-10">
@@ -114,7 +114,10 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
             <div className="h-px w-full bg-[var(--apply-rule)]" />
             <div className="flex items-end justify-between gap-6 pt-6">
               <div>
-                <p className="text-[clamp(1.5rem,2.6vw,2.25rem)] italic leading-none text-[var(--apply-muted)] font-[family-name:var(--font-cormorant)]">
+                <p
+                  className="italic leading-none text-[var(--apply-muted)] font-[family-name:var(--font-cormorant)]"
+                  style={{ fontSize: 'calc(clamp(1.5rem, 2.6vw, 2.25rem) * var(--footer-scale, 1))' }}
+                >
                   No Bad Company
                 </p>
                 <p className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">

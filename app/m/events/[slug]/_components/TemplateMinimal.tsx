@@ -82,7 +82,10 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
 
         <div className="my-10 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
 
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        <p
+          className="uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]"
+          style={{ fontSize: 'calc(10px * var(--footer-scale, 1))' }}
+        >
           <span className="text-[var(--nobc-red)]">NO BAD </span>
           <span>COMPANY</span>
         </p>

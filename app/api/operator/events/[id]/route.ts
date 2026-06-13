@@ -6,6 +6,7 @@ import { requireRole } from '@/lib/operator-role';
 import { OperatorRole } from '@prisma/client';
 import { z } from 'zod';
 import { EventAccessSchema } from '@/lib/event-access-schema';
+import { PageStyleSchema } from '@/lib/page-style';
 import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
 import { emitEvent } from '@/lib/emit-event';
 import { notifyProducer } from '@/lib/producer-webhook';
@@ -39,6 +40,9 @@ const UpdateSchema = z.object({
   showCapacity: z.boolean().optional(),
   runOfShow: z.string().optional().nullable(),
   template: z.enum(['editorial', 'split', 'minimal']).optional(),
+  // Per-event member-page styling. null resets to brand defaults. Flows through
+  // ...rest into the event.update below (stored as Json).
+  pageStyle: PageStyleSchema.nullable().optional(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'CANCELLED']).optional(),
   eventAccess: EventAccessSchema.optional(),
 });

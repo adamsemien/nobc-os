@@ -17,6 +17,7 @@ export function EventPageStyleWrapper({
 }) {
   return (
     <div
+      className="event-page-root"
       data-hero-text={style.heroTextMode}
       data-card-shadow={style.cardShadow}
       data-footer-scale={style.footerScale}
