@@ -351,7 +351,9 @@ export async function POST(req: NextRequest) {
               where: {
                 stripePaymentIntentId: piId,
                 ...(rsvp ? { workspaceId: rsvp.workspaceId } : {}),
-                paymentStatus: { notIn: ['REFUNDED'] },
+                // DISPUTED is terminal here too (matches the succeeded/authorize
+                // guards) — a refund event must not silently clear a dispute flag.
+                paymentStatus: { notIn: ['REFUNDED', 'DISPUTED'] },
               },
               data: {
                 paymentStatus: 'REFUNDED',
@@ -375,7 +377,7 @@ export async function POST(req: NextRequest) {
                   "refundAmountCents" = ${refundAmountCents}
               WHERE "stripePaymentIntentId" = ${piId}
                 AND "workspaceId" = ${rsvp.workspaceId}
-                AND "paymentStatus" <> 'REFUNDED'
+                AND "paymentStatus" NOT IN ('REFUNDED', 'DISPUTED')
                 AND ("refundAmountCents" IS NULL OR "refundAmountCents" < ${refundAmountCents})
             `;
           }

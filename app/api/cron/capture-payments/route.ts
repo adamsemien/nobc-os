@@ -15,6 +15,10 @@ export async function GET(req: NextRequest) {
   const rsvps = await db.rSVP.findMany({
     where: {
       ticketStatus: 'confirmed',
+      // Only authorized holds awaiting capture — without this the cron loads every
+      // confirmed PI'd RSVP and burns a Stripe retrieve per row just to skip the
+      // already-captured ones. Apply-required holds are confirmed + AUTHORIZED.
+      paymentStatus: 'AUTHORIZED',
       stripePaymentIntentId: { not: null },
       refundedAt: null,
       event: { startAt: { lte: cutoff } },

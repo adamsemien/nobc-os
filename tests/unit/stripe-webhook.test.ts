@@ -170,7 +170,7 @@ describe('stripe webhook: charge.refunded', () => {
 
     expect(m.txRsvpUpdateMany).toHaveBeenCalledOnce();
     const call = m.txRsvpUpdateMany.mock.calls[0][0];
-    expect(call.where).toMatchObject({ stripePaymentIntentId: 'pi_1', workspaceId: 'w1', paymentStatus: { notIn: ['REFUNDED'] } });
+    expect(call.where).toMatchObject({ stripePaymentIntentId: 'pi_1', workspaceId: 'w1', paymentStatus: { notIn: ['REFUNDED', 'DISPUTED'] } });
     expect(call.data).toMatchObject({ paymentStatus: 'REFUNDED', ticketStatus: 'refunded', refundAmountCents: 5000 });
     expect(call.data.refundedAt).toBeInstanceOf(Date);
     // The full branch must NOT use the raw partial path.
