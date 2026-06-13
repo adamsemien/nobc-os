@@ -34,9 +34,10 @@ export const PageStyleSchema = z.object({
   // Display title size multiplier (Cormorant stays the family — size only).
   titleScale: z.number().min(0.8).max(1.2).default(1),
   heroHeight: z.enum(['compact', 'standard', 'tall']).default('standard'),
-  // Subtle paper grain. Off by default; capped low so it never reads as degraded print.
+  // Paper grain (grayscale noise, multiply-blended). Off by default; range is wide
+  // enough to actually read on the light paper without becoming dirty.
   textureOn: z.boolean().default(false),
-  textureOpacity: z.number().min(0.01).max(0.06).default(0.03),
+  textureOpacity: z.number().min(0.03).max(0.25).default(0.1),
   // Access card depth + footer wordmark size — the "spruce" knobs. Token-only.
   cardShadow: z.enum(['flat', 'raised', 'lifted']).default('raised'),
   footerScale: z.enum(['sm', 'md', 'lg']).default('md'),

@@ -19,7 +19,7 @@ describe('PAGE_STYLE_DEFAULTS', () => {
       titleScale: 1,
       heroHeight: 'standard',
       textureOn: false,
-      textureOpacity: 0.03,
+      textureOpacity: 0.1,
       cardShadow: 'raised',
       footerScale: 'md',
     });

@@ -203,8 +203,8 @@ export function PageStyleEditor({
               {value.textureOn ? (
                 <RangeRow
                   label="Intensity"
-                  min={0.01}
-                  max={0.06}
+                  min={0.03}
+                  max={0.25}
                   step={0.01}
                   value={value.textureOpacity}
                   onChange={(v) => set('textureOpacity', v)}
