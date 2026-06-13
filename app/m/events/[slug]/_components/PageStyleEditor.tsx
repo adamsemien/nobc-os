@@ -10,8 +10,8 @@ import { type PageStyle, PAGE_STYLE_DEFAULTS } from '@/lib/page-style';
  * Save. No free-form pickers beyond the on-brand text colors (white / ink / brand
  * red) — fonts and the rest of the palette stay locked to the theme.
  *
- * The panel is draggable by its header so it never permanently blocks the part of
- * the hero you're trying to judge (e.g. the nav/logo under the top scrim).
+ * Stays out of the way: draggable by its header, the whole panel collapses to a
+ * title bar, and each section collapses independently.
  */
 export function PageStyleEditor({
   eventId,
@@ -32,28 +32,40 @@ export function PageStyleEditor({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [open, setOpen] = useState<Record<string, boolean>>({
+    Hero: true,
+    Typography: false,
+    Texture: false,
+    'Access card': false,
+    Footer: false,
+  });
+  const toggleSection = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
-  // Draggable position. null = the default top-left anchor.
+  // Draggable position. null = the default top-left anchor. Pointer capture is set
+  // on the header (currentTarget) so move/up keep firing even when the cursor leaves
+  // the header — the earlier bug captured the panel instead, which froze the drag.
   const panelRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
-  function startDrag(e: React.PointerEvent) {
+  function startDrag(e: React.PointerEvent<HTMLElement>) {
     const el = panelRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
-    el.setPointerCapture(e.pointerId);
+    e.currentTarget.setPointerCapture(e.pointerId);
   }
-  function onDrag(e: React.PointerEvent) {
+  function onDrag(e: React.PointerEvent<HTMLElement>) {
     if (!drag.current) return;
     const x = Math.max(0, Math.min(e.clientX - drag.current.dx, window.innerWidth - 80));
-    const y = Math.max(0, Math.min(e.clientY - drag.current.dy, window.innerHeight - 56));
+    const y = Math.max(0, Math.min(e.clientY - drag.current.dy, window.innerHeight - 48));
     setPos({ x, y });
   }
-  function endDrag(e: React.PointerEvent) {
+  function endDrag(e: React.PointerEvent<HTMLElement>) {
+    if (!drag.current) return;
     drag.current = null;
-    panelRef.current?.releasePointerCapture?.(e.pointerId);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
   }
 
   const dirty = JSON.stringify(value) !== JSON.stringify(saved);
@@ -82,6 +94,8 @@ export function PageStyleEditor({
     }
   }
 
+  const stop = (e: React.PointerEvent) => e.stopPropagation();
+
   return (
     <div
       ref={panelRef}
@@ -92,164 +106,193 @@ export function PageStyleEditor({
         onPointerDown={startDrag}
         onPointerMove={onDrag}
         onPointerUp={endDrag}
-        className="flex cursor-move touch-none select-none items-center justify-between border-b border-[var(--apply-rule)] px-3 py-2.5"
+        className="flex cursor-move touch-none select-none items-center justify-between gap-3 border-b border-[var(--apply-rule)] px-3 py-2.5"
       >
         <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)]">
           Page design <span className="text-[var(--apply-muted)]">· drag</span>
         </span>
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={onClose}
-          className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--nobc-red)]"
-        >
-          Close
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3 py-3">
-        {template === 'editorial' ? (
-          <Section title="Hero">
-            <SegRow
-              label="Title color"
-              options={['light', 'dark', 'red'] as const}
-              value={value.heroTitleColor}
-              onChange={(v) => set('heroTitleColor', v)}
-            />
-            <SegRow
-              label="Accent 'No Bad'"
-              options={['off', 'on'] as const}
-              value={value.heroTitleAccent ? 'on' : 'off'}
-              onChange={(v) => set('heroTitleAccent', v === 'on')}
-            />
-            <SegRow
-              label="Nav & date"
-              options={['light', 'dark'] as const}
-              value={value.heroTextMode}
-              onChange={(v) => set('heroTextMode', v)}
-            />
-            <RangeRow
-              label="Top scrim"
-              min={0.3}
-              max={0.75}
-              step={0.05}
-              value={value.heroScrimTop}
-              onChange={(v) => set('heroScrimTop', v)}
-              format={pct}
-            />
-            <RangeRow
-              label="Bottom scrim"
-              min={0.45}
-              max={0.85}
-              step={0.05}
-              value={value.heroScrimBottom}
-              onChange={(v) => set('heroScrimBottom', v)}
-              format={pct}
-            />
-            <SegRow
-              label="Hero height"
-              options={['compact', 'standard', 'tall'] as const}
-              value={value.heroHeight}
-              onChange={(v) => set('heroHeight', v)}
-            />
-          </Section>
-        ) : null}
-
-        <Section title="Typography">
-          <RangeRow
-            label="Title size"
-            min={0.8}
-            max={1.2}
-            step={0.05}
-            value={value.titleScale}
-            onChange={(v) => set('titleScale', v)}
-            format={(v) => `${v.toFixed(2)}×`}
-          />
-        </Section>
-
-        <Section title="Texture">
-          <SegRow
-            label="Paper grain"
-            options={['off', 'on'] as const}
-            value={value.textureOn ? 'on' : 'off'}
-            onChange={(v) => set('textureOn', v === 'on')}
-          />
-          {value.textureOn ? (
-            <RangeRow
-              label="Intensity"
-              min={0.01}
-              max={0.06}
-              step={0.01}
-              value={value.textureOpacity}
-              onChange={(v) => set('textureOpacity', v)}
-              format={pct}
-            />
-          ) : null}
-        </Section>
-
-        <Section title="Access card">
-          <SegRow
-            label="Shadow"
-            options={['flat', 'raised', 'lifted'] as const}
-            value={value.cardShadow}
-            onChange={(v) => set('cardShadow', v)}
-          />
-        </Section>
-
-        <Section title="Footer">
-          <SegRow
-            label="Size"
-            options={['sm', 'md', 'lg'] as const}
-            value={value.footerScale}
-            onChange={(v) => set('footerScale', v)}
-          />
-        </Section>
-      </div>
-
-      <div className="border-t border-[var(--apply-rule)] px-3 py-2.5">
-        {error ? (
-          <p className="mb-2 text-[10px] uppercase tracking-wide text-[var(--nobc-red)]">{error}</p>
-        ) : null}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={save}
-            disabled={!dirty || saving}
-            className="flex-1 rounded-sm bg-[var(--nobc-red)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-opacity hover:bg-[var(--nobc-red-hover)] disabled:opacity-40"
+            onPointerDown={stop}
+            onClick={() => setCollapsed((c) => !c)}
+            className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)]"
           >
-            {saving ? 'Saving' : 'Save & close'}
+            {collapsed ? 'Expand' : 'Hide'}
           </button>
           <button
             type="button"
-            onClick={() => onChange(saved)}
-            disabled={!dirty || saving}
-            className="rounded-sm border border-[var(--apply-rule)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)] disabled:opacity-40"
+            onPointerDown={stop}
+            onClick={onClose}
+            className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--nobc-red)]"
           >
-            Discard
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange(PAGE_STYLE_DEFAULTS)}
-            disabled={saving}
-            className="rounded-sm border border-[var(--apply-rule)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)] disabled:opacity-40"
-          >
-            Reset
+            Close
           </button>
         </div>
       </div>
+
+      {collapsed ? null : (
+        <>
+          <div className="flex-1 overflow-y-auto px-3 py-3">
+            {template === 'editorial' ? (
+              <Section title="Hero" open={open['Hero']} onToggle={() => toggleSection('Hero')}>
+                <SegRow
+                  label="Title color"
+                  options={['light', 'dark', 'red'] as const}
+                  value={value.heroTitleColor}
+                  onChange={(v) => set('heroTitleColor', v)}
+                />
+                <SegRow
+                  label="Accent 'No Bad'"
+                  options={['off', 'on'] as const}
+                  value={value.heroTitleAccent ? 'on' : 'off'}
+                  onChange={(v) => set('heroTitleAccent', v === 'on')}
+                />
+                <SegRow
+                  label="Nav & date"
+                  options={['light', 'dark'] as const}
+                  value={value.heroTextMode}
+                  onChange={(v) => set('heroTextMode', v)}
+                />
+                <RangeRow
+                  label="Top scrim"
+                  min={0.3}
+                  max={0.75}
+                  step={0.05}
+                  value={value.heroScrimTop}
+                  onChange={(v) => set('heroScrimTop', v)}
+                  format={pct}
+                />
+                <RangeRow
+                  label="Bottom scrim"
+                  min={0.45}
+                  max={0.85}
+                  step={0.05}
+                  value={value.heroScrimBottom}
+                  onChange={(v) => set('heroScrimBottom', v)}
+                  format={pct}
+                />
+                <SegRow
+                  label="Hero height"
+                  options={['compact', 'standard', 'tall'] as const}
+                  value={value.heroHeight}
+                  onChange={(v) => set('heroHeight', v)}
+                />
+              </Section>
+            ) : null}
+
+            <Section title="Typography" open={open['Typography']} onToggle={() => toggleSection('Typography')}>
+              <RangeRow
+                label="Title size"
+                min={0.8}
+                max={1.2}
+                step={0.05}
+                value={value.titleScale}
+                onChange={(v) => set('titleScale', v)}
+                format={(v) => `${v.toFixed(2)}×`}
+              />
+            </Section>
+
+            <Section title="Texture" open={open['Texture']} onToggle={() => toggleSection('Texture')}>
+              <SegRow
+                label="Paper grain"
+                options={['off', 'on'] as const}
+                value={value.textureOn ? 'on' : 'off'}
+                onChange={(v) => set('textureOn', v === 'on')}
+              />
+              {value.textureOn ? (
+                <RangeRow
+                  label="Intensity"
+                  min={0.01}
+                  max={0.06}
+                  step={0.01}
+                  value={value.textureOpacity}
+                  onChange={(v) => set('textureOpacity', v)}
+                  format={pct}
+                />
+              ) : null}
+            </Section>
+
+            <Section title="Access card" open={open['Access card']} onToggle={() => toggleSection('Access card')}>
+              <SegRow
+                label="Shadow"
+                options={['flat', 'raised', 'lifted'] as const}
+                value={value.cardShadow}
+                onChange={(v) => set('cardShadow', v)}
+              />
+            </Section>
+
+            <Section title="Footer" open={open['Footer']} onToggle={() => toggleSection('Footer')}>
+              <SegRow
+                label="Size"
+                options={['sm', 'md', 'lg'] as const}
+                value={value.footerScale}
+                onChange={(v) => set('footerScale', v)}
+              />
+            </Section>
+          </div>
+
+          <div className="border-t border-[var(--apply-rule)] px-3 py-2.5">
+            {error ? (
+              <p className="mb-2 text-[10px] uppercase tracking-wide text-[var(--nobc-red)]">{error}</p>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={save}
+                disabled={!dirty || saving}
+                className="flex-1 rounded-sm bg-[var(--nobc-red)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-opacity hover:bg-[var(--nobc-red-hover)] disabled:opacity-40"
+              >
+                {saving ? 'Saving' : 'Save & close'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange(saved)}
+                disabled={!dirty || saving}
+                className="rounded-sm border border-[var(--apply-rule)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)] disabled:opacity-40"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange(PAGE_STYLE_DEFAULTS)}
+                disabled={saving}
+                className="rounded-sm border border-[var(--apply-rule)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)] disabled:opacity-40"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="mb-4 last:mb-0">
-      <p className="mb-2 text-[9px] font-medium uppercase tracking-widest text-[var(--apply-muted)]">
-        {title}
-      </p>
-      <div className="flex flex-col gap-3">{children}</div>
+    <div className="mb-3 border-b border-[var(--apply-rule)] pb-3 last:mb-0 last:border-0 last:pb-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between text-[9px] font-medium uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)]"
+      >
+        <span>{title}</span>
+        <span className="text-[12px] leading-none">{open ? '–' : '+'}</span>
+      </button>
+      {open ? <div className="mt-2 flex flex-col gap-3">{children}</div> : null}
     </div>
   );
 }
