@@ -32,6 +32,22 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
           <EventHeroFallback className="absolute inset-0 h-full w-full" />
         )}
 
+        {/* Legibility scrims — keep the red logo/nav (top) and title/date (bottom)
+            readable over ANY hero photo. Opacities are CSS variables so the
+            operator page-style editor can tune them per event; the defaults work
+            for a typical photo. Black gradients are functional scrims, not brand
+            colors, so they are exempt from the semantic-token rule. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-40"
+          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,var(--hero-scrim-top,0.55)), rgba(0,0,0,0))' }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-1/2"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,var(--hero-scrim-bottom,0.65)), rgba(0,0,0,0))' }}
+        />
+
         <div className="absolute inset-x-0 top-0 z-10">
           <MemberShellNav applyHref={applyHref} theme="overlay" />
         </div>
