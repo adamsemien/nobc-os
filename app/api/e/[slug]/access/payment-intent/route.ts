@@ -159,16 +159,20 @@ export async function POST(
   //   - approvalRequired === false -> 'automatic' (immediate capture; ticketed).
   //     Captured by Stripe on payment_intent.succeeded.
   //
-  // Idempotency key scoped to (workspace, event, member) so a guest double-tap
-  // or network retry resolves to the same Stripe PaymentIntent instead of
-  // minting a second live 7-day card hold. Mirrors the member route
-  // (app/api/m/events/[slug]/access/payment-intent/route.ts).
-  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}`;
+  // Idempotency key scoped to (workspace, event, member, amount, capture_method)
+  // so a guest double-tap or network retry resolves to the same PaymentIntent,
+  // while a genuine change between attempts (tier/price change -> different
+  // amount, approvalRequired toggle -> different capture_method) produces a
+  // FRESH key. Without amount+mode in the key, Stripe returns the original PI
+  // and ignores the new params, charging the stale amount or wrong hold type.
+  // Mirrors the member route (app/api/m/events/[slug]/access/payment-intent).
+  const captureMethod = event.approvalRequired ? 'manual' : 'automatic';
+  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}-${amountCents}-${captureMethod}`;
   const pi = await stripe.paymentIntents.create(
     {
       amount: amountCents,
       currency: 'usd',
-      capture_method: event.approvalRequired ? 'manual' : 'automatic',
+      capture_method: captureMethod,
       description: event.title,
       receipt_email: rsvpMember.email,
       automatic_payment_methods: { enabled: true },

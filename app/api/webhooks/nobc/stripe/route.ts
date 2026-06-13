@@ -360,18 +360,24 @@ export async function POST(req: NextRequest) {
                 refundAmountCents,
               },
             });
-          } else {
-            await tx.rSVP.updateMany({
-              where: {
-                stripePaymentIntentId: piId,
-                ...(rsvp ? { workspaceId: rsvp.workspaceId } : {}),
-                paymentStatus: { notIn: ['REFUNDED', 'PARTIALLY_REFUNDED'] },
-              },
-              data: {
-                paymentStatus: 'PARTIALLY_REFUNDED',
-                refundAmountCents,
-              },
-            });
+          } else if (rsvp) {
+            // Reconciliation authority: update whenever Stripe's cumulative
+            // amount_refunded exceeds what we have recorded. amount_refunded is
+            // a monotonic running total (never decreases), so a duplicate event
+            // is a no-op and a SECOND partial is NOT frozen out — a notIn
+            // ['PARTIALLY_REFUNDED'] guard would silently ignore later partials,
+            // leaving the DB undercounting and risking an over-refund via the
+            // operator route. Prisma cannot compare two columns in `where`, so
+            // this is raw SQL. Never regress a row that is already fully REFUNDED.
+            await tx.$executeRaw`
+              UPDATE "RSVP"
+              SET "paymentStatus" = 'PARTIALLY_REFUNDED',
+                  "refundAmountCents" = ${refundAmountCents}
+              WHERE "stripePaymentIntentId" = ${piId}
+                AND "workspaceId" = ${rsvp.workspaceId}
+                AND "paymentStatus" <> 'REFUNDED'
+                AND ("refundAmountCents" IS NULL OR "refundAmountCents" < ${refundAmountCents})
+            `;
           }
 
           if (rsvp) {

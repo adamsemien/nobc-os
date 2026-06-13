@@ -90,17 +90,36 @@ export async function POST(req: NextRequest) {
           amountCents: pi.amount ?? amountCents,
         });
       }
+      // Payment already went through on a prior attempt — the payment_intent.succeeded
+      // webhook will flip this RSVP to confirmed. Never cancel a succeeded PI (that
+      // throws) and never re-create (that double-charges). Return 409.
+      if (pi.status === 'succeeded') {
+        return NextResponse.json({ error: 'Already reserved' }, { status: 409 });
+      }
+      // Any other non-terminal state: release the stale hold before re-creating.
+      // Best-effort + catch: the PI could race to succeeded between retrieve and
+      // cancel, which would otherwise throw and 500 a member whose card is fine.
       if (pi.status !== 'canceled') {
-        await stripe.paymentIntents.cancel(existing.stripePaymentIntentId);
+        await stripe.paymentIntents
+          .cancel(existing.stripePaymentIntentId)
+          .catch((e) =>
+            console.error('[create-payment-intent] failed to cancel stale PI', {
+              piId: existing.stripePaymentIntentId,
+              e,
+            }),
+          );
       }
     }
   }
 
-  // Idempotency key scoped to (workspace, event, member) so a double-click or a
-  // network retry resolves to the same Stripe PaymentIntent instead of creating
-  // a second live authorized hold that dangles for 7 days. Mirrors the member
-  // route (app/api/m/events/[slug]/access/payment-intent/route.ts).
-  const idempotencyKey = `pi-${workspaceId}-${eventId}-${member.id}`;
+  // Idempotency key scoped to (workspace, event, member, amount, capture_method)
+  // so a double-click or network retry resolves to the same PaymentIntent, while
+  // a genuine change between attempts (tier/price change -> different amount,
+  // approvalRequired toggle -> different capture_method) produces a FRESH key.
+  // Without amount+mode in the key, Stripe returns the original PI and ignores
+  // the new params, charging the stale amount or minting the wrong hold type.
+  const captureMethod = event.approvalRequired ? 'manual' : 'automatic';
+  const idempotencyKey = `pi-${workspaceId}-${eventId}-${member.id}-${amountCents}-${captureMethod}`;
   let pi: Awaited<ReturnType<typeof stripe.paymentIntents.create>>;
   try {
     pi = await stripe.paymentIntents.create(
@@ -110,7 +129,7 @@ export async function POST(req: NextRequest) {
         // approvalRequired -> 'manual' (authorize-and-hold, captured on operator
         // approval); ticketed no-approval -> 'automatic' (immediate capture,
         // captured by Stripe on payment_intent.succeeded).
-        capture_method: event.approvalRequired ? 'manual' : 'automatic',
+        capture_method: captureMethod,
         description: event.title,
         receipt_email: member.email,
         metadata: { workspaceId, eventId, memberId: member.id },
