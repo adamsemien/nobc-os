@@ -1,14 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { type PageStyle, PAGE_STYLE_DEFAULTS } from '@/lib/page-style';
 
 /**
- * Operator-only live editor for a single event's member-page style. It drives the
+ * Operator-only live editor for a single event's member-page style. Drives the
  * lifted pageStyle state in EventDetail (onChange) so every move repaints the page
  * behind the panel instantly, and persists via PATCH /api/operator/events/[id] on
- * Save. No color or font pickers — the brand system owns those; this only exposes
- * the per-event legibility/texture knobs that change with each hero photo.
+ * Save. No free-form pickers beyond the on-brand text colors (white / ink / brand
+ * red) — fonts and the rest of the palette stay locked to the theme.
+ *
+ * The panel is draggable by its header so it never permanently blocks the part of
+ * the hero you're trying to judge (e.g. the nav/logo under the top scrim).
  */
 export function PageStyleEditor({
   eventId,
@@ -30,6 +33,29 @@ export function PageStyleEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Draggable position. null = the default top-left anchor.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+
+  function startDrag(e: React.PointerEvent) {
+    const el = panelRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    el.setPointerCapture(e.pointerId);
+  }
+  function onDrag(e: React.PointerEvent) {
+    if (!drag.current) return;
+    const x = Math.max(0, Math.min(e.clientX - drag.current.dx, window.innerWidth - 80));
+    const y = Math.max(0, Math.min(e.clientY - drag.current.dy, window.innerHeight - 56));
+    setPos({ x, y });
+  }
+  function endDrag(e: React.PointerEvent) {
+    drag.current = null;
+    panelRef.current?.releasePointerCapture?.(e.pointerId);
+  }
+
   const dirty = JSON.stringify(value) !== JSON.stringify(saved);
   const set = <K extends keyof PageStyle>(key: K, v: PageStyle[K]) =>
     onChange({ ...value, [key]: v });
@@ -48,6 +74,7 @@ export function PageStyleEditor({
         return;
       }
       onSaved(value);
+      onClose(); // close on a successful save
     } catch {
       setError('Save failed');
     } finally {
@@ -56,13 +83,23 @@ export function PageStyleEditor({
   }
 
   return (
-    <div className="fixed left-3 top-3 z-40 flex max-h-[calc(100vh-1.5rem)] w-[300px] flex-col overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-events-paper-card/95 shadow-[0_4px_24px_rgba(28,16,8,0.18)] backdrop-blur font-[family-name:var(--font-dm-sans)]">
-      <div className="flex items-center justify-between border-b border-[var(--apply-rule)] px-3 py-2.5">
+    <div
+      ref={panelRef}
+      className="fixed z-40 flex max-h-[calc(100vh-1.5rem)] w-[300px] flex-col overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-events-paper-card/95 shadow-[0_4px_24px_rgba(28,16,8,0.18)] backdrop-blur font-[family-name:var(--font-dm-sans)]"
+      style={pos ? { left: pos.x, top: pos.y } : { left: 12, top: 12 }}
+    >
+      <div
+        onPointerDown={startDrag}
+        onPointerMove={onDrag}
+        onPointerUp={endDrag}
+        className="flex cursor-move touch-none select-none items-center justify-between border-b border-[var(--apply-rule)] px-3 py-2.5"
+      >
         <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)]">
-          Page design
+          Page design <span className="text-[var(--apply-muted)]">· drag</span>
         </span>
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={onClose}
           className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--nobc-red)]"
         >
@@ -73,6 +110,18 @@ export function PageStyleEditor({
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {template === 'editorial' ? (
           <Section title="Hero">
+            <SegRow
+              label="Title color"
+              options={['light', 'dark', 'red'] as const}
+              value={value.heroTitleColor}
+              onChange={(v) => set('heroTitleColor', v)}
+            />
+            <SegRow
+              label="Nav & date"
+              options={['light', 'dark'] as const}
+              value={value.heroTextMode}
+              onChange={(v) => set('heroTextMode', v)}
+            />
             <RangeRow
               label="Top scrim"
               min={0.3}
@@ -96,12 +145,6 @@ export function PageStyleEditor({
               options={['compact', 'standard', 'tall'] as const}
               value={value.heroHeight}
               onChange={(v) => set('heroHeight', v)}
-            />
-            <SegRow
-              label="Overlay text"
-              options={['light', 'dark'] as const}
-              value={value.heroTextMode}
-              onChange={(v) => set('heroTextMode', v)}
             />
           </Section>
         ) : null}
@@ -168,7 +211,7 @@ export function PageStyleEditor({
             disabled={!dirty || saving}
             className="flex-1 rounded-sm bg-[var(--nobc-red)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-opacity hover:bg-[var(--nobc-red-hover)] disabled:opacity-40"
           >
-            {saving ? 'Saving' : dirty ? 'Save' : 'Saved'}
+            {saving ? 'Saving' : 'Save & close'}
           </button>
           <button
             type="button"

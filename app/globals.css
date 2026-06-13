@@ -493,6 +493,19 @@
   --hero-fg-soft: color-mix(in srgb, var(--apply-ink) 78%, transparent);
 }
 
+/* Hero title color — set by EventPageStyleWrapper via data-hero-title, independent
+   of the nav/date text mode. 'light' (white) is the default and matches the prior
+   look; 'dark' is ink; 'red' is brand red. */
+[data-hero-title='light'] {
+  --hero-title-fg: #ffffff;
+}
+[data-hero-title='dark'] {
+  --hero-title-fg: var(--apply-ink);
+}
+[data-hero-title='red'] {
+  --hero-title-fg: var(--nobc-red);
+}
+
 /* Access card elevation — set by EventPageStyleWrapper via data-card-shadow.
    'raised' (default) keeps the card's built-in Tailwind shadow, so the default
    look is unchanged; only 'flat' and 'lifted' override it. */

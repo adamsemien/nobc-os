@@ -58,7 +58,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
               className="max-w-4xl font-normal leading-[1.04] font-[family-name:var(--font-cormorant)]"
               style={{
                 fontSize: 'calc(clamp(2.75rem, 5.8vw, 4.75rem) * var(--page-title-scale, 1))',
-                color: 'var(--hero-fg, white)',
+                color: 'var(--hero-title-fg, var(--hero-fg, white))',
               }}
             >
               {event.title}

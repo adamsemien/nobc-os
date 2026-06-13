@@ -10,6 +10,7 @@ import { z } from 'zod';
  */
 
 export type HeroTextMode = 'light' | 'dark';
+export type HeroTitleColor = 'light' | 'dark' | 'red';
 export type HeroHeight = 'compact' | 'standard' | 'tall';
 export type CardShadow = 'flat' | 'raised' | 'lifted';
 export type FooterScale = 'sm' | 'md' | 'lg';
@@ -20,9 +21,12 @@ export const PageStyleSchema = z.object({
   // the nav/logo zone; the bottom covers the title/date.
   heroScrimTop: z.number().min(0.3).max(0.75).default(0.55),
   heroScrimBottom: z.number().min(0.45).max(0.85).default(0.65),
-  // Light text over dark photos (default) or dark text over light photos. "No Bad"
-  // stays red regardless; this drives "Company" + the nav + title/date.
+  // Nav + date color over the hero photo: light over dark photos (default) or dark
+  // over light photos. The nav "No Bad" stays brand red regardless.
   heroTextMode: z.enum(['light', 'dark']).default('light'),
+  // Hero title color, chosen against the photo: white (default), ink, or brand red.
+  // Independent of heroTextMode so the title can be red while the nav/date stay light.
+  heroTitleColor: z.enum(['light', 'dark', 'red']).default('light'),
   // Display title size multiplier (Cormorant stays the family — size only).
   titleScale: z.number().min(0.8).max(1.2).default(1),
   heroHeight: z.enum(['compact', 'standard', 'tall']).default('standard'),
