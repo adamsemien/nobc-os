@@ -305,7 +305,7 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
 
   return (
     <>
-    <div className={`${cardWrapper}${mobileSticky && isCtaState ? ' max-lg:hidden' : ''}`}>
+    <div className={`ev-access-card ${cardWrapper}${mobileSticky && isCtaState ? ' max-lg:hidden' : ''}`}>
       {!hideHeader ? (
         <>
           <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">

@@ -26,6 +26,7 @@ import {
 } from './event-access';
 import type { EventDetailDTO } from '@/app/m/events/[slug]/_components/EventDetail';
 import type { WorkflowPath } from '@/lib/workflows/types';
+import { parsePageStyle } from '@/lib/page-style';
 
 function parseWorkflowPaths(value: unknown): WorkflowPath[] {
   if (!Array.isArray(value)) return [];
@@ -153,6 +154,8 @@ export async function assemblePublicEventDTO(
     template: (event.template ?? 'editorial') as 'editorial' | 'split' | 'minimal',
     isOperator: false,
     workflowPaths,
+    // Per-event styling overrides; null/invalid falls back to brand defaults.
+    pageStyle: parsePageStyle(event.pageStyle),
   };
 
   return dto;

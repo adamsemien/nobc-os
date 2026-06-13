@@ -31,7 +31,10 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
             {accessTypeLabel(event.resolved)}
           </p>
 
-          <h1 className="mt-6 text-[clamp(2.5rem,6vw,4rem)] font-normal leading-[1.05] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <h1
+            className="mt-6 font-normal leading-[1.05] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]"
+            style={{ fontSize: 'calc(clamp(2.5rem, 6vw, 4rem) * var(--page-title-scale, 1))' }}
+          >
             {event.title}
           </h1>
 
@@ -79,7 +82,10 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
 
         <div className="my-10 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
 
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+        <p
+          className="uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]"
+          style={{ fontSize: 'calc(10px * var(--footer-scale, 1))' }}
+        >
           <span className="text-[var(--nobc-red)]">NO BAD </span>
           <span>COMPANY</span>
         </p>

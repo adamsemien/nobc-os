@@ -49,7 +49,10 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           </p>
 
           {/* title */}
-          <h1 className="mt-4 max-w-2xl text-[clamp(2.75rem,5vw,4.25rem)] font-medium leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <h1
+            className="mt-4 max-w-2xl font-medium leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]"
+            style={{ fontSize: 'calc(clamp(2.75rem, 5vw, 4.25rem) * var(--page-title-scale, 1))' }}
+          >
             {event.title}
           </h1>
 
@@ -94,7 +97,10 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
             <div className="h-px w-full bg-[var(--apply-rule)]" />
             <div className="flex items-end justify-between gap-6 pt-6">
               <div>
-                <p className="text-[clamp(1.5rem,2.6vw,2.25rem)] italic leading-none text-[var(--apply-muted)] font-[family-name:var(--font-cormorant)]">
+                <p
+                  className="italic leading-none text-[var(--apply-muted)] font-[family-name:var(--font-cormorant)]"
+                  style={{ fontSize: 'calc(clamp(1.5rem, 2.6vw, 2.25rem) * var(--footer-scale, 1))' }}
+                >
                   No Bad Company
                 </p>
                 <p className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">

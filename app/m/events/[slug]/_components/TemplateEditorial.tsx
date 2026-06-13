@@ -7,6 +7,22 @@ import { EventHeroFallback } from './EventHeroFallback';
 import { parseDate, formatDateLine } from './event-format';
 import type { EventDetailDTO } from './EventDetail';
 
+/**
+ * Render the hero title, wrapping a leading "No Bad" in an accent span. The span
+ * only turns red when data-hero-title-accent is on (set by the page-style editor);
+ * otherwise it inherits the title color, so the title reads as one color.
+ */
+function renderHeroTitle(title: string) {
+  const m = /^no bad\b/i.exec(title);
+  if (!m) return title;
+  return (
+    <>
+      <span className="ev-title-accent">{title.slice(0, m[0].length)}</span>
+      {title.slice(m[0].length)}
+    </>
+  );
+}
+
 export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
   const applyHref = useMemberApplyHref();
   const start = parseDate(event.startAt);
@@ -19,7 +35,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
       <section
         className="relative isolate w-full"
         aria-label="Event hero"
-        style={{ height: '58vh', minHeight: 380 }}
+        style={{ height: 'var(--hero-height-vh, 58vh)', minHeight: 380 }}
       >
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -32,16 +48,41 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
           <EventHeroFallback className="absolute inset-0 h-full w-full" />
         )}
 
+        {/* Legibility scrims — keep the red logo/nav (top) and title/date (bottom)
+            readable over ANY hero photo. Opacities are CSS variables so the
+            operator page-style editor can tune them per event; the defaults work
+            for a typical photo. Black gradients are functional scrims, not brand
+            colors, so they are exempt from the semantic-token rule. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-40"
+          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,max(0.3, var(--hero-scrim-top,0.55))), rgba(0,0,0,0))' }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-1/2"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,max(0.45, var(--hero-scrim-bottom,0.65))), rgba(0,0,0,0))' }}
+        />
+
         <div className="absolute inset-x-0 top-0 z-10">
           <MemberShellNav applyHref={applyHref} theme="overlay" />
         </div>
 
         <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-10 sm:px-10 sm:pb-14">
           <div className="ev-stagger mx-auto max-w-6xl">
-            <h1 className="max-w-4xl text-[clamp(2.75rem,5.8vw,4.75rem)] font-normal leading-[1.04] text-white font-[family-name:var(--font-cormorant)]">
-              {event.title}
+            <h1
+              className="max-w-4xl font-normal leading-[1.04] font-[family-name:var(--font-cormorant)]"
+              style={{
+                fontSize: 'calc(clamp(2.75rem, 5.8vw, 4.75rem) * var(--page-title-scale, 1))',
+                color: 'var(--hero-title-fg, var(--hero-fg, white))',
+              }}
+            >
+              {renderHeroTitle(event.title)}
             </h1>
-            <p className="mt-4 text-[12px] font-medium uppercase tracking-[0.2em] text-white/85 font-[family-name:var(--font-dm-sans)]">
+            <p
+              className="mt-4 text-[12px] font-medium uppercase tracking-[0.2em] font-[family-name:var(--font-dm-sans)]"
+              style={{ color: 'var(--hero-fg-soft, rgba(255,255,255,0.85))' }}
+            >
               {dateCaps}
               {venueCaps ? ` · ${venueCaps}` : ''}
             </p>
@@ -89,7 +130,10 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
             <div className="h-px w-full bg-[var(--apply-rule)]" />
             <div className="flex items-end justify-between gap-6 pt-6">
               <div>
-                <p className="text-[clamp(1.5rem,2.6vw,2.25rem)] italic leading-none text-[var(--apply-muted)] font-[family-name:var(--font-cormorant)]">
+                <p
+                  className="italic leading-none text-[var(--apply-muted)] font-[family-name:var(--font-cormorant)]"
+                  style={{ fontSize: 'calc(clamp(1.5rem, 2.6vw, 2.25rem) * var(--footer-scale, 1))' }}
+                >
                   No Bad Company
                 </p>
                 <p className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">

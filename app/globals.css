@@ -480,6 +480,76 @@
   --bg-reveal-surface: rgba(255,255,255,0.025);
 }
 
+/* Event hero overlay text mode — set by EventPageStyleWrapper via data-hero-text.
+   light = white text over a dark photo (default); dark = ink over a light photo.
+   "No Bad" stays brand red in both; only "Company", the nav, and the title/date
+   follow this. Defaults match the previous hard-coded white overlay text. */
+[data-hero-text='light'] {
+  --hero-fg: #ffffff;
+  --hero-fg-soft: rgba(255, 255, 255, 0.85);
+}
+[data-hero-text='dark'] {
+  --hero-fg: var(--apply-ink);
+  --hero-fg-soft: color-mix(in srgb, var(--apply-ink) 78%, transparent);
+}
+
+/* Hero title color — set by EventPageStyleWrapper via data-hero-title, independent
+   of the nav/date text mode. 'light' (white) is the default and matches the prior
+   look; 'dark' is ink; 'red' is brand red. */
+[data-hero-title='light'] {
+  --hero-title-fg: #ffffff;
+}
+[data-hero-title='dark'] {
+  --hero-title-fg: var(--apply-ink);
+}
+[data-hero-title='red'] {
+  --hero-title-fg: var(--nobc-red);
+}
+
+/* Brand accent — reddens a leading "No Bad" in the hero title when on. Off (default)
+   leaves the accent span inheriting the title color, so the title is single-color. */
+[data-hero-title-accent='on'] .ev-title-accent {
+  color: var(--nobc-red);
+}
+
+/* Access card elevation — set by EventPageStyleWrapper via data-card-shadow.
+   'raised' (default) keeps the card's built-in Tailwind shadow, so the default
+   look is unchanged; only 'flat' and 'lifted' override it. */
+[data-card-shadow='flat'] .ev-access-card {
+  box-shadow: none;
+}
+[data-card-shadow='lifted'] .ev-access-card {
+  box-shadow: 0 12px 34px -8px rgba(28, 16, 8, 0.18);
+}
+
+/* Footer brand-anchor scale — set via data-footer-scale. md (default) leaves
+   --footer-scale unset so the wordmarks fall back to 1 (unchanged look). */
+[data-footer-scale='sm'] {
+  --footer-scale: 0.85;
+}
+[data-footer-scale='lg'] {
+  --footer-scale: 1.2;
+}
+
+/* Paper grain texture — opt-in per event via data-textureOn. Rendered as an
+   inline fractalNoise SVG over the whole page (absolute so it scrolls with
+   content and never blocks pointer events). Default opacity resolves to 0
+   (--paper-grain-on = 0) so pages without texture are pixel-identical. */
+.event-page-root {
+  position: relative;
+}
+.event-page-root::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: multiply;
+  opacity: calc(var(--paper-grain-on, 0) * var(--paper-grain-opacity, 0.03));
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -58,6 +58,7 @@ export async function getEventBySlug(workspaceId: string, slug: string) {
     where: { workspaceId_slug: { workspaceId, slug } },
     select: {
       ...listSelect,
+      pageStyle: true,
       plusOnesAllowed: true,
       customQuestions: {
         select: {

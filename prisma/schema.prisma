@@ -474,6 +474,9 @@ model Event {
   refundWindowHours     Int?
   runOfShow             String?         @db.Text
   template              String          @default("editorial")
+  /// Per-event member-page styling overrides (scrim, title scale, hero height,
+  /// texture, card/footer). Validated by lib/page-style.ts; null = brand defaults.
+  pageStyle             Json?
   eventAccess           Json            @default("{\"member\":{\"enabled\":true,\"gate\":\"auto_confirm\",\"priceCents\":0},\"guest\":{\"enabled\":false,\"gate\":\"pay\",\"priceCents\":0},\"comp\":{\"enabled\":false,\"budgetCap\":null}}")
 
   // Recurring — seriesId links to EventSeries
