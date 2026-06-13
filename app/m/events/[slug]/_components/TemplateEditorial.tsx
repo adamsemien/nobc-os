@@ -19,7 +19,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
       <section
         className="relative isolate w-full"
         aria-label="Event hero"
-        style={{ height: '58vh', minHeight: 380 }}
+        style={{ height: 'var(--hero-height-vh, 58vh)', minHeight: 380 }}
       >
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -54,10 +54,19 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
 
         <div className="absolute inset-x-0 bottom-0 z-10 px-6 pb-10 sm:px-10 sm:pb-14">
           <div className="ev-stagger mx-auto max-w-6xl">
-            <h1 className="max-w-4xl text-[clamp(2.75rem,5.8vw,4.75rem)] font-normal leading-[1.04] text-white font-[family-name:var(--font-cormorant)]">
+            <h1
+              className="max-w-4xl font-normal leading-[1.04] font-[family-name:var(--font-cormorant)]"
+              style={{
+                fontSize: 'calc(clamp(2.75rem, 5.8vw, 4.75rem) * var(--page-title-scale, 1))',
+                color: 'var(--hero-fg, white)',
+              }}
+            >
               {event.title}
             </h1>
-            <p className="mt-4 text-[12px] font-medium uppercase tracking-[0.2em] text-white/85 font-[family-name:var(--font-dm-sans)]">
+            <p
+              className="mt-4 text-[12px] font-medium uppercase tracking-[0.2em] font-[family-name:var(--font-dm-sans)]"
+              style={{ color: 'var(--hero-fg-soft, rgba(255,255,255,0.85))' }}
+            >
               {dateCaps}
               {venueCaps ? ` · ${venueCaps}` : ''}
             </p>

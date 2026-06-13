@@ -480,6 +480,19 @@
   --bg-reveal-surface: rgba(255,255,255,0.025);
 }
 
+/* Event hero overlay text mode — set by EventPageStyleWrapper via data-hero-text.
+   light = white text over a dark photo (default); dark = ink over a light photo.
+   "No Bad" stays brand red in both; only "Company", the nav, and the title/date
+   follow this. Defaults match the previous hard-coded white overlay text. */
+[data-hero-text='light'] {
+  --hero-fg: #ffffff;
+  --hero-fg-soft: rgba(255, 255, 255, 0.85);
+}
+[data-hero-text='dark'] {
+  --hero-fg: var(--apply-ink);
+  --hero-fg-soft: color-mix(in srgb, var(--apply-ink) 78%, transparent);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

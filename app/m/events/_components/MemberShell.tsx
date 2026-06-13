@@ -35,6 +35,9 @@ export function MemberShellNav({
             ? 'text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-fg sm:text-[0.7rem] sm:tracking-[0.16em]'
             : 'text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-ref-ink sm:text-[0.7rem] sm:tracking-[0.16em]'
         }${overlay ? ' [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]' : ''}`}
+        // Over a photo, "Company" follows the hero text-mode (light/dark); "No Bad"
+        // keeps its own brand-red class below, so the wordmark is always red + legible.
+        style={overlay ? { color: 'var(--hero-fg)' } : undefined}
       >
         <span className="text-nobc-red">NO BAD </span>
         <span>COMPANY</span>
@@ -47,6 +50,7 @@ export function MemberShellNav({
               ? 'text-[0.65rem] font-normal uppercase tracking-[0.2em] text-events-fg-soft'
               : 'text-[0.65rem] font-normal uppercase tracking-[0.2em] text-events-ref-ink'
           }${overlay ? ' [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]' : ''}`}
+          style={overlay ? { color: 'var(--hero-fg-soft)' } : undefined}
         >
           Events
         </Link>

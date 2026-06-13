@@ -31,7 +31,10 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
             {accessTypeLabel(event.resolved)}
           </p>
 
-          <h1 className="mt-6 text-[clamp(2.5rem,6vw,4rem)] font-normal leading-[1.05] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <h1
+            className="mt-6 font-normal leading-[1.05] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]"
+            style={{ fontSize: 'calc(clamp(2.5rem, 6vw, 4rem) * var(--page-title-scale, 1))' }}
+          >
             {event.title}
           </h1>
 

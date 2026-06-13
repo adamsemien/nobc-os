@@ -49,7 +49,10 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           </p>
 
           {/* title */}
-          <h1 className="mt-4 max-w-2xl text-[clamp(2.75rem,5vw,4.25rem)] font-medium leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <h1
+            className="mt-4 max-w-2xl font-medium leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]"
+            style={{ fontSize: 'calc(clamp(2.75rem, 5vw, 4.25rem) * var(--page-title-scale, 1))' }}
+          >
             {event.title}
           </h1>
 
