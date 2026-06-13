@@ -13,7 +13,7 @@ import {
 import { MemberWorkspaceGate } from '../_components/MemberWorkspaceGate';
 import { EventDetail, type EventDetailDTO } from './_components/EventDetail';
 import type { WorkflowPath } from '@/lib/workflows/types';
-import { PAGE_STYLE_DEFAULTS } from '@/lib/page-style';
+import { parsePageStyle } from '@/lib/page-style';
 
 function parseWorkflowPaths(value: unknown): WorkflowPath[] {
   if (!Array.isArray(value)) return [];
@@ -162,9 +162,8 @@ export default async function EventDetailPage({
     isOperator: viewer !== 'member',
     isPastEvent,
     workflowPaths,
-    // P1: defaults (current look). P2 swaps this to parsePageStyle(event.pageStyle)
-    // once the additive Event.pageStyle column exists.
-    pageStyle: PAGE_STYLE_DEFAULTS,
+    // Per-event styling overrides; null/invalid falls back to brand defaults.
+    pageStyle: parsePageStyle(event.pageStyle),
   };
 
   return <EventDetail event={dto} />;
