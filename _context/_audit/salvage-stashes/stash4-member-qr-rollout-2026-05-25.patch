@@ -1,0 +1,351 @@
+diff --git a/app/api/apply/membership/[id]/approve/route.ts b/app/api/apply/membership/[id]/approve/route.ts
+index 64bbe7d..77bb829 100644
+--- a/app/api/apply/membership/[id]/approve/route.ts
++++ b/app/api/apply/membership/[id]/approve/route.ts
+@@ -4,6 +4,7 @@ import { render } from '@react-email/render';
+ import { db } from '@/lib/db';
+ import { requireWorkspaceId } from '@/lib/auth';
+ import { resend } from '@/lib/resend';
++import { generateMemberQrCode } from '@/lib/member-qr';
+ import WelcomeEmail from '@/emails/WelcomeEmail';
+ import WaitlistEmail from '@/emails/WaitlistEmail';
+ import DeclineEmail from '@/emails/DeclineEmail';
+@@ -76,6 +77,7 @@ export async function POST(
+         status: 'APPROVED',
+         approved: true,
+         approvedAt: now,
++        memberQrCode: generateMemberQrCode(),
+       },
+     });
+ 
+diff --git a/app/api/apply/membership/[id]/submit/route.ts b/app/api/apply/membership/[id]/submit/route.ts
+index 586d765..86c0998 100644
+--- a/app/api/apply/membership/[id]/submit/route.ts
++++ b/app/api/apply/membership/[id]/submit/route.ts
+@@ -8,6 +8,7 @@ import { scoreApplication } from '@/lib/scoring';
+ import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
+ import { maybeFireSlack } from '@/lib/comments-notify';
+ import WelcomeEmail from '@/emails/WelcomeEmail';
++import { generateMemberQrCode } from '@/lib/member-qr';
+ 
+ export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+   const { id } = await params;
+@@ -80,6 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
+         status: 'APPROVED',
+         approved: true,
+         approvedAt: now,
++        memberQrCode: generateMemberQrCode(),
+       },
+     });
+ 
+diff --git a/app/api/rsvp/plus-one/route.ts b/app/api/rsvp/plus-one/route.ts
+index a84c643..1f2d7db 100644
+--- a/app/api/rsvp/plus-one/route.ts
++++ b/app/api/rsvp/plus-one/route.ts
+@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
+ import { db } from '@/lib/db';
+ import { getMemberWorkspaceId } from '@/lib/auth';
+ import { resend } from '@/lib/resend';
++import { generateMemberQrCode } from '@/lib/member-qr';
+ 
+ export async function POST(req: NextRequest) {
+   const { userId } = await auth();
+@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
+         lastName: guestRest.join(' ') || '',
+         status: 'APPROVED',
+         approved: true,
++        memberQrCode: generateMemberQrCode(),
+       },
+     });
+     guestMemberId = newGuest.id;
+diff --git a/app/api/webhooks/nobc/stripe/route.ts b/app/api/webhooks/nobc/stripe/route.ts
+index ee7ecd5..b3ec3ff 100644
+--- a/app/api/webhooks/nobc/stripe/route.ts
++++ b/app/api/webhooks/nobc/stripe/route.ts
+@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
+ import { resend } from '@/lib/resend';
+ import { rsvpConfirmedEmail } from '@/lib/email-templates';
+ import { emitEvent } from '@/lib/emit-event';
++import QRCode from 'qrcode';
+ 
+ export async function POST(req: NextRequest) {
+   const body = await req.text();
+@@ -68,9 +69,14 @@ export async function POST(req: NextRequest) {
+       if (process.env.RESEND_API_KEY && eventRecord) {
+         const member = await db.member.findFirst({
+           where: { id: memberId },
+-          select: { email: true, firstName: true, lastName: true },
++          select: { email: true, firstName: true, lastName: true, memberQrCode: true },
+         });
+         if (member) {
++          // Embed the buyer's scan token as a QR — this is exactly what the
++          // door scanner matches on (CheckInClient → memberQrCode).
++          const qrDataUrl = member.memberQrCode
++            ? await QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 })
++            : undefined;
+           const { subject, html } = rsvpConfirmedEmail(
+             `${member.firstName} ${member.lastName}`.trim(),
+             eventRecord.title,
+@@ -78,6 +84,7 @@ export async function POST(req: NextRequest) {
+             eventRecord.location,
+             eventRecord.slug,
+             rsvpId,
++            qrDataUrl,
+           );
+           resend.emails.send({
+             from: 'NoBC <team@thenobadcompany.com>',
+@@ -132,12 +139,16 @@ export async function POST(req: NextRequest) {
+           const member = memberId
+             ? await db.member.findFirst({
+                 where: { id: memberId },
+-                select: { email: true, firstName: true, lastName: true },
++                select: { email: true, firstName: true, lastName: true, memberQrCode: true },
+               })
+             : null;
+           if (eventRecord && member) {
+             const { resend } = await import('@/lib/resend');
+             const { rsvpConfirmedEmail } = await import('@/lib/email-templates');
++            // Embed the buyer's scan token as a QR — matches the door scanner.
++            const qrDataUrl = member.memberQrCode
++              ? await QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 })
++              : undefined;
+             const { subject, html } = rsvpConfirmedEmail(
+               `${member.firstName} ${member.lastName}`.trim(),
+               eventRecord.title,
+@@ -145,6 +156,7 @@ export async function POST(req: NextRequest) {
+               eventRecord.location,
+               eventRecord.slug,
+               rsvp.id,
++              qrDataUrl,
+             );
+             resend.emails
+               .send({ from: 'NoBC <team@thenobadcompany.com>', to: member.email, subject, html })
+diff --git a/app/m/events/[slug]/confirmed/page.tsx b/app/m/events/[slug]/confirmed/page.tsx
+index 366596c..7446f52 100644
+--- a/app/m/events/[slug]/confirmed/page.tsx
++++ b/app/m/events/[slug]/confirmed/page.tsx
+@@ -214,60 +214,9 @@ export default async function EventConfirmedPage({
+           </p>
+         </div>
+ 
+-        {/* Wallet buttons */}
+-        <div
+-          style={{
+-            width: '100%',
+-            display: 'flex',
+-            flexDirection: 'column',
+-            gap: '10px',
+-          }}
+-        >
+-          <a
+-            href={`/api/wallet/apple/${rsvpId}`}
+-            style={{
+-              display: 'flex',
+-              alignItems: 'center',
+-              justifyContent: 'center',
+-              gap: '8px',
+-              width: '100%',
+-              padding: '14px 20px',
+-              background: '#000',
+-              color: '#fff',
+-              borderRadius: '6px',
+-              textDecoration: 'none',
+-              fontFamily: 'var(--font-dm-sans, DM Sans, sans-serif)',
+-              fontSize: '0.875rem',
+-              fontWeight: 500,
+-              letterSpacing: '0.01em',
+-            }}
+-          >
+-            <AppleWalletIcon />
+-            Add to Apple Wallet
+-          </a>
+-          <a
+-            href={`/api/wallet/google/${rsvpId}`}
+-            style={{
+-              display: 'flex',
+-              alignItems: 'center',
+-              justifyContent: 'center',
+-              gap: '8px',
+-              width: '100%',
+-              padding: '14px 20px',
+-              background: '#1a73e8',
+-              color: '#fff',
+-              borderRadius: '6px',
+-              textDecoration: 'none',
+-              fontFamily: 'var(--font-dm-sans, DM Sans, sans-serif)',
+-              fontSize: '0.875rem',
+-              fontWeight: 500,
+-              letterSpacing: '0.01em',
+-            }}
+-          >
+-            <GoogleWalletIcon />
+-            Add to Google Wallet
+-          </a>
+-        </div>
++        {/* Apple/Google Wallet buttons removed 2026-05-21: the wallet routes are
++            POST-only so the <a> GET links 405'd, and PassNinja passes are deferred
++            (keys unset). The QR above is the working, scannable pass. */}
+ 
+         {/* Share event link */}
+         <ShareButton
+@@ -397,21 +346,4 @@ function FallbackPage({ slug, applyHref, reason }: { slug: string; applyHref: st
+   );
+ }
+ 
+-function AppleWalletIcon() {
+-  return (
+-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+-      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+-    </svg>
+-  );
+-}
+-
+-function GoogleWalletIcon() {
+-  return (
+-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+-      <path d="M21.56 10.738l-9.56-.01v3.284l5.507.001c-.237 1.271-.96 2.349-2.045 3.071l3.304 2.566c1.928-1.778 3.04-4.395 3.04-7.493 0-.47-.042-.925-.107-1.419z" />
+-      <path d="M12 22c2.7 0 4.962-.894 6.616-2.421l-3.304-2.566c-.894.6-2.04.955-3.312.955-2.547 0-4.704-1.72-5.474-4.033l-3.35 2.598C4.438 19.861 8.003 22 12 22z" fill="#34A853" />
+-      <path d="M6.526 13.935A5.85 5.85 0 0 1 6.2 12c0-.68.12-1.34.326-1.957L3.176 7.445A9.996 9.996 0 0 0 2 12c0 1.614.387 3.138 1.068 4.487l3.458-2.552z" fill="#FBBC05" />
+-      <path d="M12 6.012c1.437 0 2.727.494 3.741 1.464l2.804-2.804C16.956 3.054 14.695 2 12 2 8.003 2 4.438 4.14 2.794 7.445l3.732 2.598C7.296 7.73 9.453 6.012 12 6.012z" fill="#EA4335" />
+-    </svg>
+-  );
+-}
++// AppleWalletIcon / GoogleWalletIcon removed 2026-05-21 with the wallet buttons.
+diff --git a/lib/applications/approve.ts b/lib/applications/approve.ts
+index 82aa19f..fba1c84 100644
+--- a/lib/applications/approve.ts
++++ b/lib/applications/approve.ts
+@@ -2,12 +2,12 @@
+  *  `applications.approve` tool, so both go through identical logic:
+  *  flip status → APPROVED, upsert the Member, fire wallet pass + welcome
+  *  email, emit audit events. */
+-import { randomBytes } from 'crypto';
+ import { MemberStatus, type Application, type AuditActorType, type Member } from '@prisma/client';
+ import { db } from '@/lib/db';
+ import { emitEvent } from '@/lib/emit-event';
+ import { welcomeEmail } from '@/lib/email-templates';
+ import { generateMemberPass } from '@/lib/wallet-pass';
++import { generateMemberQrCode } from '@/lib/member-qr';
+ import { resend } from '@/lib/resend';
+ 
+ export type ApproveOutcome =
+@@ -28,7 +28,7 @@ export async function approveApplication(params: {
+   if (app.workspaceId !== workspaceId) return { ok: false, error: 'forbidden' };
+   if (app.status === 'APPROVED') return { ok: false, error: 'already_approved' };
+ 
+-  const memberQrCode = randomBytes(8).toString('hex');
++  const memberQrCode = generateMemberQrCode();
+   const now = new Date();
+   const [firstName, ...rest] = app.fullName.trim().split(' ');
+   const lastName = rest.join(' ') || '';
+diff --git a/lib/apply-event-rsvp.ts b/lib/apply-event-rsvp.ts
+index 8d4268b..0955c83 100644
+--- a/lib/apply-event-rsvp.ts
++++ b/lib/apply-event-rsvp.ts
+@@ -1,5 +1,6 @@
+ import { db } from '@/lib/db';
+ import { MemberStatus } from '@prisma/client';
++import { generateMemberQrCode } from '@/lib/member-qr';
+ 
+ type AttachParams = {
+   workspaceId: string;
+@@ -48,6 +49,7 @@ export async function attachEventRsvpAfterApply(p: AttachParams): Promise<void>
+       phone: phone?.trim() || undefined,
+       status: MemberStatus.PENDING,
+       approved: false,
++      memberQrCode: generateMemberQrCode(),
+     },
+     update: {
+       email: email.trim().toLowerCase(),
+diff --git a/lib/clerk-member.ts b/lib/clerk-member.ts
+index 7711717..7dc0be7 100644
+--- a/lib/clerk-member.ts
++++ b/lib/clerk-member.ts
+@@ -1,5 +1,6 @@
+ import { clerkClient } from '@clerk/nextjs/server';
+ import { db } from '@/lib/db';
++import { generateMemberQrCode } from '@/lib/member-qr';
+ 
+ export type ClerkMemberRow = {
+   id: string;
+@@ -44,6 +45,7 @@ export async function getOrCreateMemberFromClerk(
+       lastName,
+       approved: false,
+       status: 'PENDING',
++      memberQrCode: generateMemberQrCode(),
+     },
+     select: { id: true, approved: true, memberQrCode: true, firstName: true, lastName: true, email: true },
+   });
+diff --git a/lib/email-templates.ts b/lib/email-templates.ts
+index 47183e1..0ab3f17 100644
+--- a/lib/email-templates.ts
++++ b/lib/email-templates.ts
+@@ -14,6 +14,7 @@ export function rsvpConfirmedEmail(
+   location: string | null | undefined,
+   eventSlug: string,
+   rsvpId: string,
++  qrDataUrl?: string,
+ ): { subject: string; html: string } {
+   const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
+   const confirmedUrl = `${appUrl}/m/events/${eventSlug}/confirmed?rsvpId=${rsvpId}`;
+@@ -24,6 +25,12 @@ export function rsvpConfirmedEmail(
+   const timeStr = startAt.toLocaleTimeString('en-US', {
+     hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
+   });
++  // Inline QR (technique mirrors compTicketEmail). Some clients strip data-URI
++  // images, so the confirmed-page link below stays as the fallback.
++  const qrBlock = qrDataUrl
++    ? `<p>Show this QR code at the door and staff will scan you in:</p>
++<p><img src="${qrDataUrl}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>`
++    : '';
+   return {
+     subject: `you're in — ${eventTitle}`,
+     html: `<p>Hi ${name},</p>
+@@ -32,6 +39,7 @@ export function rsvpConfirmedEmail(
+ 
+ <p><strong>Date:</strong> ${dateStr}<br><strong>Time:</strong> ${timeStr}</p>
+ ${locationLine}
++${qrBlock}
+ <p>Your ticket and QR code are at the link below — show it at the door and staff will scan you in.</p>
+ <p><a href="${confirmedUrl}">${confirmedUrl}</a></p>
+ 
+diff --git a/lib/mcp/legacy-tools.ts b/lib/mcp/legacy-tools.ts
+index 34f3e96..b7bd8bd 100644
+--- a/lib/mcp/legacy-tools.ts
++++ b/lib/mcp/legacy-tools.ts
+@@ -1,5 +1,5 @@
+ import { z } from 'zod';
+-import { randomBytes } from 'crypto';
++import { generateMemberQrCode } from '@/lib/member-qr';
+ import { MemberStatus, TagEntityType } from '@prisma/client';
+ import { db } from '@/lib/db';
+ import { emitEvent } from '@/lib/emit-event';
+@@ -104,7 +104,7 @@ function uniqueTools(): LegacyMap {
+               firstName,
+               lastName,
+               status: MemberStatus.GUEST,
+-              memberQrCode: randomBytes(8).toString('hex'),
++              memberQrCode: generateMemberQrCode(),
+             },
+             select: { id: true },
+           });
+diff --git a/lib/mcp/tools/applications.ts b/lib/mcp/tools/applications.ts
+index dbed721..97d9e38 100644
+--- a/lib/mcp/tools/applications.ts
++++ b/lib/mcp/tools/applications.ts
+@@ -1,5 +1,5 @@
+ import { z } from 'zod';
+-import { randomBytes } from 'crypto';
++import { generateMemberQrCode } from '@/lib/member-qr';
+ import { MemberStatus, type ApplicationStatus } from '@prisma/client';
+ import { db } from '@/lib/db';
+ import { emitEvent } from '@/lib/emit-event';
+@@ -42,7 +42,7 @@ export async function approveApplication(ctx: McpContext, applicationId: string,
+   if (!app) throw new Error('Application not found or not in this workspace');
+   if (app.status === 'APPROVED') throw new Error('Already approved');
+ 
+-  const memberQrCode = randomBytes(8).toString('hex');
++  const memberQrCode = generateMemberQrCode();
+   const now = new Date();
+   const [firstName, ...rest] = app.fullName.trim().split(' ');
+   const lastName = rest.join(' ') || '';

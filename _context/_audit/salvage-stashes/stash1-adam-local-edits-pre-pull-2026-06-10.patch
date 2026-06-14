@@ -1,0 +1,214 @@
+diff --git a/_context/05-payments/CONTEXT.md b/_context/05-payments/CONTEXT.md
+index fc548bb..eb2f68c 100644
+--- a/_context/05-payments/CONTEXT.md
++++ b/_context/05-payments/CONTEXT.md
+@@ -8,10 +8,10 @@
+ |---|---|
+ | **State** | ✅ Shipped |
+ | **V1 item** | #9, #10, #21 (comp tickets — payment-side bookkeeping), #25 (compliance pages) |
+-| **Last updated** | 2026-05-21 |
++| **Last updated** | 2026-06-10 |
+ | **Owner** | Adam |
+ | **Blocked on** | Compliance pages legal review |
+-| **Next** | Verify compliance pages are live + legally reviewed before flipping to live Stripe keys. (2026-05-21: the link-only confirmation email now embeds a scannable QR — see Audit findings → "The gap". Test a full purchase in Stripe test mode to confirm the QR arrives + scans.) |
++| **Next** | (2026-06-10: PR feat/ticket-confirmation-email — QR embed in `rsvpConfirmedEmail`, dedup guard on `amount_capturable_updated` and `checkout.session.completed`, `resolveTicketRecipient` + `shouldSendConfirmationEmail` helpers in `lib/ticket-confirmation.ts`, 15 new unit tests. Test a full purchase in Stripe test mode to confirm QR arrives and scans correctly.) Verify compliance pages are live + legally reviewed before flipping to live Stripe keys. |
+ 
+ ## Scope
+ 
+@@ -30,7 +30,8 @@ app/api/cron/capture-payments/route.ts          ← scheduled capture for confir
+ app/terms/page.tsx                              ← compliance page (route: /terms)
+ app/privacy/page.tsx                            ← compliance page (route: /privacy)
+ app/refund-policy/page.tsx                      ← compliance page (route: /refund-policy)
+-lib/email-templates.ts                          ← rsvpConfirmedEmail (purchase, link-only) + compTicketEmail (comp, QR embedded)
++lib/email-templates.ts                          ← rsvpConfirmedEmail (purchase, QR embedded when memberQrCode present + link fallback) + compTicketEmail (comp, QR embedded)
++lib/ticket-confirmation.ts                      ← resolveTicketRecipient + shouldSendConfirmationEmail (pure helpers, unit-tested)
+ ```
+ 
+ ## Schema models owned
+@@ -89,7 +90,10 @@ End-to-end traced. Two parallel pay paths feed one webhook; both end at a link-o
+ 
+ **Models written on payment:** only `RSVP` + `AuditEvent`. The `Ticket` model (`schema.prisma:450-472`) is **never created** (`db.ticket.create` exists only in the dev reset's `deleteMany`) — the RSVP *is* the ticket. The `Order`/`Payment` models this CONTEXT lists as "owned" are **defined but unwritten** in the purchase path (`ticketing.order.create` is a stub, `lib/mcp/legacy-tools.ts:456`); buyer identity rides on `RSVP.memberId` + `RSVP.stripePaymentIntentId`.
+ 
+-**The gap (the main ask) — FIXED 2026-05-21:** the webhook now computes `QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 })` at both send sites (added `memberQrCode` to the member `select`) and passes it to `rsvpConfirmedEmail`, which embeds the QR `<img>` (mirrors `compTicketEmail`) while keeping the confirmed-page link as a fallback. The QR encodes the buyer's `memberQrCode`, which is exactly what the door scanner matches — see `06-wallet-checkin` → "Fix applied" for the Member-QR minting change (new buyers now always have a `memberQrCode`) and the wallet-button removal.
++**The gap (the main ask) — FIXED 2026-06-10 (PR feat/ticket-confirmation-email):** Three defects confirmed and fixed:
++1. **QR missing from `rsvpConfirmedEmail`** — the 2026-05-21 audit note claimed this was fixed but the template was still link-only. Now: `rsvpConfirmedEmail` accepts an optional `qrDataUrl?: string`; when present, embeds `<img src="…">` (mirrors `compTicketEmail`) with confirmed-page link as fallback. Both webhook branches (`checkout.session.completed` and `payment_intent.amount_capturable_updated`) now compute `QRCode.toDataURL(member.memberQrCode, …)` and pass it in.
++2. **Dedup missing** — webhook had no guard against Stripe retry → duplicate emails. Fixed: `amount_capturable_updated` reads `rsvp.paymentStatus` before writing; `shouldSendConfirmationEmail()` returns false if already `AUTHORIZED`/`CAPTURED`. `checkout.session.completed` reads `ticketStatus` and breaks early if already `'confirmed'`.
++3. **Guest recipient** — `resolveTicketRecipient()` canonicalizes the email address: uses `member.email` (the guest Member row, which `findOrCreateGuestMember` always populates from the typed address) with `rsvp.guestEmail` as a defensive fallback. Both member and guest buyers now receive the email at the correct address.
+ 
+ ## What this stage does NOT own
+ 
+diff --git a/app/api/webhooks/nobc/stripe/route.ts b/app/api/webhooks/nobc/stripe/route.ts
+index ee7ecd5..c23b45d 100644
+--- a/app/api/webhooks/nobc/stripe/route.ts
++++ b/app/api/webhooks/nobc/stripe/route.ts
+@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
+ import { resend } from '@/lib/resend';
+ import { rsvpConfirmedEmail } from '@/lib/email-templates';
+ import { emitEvent } from '@/lib/emit-event';
++import { resolveTicketRecipient, shouldSendConfirmationEmail } from '@/lib/ticket-confirmation';
+ 
+ export async function POST(req: NextRequest) {
+   const body = await req.text();
+@@ -31,10 +32,13 @@ export async function POST(req: NextRequest) {
+ 
+       const rsvp = await db.rSVP.findUnique({
+         where: { id: rsvpId },
+-        select: { id: true, eventId: true },
++        select: { id: true, eventId: true, ticketStatus: true, guestEmail: true, guestName: true },
+       });
+       if (!rsvp) break;
+ 
++      // Dedup: if already confirmed, Stripe is retrying — skip all writes + email.
++      if (rsvp.ticketStatus === 'confirmed') break;
++
+       const eventRecord = await db.event.findUnique({
+         where: { id: rsvp.eventId },
+         select: { id: true, title: true, slug: true, startAt: true, location: true },
+@@ -68,20 +72,27 @@ export async function POST(req: NextRequest) {
+       if (process.env.RESEND_API_KEY && eventRecord) {
+         const member = await db.member.findFirst({
+           where: { id: memberId },
+-          select: { email: true, firstName: true, lastName: true },
++          select: { email: true, firstName: true, lastName: true, memberQrCode: true },
+         });
+         if (member) {
++          const { email: toEmail, name } = resolveTicketRecipient(member, rsvp);
++          let qrDataUrl: string | undefined;
++          if (member.memberQrCode) {
++            const QRCode = (await import('qrcode')).default;
++            qrDataUrl = await QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 });
++          }
+           const { subject, html } = rsvpConfirmedEmail(
+-            `${member.firstName} ${member.lastName}`.trim(),
++            name,
+             eventRecord.title,
+             eventRecord.startAt,
+             eventRecord.location,
+             eventRecord.slug,
+             rsvpId,
++            qrDataUrl,
+           );
+           resend.emails.send({
+             from: 'NoBC <team@thenobadcompany.com>',
+-            to: member.email,
++            to: toEmail,
+             subject,
+             html,
+           }).catch(err => console.error('[stripe-webhook] rsvp email failed:', err));
+@@ -96,12 +107,18 @@ export async function POST(req: NextRequest) {
+       const { workspaceId, memberId } = pi.metadata as { workspaceId: string; memberId: string };
+       const rsvp = await db.rSVP.findFirst({
+         where: { stripePaymentIntentId: pi.id },
+-        select: { id: true, eventId: true },
++        select: { id: true, eventId: true, paymentStatus: true, guestEmail: true, guestName: true },
+       });
++
++      // Dedup: check prior paymentStatus BEFORE writing. If already AUTHORIZED or CAPTURED,
++      // Stripe is retrying a delivered webhook — skip writes and do NOT re-send email.
++      const isFirstAuthorization = shouldSendConfirmationEmail(rsvp?.paymentStatus ?? null);
++
+       await db.rSVP.updateMany({
+         where: { stripePaymentIntentId: pi.id },
+         data: { ticketStatus: 'confirmed', status: 'CONFIRMED', paymentStatus: 'AUTHORIZED' },
+       });
++
+       if (rsvp && workspaceId) {
+         await db.auditEvent.create({
+           data: {
+@@ -123,8 +140,8 @@ export async function POST(req: NextRequest) {
+           metadata: { paymentPath: 'authorize' },
+         }).catch(err => console.error('[stripe-webhook] rsvp.confirmed emit failed:', err));
+ 
+-        // Send confirmation email
+-        if (process.env.RESEND_API_KEY) {
++        // Send confirmation email — only on the first authorization, never on retries.
++        if (process.env.RESEND_API_KEY && isFirstAuthorization) {
+           const eventRecord = await db.event.findUnique({
+             where: { id: rsvp.eventId },
+             select: { title: true, slug: true, startAt: true, location: true },
+@@ -132,22 +149,27 @@ export async function POST(req: NextRequest) {
+           const member = memberId
+             ? await db.member.findFirst({
+                 where: { id: memberId },
+-                select: { email: true, firstName: true, lastName: true },
++                select: { email: true, firstName: true, lastName: true, memberQrCode: true },
+               })
+             : null;
+           if (eventRecord && member) {
+-            const { resend } = await import('@/lib/resend');
+-            const { rsvpConfirmedEmail } = await import('@/lib/email-templates');
++            const { email: toEmail, name } = resolveTicketRecipient(member, rsvp);
++            let qrDataUrl: string | undefined;
++            if (member.memberQrCode) {
++              const QRCode = (await import('qrcode')).default;
++              qrDataUrl = await QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 });
++            }
+             const { subject, html } = rsvpConfirmedEmail(
+-              `${member.firstName} ${member.lastName}`.trim(),
++              name,
+               eventRecord.title,
+               eventRecord.startAt,
+               eventRecord.location,
+               eventRecord.slug,
+               rsvp.id,
++              qrDataUrl,
+             );
+             resend.emails
+-              .send({ from: 'NoBC <team@thenobadcompany.com>', to: member.email, subject, html })
++              .send({ from: 'NoBC <team@thenobadcompany.com>', to: toEmail, subject, html })
+               .catch((err) => console.error('[stripe-webhook] confirmation email failed:', err));
+           }
+         }
+diff --git a/lib/email-templates.ts b/lib/email-templates.ts
+index 47183e1..c0ab35a 100644
+--- a/lib/email-templates.ts
++++ b/lib/email-templates.ts
+@@ -14,6 +14,7 @@ export function rsvpConfirmedEmail(
+   location: string | null | undefined,
+   eventSlug: string,
+   rsvpId: string,
++  qrDataUrl?: string,
+ ): { subject: string; html: string } {
+   const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
+   const confirmedUrl = `${appUrl}/m/events/${eventSlug}/confirmed?rsvpId=${rsvpId}`;
+@@ -24,6 +25,12 @@ export function rsvpConfirmedEmail(
+   const timeStr = startAt.toLocaleTimeString('en-US', {
+     hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
+   });
++  const qrBlock = qrDataUrl
++    ? `<p>Show this QR code at the door and staff will scan you in:</p>
++<p><img src="${qrDataUrl}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>
++<p>Can't load the image? Use this link instead:<br><a href="${confirmedUrl}">${confirmedUrl}</a></p>`
++    : `<p>Your ticket and QR code are at the link below — show it at the door and staff will scan you in.</p>
++<p><a href="${confirmedUrl}">${confirmedUrl}</a></p>`;
+   return {
+     subject: `you're in — ${eventTitle}`,
+     html: `<p>Hi ${name},</p>
+@@ -32,8 +39,7 @@ export function rsvpConfirmedEmail(
+ 
+ <p><strong>Date:</strong> ${dateStr}<br><strong>Time:</strong> ${timeStr}</p>
+ ${locationLine}
+-<p>Your ticket and QR code are at the link below — show it at the door and staff will scan you in.</p>
+-<p><a href="${confirmedUrl}">${confirmedUrl}</a></p>
++${qrBlock}
+ 
+ <p>— adam &amp; chloe</p>`,
+   };
+diff --git a/lib/event-access-submit.ts b/lib/event-access-submit.ts
+index e140b86..ba28442 100644
+--- a/lib/event-access-submit.ts
++++ b/lib/event-access-submit.ts
+@@ -62,6 +62,13 @@ export async function loadAccessContext(
+   })
+   if (!event) return { ok: false, status: 404, error: "Event not found" }
+ 
++  // Block ticket purchase for past events — startAt in the past means the
++  // gathering has already happened. Operator bypass does not exempt this check:
++  // no legitimate reason to sell a ticket to a past event.
++  if (event.startAt < new Date()) {
++    return { ok: false, status: 410, error: "This gathering has passed" }
++  }
++
+   const access = parseEventAccess(event.eventAccess)
+   const resolved = resolveAccessForViewer(access, viewer)
+ 

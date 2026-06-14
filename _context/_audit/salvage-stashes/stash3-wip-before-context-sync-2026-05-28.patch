@@ -1,0 +1,170 @@
+diff --git a/.gitignore b/.gitignore
+index 4ebf525..e6ab9d9 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -49,3 +49,4 @@ next-env.d.ts
+ 
+ # claude code
+ .claude/
++.env*.local
+diff --git a/scripts/backfill-member-qr.ts b/scripts/backfill-member-qr.ts
+new file mode 100644
+index 0000000..3c1b12e
+--- /dev/null
++++ b/scripts/backfill-member-qr.ts
+@@ -0,0 +1,155 @@
++/** One-time backfill: give every Member a `memberQrCode`.
++ *
++ *  WHY: a prior fix made every Member-creation path mint `memberQrCode` via
++ *  lib/member-qr.ts → generateMemberQrCode(). But Members created BEFORE that fix
++ *  still have `memberQrCode = null`, so their ticket emails fall back to link-only
++ *  and their QR fails the door scanner (CheckInClient matches strictly on
++ *  memberQrCode). This script mints a token for exactly those null rows.
++ *
++ *  SAFETY:
++ *   - Writes ONLY the `memberQrCode` column, ONLY on rows where it IS NULL.
++ *     A Member that already has a token is never touched.
++ *   - Idempotent: the update is guarded (`updateMany where memberQrCode: null`),
++ *     so re-running — or two runs racing — only writes a still-null row.
++ *   - Producer shares this Neon instance, but this column is NoBC-only scan-token
++ *     data; the script is intentionally GLOBAL (all workspaces) because a null QR
++ *     is a cross-tenant data gap, and the single harmless column makes that safe.
++ *   - Uses the EXISTING generator (generateMemberQrCode) — does not reinvent it.
++ *   - On the vanishingly rare @unique collision (P2002), it regenerates + retries
++ *     rather than crashing the run.
++ *   - Dry-run prints per-workspace counts and writes NOTHING.
++ *
++ *    Dry run:  ./node_modules/.bin/tsx scripts/backfill-member-qr.ts --dry-run
++ *    Execute:  ./node_modules/.bin/tsx scripts/backfill-member-qr.ts
++ */
++import { config } from 'dotenv';
++config({ path: '.env.local' });
++
++import { Prisma } from '@prisma/client';
++import { generateMemberQrCode } from '@/lib/member-qr';
++
++const DRY_RUN = process.argv.includes('--dry-run');
++const MAX_COLLISION_RETRIES = 5;
++
++type WsBucket = { name: string; count: number };
++
++function isUniqueViolation(e: unknown): boolean {
++  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
++}
++
++async function main() {
++  const { db } = await import('@/lib/db');
++
++  console.log(
++    DRY_RUN
++      ? '--- DRY RUN (no changes) — omit --dry-run to execute ---\n'
++      : '*** WRITE MODE — null memberQrCode rows will be backfilled ***\n',
++  );
++
++  // 1. Every Member with a null token, across ALL workspaces.
++  const nullMembers = await db.member.findMany({
++    where: { memberQrCode: null },
++    select: { id: true, workspaceId: true },
++  });
++
++  if (nullMembers.length === 0) {
++    console.log('No Members with a null memberQrCode. Nothing to backfill.');
++    await db.$disconnect();
++    return;
++  }
++
++  // Resolve workspace names for a readable per-workspace breakdown.
++  const workspaceIds = Array.from(new Set(nullMembers.map((m) => m.workspaceId)));
++  const workspaces = await db.workspace.findMany({
++    where: { id: { in: workspaceIds } },
++    select: { id: true, name: true },
++  });
++  const nameById = new Map(workspaces.map((w) => [w.id, w.name]));
++
++  // Per-workspace "would update" tally.
++  const wouldByWs = new Map<string, WsBucket>();
++  for (const m of nullMembers) {
++    const b = wouldByWs.get(m.workspaceId) ?? { name: nameById.get(m.workspaceId) ?? '(unknown workspace)', count: 0 };
++    b.count += 1;
++    wouldByWs.set(m.workspaceId, b);
++  }
++
++  const sortedWould = [...wouldByWs.entries()].sort((a, b) => b[1].count - a[1].count);
++
++  console.log(`Members with null memberQrCode: ${nullMembers.length} (across ${workspaceIds.length} workspace(s))`);
++  console.log('Per workspace:');
++  for (const [wsId, b] of sortedWould) {
++    console.log(`  ${b.name} (${wsId}): ${b.count}`);
++  }
++
++  if (DRY_RUN) {
++    console.log('\nDRY RUN complete — nothing written. Re-run without --dry-run to execute.');
++    await db.$disconnect();
++    return;
++  }
++
++  // 2 + 3 + 4. Backfill each null row: generate token, update only-if-still-null,
++  // retry on the rare unique collision.
++  console.log('');
++  const changedByWs = new Map<string, WsBucket>();
++  let updated = 0;
++  let skippedAlreadySet = 0; // count 0 → row got a token between read and write (race / re-run)
++  let failed = 0;
++
++  for (let i = 0; i < nullMembers.length; i++) {
++    const m = nullMembers[i];
++    let done = false;
++
++    for (let attempt = 1; attempt <= MAX_COLLISION_RETRIES && !done; attempt++) {
++      const token = generateMemberQrCode();
++      try {
++        // Guarded update: writes ONLY if the row is still null. Returns count.
++        const res = await db.member.updateMany({
++          where: { id: m.id, memberQrCode: null },
++          data: { memberQrCode: token },
++        });
++        if (res.count > 0) {
++          updated += res.count;
++          const b = changedByWs.get(m.workspaceId) ?? { name: nameById.get(m.workspaceId) ?? '(unknown workspace)', count: 0 };
++          b.count += res.count;
++          changedByWs.set(m.workspaceId, b);
++        } else {
++          skippedAlreadySet += 1; // already had a token (idempotent no-op)
++        }
++        done = true;
++      } catch (e) {
++        if (isUniqueViolation(e)) {
++          if (attempt < MAX_COLLISION_RETRIES) {
++            console.warn(`  collision on member ${m.id} (attempt ${attempt}) — regenerating token`);
++            continue; // regenerate + retry
++          }
++          console.error(`  FAILED member ${m.id} after ${MAX_COLLISION_RETRIES} collision retries`);
++          failed += 1;
++          done = true;
++        } else {
++          throw e; // anything other than a unique collision is a real error — stop the run
++        }
++      }
++    }
++
++    if ((i + 1) % 100 === 0) console.log(`  …processed ${i + 1}/${nullMembers.length}`);
++  }
++
++  const sortedChanged = [...changedByWs.entries()].sort((a, b) => b[1].count - a[1].count);
++  console.log('\n✓ Backfill complete. Rows changed per workspace:');
++  if (sortedChanged.length === 0) {
++    console.log('  (none — all candidate rows already had a token)');
++  } else {
++    for (const [wsId, b] of sortedChanged) {
++      console.log(`  ${b.name} (${wsId}): ${b.count}`);
++    }
++  }
++  console.log(`\nTotals — updated: ${updated}  |  already-set (skipped): ${skippedAlreadySet}  |  failed: ${failed}`);
++
++  await db.$disconnect();
++}
++
++main().catch((e) => {
++  console.error(e);
++  process.exit(1);
++});
