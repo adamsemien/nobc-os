@@ -1,0 +1,267 @@
+.../operator/events/[id]/promote-waitlist/route.ts | 64 +++++++++++++++++-----
+ app/api/operator/rsvps/[id]/approve/route.ts       | 47 +++++++++++-----
+ app/api/rsvp/plus-one/route.ts                     | 49 +++++++++++++----
+ app/api/stripe/capture/route.ts                    | 14 +++--
+ app/api/stripe/create-payment-intent/route.ts      | 24 +++++---
+ 5 files changed, 144 insertions(+), 54 deletions(-)
+
+--- Changes ---
+
+app/api/operator/events/[id]/promote-waitlist/route.ts
+  @@ -15,30 +15,68 @@ export async function POST(
+  -    select: { id: true },
+  +    select: { id: true, capacity: true },
+     });
+     if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+   
+  -  const next = await db.rSVP.findFirst({
+  -    where: { workspaceId, eventId, status: 'WAITLISTED' },
+  -    orderBy: { createdAt: 'asc' },
+  -    select: { id: true, memberId: true },
+  -  });
+  -  if (!next) return NextResponse.json({ error: 'No one on the waitlist' }, { status: 404 });
+  +  // Claim the next waitlisted entry inside one serializable transaction holding
+  +  // the Event row lock, so two rapid clicks can't promote two people into one
+  +  // seat: the lock serializes the count + claim, and the capacity re-check runs
+  +  // against the freshly-locked state. Mirrors lib/waitlist.ts promoteFromWaitlist.
+  +  let result:
+  +    | { kind: 'promoted'; rsvpId: string }
+  +    | { kind: 'full' }
+  +    | { kind: 'empty' };
+  +  try {
+  +    result = await db.$transaction(
+  +      async (tx) => {
+  +        await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
+   
+  -  const updated = await db.rSVP.update({
+  -    where: { id: next.id },
+  -    data: { status: 'CONFIRMED', ticketStatus: 'confirmed' },
+  -  });
+  +        if (event.capacity) {
+  +          const taken = await tx.rSVP.count({
+  +            where: { workspaceId, eventId, ticketStatus: { in: ['confirmed', 'held'] } },
+  +          });
+  +          if (taken >= event.capacity) {
+  +            return { kind: 'full' as const };
+  +          }
+  +        }
+  +
+  +        const next = await tx.rSVP.findFirst({
+  +          where: { workspaceId, eventId, status: 'WAITLISTED' },
+  +          orderBy: { createdAt: 'asc' },
+  +          select: { id: true, memberId: true },
+  +        });
+  +        if (!next) return { kind: 'empty' as const };
+  +
+  +        const updated = await tx.rSVP.update({
+  +          where: { id: next.id },
+  +          data: { status: 'CONFIRMED', ticketStatus: 'confirmed' },
+  +        });
+  +        return { kind: 'promoted' as const, rsvpId: updated.id };
+  +      },
+  +      { isolationLevel: 'Serializable' },
+  +    );
+  +  } catch (err) {
+  +    console.error('[promote-waitlist] promote transaction failed', { workspaceId, eventId, err });
+  +    throw err;
+  +  }
+  +
+  +  if (result.kind === 'empty') {
+  +    return NextResponse.json({ error: 'No one on the waitlist' }, { status: 404 });
+  +  }
+  +  if (result.kind === 'full') {
+  +    return NextResponse.json({ error: 'Event is at capacity' }, { status: 409 });
+  +  }
+  +  const { rsvpId } = result;
+   
+     await emitEvent({
+       workspaceId,
+       actorId: userId,
+       action: 'rsvp.confirmed',
+       entityType: 'RSVP',
+  -    entityId: next.id,
+  +    entityId: rsvpId,
+       metadata: { promotedFromWaitlist: true, eventId, via: 'room' },
+     }).catch(err => console.error('[promote-waitlist] emit failed:', err));
+   
+  -  return NextResponse.json({ ok: true, rsvpId: updated.id });
+  +  return NextResponse.json({ ok: true, rsvpId });
+   }
+  +51 -13
+
+app/api/operator/rsvps/[id]/approve/route.ts
+  @@ -26,23 +26,40 @@ export async function POST(
+  -  if (event?.capacity) {
+  -    const taken = await db.rSVP.count({
+  -      where: {
+  -        workspaceId,
+  -        eventId: rsvp.eventId,
+  -        ticketStatus: { in: ['confirmed', 'held'] },
+  +  // Capacity re-check + approve in one serializable transaction holding the
+  +  // Event row lock — without it, two operators approving the last seat together
+  +  // both see taken < capacity and both confirm, overselling. Mirrors
+  +  // lib/waitlist.ts promoteFromWaitlist.
+  +  let confirmed = false;
+  +  try {
+  +    confirmed = await db.$transaction(
+  +      async (tx) => {
+  +        if (event?.capacity) {
+  +          await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${rsvp.eventId} FOR UPDATE`;
+  +          const taken = await tx.rSVP.count({
+  +            where: {
+  +              workspaceId,
+  +              eventId: rsvp.eventId,
+  +              ticketStatus: { in: ['confirmed', 'held'] },
+  +            },
+  +          });
+  +          if (taken >= event.capacity) return false;
+  +        }
+  +        await tx.rSVP.update({
+  +          where: { id },
+  +          data: { ticketStatus: 'confirmed', status: 'CONFIRMED' },
+  +        });
+  +        return true;
+         },
+  -    });
+  -    if (taken >= event.capacity) {
+  -      return NextResponse.json({ error: 'Event is at capacity' }, { status: 409 });
+  -    }
+  +      { isolationLevel: 'Serializable' },
+  +    );
+  +  } catch (err) {
+  +    console.error('[approve] approve transaction failed', { workspaceId, rsvpId: id, err });
+  +    throw err;
+  +  }
+  +  if (!confirmed) {
+  +    return NextResponse.json({ error: 'Event is at capacity' }, { status: 409 });
+     }
+  -
+  -  await db.rSVP.update({
+  -    where: { id },
+  -    data: { ticketStatus: 'confirmed', status: 'CONFIRMED' },
+  -  });
+   
+     await db.auditEvent.create({
+       data: {
+  +32 -15
+
+app/api/rsvp/plus-one/route.ts
+  @@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
+  -    select: { id: true, title: true, slug: true, startAt: true },
+  +    select: { id: true, title: true, slug: true, startAt: true, capacity: true },
+     });
+     if (!event) return NextResponse.json({ error: 'Event not found or plus-ones not allowed' }, { status: 404 });
+   
+  @@ -71,17 +71,42 @@ export async function POST(req: NextRequest) {
+  -  const rsvp = await db.rSVP.create({
+  -    data: {
+  -      workspaceId,
+  -      eventId,
+  -      memberId: guest.id,
+  -      status: 'CONFIRMED',
+  -      ticketStatus: 'confirmed',
+  -      origin: 'plus_one',
+  -      plusOneOfMemberId: member.id,
+  -    },
+  -  });
+  +  // A plus-one is a confirmed seat, so it consumes capacity. Gate the count +
+  +  // create in one serializable transaction holding the Event row lock — without
+  +  // it a plus-one silently oversells a full event, and concurrent adds race.
+  +  // Mirrors lib/waitlist.ts promoteFromWaitlist.
+  +  let rsvp: { id: string } | null;
+  +  try {
+  +    rsvp = await db.$transaction(
+  +      async (tx) => {
+  +        if (event.capacity) {
+  +          await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
+  +          const taken = await tx.rSVP.count({
+  +            where: { workspaceId, eventId, ticketStatus: { in: ['confirmed', 'held'] } },
+  +          });
+  +          if (taken >= event.capacity) return null;
+  +        }
+  +        return tx.rSVP.create({
+  +          data: {
+  +            workspaceId,
+  +            eventId,
+  +            memberId: guest.id,
+  +            status: 'CONFIRMED',
+  +            ticketStatus: 'confirmed',
+  +            origin: 'plus_one',
+  +            plusOneOfMemberId: member.id,
+  +          },
+  +        });
+  +      },
+  +      { isolationLevel: 'Serializable' },
+  +    );
+  +  } catch (err) {
+  +    console.error('[plus-one] create transaction failed', { workspaceId, eventId, err });
+  +    throw err;
+  +  }
+  +  if (!rsvp) {
+  +    return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+  +  }
+   
+     await db.auditEvent.create({
+       data: {
+  +37 -12
+
+app/api/stripe/capture/route.ts
+  @@ -1,8 +1,8 @@
+  -import { auth } from '@clerk/nextjs/server';
+   import { NextRequest, NextResponse } from 'next/server';
+   import { z } from 'zod';
+  +import { OperatorRole } from '@prisma/client';
+   import { db } from '@/lib/db';
+  -import { requireWorkspaceId } from '@/lib/auth';
+  +import { requireRole } from '@/lib/operator-role';
+   import { stripe } from '@/lib/stripe';
+   import { alert } from '@/lib/alerting';
+   
+  @@ -11,10 +11,12 @@ const BodySchema = z.object({
+  -  const { userId } = await auth();
+  -  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  -
+  -  const workspaceId = await requireWorkspaceId(userId);
+  +  // Capture is an operational write — gate to STAFF+ so a READ_ONLY org member
+  +  // can't self-capture their own held payment and bypass the operator approval
+  +  // gate. Mirrors the refund route's requireRole gating (refund uses ADMIN).
+  +  const gate = await requireRole(OperatorRole.STAFF);
+  +  if (!gate.ok) return gate.response;
+  +  const { userId, workspaceId } = gate;
+   
+     let body: z.infer<typeof BodySchema>;
+     try {
+  +8 -6
+
+app/api/stripe/create-payment-intent/route.ts
+  @@ -96,16 +96,24 @@ export async function POST(req: NextRequest) {
+  +  // Idempotency key scoped to (workspace, event, member) so a double-click or a
+  +  // network retry resolves to the same Stripe PaymentIntent instead of creating
+  +  // a second live authorized hold that dangles for 7 days. Mirrors the member
+  +  // route (app/api/m/events/[slug]/access/payment-intent/route.ts).
+  +  const idempotencyKey = `pi-${workspaceId}-${eventId}-${member.id}`;
+     let pi: Awaited<ReturnType<typeof stripe.paymentIntents.create>>;
+     try {
+  -    pi = await stripe.paymentIntents.create({
+  -      amount: amountCents,
+  -      currency: 'usd',
+  -      capture_method: 'manual',
+  -      description: event.title,
+  -      receipt_email: member.email,
+  -      metadata: { workspaceId, eventId, memberId: member.id },
+  -    });
+  +    pi = await stripe.paymentIntents.create(
+  +      {
+  +        amount: amountCents,
+  +        currency: 'usd',
+  +        capture_method: 'manual',
+  +        description: event.title,
+  +        receipt_email: member.email,
+  +        metadata: { workspaceId, eventId, memberId: member.id },
+  +      },
+  +      { idempotencyKey },
+  +    );
+     } catch (err) {
+       void alert({
+         severity: 'critical',
+  +16 -8
