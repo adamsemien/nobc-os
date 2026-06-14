@@ -607,14 +607,39 @@ function RefundModal({
   const isAuthorized = rsvp.paymentStatus === 'AUTHORIZED' && !rsvp.capturedAt;
   const name = `${rsvp.member.firstName} ${rsvp.member.lastName}`;
 
+  // Remaining refundable balance = charged minus anything already refunded.
+  const remainingCents = (rsvp.amountCents ?? 0) - (rsvp.refundAmountCents ?? 0);
+  // Partial refunds only apply to a captured payment, never an uncaptured hold.
+  const canPartialRefund = !isAuthorized && remainingCents > 0;
+  const [amountDollars, setAmountDollars] = useState<string>(
+    remainingCents > 0 ? (remainingCents / 100).toFixed(2) : '',
+  );
+
   async function handleConfirm() {
-    setLoading(true);
     setError(null);
+
+    // Resolve the partial amount (if the operator lowered it below the full balance).
+    let amountCents: number | undefined;
+    if (canPartialRefund) {
+      const parsed = Math.round(parseFloat(amountDollars) * 100);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        setError('Enter a valid refund amount.');
+        return;
+      }
+      if (parsed > remainingCents) {
+        setError(`Refund cannot exceed ${formatCents(remainingCents)}.`);
+        return;
+      }
+      // Only send amountCents when it is genuinely a partial refund.
+      if (parsed < remainingCents) amountCents = parsed;
+    }
+
+    setLoading(true);
     try {
       const res = await fetch('/api/stripe/refund', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rsvpId: rsvp.id }),
+        body: JSON.stringify({ rsvpId: rsvp.id, ...(amountCents != null ? { amountCents } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? 'Refund failed');
@@ -662,10 +687,39 @@ function RefundModal({
             <p className="mt-1 text-sm text-text-muted">
               {isAuthorized
                 ? `This will cancel the authorization hold for ${name}. Their card will not be charged.`
-                : `This will refund ${rsvp.amountCents ? formatCents(rsvp.amountCents) : 'the full amount'} to ${name}.`}
+                : canPartialRefund
+                  ? `Refund up to ${formatCents(remainingCents)} to ${name}.${
+                      (rsvp.refundAmountCents ?? 0) > 0
+                        ? ` ${formatCents(rsvp.refundAmountCents ?? 0)} has already been refunded.`
+                        : ''
+                    }`
+                  : `This will refund ${rsvp.amountCents ? formatCents(rsvp.amountCents) : 'the full amount'} to ${name}.`}
             </p>
           </div>
         </div>
+
+        {canPartialRefund && (
+          <div className="mt-4">
+            <label htmlFor="refund-amount" className="block text-xs font-medium text-text-secondary">
+              Refund amount
+            </label>
+            <input
+              id="refund-amount"
+              type="number"
+              inputMode="decimal"
+              min="0.01"
+              max={(remainingCents / 100).toFixed(2)}
+              step="0.01"
+              value={amountDollars}
+              onChange={(e) => setAmountDollars(e.target.value)}
+              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary"
+              style={{ borderRadius: '6px' }}
+            />
+            <p className="mt-1 text-xs text-text-muted">
+              Defaults to the full balance. Lower it to issue a partial refund.
+            </p>
+          </div>
+        )}
 
         {error && (
           <p

@@ -1685,3 +1685,17 @@ model AssetDownload {
   @@index([assetId])
   @@index([shareLinkId])
 }
+
+// Stripe webhook idempotency ledger. Stripe delivers events at-least-once, so the
+// webhook handler upserts on stripeId and short-circuits if the row already exists.
+// Not user data: this is an infra ledger, so workspaceId is best-effort (nullable).
+model StripeEvent {
+  id          String   @id @default(cuid())
+  stripeId    String   @unique // Stripe event id (evt_...), the dedup key
+  type        String // event.type, e.g. "payment_intent.succeeded"
+  workspaceId String? // resolved from PaymentIntent metadata when present; null for account-level events
+  processedAt DateTime @default(now())
+
+  @@index([type])
+  @@index([processedAt])
+}

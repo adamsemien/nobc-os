@@ -217,16 +217,24 @@ export async function POST(
     }
   }
 
-  // Idempotency key: scoped to (workspace, event, member) so concurrent
-  // double-submits resolve to the same Stripe PaymentIntent.
-  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}`;
+  // Idempotency key scoped to (workspace, event, member, amount, capture_method)
+  // so concurrent double-submits resolve to the same PaymentIntent, while a
+  // genuine change between attempts (tier/price change -> different amount,
+  // approvalRequired toggle -> different capture_method) produces a FRESH key.
+  // Without amount+mode in the key, Stripe returns the original PI and ignores
+  // the new params, charging the stale amount or minting the wrong hold type.
+  const captureMethod = event.approvalRequired ? 'manual' : 'automatic';
+  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}-${amountCents}-${captureMethod}`;
   let pi: Awaited<ReturnType<typeof stripe.paymentIntents.create>>;
   try {
     pi = await stripe.paymentIntents.create(
       {
         amount: amountCents,
         currency: 'usd',
-        capture_method: 'manual',
+        // approvalRequired -> 'manual' (authorize-and-hold, captured on operator
+        // approval); ticketed no-approval -> 'automatic' (immediate capture,
+        // captured by Stripe on payment_intent.succeeded).
+        capture_method: captureMethod,
         description: event.title,
         receipt_email: rsvpMember.email,
         automatic_payment_methods: { enabled: true },
@@ -260,7 +268,7 @@ export async function POST(
       where: { id: existingRsvp.id },
       data: {
         stripePaymentIntentId: pi.id,
-        paymentStatus: 'AUTHORIZED',
+        paymentStatus: 'PENDING',
         amountCents,
         ticketStatus: 'held',
         tierId: resolvedTierId ?? null,
@@ -291,7 +299,7 @@ export async function POST(
             status: 'CONFIRMED',
             ticketStatus: 'held',
             stripePaymentIntentId: pi.id,
-            paymentStatus: 'AUTHORIZED',
+            paymentStatus: 'PENDING',
             amountCents,
             tierId: resolvedTierId ?? null,
             customAnswers: body.customAnswers ?? undefined,

@@ -6,12 +6,25 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped |
+| **State** | ✅ Shipped (🟡 checkout-hardening on branch `feat/stripe-checkout-hardening`, not yet merged) |
 | **V1 item** | #9, #10, #21 (comp tickets — payment-side bookkeeping), #25 (compliance pages) |
-| **Last updated** | 2026-06-10 |
+| **Last updated** | 2026-06-13 |
 | **Owner** | Adam |
-| **Blocked on** | Compliance pages legal review |
-| **Next** | (2026-06-10: PR feat/ticket-confirmation-email — QR embed in `rsvpConfirmedEmail`, dedup guard on `amount_capturable_updated` and `checkout.session.completed`, `resolveTicketRecipient` + `shouldSendConfirmationEmail` helpers in `lib/ticket-confirmation.ts`, 15 new unit tests. Test a full purchase in Stripe test mode to confirm QR arrives and scans correctly.) Verify compliance pages are live + legally reviewed before flipping to live Stripe keys. |
+| **Blocked on** | Compliance pages legal review. Apply `prisma/sql/stripe-event.sql` to **production** before June 20 (StripeEvent table; webhook idempotency fails closed without it). |
+| **Next** | (2026-06-13: branch `feat/stripe-checkout-hardening`, 10 commits, NOT merged — all 7 hardening phases done.) Merge after review, then: (1) `prisma db execute --file prisma/sql/stripe-event.sql` against prod Neon; (2) set `CRON_SECRET` in Vercel (capture-payments cron now scheduled in vercel.json); (3) Stripe test-mode dress rehearsal per `_context/_audit/STRIPE-TESTING.md`; (4) $1 live test. Earlier 2026-06-10 ticket-confirmation-email note is now subsumed. |
+
+## Checkout hardening (2026-06-13, branch `feat/stripe-checkout-hardening`)
+
+Seven-phase money-path hardening for the June 20 all-guest paid event. Decisions: ticketed (no approval) = **immediate capture**; apply-or-pay = authorize/hold, capture on operator approval; waitlist = notify-and-recheckout (no held PI, so **no off-session capture**); refund = full + partial.
+
+- **Phase 1** `StripeEvent` idempotency model + additive `prisma/sql/stripe-event.sql` (apply to prod before launch).
+- **Phase 2** Webhook rewrite: signature → dedup short-circuit → money-state writes synchronous in one `db.$transaction` (dedup row written in the same tx) → 200 → side effects via `after()`. Status guards (`notIn`) prevent regressing CAPTURED/REFUNDED/PARTIALLY_REFUNDED/DISPUTED; all writes workspace-scoped; P2002 → 200 deduped, else 500 for Stripe retry.
+- **Phase 3a** `capture_method` conditional on `approvalRequired`; PI-create paymentStatus PENDING (AUTHORIZED only from `amount_capturable_updated`) so the immediate-capture email isn't gated off.
+- **Phase 3b** Serializable capacity transactions folded into approve + plus-one; (workspace,event,member,**amount,capture_method**) idempotency keys on all three PI routes.
+- **Phase 4** Operator **partial refunds** + cumulative tracking, reconciled by `charge.refunded` (monotonic raw UPDATE so a second partial isn't frozen out); L2 guard on `paymentStatus==='REFUNDED'`; M3 via Stripe idempotency keys + webhook-as-source-of-truth; hold-cancel records $0. RefundModal gains a partial-amount input.
+- **Phase 6** Unit coverage: `stripe-webhook` (9), `stripe-refund-route` (8), `create-payment-intent-route` (2). Suite: 49 files / 454 green.
+- **Phases 5+7** `capture-payments` cron scheduled (`0 12 * * *`) + hardened to write CAPTURED/capturedAt; `assertNotProduction()` seed guard + `seed-payment-states.ts`; `_context/_audit/STRIPE-TESTING.md` harness.
+- Two adversarial tonone passes (spine+warden) drove fixes C1/C2/H1 + DISPUTED-safe reconciliation + narrowed cron filter; raw-SQL table/column casing verified against migrations.
 
 ## Scope
 
@@ -32,6 +45,13 @@ app/privacy/page.tsx                            ← compliance page (route: /pri
 app/refund-policy/page.tsx                      ← compliance page (route: /refund-policy)
 lib/email-templates.ts                          ← rsvpConfirmedEmail (purchase, QR embedded when memberQrCode present + link fallback) + compTicketEmail (comp, QR embedded)
 lib/ticket-confirmation.ts                      ← resolveTicketRecipient + shouldSendConfirmationEmail (pure helpers, unit-tested)
+prisma/sql/stripe-event.sql                      ← additive StripeEvent table (webhook idempotency) — apply to prod via db execute, never db push
+scripts/_seed-guard.ts                           ← assertNotProduction() shared seed guard
+scripts/seed-payment-states.ts                   ← DB-only RSVP fixtures in every payment state (refund/capture UI QA)
+tests/unit/stripe-webhook.test.ts                ← webhook contract (signature, dedup, capture, refund full/partial, P2002/500)
+tests/unit/stripe-refund-route.test.ts           ← refund route (full/partial/cumulative/cancel/guards)
+tests/unit/create-payment-intent-route.test.ts   ← C2 succeeded-PI 409 + H1 idempotency key
+_context/_audit/STRIPE-TESTING.md                ← repeatable test harness (Stripe CLI, cards, per-flow rehearsal)
 ```
 
 ## Schema models owned

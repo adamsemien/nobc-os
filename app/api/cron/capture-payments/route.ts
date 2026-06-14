@@ -15,6 +15,10 @@ export async function GET(req: NextRequest) {
   const rsvps = await db.rSVP.findMany({
     where: {
       ticketStatus: 'confirmed',
+      // Only authorized holds awaiting capture — without this the cron loads every
+      // confirmed PI'd RSVP and burns a Stripe retrieve per row just to skip the
+      // already-captured ones. Apply-required holds are confirmed + AUTHORIZED.
+      paymentStatus: 'AUTHORIZED',
       stripePaymentIntentId: { not: null },
       refundedAt: null,
       event: { startAt: { lte: cutoff } },
@@ -33,6 +37,18 @@ export async function GET(req: NextRequest) {
         continue;
       }
       await stripe.paymentIntents.capture(rsvp.stripePaymentIntentId);
+      // Reflect the capture in money state immediately (the webhook also sets this
+      // via payment_intent.succeeded, but the backstop must not leave the operator
+      // UI showing an uncaptured hold if that event is delayed/missed). Scoped to
+      // the workspace and guarded so it never regresses a refunded/disputed row.
+      await db.rSVP.updateMany({
+        where: {
+          id: rsvp.id,
+          workspaceId: rsvp.workspaceId,
+          paymentStatus: { notIn: ['CAPTURED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'DISPUTED'] },
+        },
+        data: { paymentStatus: 'CAPTURED', capturedAt: new Date() },
+      });
       await db.auditEvent.create({
         data: {
           workspaceId: rsvp.workspaceId,

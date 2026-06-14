@@ -110,8 +110,10 @@ describe('public guest checkout: serializable capacity re-check on first-time RS
     m.txRsvpCount.mockResolvedValue(1);
     await post();
     expect(m.piCreate).toHaveBeenCalledOnce();
-    // 2nd arg carries the idempotency key scoped to (workspace, event, member).
-    expect(m.piCreate.mock.calls[0][1]).toMatchObject({ idempotencyKey: 'pi-w1-ev1-g1' });
+    // 2nd arg carries the idempotency key scoped to (workspace, event, member,
+    // amount, capture_method) — amount+mode in the key so a price/mode change
+    // mints a fresh PI instead of reusing the stale one.
+    expect(m.piCreate.mock.calls[0][1]).toMatchObject({ idempotencyKey: 'pi-w1-ev1-g1-5000-automatic' });
   });
 
   it('seat available: re-counts taken seats and creates the RSVP on the SAME transaction', async () => {
@@ -129,7 +131,10 @@ describe('public guest checkout: serializable capacity re-check on first-time RS
     expect(m.txRsvpCreate).toHaveBeenCalledOnce();
     expect(m.txRsvpCreate.mock.calls[0][0].data).toMatchObject({
       ticketStatus: 'held',
-      paymentStatus: 'AUTHORIZED',
+      // PENDING (not AUTHORIZED) at create — AUTHORIZED is written only by the
+      // amount_capturable_updated webhook. Writing AUTHORIZED here would gate off
+      // the immediate-capture confirmation email (shouldSendConfirmationEmail).
+      paymentStatus: 'PENDING',
       stripePaymentIntentId: 'pi_1',
     });
     // The plain-client create is NOT used for first-time RSVPs.

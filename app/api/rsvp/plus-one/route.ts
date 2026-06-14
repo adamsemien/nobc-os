@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   const event = await db.event.findFirst({
     where: { id: eventId, workspaceId, status: 'PUBLISHED', plusOnesAllowed: true },
-    select: { id: true, title: true, slug: true, startAt: true },
+    select: { id: true, title: true, slug: true, startAt: true, capacity: true },
   });
   if (!event) return NextResponse.json({ error: 'Event not found or plus-ones not allowed' }, { status: 404 });
 
@@ -71,17 +71,42 @@ export async function POST(req: NextRequest) {
   // with status=APPROVED, approved=true.)
   const guest = await resolveMember({ workspaceId, email: guestEmail, name: guestName, source: 'plus_one' });
 
-  const rsvp = await db.rSVP.create({
-    data: {
-      workspaceId,
-      eventId,
-      memberId: guest.id,
-      status: 'CONFIRMED',
-      ticketStatus: 'confirmed',
-      origin: 'plus_one',
-      plusOneOfMemberId: member.id,
-    },
-  });
+  // A plus-one is a confirmed seat, so it consumes capacity. Gate the count +
+  // create in one serializable transaction holding the Event row lock — without
+  // it a plus-one silently oversells a full event, and concurrent adds race.
+  // Mirrors lib/waitlist.ts promoteFromWaitlist.
+  let rsvp: { id: string } | null;
+  try {
+    rsvp = await db.$transaction(
+      async (tx) => {
+        if (event.capacity) {
+          await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
+          const taken = await tx.rSVP.count({
+            where: { workspaceId, eventId, ticketStatus: { in: ['confirmed', 'held'] } },
+          });
+          if (taken >= event.capacity) return null;
+        }
+        return tx.rSVP.create({
+          data: {
+            workspaceId,
+            eventId,
+            memberId: guest.id,
+            status: 'CONFIRMED',
+            ticketStatus: 'confirmed',
+            origin: 'plus_one',
+            plusOneOfMemberId: member.id,
+          },
+        });
+      },
+      { isolationLevel: 'Serializable' },
+    );
+  } catch (err) {
+    console.error('[plus-one] create transaction failed', { workspaceId, eventId, err });
+    throw err;
+  }
+  if (!rsvp) {
+    return NextResponse.json({ error: 'Event is full' }, { status: 409 });
+  }
 
   await db.auditEvent.create({
     data: {
