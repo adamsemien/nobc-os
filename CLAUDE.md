@@ -44,7 +44,7 @@ Methodology: see the `nobc-icm` skill.
 
 ## Current Build State
 
-**As of 2026-05-28 — V1 is functionally complete.**
+**V1 is functionally complete (since 2026-05-28).** Build has since moved past V1 onto the CRM-spine convergence — `main` is at `#101` (2026-06-12), with the connector wave (`#90`/`#91`/`#92`/`#95`/`#96`/`#98`/`#99`) and first CRM surface (`#89`) merged. **For live state, read `_context/_audit/STATE-OF-PLAY.md` first** — the table below is the V1 baseline, not the current frontier.
 17/20 V1 items are DONE in code. 2 are PARTIAL (credentials only, not code). 0 are NOT STARTED.
 A May-2026 session added the House Phone SMS inbox (Runtype evaluated and **scratched** — final architecture is a standalone Node.js service on Railway), the member-QR rollout, the editorial event-page redesign, operator roles, the House Phone Intelligence tab, and the Digital Asset Manager through Phase 4 — see "What shipped beyond V1 scope" below.
 
@@ -198,7 +198,7 @@ Producer (Replit) ←Phase J HMAC webhook→ NoBC OS (Vercel)
 
 **Critical:** Producer and NoBC OS share the SAME Postgres instance. This is why schema changes are production-affecting and must NEVER auto-push — they could break Producer.
 
-> ⚠️ **2026-06-09 — this "shared Postgres" claim is contradicted by live config and is under verification.** Verified: separate databases in dev (Producer → `helium/heliumdb`; NoBC → Neon `ep-twilight-forest-…`) and **separate Clerk apps**. Producer is effectively a standalone dev-stage tool (no prod env yet). The only unconfirmed gap is Producer's *production* `DATABASE_URL`. Until that's confirmed, do NOT assume a shared DB. The `db push` ban stands regardless (it's correct on any DB). See `_context/_audit/PRODUCER-OPERATOR-STRATEGY.md` + `STATE-OF-PLAY.md`.
+> ⚠️ **2026-06-09 — this "shared Postgres" claim is contradicted by live config and is under verification.** Verified: separate databases in dev (Producer → `helium/heliumdb`; NoBC → Neon `ep-twilight-forest-…`) and **separate Clerk apps**. Producer is effectively a standalone dev-stage tool (no prod env yet). **Confirmed 2026-06-12** (Producer-side audit + `migrate diff`): Producer is **dev-stage only** — single Replit-managed `heliumdb`, **dev Clerk only, no production DB or Clerk**. The shared-Postgres premise is **definitively false in every environment**. The `db push` ban stands regardless (it's correct on any DB). See `_context/_audit/PRODUCER-OPERATOR-STRATEGY.md` + `STATE-OF-PLAY.md`.
 
 Phase J details:
 - HMAC-SHA256 with shared secret
