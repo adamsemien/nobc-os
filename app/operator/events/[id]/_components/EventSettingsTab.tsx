@@ -344,11 +344,14 @@ export function EventSettingsTab({ event }: Props) {
         />
       </div>
 
-      {/* Hero image — paste a URL or upload a file; swappable any time */}
+      {/* Hero image — paste a URL or upload a file; swappable any time.
+          type="text" (not "url"): an uploaded hero stores a relative R2 key
+          (event-hero/…), which fails native url-input validation and would block
+          the entire settings save. The server accepts any string (heroImageAssetId). */}
       <div>
         <label className="mb-1 block text-sm font-medium text-text-secondary">Hero image</label>
         <input
-          type="url"
+          type="text"
           className="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
           style={{ borderRadius: '6px' }}
           placeholder="Paste an image URL, or upload below…"
