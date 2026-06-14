@@ -11,12 +11,14 @@ import { LastCallGame } from './LastCallGame';
  * in the operator tool, outside a text field, and the platform answers: the room
  * shudders, a speakeasy door appears, a peephole slides open, someone checks the
  * list — and the door swings into a private after-hours room with a spinning
- * record and a procedurally generated lo-fi walking bass (pure WebAudio, no
- * files). "Kill the lights" drops the whole dashboard into the Darkroom theme.
+ * record you can flip: click it to cycle four procedurally generated sides —
+ * the house lo-fi walk, deep house, a cantina bodega bounce, and a slow jam
+ * (pure WebAudio, no files). "Kill the lights" drops the dashboard into Darkroom.
  *
- * Entirely client-side and self-contained: no network, no data access, no
- * persistence beyond the existing theme localStorage key. Sibling of the other
- * layout-mounted eggs (Obsidian idle, AIM, MySpace, Konami-in-Void).
+ * Entirely client-side and self-contained: no network, no data access; the only
+ * persistence is two localStorage keys — the shared theme key and the chosen
+ * record side. Sibling of the other layout-mounted eggs (Obsidian idle, AIM,
+ * MySpace, Konami-in-Void).
  */
 
 const KNOCK = 'knockknock';
@@ -26,12 +28,129 @@ type Phase = 'closed' | 'door' | 'room' | 'game' | 'lightsout';
 
 type BackRoomAudio = {
   knock: () => void;
-  startRecord: () => void;
+  startRecord: (initial?: number) => void;
+  setTrack: (i: number) => void;
   click: () => void;
   pluck: () => void;
   buzz: () => void;
   setMuted: (muted: boolean) => void;
   dispose: () => void;
+};
+
+/**
+ * The four sides on the record. The default (index 0) is the room's original
+ * lo-fi walking bass, so the door always opens to its signature sound; clicking
+ * the vinyl flips through deep house, a cantina bodega bounce, and a slow jam.
+ * Each side is fully procedural — a bass line plus a kick (reused door thud) and
+ * a brushed hat, shaped per-track by tempo, filter cutoff, waveform, and swing.
+ *   - bass:     one frequency per quarter-note beat (the line loops)
+ *   - kick/hat: 0|1 per beat, indexed step % bass.length (kick on the beat, hat
+ *               on the offbeat); swing pushes the hat late for a shuffled feel
+ *   - top/bot:  the two lines printed on the spinning label; name feeds aria
+ */
+type Track = {
+  top: string;
+  bot: string;
+  name: string;
+  bass: number[];
+  quarter: number; // seconds per beat
+  cutoff: number; // bass lowpass, Hz
+  wave: OscillatorType;
+  noteGain: number; // bass note peak gain
+  kick: number[]; // 0|1 per beat
+  hat: number[]; // 0|1 per beat (offbeat brush)
+  swing: number; // 0..0.2 — fraction the offbeat hat is pushed late
+};
+
+const TRACKS: Track[] = [
+  {
+    // Side A — the original: D-minor walk, Dm / Gm / Am / Dm turnaround.
+    top: 'NBC',
+    bot: '33⅓',
+    name: 'the house lo-fi walk',
+    bass: [
+      73.42, 87.31, 110, 87.31, // D2 F2 A2 F2
+      98, 116.54, 146.83, 116.54, // G2 Bb2 D3 Bb2
+      110, 130.81, 164.81, 130.81, // A2 C3 E3 C3
+      73.42, 110, 87.31, 82.41, // D2 A2 F2 E2
+    ],
+    quarter: 0.66, // ~91bpm
+    cutoff: 260,
+    wave: 'triangle',
+    noteGain: 0.16,
+    kick: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // no kick — just bass + brush
+    hat: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], // brush on the offbeats
+    swing: 0,
+  },
+  {
+    // Side B — deep house: four-on-the-floor, Am F C G, filtered saw bass.
+    top: 'DEEP',
+    bot: 'HOUSE',
+    name: 'deep house, four on the floor',
+    bass: [
+      110, 110, 82.41, 110, // A2 A2 E2 A2
+      87.31, 87.31, 130.81, 110, // F2 F2 C3 A2
+      130.81, 130.81, 98, 164.81, // C3 C3 G2 E3
+      98, 98, 146.83, 123.47, // G2 G2 D3 B2
+    ],
+    quarter: 0.48, // ~124bpm
+    cutoff: 520,
+    wave: 'sawtooth',
+    noteGain: 0.13,
+    kick: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // four on the floor
+    hat: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // open hat every offbeat
+    swing: 0,
+  },
+  {
+    // Side C — cantina bodega: bouncy swung oom-pah, reedy square, bluesy turn.
+    top: 'CANTINA',
+    bot: 'BODEGA',
+    name: 'the cantina bodega bounce',
+    bass: [
+      130.81, 98, 130.81, 98, // C3 G2 C3 G2
+      87.31, 130.81, 87.31, 130.81, // F2 C3 F2 C3
+      98, 146.83, 98, 123.47, // G2 D3 G2 B2
+      130.81, 164.81, 98, 116.54, // C3 E3 G2 Bb2 (bluesy turn)
+    ],
+    quarter: 0.54, // ~111bpm
+    cutoff: 900,
+    wave: 'square',
+    noteGain: 0.11,
+    kick: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0], // oom on the downbeats
+    hat: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // swung shaker
+    swing: 0.12,
+  },
+  {
+    // Side D — slow jam: laid-back R&B, Dm7 Gm7 Bb A7, round triangle sub.
+    top: 'SLOW',
+    bot: 'JAM',
+    name: 'an after-hours slow jam',
+    bass: [
+      73.42, 110, 87.31, 130.81, // D2 A2 F2 C3 (Dm7)
+      98, 146.83, 116.54, 110, // G2 D3 Bb2 A2 (Gm7)
+      116.54, 87.31, 116.54, 110, // Bb2 F2 Bb2 A2 (Bb)
+      110, 164.81, 138.59, 110, // A2 E3 C#3 A2 (A7)
+    ],
+    quarter: 0.84, // ~71bpm
+    cutoff: 190,
+    wave: 'triangle',
+    noteGain: 0.17,
+    kick: [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1], // beats 1 & 4
+    hat: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], // brushed backbeat
+    swing: 0.08,
+  },
+];
+
+const TRACK_KEY = 'nobc-backroom-track';
+
+/** Read the saved side index, clamped to a real track; defaults to 0 (Side A). */
+const readSavedTrack = (): number => {
+  try {
+    const v = Number(window.localStorage.getItem(TRACK_KEY));
+    return Number.isInteger(v) && v >= 0 && v < TRACKS.length ? v : 0;
+  } catch {
+    return 0;
+  }
 };
 
 /** Procedural speakeasy audio: two door thuds, looping vinyl crackle, a walking
@@ -51,15 +170,17 @@ function createBackRoomAudio(): BackRoomAudio | null {
     let crackle: AudioBufferSourceNode | null = null;
     let nextNoteAt = 0;
     let step = 0;
+    let track: Track = TRACKS[0]; // the side currently spinning
 
-    const thud = (at: number) => {
+    // Doubles as the door knock (peak 0.22) and the groove kick (peak ~0.16).
+    const thud = (at: number, peak = 0.22) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(86, at);
       osc.frequency.exponentialRampToValueAtTime(44, at + 0.13);
       gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.22, at + 0.012);
+      gain.gain.exponentialRampToValueAtTime(peak, at + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.24);
       osc.connect(gain).connect(master);
       osc.start(at);
@@ -93,30 +214,23 @@ function createBackRoomAudio(): BackRoomAudio | null {
       return src;
     };
 
-    // D-minor walk: Dm / Gm / Am / Dm turnaround, one note per quarter.
-    const BASS = [
-      73.42, 87.31, 110, 87.31, // D2 F2 A2 F2
-      98, 116.54, 146.83, 116.54, // G2 Bb2 D3 Bb2
-      110, 130.81, 164.81, 130.81, // A2 C3 E3 C3
-      73.42, 110, 87.31, 82.41, // D2 A2 F2 E2
-    ];
-    const QUARTER = 0.66; // ~91bpm
-
+    // Bass voice — waveform, filter cutoff, gain, and length all read live from
+    // the current track, so a side-flip is heard on the very next note.
     const note = (freq: number, at: number) => {
       const osc = ctx.createOscillator();
       const lp = ctx.createBiquadFilter();
       const gain = ctx.createGain();
-      osc.type = 'triangle';
+      osc.type = track.wave;
       osc.frequency.value = freq;
       osc.detune.value = (Math.random() - 0.5) * 8; // human
       lp.type = 'lowpass';
-      lp.frequency.value = 260;
+      lp.frequency.value = track.cutoff;
       gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.16, at + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + QUARTER * 0.82);
+      gain.gain.exponentialRampToValueAtTime(track.noteGain, at + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + track.quarter * 0.82);
       osc.connect(lp).connect(gain).connect(master);
       osc.start(at);
-      osc.stop(at + QUARTER);
+      osc.stop(at + track.quarter);
     };
 
     const brush = (at: number) => {
@@ -135,19 +249,32 @@ function createBackRoomAudio(): BackRoomAudio | null {
       src.start(at);
     };
 
-    const startRecord = () => {
+    const startRecord = (initial = 0) => {
       void ctx.resume();
+      track = TRACKS[initial % TRACKS.length] ?? TRACKS[0];
+      step = 0;
       if (!crackle) crackle = makeCrackle();
       if (recordTimer !== null) return;
       nextNoteAt = ctx.currentTime + 0.12;
       recordTimer = window.setInterval(() => {
+        const t = track; // stable for this tick; a flip lands on the next one
         while (nextNoteAt < ctx.currentTime + 0.45) {
-          note(BASS[step % BASS.length], nextNoteAt + (Math.random() - 0.5) * 0.018);
-          if (step % 2 === 1) brush(nextNoteAt + QUARTER / 2);
-          nextNoteAt += QUARTER;
+          const i = step % t.bass.length;
+          note(t.bass[i], nextNoteAt + (Math.random() - 0.5) * 0.018);
+          if (t.kick[i]) thud(nextNoteAt, 0.16);
+          if (t.hat[i]) brush(nextNoteAt + t.quarter * (0.5 + t.swing));
+          nextNoteAt += t.quarter;
           step += 1;
         }
       }, 160);
+    };
+
+    // Flip the record — swap the side and restart its line from the top. The
+    // crackle bed keeps running, so the change is seamless.
+    const setTrack = (i: number) => {
+      void ctx.resume();
+      track = TRACKS[i % TRACKS.length] ?? TRACKS[0];
+      step = 0;
     };
 
     const click = () => {
@@ -209,7 +336,7 @@ function createBackRoomAudio(): BackRoomAudio | null {
       void ctx.close();
     };
 
-    return { knock, startRecord, click, pluck, buzz, setMuted, dispose };
+    return { knock, startRecord, setTrack, click, pluck, buzz, setMuted, dispose };
   } catch (err) {
     console.warn('[back-room] WebAudio unavailable — the room will be silent', err);
     return null;
@@ -225,6 +352,7 @@ export function BackRoomEasterEgg() {
   const [phase, setPhase] = useState<Phase>('closed');
   const [muted, setMutedState] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const [trackIdx, setTrackIdx] = useState(0); // which side is on the record
 
   const phaseRef = useRef<Phase>(phase);
   phaseRef.current = phase;
@@ -253,6 +381,7 @@ export function BackRoomEasterEgg() {
     restoreFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     audioRef.current = createBackRoomAudio();
+    setTrackIdx(readSavedTrack()); // open to whichever side last spun
     if (prefersReducedMotion()) {
       setPhase('room'); // still and silent — the card, no cinematic
       return;
@@ -331,11 +460,11 @@ export function BackRoomEasterEgg() {
     return () => window.clearTimeout(id);
   }, [phase]);
 
-  // Room: focus the dialog, drop the needle.
+  // Room: focus the dialog, drop the needle on the last side that spun.
   useEffect(() => {
     if (phase !== 'room') return;
     dialogRef.current?.focus();
-    if (!prefersReducedMotion()) audioRef.current?.startRecord();
+    if (!prefersReducedMotion()) audioRef.current?.startRecord(readSavedTrack());
   }, [phase]);
 
   // Escape: leaves the game for the room first, then closes everything.
@@ -388,6 +517,21 @@ export function BackRoomEasterEgg() {
     setMutedState((m) => {
       audioRef.current?.setMuted(!m);
       return !m;
+    });
+  }, []);
+
+  // Flip the record — needle lift, swap the side, remember it for next time.
+  const cycleRecord = useCallback(() => {
+    setTrackIdx((i) => {
+      const next = (i + 1) % TRACKS.length;
+      audioRef.current?.click();
+      audioRef.current?.setTrack(next);
+      try {
+        window.localStorage.setItem(TRACK_KEY, String(next));
+      } catch {
+        // private mode / blocked storage — the flip still plays, just won't persist
+      }
+      return next;
     });
   }, []);
 
@@ -542,16 +686,21 @@ export function BackRoomEasterEgg() {
                   </p>
 
                   <div className="br-vinyl-row mt-6 flex items-center gap-6">
-                    <div className="br-vinyl-wrap" aria-hidden>
+                    <button
+                      type="button"
+                      className="br-vinyl-wrap"
+                      onClick={cycleRecord}
+                      aria-label={`Now playing ${TRACKS[trackIdx].name}. Click to flip the record.`}
+                    >
                       <div className="br-vinyl">
-                        <span className="br-vinyl-label">
-                          NBC
+                        <span key={trackIdx} className="br-vinyl-label">
+                          {TRACKS[trackIdx].top}
                           <br />
-                          33&#8531;
+                          {TRACKS[trackIdx].bot}
                         </span>
                       </div>
                       <div className="br-tonearm" />
-                    </div>
+                    </button>
                     <ul className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
                       <li>What&rsquo;s poured here stays here.</li>
                       <li>Bring someone worth remembering.</li>
