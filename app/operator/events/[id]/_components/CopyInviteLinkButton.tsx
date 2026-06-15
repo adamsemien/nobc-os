@@ -12,7 +12,7 @@ export function CopyInviteLinkButton({ slug }: Props) {
 
   async function handleCopy() {
     try {
-      const url = `${window.location.origin}/m/events/${slug}`;
+      const url = `${window.location.origin}/e/${slug}`;
       await navigator.clipboard.writeText(url);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);

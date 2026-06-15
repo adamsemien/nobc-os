@@ -218,12 +218,12 @@ export default async function OperatorEventDetailPage({
         <div className="mb-8 flex flex-wrap items-center gap-2">
           <CopyInviteLinkButton slug={event.slug} />
           <a
-            href={`/m/events/${event.slug}`}
+            href={`/e/${event.slug}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-primary hover:text-primary"
           >
-            Preview Member Page ↗
+            Preview Public Page ↗
           </a>
           <a
             href={PRODUCER_URL ? `${PRODUCER_URL}/events/${event.slug}` : '#'}

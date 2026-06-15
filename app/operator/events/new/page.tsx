@@ -590,7 +590,7 @@ export default function NewEventPage() {
                 <div>
                   <FieldLabel>Slug</FieldLabel>
                   <TextInput type="text" value={form.slug} onChange={e => handleSlugChange(e.target.value)} className="font-mono" />
-                  {form.slug ? <p className={`mt-1 text-[11px] text-text-tertiary ${chrome}`}>/m/events/{form.slug}</p> : null}
+                  {form.slug ? <p className={`mt-1 text-[11px] text-text-tertiary ${chrome}`}>/e/{form.slug}</p> : null}
                 </div>
                 <div className={flashCls + ' rounded-[8px]'}>
                   <FieldLabel>Description</FieldLabel>
