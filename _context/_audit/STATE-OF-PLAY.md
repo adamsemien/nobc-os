@@ -16,12 +16,12 @@
 **IN FLIGHT**
 - **`fix-guest-event-link`** (worktree; "guest-link" CC session) — base `main`@`2dde584`, isolated, **NOT committed/pushed** at time of writing. Repoints 4 operator links `/m/events/[slug]` → `/e/[slug]`: Copy Invite Link, the preview link (relabeled "Preview Public Page"), and the canonical-URL display in event settings + new-event. Member emails/links/Stripe-return URLs intentionally stay on `/m/`. **Root cause:** the public `/e/[slug]` surface was built (page + anon-guest API fallback) but **orphaned** — every share/invite link, incl. operator "Copy Invite Link", emitted the Clerk-gated `/m/events/` member URL → guest login wall. Deferred (offered, declined): anon `/m/events/[slug]` → redirect `/e/[slug]` to rescue links already shared.
 - **`feat/event-access-flow-rework`** — **parked PROMPT, not a branch** (absent local + origin). No collision with `fix-guest-event-link`.
-- **`agent-a594332f8fd3a05df`** @ `f794cc9` — separate **locked** worktree under `~/nobc-os` (different clone path); scope unknown to the guest-link session.
+- **`agent-a594332f8fd3a05df`** @ `f794cc9` — **orphaned registration**: `~/nobc-os` dir gone; branch `f794cc9` is a 2026-05-15 commit fully merged into main (0 ahead). No live session, no unmerged work, no collision risk.
 
 **MONEY PATH / SMOKE TEST**
 - Live **$1 charge on `/e/no-bad-monday`** (incognito, logged out): **NOT YET — No.**
 - Code/env green: Stripe webhook route + `StripeEvent` model + `pageStyle` field present; `CRON_SECRET`, `CHECKIN_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `DATABASE_URL` all set in Vercel prod.
-- Adam-only gates before charging: (a) `StripeEvent` table applied to Neon prod; (b) Stripe dashboard endpoint/events/signing-secret wired.
+- Pre-charge gates **CLOSED** (confirmed by Adam 2026-06-15): `StripeEvent` table + all 4 indexes confirmed in Neon prod; Stripe live webhook wiring (endpoint/events/signing-secret) confirmed. Both **done, not pending**.
 - **Known 500s — UNFIXED:**
   - `/m/` member payment-intent route: 500s (real members, not just preview) — UNFIXED.
   - operator comp-bypass route: 500s — UNFIXED.
