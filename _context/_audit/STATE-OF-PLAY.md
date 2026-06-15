@@ -2,8 +2,35 @@
 
 > **If you are a fresh Claude Code session, read this first.** It is the live
 > handoff for the in-flight security + strategy work. Single owner: the "Apex /
-> security-and-strategy" session (Opus 4.8). Last updated: **2026-06-09**.
+> security-and-strategy" session (Opus 4.8). Last updated: **2026-06-15**.
 > Update this file whenever the state below changes — it is the resume point.
+
+---
+
+## 0. Current shared state — 2026-06-15 (live; read before §1)
+
+> Canonical handoff across all active sessions (Adam + multiple CC clones). Verified facts only.
+
+**PROD:** `app.thenobadcompany.com` → `main` @ `2dde584` (#106/#107/#109). Event-save bug fixed (hero input `type=url` → `text`). Public event page `/e/[slug]` renders for anonymous visitors — verified live: `/e/no-bad-monday` → HTTP 200.
+
+**IN FLIGHT**
+- **`fix-guest-event-link`** (worktree; "guest-link" CC session) — base `main`@`2dde584`, isolated, **NOT committed/pushed** at time of writing. Repoints 4 operator links `/m/events/[slug]` → `/e/[slug]`: Copy Invite Link, the preview link (relabeled "Preview Public Page"), and the canonical-URL display in event settings + new-event. Member emails/links/Stripe-return URLs intentionally stay on `/m/`. **Root cause:** the public `/e/[slug]` surface was built (page + anon-guest API fallback) but **orphaned** — every share/invite link, incl. operator "Copy Invite Link", emitted the Clerk-gated `/m/events/` member URL → guest login wall. Deferred (offered, declined): anon `/m/events/[slug]` → redirect `/e/[slug]` to rescue links already shared.
+- **`feat/event-access-flow-rework`** — **parked PROMPT, not a branch** (absent local + origin). No collision with `fix-guest-event-link`.
+- **`agent-a594332f8fd3a05df`** @ `f794cc9` — separate **locked** worktree under `~/nobc-os` (different clone path); scope unknown to the guest-link session.
+
+**MONEY PATH / SMOKE TEST**
+- Live **$1 charge on `/e/no-bad-monday`** (incognito, logged out): **NOT YET — No.**
+- Code/env green: Stripe webhook route + `StripeEvent` model + `pageStyle` field present; `CRON_SECRET`, `CHECKIN_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `DATABASE_URL` all set in Vercel prod.
+- Adam-only gates before charging: (a) `StripeEvent` table applied to Neon prod; (b) Stripe dashboard endpoint/events/signing-secret wired.
+- **Known 500s — UNFIXED:**
+  - `/m/` member payment-intent route: 500s (real members, not just preview) — UNFIXED.
+  - operator comp-bypass route: 500s — UNFIXED.
+  - guest `/e/` Stripe create (route line ~171): no try/catch → empty-500 possible on a real charge.
+
+**NEXT**
+- Commit + push `fix-guest-event-link` → Vercel preview → PR → merge → deploy (fixes the live invite link).
+- Run the $1 smoke test on `/e/no-bad-monday`.
+- Fix branch: outer try/catch on guest `/e/` Stripe create + diagnose the two `/m/` 500s. **Plan-first, no merge/deploy without Adam.**
 
 ---
 
