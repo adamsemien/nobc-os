@@ -167,24 +167,16 @@ export async function POST(
   if (ticketStatus === 'confirmed' || ticketStatus === 'pending_approval') {
     const emailVariant = ticketStatus === 'confirmed' ? 'confirmed' : 'pending_approval';
 
-    // For confirmed RSVPs, generate a QR code data URL from the member's scan token.
-    let qrCodeDataUrl: string | undefined;
-    if (emailVariant === 'confirmed' && rsvpMember.memberQrCode) {
-      try {
-        const QRCode = await import('qrcode');
-        qrCodeDataUrl = await QRCode.toDataURL(rsvpMember.memberQrCode, { width: 300 });
-      } catch (err) {
-        console.error('[public-submit] QR code generation failed', { rsvpId, err });
-      }
-    }
-
+    // QR is delivered as a hosted <img> (/api/qr/{rsvpId}) — Gmail/Outlook reject
+    // data: URIs — so we pass only whether the member has a scannable QR.
     sendGuestAccessConfirmation({
       to: rsvpMember.email,
       variant: emailVariant,
       eventName: event.title,
       eventDate: event.startAt,
       eventLocation: event.location,
-      qrCodeDataUrl,
+      rsvpId,
+      qrAvailable: Boolean(rsvpMember.memberQrCode),
       workspaceId,
     }).catch((err) => {
       console.error('[public-submit] sendGuestAccessConfirmation failed', { rsvpId, err });

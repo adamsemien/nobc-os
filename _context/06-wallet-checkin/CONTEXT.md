@@ -8,7 +8,7 @@
 |---|---|
 | **State** | 🔶 Partial |
 | **V1 item** | #11, #12 |
-| **Last updated** | 2026-06-09 |
+| **Last updated** | 2026-06-15 |
 | **Owner** | Adam |
 | **Blocked on** | `PASSNINJA_*` keys unset in Vercel (Apple/Google passes still 503; deferred). The QR-in-email + door-scan path no longer depends on PassNinja — it works via the plain `memberQrCode` QR. |
 | **Next** | Set `CHECKIN_SECRET` in Vercel (server signing key for the new check-in tokens) and REMOVE the now-unused `NEXT_PUBLIC_CHECKIN_SECRET`. Set `PASSNINJA_*` to light up native wallet passes. Optional: one-time backfill `memberQrCode` for Members created before 2026-05-21. |
@@ -37,6 +37,7 @@ app/check-in/[slug]/page.tsx                    ← per-event scanner UI (PWA, C
 public/manifest.json                            ← PWA manifest
 public/sw.js                                    ← service worker (offline)
 lib/wallet-pass.ts                              ← PassNinja-backed Apple+Google pass helpers (single file, replaces the per-platform builders that were never created; QR encoding lives inline in the email/wallet send paths, no shared lib/check-in/qr.ts module)
+app/api/qr/[id]/route.ts                        ← PUBLIC PNG QR endpoint for EMAIL <img> (rsvpId → member.memberQrCode → QRCode.toBuffer; fail-closed 404). Door-scan QR delivery for confirmation/comp emails (2026-06-15)
 ```
 
 ## Inputs
@@ -105,6 +106,16 @@ The three gaps above are resolved (gaps 1 + 3) or sidestepped (gap 2):
 - **Gap 3 fixed:** the embedded QR encodes `member.memberQrCode`, which is exactly what `CheckInClient.tsx:151` matches and what `app/api/check-in/event/route.ts:67` loads into the offline door DB → non-member buyers now pass the scan.
 - **Gap 2 (wallet buttons):** the dead Apple/Google `<a>` buttons were **removed** from `app/m/events/[slug]/confirmed/page.tsx` (per task scope) — the 405 itself was NOT fixed and PassNinja code was untouched.
 - **Not changed (no schema migration, by request):** `memberQrCode` field already existed. **Dev-only** member-creation paths (`app/api/dev/seed`, `app/api/dev/persona/*`) were intentionally left to preserve the deterministic-seed rule; `prisma/seed-demo.ts` already mints deterministically. **Edge case:** Members created *before* this change still have `memberQrCode = null` → their purchase email falls back to link-only and door scan fails until a one-time backfill (not done — no migration/script was requested).
+
+### Follow-up fix (2026-06-15) — email QR moved from data: URI to a hosted HTTPS image (`fix-guest-event-link`, NOT merged)
+The 2026-05-21 fix embedded the QR as `<img src="data:image/png;base64,…">`. **Gmail AND Outlook both refuse to render `data:` URI images**, so the QR showed as a broken image in both (the `/confirmed` page kept working because a browser renders data: URIs). Fix:
+- **New PUBLIC route `app/api/qr/[id]/route.ts`** (Node runtime): keyed by **rsvpId** → `findUnique` RSVP → `member.memberQrCode` → `QRCode.toBuffer` PNG; **fail-closed 404** on bad/missing id or no QR (never renders an arbitrary string); bounded id guard; `Cache-Control: public, max-age=86400` (see Cache window below) so Gmail/Outlook image proxies cache it. Public by design — `middleware.ts` `isProtectedRoute` does not match `/api/qr`, so no auth gate (no middleware change needed).
+- `rsvpConfirmedEmail` (param `qrDataUrl?: string` → `qrAvailable?: boolean`) and `compTicketEmail` (dropped `qrDataUrl`) now emit `<img src="${appUrl}/api/qr/${rsvpId}">`. The three live senders — `app/api/webhooks/nobc/stripe/route.ts`, `app/api/operator/events/[id]/comp/route.ts`, `lib/agent/tools/rsvps/comp-ticket.ts` — stopped calling `QRCode.toDataURL` (the comp senders still mint-if-missing so the route can resolve the code).
+- **ALL email QR paths now use the hosted endpoint** — the originally-out-of-scope **public `/e/` guest-access path** was extended too (approved): `emails/GuestAccessConfirmation.tsx` (now takes `rsvpId` + `qrAvailable` instead of a precomputed `qrCodeDataUrl`) and its only caller `app/api/e/[slug]/access/submit/route.ts` (dropped `QRCode.toDataURL`). That route is currently **orphaned** (no client fetches `/api/e/*`; the live `/e/[slug]` page posts to `/api/m/...`), but fixing it means **no `data:` URI QR remains anywhere** and the path is safe if ever wired up.
+- Template fallback hardened: `NEXT_PUBLIC_APP_URL ?? 'https://thenobadcompany.com'` → `?? 'https://app.thenobadcompany.com'` (the domain that actually hosts `/api/qr`), so an unset env can't point the QR at a route-less host. Applied in both `lib/email-templates.ts` and `emails/GuestAccessConfirmation.tsx`.
+- **Cache window:** `/api/qr` returns `Cache-Control: public, max-age=86400` (1-day). Dialed back from an initial year-long `immutable` so a voided/rotated QR isn't pinned in CDN/proxy caches for a year (revocation headroom), while still letting Gmail/Outlook image proxies cache it.
+- **Known pre-scale items (LOW, intentionally left as-is):** (1) `/api/qr` has **no rate limit** — one `findUnique` per request; well-behaved email clients proxy-cache after first hit, but add throttling before significant traffic. (2) The **rsvpId travels in the URL** — acceptable: it's a high-entropy cuid, returns only a PNG (no PII), and exposes the same QR value already reachable via the `/confirmed` link already in the email.
+- The QR still encodes `member.memberQrCode` (exactly what `CheckInClient.tsx` matches), so door scanning is unaffected. No schema change. `tsc` + `next build` + ticket-confirmation unit tests (15/15) green. **Gate before deploy:** Vercel **Production** `NEXT_PUBLIC_APP_URL` must be `https://app.thenobadcompany.com` (or any domain serving `/api/qr`).
 
 ### The Room (live check-in board) — query owned here, gate/seed elsewhere
 - Route `/operator/events/[id]/room` → `app/operator/events/[id]/room/page.tsx` → `RoomDashboard.tsx` (polls `/room` every 10s, `/room/vibe` AI descriptor every 30 min) → data from `app/api/operator/events/[id]/room/route.ts`.

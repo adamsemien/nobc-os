@@ -23,6 +23,12 @@ import * as React from 'react';
 import { render } from '@react-email/render';
 import { resend } from '@/lib/resend';
 
+// Same appUrl/fallback as lib/email-templates.ts. The QR is delivered as a hosted
+// HTTPS <img> (/api/qr/{rsvpId}), never a data: URI, because Gmail and Outlook
+// refuse to render inline data: URI images. Fallback targets the app domain that
+// hosts /api/qr, not the marketing site.
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.thenobadcompany.com';
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Variant = 'confirmed' | 'pending_approval';
@@ -32,7 +38,8 @@ interface GuestAccessConfirmationProps {
   eventName: string;
   eventDate: Date;
   eventLocation: string | null;
-  qrCodeDataUrl?: string; // only for 'confirmed'
+  rsvpId: string;
+  qrAvailable?: boolean; // only for 'confirmed' — whether the member has a QR
 }
 
 // ── Template ─────────────────────────────────────────────────────────────────
@@ -42,7 +49,8 @@ export default function GuestAccessConfirmation({
   eventName,
   eventDate,
   eventLocation,
-  qrCodeDataUrl,
+  rsvpId,
+  qrAvailable,
 }: GuestAccessConfirmationProps) {
   const formattedDate = eventDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -87,14 +95,14 @@ export default function GuestAccessConfirmation({
 
           <Hr style={divider} />
 
-          {/* Confirmed variant — QR code */}
-          {isConfirmed && qrCodeDataUrl ? (
+          {/* Confirmed variant — QR code (hosted HTTPS image, not a data: URI) */}
+          {isConfirmed && qrAvailable ? (
             <>
               <Text style={paragraph}>
                 Show this QR code at the door.
               </Text>
               <Img
-                src={qrCodeDataUrl}
+                src={`${appUrl}/api/qr/${encodeURIComponent(rsvpId)}`}
                 alt="Event access QR code"
                 width={200}
                 height={200}
@@ -104,7 +112,7 @@ export default function GuestAccessConfirmation({
           ) : null}
 
           {/* Confirmed variant — no QR (fallback) */}
-          {isConfirmed && !qrCodeDataUrl ? (
+          {isConfirmed && !qrAvailable ? (
             <Text style={paragraph}>
               We&apos;ll see you there. Show this email at the door if asked.
             </Text>
@@ -224,10 +232,11 @@ export async function sendGuestAccessConfirmation(params: {
   eventName: string;
   eventDate: Date;
   eventLocation: string | null;
-  qrCodeDataUrl?: string; // present only for 'confirmed'
+  rsvpId: string;
+  qrAvailable?: boolean; // present only for 'confirmed'
   workspaceId: string;
 }): Promise<void> {
-  const { to, variant, eventName, eventDate, eventLocation, qrCodeDataUrl } = params;
+  const { to, variant, eventName, eventDate, eventLocation, rsvpId, qrAvailable } = params;
 
   const html = await render(
     <GuestAccessConfirmation
@@ -235,7 +244,8 @@ export async function sendGuestAccessConfirmation(params: {
       eventName={eventName}
       eventDate={eventDate}
       eventLocation={eventLocation}
-      qrCodeDataUrl={qrCodeDataUrl}
+      rsvpId={rsvpId}
+      qrAvailable={qrAvailable}
     />,
   );
 

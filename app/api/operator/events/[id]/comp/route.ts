@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import QRCode from 'qrcode';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/operator-role';
@@ -90,13 +89,12 @@ export async function POST(
 
   if (process.env.RESEND_API_KEY) {
     try {
-      const qrDataUrl = await QRCode.toDataURL(memberQrCode, { width: 400, margin: 1 });
       const { resend } = await import('@/lib/resend');
       const { compTicketEmail } = await import('@/lib/email-templates');
       await resend.emails.send({
         from: 'NoBC <team@thenobadcompany.com>',
         to: email.trim(),
-        ...compTicketEmail(fullName, event.title, event.startAt, event.location, rsvp.id, qrDataUrl),
+        ...compTicketEmail(fullName, event.title, event.startAt, event.location, rsvp.id),
       });
     } catch (err) {
       console.error('[comp] confirmation email failed:', err);
