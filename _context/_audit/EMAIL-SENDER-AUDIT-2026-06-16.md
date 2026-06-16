@@ -73,3 +73,22 @@ route, and intelligence deliverables.
    app/operator/applications/_components/ApplicationsQueue.tsx:1059,
    app/operator/members/import/ImportPreviewClient.tsx, and the lib/pdf/*
    recap/brief documents. These are UI and PDF copy, not email.
+
+## Independent verification (2026-06-16)
+
+A read-only adversarial pass (tonone:proof) over `git diff 49e1056..HEAD`
+returned **SHIP WITH NOTES**: tsc 0 errors, 495/495 unit tests green, all nine
+claims (em dashes, Central timezone, no data: URIs, app-URL fallback, /api/qr
+fail-closed + indirection, test integrity, the WS1b name finding, brand rules,
+atomic commits) PASS. Two non-blocking follow-ups it surfaced, both
+PRE-EXISTING (not introduced by this branch):
+
+6. **plus-one guest email shows the date but no clock time.**
+   app/api/rsvp/plus-one/route.ts:139 formats startAt with toLocaleDateString
+   only, while every other confirmation email includes a time. This branch added
+   Central timezone to that date but did not add a time (a copy change, not a tz
+   fix). Worth a follow-up.
+7. **"RSVP" in member-facing default copy.** lib/email-templates-defaults.ts (the
+   rsvp.confirmation body, "update your RSVP at {{event.url}}") uses "RSVP" where
+   the terminology law wants "Access". Pre-existing wording; left as-is to stay
+   surgical. Fold into a broader RSVP-to-Access terminology pass, not a one-off.
