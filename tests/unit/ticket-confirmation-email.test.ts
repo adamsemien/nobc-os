@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { rsvpConfirmedEmail } from '@/lib/email-templates';
+import { rsvpConfirmedEmail, compTicketEmail } from '@/lib/email-templates';
 import {
   resolveTicketRecipient,
   shouldSendConfirmationEmail,
@@ -45,7 +45,7 @@ describe('rsvpConfirmedEmail — QR embed', () => {
     expect(html).toContain(`/api/qr/${BASE.rsvpId}`);
   });
 
-  it('still includes the confirmed-page link when QR is available', () => {
+  it('still includes the public ticket-page link when QR is available', () => {
     const { html } = rsvpConfirmedEmail(
       BASE.name,
       BASE.eventTitle,
@@ -55,7 +55,7 @@ describe('rsvpConfirmedEmail — QR embed', () => {
       BASE.rsvpId,
       true,
     );
-    expect(html).toContain(`/m/events/${BASE.eventSlug}/confirmed?rsvpId=${BASE.rsvpId}`);
+    expect(html).toContain(`/ticket/${BASE.rsvpId}`);
   });
 
   it('omits the QR <img> when qrAvailable is omitted (link-only fallback)', () => {
@@ -68,7 +68,7 @@ describe('rsvpConfirmedEmail — QR embed', () => {
       BASE.rsvpId,
     );
     expect(html).not.toContain('<img');
-    expect(html).toContain(`/m/events/${BASE.eventSlug}/confirmed?rsvpId=${BASE.rsvpId}`);
+    expect(html).toContain(`/ticket/${BASE.rsvpId}`);
   });
 
   it('omits location line when location is null', () => {
@@ -106,6 +106,35 @@ describe('rsvpConfirmedEmail — QR embed', () => {
     );
     expect(html.toLowerCase()).not.toContain('charged');
     expect(html.toLowerCase()).not.toContain('payment received');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 1b. Fallback links target the public, no-login /ticket page (not gated paths)
+// ---------------------------------------------------------------------------
+
+describe('email fallback links target the public /ticket page', () => {
+  const RSVP_ID = 'rsvp_abc12345';
+  const SLUG = 'summer-rooftop';
+  const at = new Date('2026-08-01T20:00:00Z');
+
+  it('rsvpConfirmedEmail (with QR) links to /ticket, not the gated /m path', () => {
+    const { html } = rsvpConfirmedEmail('Ada', 'Summer Rooftop', at, 'Austin', SLUG, RSVP_ID, true);
+    expect(html).toContain(`/ticket/${RSVP_ID}`);
+    expect(html).not.toContain('/m/events/');
+    expect(html).not.toContain('/confirmed?rsvpId=');
+  });
+
+  it('rsvpConfirmedEmail (link-only fallback) links to /ticket, not the gated /m path', () => {
+    const { html } = rsvpConfirmedEmail('Ada', 'Summer Rooftop', at, 'Austin', SLUG, RSVP_ID);
+    expect(html).toContain(`/ticket/${RSVP_ID}`);
+    expect(html).not.toContain('/m/events/');
+  });
+
+  it('compTicketEmail links to /ticket, not the gated /check-in path', () => {
+    const { html } = compTicketEmail('Ada', 'Summer Rooftop', at, 'Austin', RSVP_ID);
+    expect(html).toContain(`/ticket/${RSVP_ID}`);
+    expect(html).not.toContain('/check-in/verify/');
   });
 });
 

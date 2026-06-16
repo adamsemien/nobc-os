@@ -22,7 +22,10 @@ export function rsvpConfirmedEmail(
   qrAvailable?: boolean,
 ): { subject: string; html: string } {
   const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
-  const confirmedUrl = `${appUrl}/m/events/${eventSlug}/confirmed?rsvpId=${rsvpId}`;
+  // Fallback points at the public, no-login ticket page so guest ticket-holders
+  // are never bounced to the Clerk-gated /m confirmed page. eventSlug is kept in
+  // the signature for caller stability (no longer used to build the URL).
+  const confirmedUrl = `${appUrl}/ticket/${rsvpId}`;
   const dateStr = startAt.toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
     timeZone: 'America/Chicago',
@@ -58,7 +61,9 @@ export function compTicketEmail(
   rsvpId: string,
 ): { subject: string; html: string } {
   const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
-  const verifyUrl = `${appUrl}/check-in/verify/${rsvpId}`;
+  // Fallback points at the public, no-login ticket page so comp guests are never
+  // bounced to the Clerk-gated /check-in route.
+  const verifyUrl = `${appUrl}/ticket/${rsvpId}`;
   return {
     subject: `Your invitation: ${eventTitle}`,
     html: `<p>Hi ${name},</p>
