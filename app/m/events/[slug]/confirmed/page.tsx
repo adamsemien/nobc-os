@@ -94,6 +94,16 @@ export default async function EventConfirmedPage({
   const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/m/events/${event.slug}`;
   const applyHref = getApplyHref();
 
+  // TODO(wallet): the Apple/Google wallet CTAs below post to /api/wallet/* which
+  // returns 503 until wallet passes are configured (PassNinja certs unset), so
+  // today they lead to a broken "this page isn't working" target. Gate the whole
+  // block on the documented go-live env so the dead CTA never renders.
+  // To re-enable: set PASSNINJA_API_KEY + PASSNINJA_ACCOUNT_ID (the same step
+  // that brings wallet passes live - see CLAUDE.md / README env vars).
+  const walletConfigured = Boolean(
+    process.env.PASSNINJA_API_KEY && process.env.PASSNINJA_ACCOUNT_ID,
+  );
+
   return (
     <div
       style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--events-ref-cream, #F9F7F2)' }}
@@ -214,7 +224,8 @@ export default async function EventConfirmedPage({
           </p>
         </div>
 
-        {/* Wallet buttons */}
+        {/* Wallet buttons - hidden until wallet passes are configured; see TODO(wallet) above */}
+        {walletConfigured && (
         <div
           style={{
             width: '100%',
@@ -268,6 +279,7 @@ export default async function EventConfirmedPage({
             Add to Google Wallet
           </a>
         </div>
+        )}
 
         {/* Share event link */}
         <ShareButton
