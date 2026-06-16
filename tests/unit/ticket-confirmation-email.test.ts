@@ -28,8 +28,7 @@ describe('rsvpConfirmedEmail — QR embed', () => {
     rsvpId: 'rsvp_abc123',
   };
 
-  it('embeds the QR <img> when qrDataUrl is provided', () => {
-    const qrDataUrl = 'data:image/png;base64,abc==';
+  it('embeds the QR <img> (hosted /api/qr URL) when qrAvailable is true', () => {
     const { html } = rsvpConfirmedEmail(
       BASE.name,
       BASE.eventTitle,
@@ -37,13 +36,14 @@ describe('rsvpConfirmedEmail — QR embed', () => {
       BASE.location,
       BASE.eventSlug,
       BASE.rsvpId,
-      qrDataUrl,
+      true,
     );
-    expect(html).toContain(`<img src="${qrDataUrl}"`);
+    // QR is now a hosted HTTPS image (Gmail/Outlook reject data: URIs), keyed by rsvpId.
+    expect(html).toContain('<img src="');
+    expect(html).toContain(`/api/qr/${BASE.rsvpId}`);
   });
 
-  it('still includes the confirmed-page link when QR is provided', () => {
-    const qrDataUrl = 'data:image/png;base64,abc==';
+  it('still includes the confirmed-page link when QR is available', () => {
     const { html } = rsvpConfirmedEmail(
       BASE.name,
       BASE.eventTitle,
@@ -51,12 +51,12 @@ describe('rsvpConfirmedEmail — QR embed', () => {
       BASE.location,
       BASE.eventSlug,
       BASE.rsvpId,
-      qrDataUrl,
+      true,
     );
     expect(html).toContain(`/m/events/${BASE.eventSlug}/confirmed?rsvpId=${BASE.rsvpId}`);
   });
 
-  it('omits the QR <img> when qrDataUrl is not provided (link-only fallback)', () => {
+  it('omits the QR <img> when qrAvailable is omitted (link-only fallback)', () => {
     const { html } = rsvpConfirmedEmail(
       BASE.name,
       BASE.eventTitle,

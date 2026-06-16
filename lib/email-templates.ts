@@ -1,4 +1,6 @@
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://thenobadcompany.com';
+// Fallback targets the app domain (which hosts /api/qr), NOT the marketing site,
+// so an unset NEXT_PUBLIC_APP_URL can't point the email QR <img> at a route-less host.
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.thenobadcompany.com';
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString('en-US', {
@@ -14,7 +16,7 @@ export function rsvpConfirmedEmail(
   location: string | null | undefined,
   eventSlug: string,
   rsvpId: string,
-  qrDataUrl?: string,
+  qrAvailable?: boolean,
 ): { subject: string; html: string } {
   const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
   const confirmedUrl = `${appUrl}/m/events/${eventSlug}/confirmed?rsvpId=${rsvpId}`;
@@ -25,9 +27,9 @@ export function rsvpConfirmedEmail(
   const timeStr = startAt.toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
   });
-  const qrBlock = qrDataUrl
+  const qrBlock = qrAvailable
     ? `<p>Show this QR code at the door and staff will scan you in:</p>
-<p><img src="${qrDataUrl}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>
+<p><img src="${appUrl}/api/qr/${encodeURIComponent(rsvpId)}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>
 <p>Can't load the image? Use this link instead:<br><a href="${confirmedUrl}">${confirmedUrl}</a></p>`
     : `<p>Your ticket and QR code are at the link below — show it at the door and staff will scan you in.</p>
 <p><a href="${confirmedUrl}">${confirmedUrl}</a></p>`;
@@ -51,7 +53,6 @@ export function compTicketEmail(
   startAt: Date,
   location: string | null | undefined,
   rsvpId: string,
-  qrDataUrl: string,
 ): { subject: string; html: string } {
   const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
   const verifyUrl = `${appUrl}/check-in/verify/${rsvpId}`;
@@ -62,7 +63,7 @@ export function compTicketEmail(
 <p><strong>Date:</strong> ${formatDate(startAt)}</p>
 ${locationLine}
 <p>Show this QR code at the door and staff will scan you in:</p>
-<p><img src="${qrDataUrl}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>
+<p><img src="${appUrl}/api/qr/${encodeURIComponent(rsvpId)}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>
 <p>Can't load the image? Use this link instead:<br><a href="${verifyUrl}">${verifyUrl}</a></p>
 <p>See you there — adam &amp; chloe</p>`,
   };

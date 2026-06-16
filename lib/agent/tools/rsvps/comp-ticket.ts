@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import QRCode from 'qrcode';
 import { db } from '@/lib/db';
 import { registerTool } from '@/lib/agent/registry';
 import type { AgentTool } from '@/lib/agent/types';
@@ -84,7 +83,6 @@ const compTicket: AgentTool<Input, CompOutput> = {
 
     if (process.env.RESEND_API_KEY) {
       try {
-        const qrDataUrl = await QRCode.toDataURL(qr, { width: 400, margin: 1 });
         const { resend } = await import('@/lib/resend');
         const { compTicketEmail } = await import('@/lib/email-templates');
         await resend.emails.send({
@@ -96,7 +94,6 @@ const compTicket: AgentTool<Input, CompOutput> = {
             event.startAt,
             event.location,
             rsvp.id,
-            qrDataUrl,
           ),
         });
       } catch (e) {

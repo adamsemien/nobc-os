@@ -17,9 +17,10 @@ type Tx = Prisma.TransactionClient;
  *
  * Runs AFTER the response (via after()) and AFTER the money-state transaction
  * has committed, so every read uses `db` (not `tx`). Preserves the exact
- * recipient/QR/email behavior the pre-hardening handler had: re-fetch the
- * event + member, resolve recipient via resolveTicketRecipient, render the QR
- * data URL from member.memberQrCode when present, send via Resend.
+ * recipient/email behavior the pre-hardening handler had: re-fetch the
+ * event + member, resolve recipient via resolveTicketRecipient, and send via
+ * Resend. The QR is delivered as a hosted <img> (/api/qr/{rsvpId}) — Gmail and
+ * Outlook reject inline data: URIs — so we only pass whether a QR exists.
  */
 function deferConfirmationEmail(
   deferred: Array<() => Promise<void>>,
@@ -49,11 +50,6 @@ function deferConfirmationEmail(
       guestEmail: args.guestEmail,
       guestName: args.guestName,
     });
-    let qrDataUrl: string | undefined;
-    if (member.memberQrCode) {
-      const QRCode = (await import('qrcode')).default;
-      qrDataUrl = await QRCode.toDataURL(member.memberQrCode, { width: 400, margin: 1 });
-    }
     const { subject, html } = rsvpConfirmedEmail(
       name,
       eventRecord.title,
@@ -61,7 +57,7 @@ function deferConfirmationEmail(
       eventRecord.location,
       eventRecord.slug,
       args.rsvpId,
-      qrDataUrl,
+      Boolean(member.memberQrCode),
     );
     await resend.emails.send({
       from: 'NoBC <team@thenobadcompany.com>',

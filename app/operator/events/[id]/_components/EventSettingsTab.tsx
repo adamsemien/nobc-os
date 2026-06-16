@@ -258,7 +258,7 @@ export function EventSettingsTab({ event }: Props) {
         {slugError && <p className="mt-1 text-xs text-text-muted">{slugError}</p>}
         {slug && !slugError && (
           <p className="mt-1 text-xs text-text-muted">
-            /m/events/<span className="text-text-secondary">{slug}</span>
+            /e/<span className="text-text-secondary">{slug}</span>
           </p>
         )}
       </div>
