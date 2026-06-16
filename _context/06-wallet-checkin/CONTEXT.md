@@ -8,10 +8,10 @@
 |---|---|
 | **State** | 🔶 Partial |
 | **V1 item** | #11, #12 |
-| **Last updated** | 2026-06-15 |
+| **Last updated** | 2026-06-16 |
 | **Owner** | Adam |
 | **Blocked on** | `PASSNINJA_*` keys unset in Vercel (Apple/Google passes still 503; deferred). The QR-in-email + door-scan path no longer depends on PassNinja — it works via the plain `memberQrCode` QR. |
-| **Next** | Set `CHECKIN_SECRET` in Vercel (server signing key for the new check-in tokens) and REMOVE the now-unused `NEXT_PUBLIC_CHECKIN_SECRET`. Set `PASSNINJA_*` to light up native wallet passes. Optional: one-time backfill `memberQrCode` for Members created before 2026-05-21. |
+| **Next** | **2026-06-16: `/api/qr/[id]` hardened (branch `chore/overnight-harden-2026-06-15`, NOT merged).** The public QR image endpoint now wraps its RSVP lookup + PNG encode in try/catch: a DB or encoding error logs with the id and returns 404 (fail closed) instead of 500. The 1-day cache value and the rsvpId to member to memberQrCode indirection are unchanged. New `tests/unit/qr-route.test.ts` (7 tests) locks the 200 PNG, the door-credential indirection, and 404 on unknown/malformed/QR-less/DB-error. A separate read-only audit, `_context/_audit/CHECKIN-RBAC-SCOPING-2026-06-15.md`, scopes the next workstream (scanner behavior gaps + a proposed door-staff RBAC tier). Earlier: Set `CHECKIN_SECRET` in Vercel (server signing key for the new check-in tokens) and REMOVE the now-unused `NEXT_PUBLIC_CHECKIN_SECRET`. Set `PASSNINJA_*` to light up native wallet passes. Optional: one-time backfill `memberQrCode` for Members created before 2026-05-21. |
 
 ## Check-in auth (changed 2026-06-09, `fix/checkin-session-token`)
 
