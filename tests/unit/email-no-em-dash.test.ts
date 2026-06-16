@@ -30,6 +30,7 @@ const EM_DASH = '—';
 
 const EMAIL_SOURCE_FILES = [
   'lib/email-templates.ts',
+  'lib/email-templates-defaults.ts',
   'emails/WelcomeEmail.tsx',
   'emails/WaitlistEmail.tsx',
   'emails/DeclineEmail.tsx',

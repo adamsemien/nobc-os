@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
 
   if (process.env.RESEND_API_KEY) {
     const hostName = `${member.firstName} ${member.lastName}`.trim();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.thenobadcompany.com';
     const eventUrl = `${appUrl}/m/events/${event.slug}`;
     await resend.emails.send({
       from: 'NoBC <team@thenobadcompany.com>',
@@ -136,9 +136,9 @@ export async function POST(req: NextRequest) {
       subject: `You're on the guest list for ${event.title}`,
       html: `<p>Hi ${escapeHtml(guestName)},</p>
 <p>You've been added to the guest list for <strong>${escapeHtml(event.title)}</strong> by ${escapeHtml(hostName)}.</p>
-<p>Date: ${new Date(event.startAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+<p>Date: ${new Date(event.startAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Chicago' })}</p>
 <p><a href="${eventUrl}">View event →</a></p>
-<p>— No Bad Company</p>`,
+<p>No Bad Company</p>`,
     }).catch(err => console.error('[plus-one] email failed:', err));
   }
 

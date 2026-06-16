@@ -2,7 +2,7 @@
  *
  *  Each `body{Html,Text}` may contain {{handlebars}} variable refs that lib/email.ts
  *  interpolates at send time. `variables` is the list of supported names for the
- *  template — surfaced as quick-insert chips in the Communications editor.
+ *  template, surfaced as quick-insert chips in the Communications editor.
  */
 
 export type DefaultTemplate = {
@@ -16,7 +16,7 @@ export type DefaultTemplate = {
   enabled: boolean;
 };
 
-const SIG = `<br/><br/>—<br/>No Bad Company`;
+const SIG = `<br/><br/>No Bad Company`;
 
 export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
   {
@@ -25,16 +25,16 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     description: 'Sent to approved members when a new event is published.',
     subject: 'New event: {{event.title}}',
     bodyHtml:
-      `<p>{{member.firstName}} —</p>` +
+      `<p>{{member.firstName}},</p>` +
       `<p>We're adding something to the calendar.</p>` +
       `<p><strong>{{event.title}}</strong><br/>{{event.dateFormatted}}<br/>{{event.location}}</p>` +
       `<p>{{event.description}}</p>` +
       `<p><a href="{{event.url}}" style="display:inline-block;background:#B22E21;color:#f9f7f2;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;">Reserve my spot</a></p>` +
       SIG,
     bodyText:
-      `{{member.firstName}} —\n\nWe're adding something to the calendar.\n\n` +
+      `{{member.firstName}},\n\nWe're adding something to the calendar.\n\n` +
       `{{event.title}}\n{{event.dateFormatted}}\n{{event.location}}\n\n` +
-      `{{event.description}}\n\nReserve: {{event.url}}\n\n—\nNo Bad Company`,
+      `{{event.description}}\n\nReserve: {{event.url}}\n\nNo Bad Company`,
     variables: [
       'member.firstName',
       'event.title',
@@ -48,18 +48,18 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
   {
     key: 'rsvp.confirmation',
     name: 'RSVP confirmation',
-    description: "Sent after a member RSVPs — confirms their spot.",
-    subject: "You're in — {{event.title}}",
+    description: "Sent after a member RSVPs. Confirms their spot.",
+    subject: "You're in: {{event.title}}",
     bodyHtml:
-      `<p>{{member.firstName}} —</p>` +
+      `<p>{{member.firstName}},</p>` +
       `<p>You're confirmed for <strong>{{event.title}}</strong>.</p>` +
       `<p>{{event.dateFormatted}}<br/>{{event.location}}</p>` +
       `<p>We'll send a reminder the day of. If anything changes, you can update your RSVP at <a href="{{event.url}}">{{event.url}}</a>.</p>` +
       SIG,
     bodyText:
-      `{{member.firstName}} —\n\nYou're confirmed for {{event.title}}.\n\n` +
+      `{{member.firstName}},\n\nYou're confirmed for {{event.title}}.\n\n` +
       `{{event.dateFormatted}}\n{{event.location}}\n\n` +
-      `We'll send a reminder day-of. Update RSVP: {{event.url}}\n\n—\nNo Bad Company`,
+      `We'll send a reminder day-of. Update RSVP: {{event.url}}\n\nNo Bad Company`,
     variables: ['member.firstName', 'event.title', 'event.dateFormatted', 'event.location', 'event.url'],
     enabled: true,
   },
@@ -67,16 +67,16 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     key: 'event.reminder',
     name: 'Day-of reminder',
     description: 'Sent the morning of an event to confirmed RSVPs.',
-    subject: 'Tonight — {{event.title}}',
+    subject: 'Tonight: {{event.title}}',
     bodyHtml:
-      `<p>{{member.firstName}} —</p>` +
+      `<p>{{member.firstName}},</p>` +
       `<p>Tonight is the night.</p>` +
       `<p><strong>{{event.title}}</strong><br/>{{event.timeFormatted}}<br/>{{event.location}}</p>` +
       `<p>See you there.</p>` +
       SIG,
     bodyText:
-      `{{member.firstName}} —\n\nTonight is the night.\n\n` +
-      `{{event.title}}\n{{event.timeFormatted}}\n{{event.location}}\n\nSee you there.\n\n—\nNo Bad Company`,
+      `{{member.firstName}},\n\nTonight is the night.\n\n` +
+      `{{event.title}}\n{{event.timeFormatted}}\n{{event.location}}\n\nSee you there.\n\nNo Bad Company`,
     variables: ['member.firstName', 'event.title', 'event.timeFormatted', 'event.location'],
     enabled: true,
   },
@@ -86,28 +86,28 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     description: 'Welcome email when an application is approved.',
     subject: 'Welcome to No Bad Company',
     bodyHtml:
-      `<p>{{member.firstName}} —</p>` +
+      `<p>{{member.firstName}},</p>` +
       `<p>You're in.</p>` +
       `<p>What that means: you'll start hearing about gatherings before anyone else. Some are open. Some are application-only. All of them are built around the right people in the right room.</p>` +
       `<p><a href="{{site.url}}/m/events">See what's coming up →</a></p>` +
       SIG,
     bodyText:
-      `{{member.firstName}} —\n\nYou're in.\n\nYou'll start hearing about gatherings before anyone else. Some open, some application-only. All built around the right people in the right room.\n\nUpcoming: {{site.url}}/m/events\n\n—\nNo Bad Company`,
+      `{{member.firstName}},\n\nYou're in.\n\nYou'll start hearing about gatherings before anyone else. Some open, some application-only. All built around the right people in the right room.\n\nUpcoming: {{site.url}}/m/events\n\nNo Bad Company`,
     variables: ['member.firstName', 'site.url'],
     enabled: true,
   },
   {
     key: 'application.rejected',
     name: 'Application not advanced',
-    description: 'Disabled by default — operator must opt in.',
+    description: 'Disabled by default. Operator must opt in.',
     subject: 'About your application',
     bodyHtml:
-      `<p>{{member.firstName}} —</p>` +
+      `<p>{{member.firstName}},</p>` +
       `<p>Thank you for applying to No Bad Company. After review, we're not moving forward at this time.</p>` +
       `<p>This is more about timing and fit than anything else. We wish you well.</p>` +
       SIG,
     bodyText:
-      `{{member.firstName}} —\n\nThank you for applying to No Bad Company. After review, we're not moving forward at this time.\n\nThis is more about timing and fit than anything else. We wish you well.\n\n—\nNo Bad Company`,
+      `{{member.firstName}},\n\nThank you for applying to No Bad Company. After review, we're not moving forward at this time.\n\nThis is more about timing and fit than anything else. We wish you well.\n\nNo Bad Company`,
     variables: ['member.firstName'],
     enabled: false,
   },
@@ -117,12 +117,12 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     description: 'Sent when an operator checks in a walk-in guest.',
     subject: 'Welcome to {{event.title}}',
     bodyHtml:
-      `<p>{{member.firstName}} —</p>` +
+      `<p>{{member.firstName}},</p>` +
       `<p>Glad you made it tonight.</p>` +
-      `<p>This is your record for the evening — we'll be in touch about what comes next.</p>` +
+      `<p>This is your record for the evening. We'll be in touch about what comes next.</p>` +
       SIG,
     bodyText:
-      `{{member.firstName}} —\n\nGlad you made it tonight.\n\nThis is your record for the evening — we'll be in touch about what comes next.\n\n—\nNo Bad Company`,
+      `{{member.firstName}},\n\nGlad you made it tonight.\n\nThis is your record for the evening. We'll be in touch about what comes next.\n\nNo Bad Company`,
     variables: ['member.firstName', 'event.title'],
     enabled: true,
   },
@@ -132,13 +132,13 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     description: 'Pre/post survey invite that measures brand lift for a sponsored event.',
     subject: 'A quick word on {{event.title}}',
     bodyHtml:
-      `<p>{{member.firstName}} —</p>` +
+      `<p>{{member.firstName}},</p>` +
       `<p>{{survey.intro}}</p>` +
       `<p>It takes under a minute and stays anonymous in anything we share.</p>` +
       `<p><a href="{{survey.url}}" style="display:inline-block;background:#B22E21;color:#f9f7f2;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;">{{survey.cta}}</a></p>` +
       SIG,
     bodyText:
-      `{{member.firstName}} —\n\n{{survey.intro}}\n\nIt takes under a minute and stays anonymous in anything we share.\n\n{{survey.cta}}: {{survey.url}}\n\n—\nNo Bad Company`,
+      `{{member.firstName}},\n\n{{survey.intro}}\n\nIt takes under a minute and stays anonymous in anything we share.\n\n{{survey.cta}}: {{survey.url}}\n\nNo Bad Company`,
     variables: ['member.firstName', 'event.title', 'survey.intro', 'survey.cta', 'survey.url'],
     enabled: true,
   },

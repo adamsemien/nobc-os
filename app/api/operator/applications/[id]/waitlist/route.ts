@@ -51,7 +51,7 @@ export async function POST(
     resend.emails.send({
       from: 'The No Bad Company <team@thenobadcompany.com>',
       to: app.email,
-      subject: 'your application — no bad company.',
+      subject: 'your application: no bad company.',
       html,
     }).catch(err => console.error('[waitlist] email failed:', err));
   }
