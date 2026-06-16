@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { RsvpCard } from './RsvpCard';
 import { WorkflowPathsCard } from './WorkflowPathsCard';
@@ -56,9 +57,14 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
         <div className="my-10 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
 
         {event.heroImageUrl ? (
-          <div className="mx-auto mb-10 aspect-video w-full max-w-md overflow-hidden rounded-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={event.heroImageUrl} alt="" className="h-full w-full object-cover" />
+          <div className="relative mx-auto mb-10 aspect-video w-full max-w-md overflow-hidden rounded-sm">
+            <Image
+              src={event.heroImageUrl}
+              alt=""
+              fill
+              sizes="(min-width: 768px) 28rem, 100vw"
+              className="object-cover"
+            />
           </div>
         ) : null}
 

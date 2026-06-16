@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -62,8 +63,13 @@ function EventHeroImage({ heroImageAssetId }: { heroImageAssetId: string | null 
   return (
     <div className="relative aspect-[3/4] w-full overflow-hidden bg-events-ref-cream-warm">
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- wired when asset pipeline exists
-        <img src={src} alt="" className="h-full w-full object-cover" />
+        <Image
+          src={src}
+          alt=""
+          fill
+          sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+          className="object-cover"
+        />
       ) : (
         <div className="events-ref-ph absolute inset-0" aria-hidden />
       )}
