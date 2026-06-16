@@ -2,10 +2,13 @@
 // so an unset NEXT_PUBLIC_APP_URL can't point the email QR <img> at a route-less host.
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.thenobadcompany.com';
 
+// Events are operated from Austin; render every date/time in Central
+// (America/Chicago). Without an explicit timeZone, these render in the server
+// zone (UTC on Vercel), turning an evening event into a next-day "1:00 AM".
 function formatDate(d: Date): string {
   return d.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
+    hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago',
   });
 }
 
@@ -22,10 +25,10 @@ export function rsvpConfirmedEmail(
   const confirmedUrl = `${appUrl}/m/events/${eventSlug}/confirmed?rsvpId=${rsvpId}`;
   const dateStr = startAt.toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-    timeZone: 'America/New_York',
+    timeZone: 'America/Chicago',
   });
   const timeStr = startAt.toLocaleTimeString('en-US', {
-    hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
+    hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago',
   });
   const qrBlock = qrAvailable
     ? `<p>Show this QR code at the door and staff will scan you in:</p>

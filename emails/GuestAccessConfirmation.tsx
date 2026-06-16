@@ -56,10 +56,12 @@ export default function GuestAccessConfirmation({
     weekday: 'long',
     month: 'long',
     day: 'numeric',
+    timeZone: 'America/Chicago',
   });
   const formattedTime = eventDate.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'America/Chicago',
   });
 
   const isConfirmed = variant === 'confirmed';
