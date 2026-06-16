@@ -40,7 +40,7 @@ export default function WelcomeEmail({
           </Text>
 
           <Text style={paragraph}>
-            keep an eye on upcoming events — we&apos;ll see you there.
+            keep an eye on upcoming events. we&apos;ll see you there.
           </Text>
 
           <Button href={`${appUrl}/m/events`} style={cta}>
@@ -49,7 +49,7 @@ export default function WelcomeEmail({
 
           <Hr style={divider} />
 
-          <Text style={signoff}>— adam &amp; chloe</Text>
+          <Text style={signoff}>adam &amp; chloe</Text>
         </Container>
       </Body>
     </Html>
