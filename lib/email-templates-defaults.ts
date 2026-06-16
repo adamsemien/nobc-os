@@ -54,12 +54,12 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
       `<p>{{member.firstName}},</p>` +
       `<p>You're confirmed for <strong>{{event.title}}</strong>.</p>` +
       `<p>{{event.dateFormatted}}<br/>{{event.location}}</p>` +
-      `<p>We'll send a reminder the day of. If anything changes, you can update your RSVP at <a href="{{event.url}}">{{event.url}}</a>.</p>` +
+      `<p>We'll send a reminder the day of. If anything changes, you can update your access at <a href="{{event.url}}">{{event.url}}</a>.</p>` +
       SIG,
     bodyText:
       `{{member.firstName}},\n\nYou're confirmed for {{event.title}}.\n\n` +
       `{{event.dateFormatted}}\n{{event.location}}\n\n` +
-      `We'll send a reminder day-of. Update RSVP: {{event.url}}\n\nNo Bad Company`,
+      `We'll send a reminder day-of. Update your access: {{event.url}}\n\nNo Bad Company`,
     variables: ['member.firstName', 'event.title', 'event.dateFormatted', 'event.location', 'event.url'],
     enabled: true,
   },
