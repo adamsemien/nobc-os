@@ -90,3 +90,13 @@ describe('app-URL fallback targets app.thenobadcompany.com, not the marketing ho
     });
   }
 });
+
+describe('plus-one guest email includes the event time in Central', () => {
+  it('renders a Central-time clock, not just the date', () => {
+    const s = src('app/api/rsvp/plus-one/route.ts');
+    // A date uses toLocaleDateString; showing a clock time requires
+    // toLocaleTimeString, and it must be pinned to Central like the date.
+    expect(s).toContain('toLocaleTimeString');
+    expect(s).toContain("timeZone: 'America/Chicago'");
+  });
+});

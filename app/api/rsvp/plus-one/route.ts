@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
       html: `<p>Hi ${escapeHtml(guestName)},</p>
 <p>You've been added to the guest list for <strong>${escapeHtml(event.title)}</strong> by ${escapeHtml(hostName)}.</p>
 <p>Date: ${new Date(event.startAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Chicago' })}</p>
+<p>Time: ${new Date(event.startAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })}</p>
 <p><a href="${eventUrl}">View event →</a></p>
 <p>No Bad Company</p>`,
     }).catch(err => console.error('[plus-one] email failed:', err));
