@@ -152,8 +152,16 @@ describe('app/ticket/[rsvpId]/page.tsx source contract', () => {
     'utf8',
   );
 
-  it('delivers the QR via the hosted /api/qr/[rsvpId] image', () => {
+  it('delivers the QR via the hosted /api/qr/[rsvpId] image, keyed to the rsvpId', () => {
     expect(src).toContain('/api/qr/');
+    // The src must interpolate the rsvpId, not a constant - guards against a
+    // regression to a hardcoded/wrong id that a bare '/api/qr/' check would miss.
+    expect(src).toContain('/api/qr/${ticket.rsvpId}');
+  });
+
+  it('renders no wallet CTA on this public page', () => {
+    // The dead Apple/Google wallet button must never reappear on this surface.
+    expect(src.toLowerCase()).not.toContain('wallet');
   });
 
   it('never references the raw door credential', () => {
