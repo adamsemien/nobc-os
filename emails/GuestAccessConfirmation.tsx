@@ -1,12 +1,12 @@
 /**
- * GuestAccessConfirmation — transactional email for public buyer page access.
+ * GuestAccessConfirmation: transactional email for public buyer page access.
  *
  * Two variants:
- *   confirmed       — QR code image + event details
- *   pending_approval — application received, we'll be in touch
+ *   confirmed        : QR code image + event details
+ *   pending_approval : application received, we'll be in touch
  *
  * Exported send function: sendGuestAccessConfirmation(params)
- * From: team@thenobadcompany.com (locked — do not change)
+ * From: team@thenobadcompany.com (locked, do not change)
  */
 
 import {
@@ -39,7 +39,7 @@ interface GuestAccessConfirmationProps {
   eventDate: Date;
   eventLocation: string | null;
   rsvpId: string;
-  qrAvailable?: boolean; // only for 'confirmed' — whether the member has a QR
+  qrAvailable?: boolean; // only for 'confirmed': whether the member has a QR
 }
 
 // ── Template ─────────────────────────────────────────────────────────────────
@@ -56,10 +56,12 @@ export default function GuestAccessConfirmation({
     weekday: 'long',
     month: 'long',
     day: 'numeric',
+    timeZone: 'America/Chicago',
   });
   const formattedTime = eventDate.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'America/Chicago',
   });
 
   const isConfirmed = variant === 'confirmed';
@@ -69,8 +71,8 @@ export default function GuestAccessConfirmation({
       <Head />
       <Preview>
         {isConfirmed
-          ? `you're on the list — ${eventName}`
-          : `application received — ${eventName}`}
+          ? `you're on the list: ${eventName}`
+          : `application received: ${eventName}`}
       </Preview>
       <Body style={body}>
         <Container style={container}>
@@ -95,7 +97,7 @@ export default function GuestAccessConfirmation({
 
           <Hr style={divider} />
 
-          {/* Confirmed variant — QR code (hosted HTTPS image, not a data: URI) */}
+          {/* Confirmed variant: QR code (hosted HTTPS image, not a data: URI) */}
           {isConfirmed && qrAvailable ? (
             <>
               <Text style={paragraph}>
@@ -111,7 +113,7 @@ export default function GuestAccessConfirmation({
             </>
           ) : null}
 
-          {/* Confirmed variant — no QR (fallback) */}
+          {/* Confirmed variant: no QR (fallback) */}
           {isConfirmed && !qrAvailable ? (
             <Text style={paragraph}>
               We&apos;ll see you there. Show this email at the door if asked.
@@ -128,7 +130,7 @@ export default function GuestAccessConfirmation({
 
           <Hr style={divider} />
 
-          <Text style={signoff}>— no bad company</Text>
+          <Text style={signoff}>no bad company</Text>
 
           <Text style={footer}>
             Questions?{' '}
@@ -251,8 +253,8 @@ export async function sendGuestAccessConfirmation(params: {
 
   const subject =
     variant === 'confirmed'
-      ? `you're on the list — ${eventName}`
-      : `application received — ${eventName}`;
+      ? `you're on the list: ${eventName}`
+      : `application received: ${eventName}`;
 
   await resend.emails.send({
     from: 'No Bad Company <team@thenobadcompany.com>',

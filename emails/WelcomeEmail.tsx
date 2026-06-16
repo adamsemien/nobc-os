@@ -10,7 +10,10 @@ import {
 } from '@react-email/components';
 import * as React from 'react';
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://thenobadcompany.com';
+// Fallback targets the app domain (which serves /m and /api/qr), NOT the
+// marketing site, so an unset NEXT_PUBLIC_APP_URL can't point the CTA at a
+// route-less host.
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.thenobadcompany.com';
 
 export default function WelcomeEmail({
   name,
@@ -40,7 +43,7 @@ export default function WelcomeEmail({
           </Text>
 
           <Text style={paragraph}>
-            keep an eye on upcoming events — we&apos;ll see you there.
+            keep an eye on upcoming events. we&apos;ll see you there.
           </Text>
 
           <Button href={`${appUrl}/m/events`} style={cta}>
@@ -49,7 +52,7 @@ export default function WelcomeEmail({
 
           <Hr style={divider} />
 
-          <Text style={signoff}>— adam &amp; chloe</Text>
+          <Text style={signoff}>adam &amp; chloe</Text>
         </Container>
       </Body>
     </Html>

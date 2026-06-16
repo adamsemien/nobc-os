@@ -28,23 +28,30 @@ export async function GET(
     return new Response('Not found', { status: 404 });
   }
 
-  const rsvp = await db.rSVP.findUnique({
-    where: { id },
-    select: { member: { select: { memberQrCode: true } } },
-  });
-  if (!rsvp?.member?.memberQrCode) {
+  try {
+    const rsvp = await db.rSVP.findUnique({
+      where: { id },
+      select: { member: { select: { memberQrCode: true } } },
+    });
+    if (!rsvp?.member?.memberQrCode) {
+      return new Response('Not found', { status: 404 });
+    }
+    const memberQrCode = rsvp.member.memberQrCode;
+
+    const png = await QRCode.toBuffer(memberQrCode, { width: 400, margin: 1, type: 'png' });
+    return new Response(new Uint8Array(png), {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        // 1-day cache: lets Gmail/Outlook image proxies cache the PNG without
+        // pinning a stale/voided QR for a year (revocation headroom).
+        'Cache-Control': 'public, max-age=86400',
+      },
+    });
+  } catch (err) {
+    // Fail closed: a DB lookup or QR-encoding error must not 500 a public
+    // image endpoint. Log with the id so the failure is traceable, then 404.
+    console.error('[api/qr] failed to render QR', { id, err });
     return new Response('Not found', { status: 404 });
   }
-  const memberQrCode = rsvp.member.memberQrCode;
-
-  const png = await QRCode.toBuffer(memberQrCode, { width: 400, margin: 1, type: 'png' });
-  return new Response(new Uint8Array(png), {
-    status: 200,
-    headers: {
-      'Content-Type': 'image/png',
-      // 1-day cache: lets Gmail/Outlook image proxies cache the PNG without
-      // pinning a stale/voided QR for a year (revocation headroom).
-      'Cache-Control': 'public, max-age=86400',
-    },
-  });
 }

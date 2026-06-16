@@ -15,7 +15,7 @@ export default function DeclineEmail({ name }: { name: string }) {
   return (
     <Html lang="en">
       <Head />
-      <Preview>your application — no bad company.</Preview>
+      <Preview>your application: no bad company.</Preview>
       <Body style={body}>
         <Container style={container}>
           <Text style={brand}>THE NO BAD COMPANY</Text>
@@ -24,13 +24,13 @@ export default function DeclineEmail({ name }: { name: string }) {
 
           <Text style={paragraph}>
             we read it carefully. at this moment it&apos;s not the right fit.
-            that&apos;s not a judgment — it&apos;s timing and composition.
+            that&apos;s not a judgment. it&apos;s timing and composition.
             thank you for taking the time.
           </Text>
 
           <Hr style={divider} />
 
-          <Text style={signoff}>— adam &amp; chloe</Text>
+          <Text style={signoff}>adam &amp; chloe</Text>
         </Container>
       </Body>
     </Html>

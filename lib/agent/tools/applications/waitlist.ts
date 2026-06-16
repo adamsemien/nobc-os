@@ -44,7 +44,7 @@ const waitlistApplication: AgentTool<Input, unknown> = {
         .send({
           from: 'The No Bad Company <team@thenobadcompany.com>',
           to: app.email,
-          subject: 'your application — no bad company.',
+          subject: 'your application: no bad company.',
           html,
         })
         .catch((e) => console.error('[agent waitlist] email failed:', e));

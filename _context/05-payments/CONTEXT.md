@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped (🟡 checkout-hardening on branch `feat/stripe-checkout-hardening`, not yet merged) |
 | **V1 item** | #9, #10, #21 (comp tickets — payment-side bookkeeping), #25 (compliance pages) |
-| **Last updated** | 2026-06-13 |
+| **Last updated** | 2026-06-16 |
 | **Owner** | Adam |
 | **Blocked on** | Compliance pages legal review. Apply `prisma/sql/stripe-event.sql` to **production** before June 20 (StripeEvent table; webhook idempotency fails closed without it). |
-| **Next** | (2026-06-13: branch `feat/stripe-checkout-hardening`, 10 commits, NOT merged — all 7 hardening phases done.) Merge after review, then: (1) `prisma db execute --file prisma/sql/stripe-event.sql` against prod Neon; (2) set `CRON_SECRET` in Vercel (capture-payments cron now scheduled in vercel.json); (3) Stripe test-mode dress rehearsal per `_context/_audit/STRIPE-TESTING.md`; (4) $1 live test. Earlier 2026-06-10 ticket-confirmation-email note is now subsumed. |
+| **Next** | **2026-06-16: overnight email harden (branch `chore/overnight-harden-2026-06-15`, NOT merged).** `rsvpConfirmedEmail`/`compTicketEmail` now render in Central (`America/Chicago`, were Eastern); em dashes removed from every subject/body (subjects to colon form); a hardening test suite (`tests/unit/email-hardening.test.ts`, `email-no-em-dash.test.ts`, `qr-route.test.ts`) locks no `data:` URIs, hosted https `/api/qr` images, `app.thenobadcompany.com` fallback, zero em dashes, and fail-closed `/api/qr`. FLAGGED (not built, awaiting approval): confirmation/comp fallback links still point at Clerk-gated `/m/.../confirmed` and `/check-in/verify` (WS1c public-route plan); the wrong-greeting-name report is data, not a template bug (WS1b). See `_context/_audit/EMAIL-SENDER-AUDIT-2026-06-16.md`. Earlier: (2026-06-13: branch `feat/stripe-checkout-hardening`, 10 commits, NOT merged — all 7 hardening phases done.) Merge after review, then: (1) `prisma db execute --file prisma/sql/stripe-event.sql` against prod Neon; (2) set `CRON_SECRET` in Vercel (capture-payments cron now scheduled in vercel.json); (3) Stripe test-mode dress rehearsal per `_context/_audit/STRIPE-TESTING.md`; (4) $1 live test. Earlier 2026-06-10 ticket-confirmation-email note is now subsumed. |
 
 ## Checkout hardening (2026-06-13, branch `feat/stripe-checkout-hardening`)
 

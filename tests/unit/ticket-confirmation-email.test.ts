@@ -8,6 +8,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { rsvpConfirmedEmail } from '@/lib/email-templates';
 import {
   resolveTicketRecipient,
@@ -172,5 +174,51 @@ describe('shouldSendConfirmationEmail', () => {
 
   it('returns true when paymentStatus is FAILED (re-attempt after failure — edge case, allow)', () => {
     expect(shouldSendConfirmationEmail('FAILED')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. rsvpConfirmedEmail — timezone (Central / America/Chicago)
+// ---------------------------------------------------------------------------
+
+describe('rsvpConfirmedEmail — timezone (Central)', () => {
+  // 01:00 UTC on Aug 2 is 8:00 PM CDT on Aug 1 (UTC-5 in summer). Rendering in
+  // the server zone (UTC) would show "1:00 AM" on "August 2" — the reported bug.
+  const eveningUtc = new Date('2026-08-02T01:00:00Z');
+
+  it('renders the event time in Central wall-clock, not raw UTC', () => {
+    const { html } = rsvpConfirmedEmail(
+      'Test Person', 'Evening Salon', eveningUtc, 'Austin', 'evening-salon', 'rsvp_tz123456', true,
+    );
+    expect(html).toContain('8:00');
+    expect(html).toContain('PM');
+    expect(html).not.toContain('1:00 AM');
+  });
+
+  it('does not shift the date across midnight (stays August 1, not August 2)', () => {
+    const { html } = rsvpConfirmedEmail(
+      'Test Person', 'Evening Salon', eveningUtc, 'Austin', 'evening-salon', 'rsvp_tz123456', true,
+    );
+    expect(html).toContain('August 1');
+    expect(html).not.toContain('August 2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. GuestAccessConfirmation — timezone source guard
+// ---------------------------------------------------------------------------
+
+describe('GuestAccessConfirmation — renders in Central', () => {
+  // The component is a react-email .tsx the vitest harness cannot import (no JSX
+  // transform), so this guards the source: it must format in America/Chicago and
+  // never fall back to America/New_York or an implicit (UTC) zone.
+  it('source uses America/Chicago and not America/New_York', () => {
+    const src = readFileSync(
+      resolve(process.cwd(), 'emails/GuestAccessConfirmation.tsx'),
+      'utf8',
+    );
+    const chicagoCount = src.split("timeZone: 'America/Chicago'").length - 1;
+    expect(chicagoCount).toBeGreaterThanOrEqual(2);
+    expect(src).not.toContain('America/New_York');
   });
 });

@@ -15,7 +15,7 @@ export default function WaitlistEmail({ name }: { name: string }) {
   return (
     <Html lang="en">
       <Head />
-      <Preview>your application — no bad company.</Preview>
+      <Preview>your application: no bad company.</Preview>
       <Body style={body}>
         <Container style={container}>
           <Text style={brand}>THE NO BAD COMPANY</Text>
@@ -29,7 +29,7 @@ export default function WaitlistEmail({ name }: { name: string }) {
 
           <Hr style={divider} />
 
-          <Text style={signoff}>— adam &amp; chloe</Text>
+          <Text style={signoff}>adam &amp; chloe</Text>
         </Container>
       </Body>
     </Html>
