@@ -10,6 +10,7 @@ import {
   Images,
   Users,
   BarChart3,
+  Handshake,
   MessageSquare,
   Settings,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ const PRIMARY_ITEMS: NavItem[] = [
   { href: '/operator/house-phone',  label: 'House Phone',  match: '/operator/house-phone',               Icon: MessageSquare },
   { href: '/operator/media',        label: 'Media',        match: '/operator/media',                     Icon: Images },
   { href: '/operator/intelligence', label: 'Intelligence', match: '/operator/intelligence',              Icon: BarChart3 },
+  { href: '/operator/sponsors',     label: 'Sponsors',     match: '/operator/sponsors',                  Icon: Handshake },
 ];
 
 const FOOTER_ITEM: NavItem = {
