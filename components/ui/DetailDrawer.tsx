@@ -29,6 +29,13 @@ export function DetailDrawer({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastFocused = useRef<HTMLElement | null>(null);
+  // Hold the latest onClose in a ref so the focus effect below depends only on
+  // `open`. Consumers commonly pass an inline onClose (new identity every
+  // render); if the effect depended on it, every keystroke in a controlled
+  // field would tear down and re-arm focus — yanking focus out of the field
+  // and onto whatever opened the drawer. See the focus-flicker bug fix.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -37,7 +44,7 @@ export function DetailDrawer({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
       }
       if (e.key === 'Tab') {
         // Focus trap
@@ -72,7 +79,7 @@ export function DetailDrawer({
       window.clearTimeout(t);
       lastFocused.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <>
