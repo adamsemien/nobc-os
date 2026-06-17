@@ -1292,6 +1292,7 @@ model SponsorBrandProfile {
   id           String   @id @default(cuid())
   workspaceId  String
   name         String
+  contactEmail String?  // primary sponsor contact for recap delivery (additive 2026-06-17)
   icp          String?
   icpTags      String[]
   category     String?
