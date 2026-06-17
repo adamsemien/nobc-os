@@ -33,5 +33,31 @@ export default async function CheckInPage({
     }
   }
 
-  return <CheckInClient eventSlug={slug} workspaceSlug={workspaceSlug} token={token} />;
+  // Preflight: if the server-only CHECKIN_SECRET is unset, mintCheckInSession
+  // returns null and every door scan 401s with no signal. Surface it to the
+  // operator loading this page. The secret value is never sent to the browser,
+  // only this boolean result.
+  const checkInSecretMissing = !process.env.CHECKIN_SECRET;
+
+  return (
+    <>
+      {checkInSecretMissing && (
+        <div
+          role="alert"
+          style={{
+            background: 'var(--warning-soft)',
+            color: 'var(--warning)',
+            borderBottom: '1px solid var(--warning)',
+            padding: '12px 16px',
+            textAlign: 'center',
+            fontSize: 14,
+            fontWeight: 500,
+          }}
+        >
+          Check-in is misconfigured: CHECKIN_SECRET is not set. Scans will fail until it is configured.
+        </div>
+      )}
+      <CheckInClient eventSlug={slug} workspaceSlug={workspaceSlug} token={token} />
+    </>
+  );
 }

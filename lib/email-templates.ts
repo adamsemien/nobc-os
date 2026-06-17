@@ -143,3 +143,46 @@ ${passSection}
 <p>adam &amp; chloe</p>`,
   };
 }
+
+export function eventCancelledEmail(
+  name: string,
+  eventTitle: string,
+  startAt: Date,
+): { subject: string; html: string } {
+  // Central time per the cancellation-notice spec (the older templates above
+  // render in Eastern; this one is intentionally America/Chicago).
+  const dateStr = startAt.toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    timeZone: 'America/Chicago',
+  });
+  return {
+    subject: `Cancelled: ${eventTitle}`,
+    html: `<p>Hi ${name},</p>
+
+<p>We're sorry to share that <strong>${eventTitle}</strong>, scheduled for ${dateStr}, has been cancelled.</p>
+
+<p>There's nothing you need to do - your access for this event has been released. If you paid for a ticket, we'll make sure you're refunded.</p>
+
+<p>We hope to see you at the next one. Keep an eye on your inbox for what's coming up.</p>
+
+<p>- adam &amp; chloe</p>`,
+  };
+}
+
+export function recapReadyEmail(
+  eventName: string,
+  url: string,
+): { subject: string; html: string } {
+  return {
+    subject: `Your ${eventName} recap is ready.`,
+    html: `<p>Hi,</p>
+
+<p>Your activation recap for <strong>${eventName}</strong> is ready to view.</p>
+
+<p><a href="${url}">View your recap</a></p>
+
+<p>The link is private to you. If anything looks off or you have questions, just reply to this note.</p>
+
+<p>- the No Bad Company team</p>`,
+  };
+}

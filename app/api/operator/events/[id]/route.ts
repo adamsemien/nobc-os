@@ -11,6 +11,7 @@ import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
 import { emitEvent } from '@/lib/emit-event';
 import { notifyProducer } from '@/lib/producer-webhook';
 import { sendTemplatedEmail, getPlatformBool } from '@/lib/email';
+import { resolveTicketRecipient } from '@/lib/ticket-confirmation';
 
 const CustomQuestionSchema = z.object({
   id: z.string(),
@@ -224,7 +225,73 @@ export async function PATCH(
     }
   }
 
+  // Fan-out a cancellation notice to confirmed attendees (hardcoded template,
+  // not the DB-templated path). Fire-and-forget so it never blocks the response.
+  if (statusChanged && rest.status === 'CANCELLED') {
+    void notifyAttendeesOfCancellation(workspaceId, id, userId).catch(err =>
+      console.error('[events] cancellation notify failed:', err),
+    );
+  }
+
   return NextResponse.json({ ok: true });
+}
+
+async function notifyAttendeesOfCancellation(workspaceId: string, eventId: string, actorId: string) {
+  if (!process.env.RESEND_API_KEY) return;
+
+  const [event, rsvps] = await Promise.all([
+    db.event.findUnique({
+      where: { id: eventId },
+      select: { title: true, startAt: true },
+    }),
+    db.rSVP.findMany({
+      where: { workspaceId, eventId, ticketStatus: 'confirmed' },
+      select: {
+        guestEmail: true,
+        guestName: true,
+        member: { select: { email: true, firstName: true, lastName: true } },
+      },
+    }),
+  ]);
+  if (!event || rsvps.length === 0) return;
+
+  const { resend } = await import('@/lib/resend');
+  const { eventCancelledEmail } = await import('@/lib/email-templates');
+
+  let sent = 0;
+  let skipped = 0;
+  for (const rsvp of rsvps) {
+    const { email, name } = resolveTicketRecipient(rsvp.member, {
+      guestEmail: rsvp.guestEmail,
+      guestName: rsvp.guestName,
+    });
+    if (!email) {
+      skipped++;
+      continue;
+    }
+    try {
+      await resend.emails.send({
+        from: 'NoBC <team@thenobadcompany.com>',
+        to: email,
+        ...eventCancelledEmail(name, event.title, event.startAt),
+      });
+      sent++;
+    } catch (err) {
+      skipped++;
+      console.error('[events] cancellation email failed:', err);
+    }
+  }
+
+  await db.auditEvent.create({
+    data: {
+      workspaceId,
+      actorId,
+      action: 'event.cancellation_sent',
+      entityType: 'EVENT',
+      entityId: eventId,
+      metadata: { sent, skipped, recipientCount: rsvps.length },
+    },
+  }).catch(() => {});
 }
 
 async function notifyMembersOfPublish(workspaceId: string, eventId: string, actorId: string) {

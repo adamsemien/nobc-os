@@ -444,6 +444,10 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
     } catch {}
   }
 
+  // Hard short-circuit: dev tooling must never render in production, even if a
+  // NEXT_PUBLIC_DEV_USER_IDS allowlist entry leaks into a prod env. NODE_ENV is
+  // inlined at build time, so this whole subtree is dead-stripped in a prod build.
+  if (process.env.NODE_ENV === 'production') return null;
   if (!isLoaded || !isAllowed) return null;
 
   async function handleSeed() {

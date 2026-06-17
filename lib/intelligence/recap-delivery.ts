@@ -68,6 +68,48 @@ async function storeAndDeliver(
   return { token, url: docUrl(token), generatedAssetId: asset.id, payload, storageConfigured };
 }
 
+/**
+ * Best-effort: email the recap magic link to the sponsor's contact. Skips with a
+ * log when email is unconfigured, no sponsor is attached, or the sponsor has no
+ * contactEmail. Never throws into the recap path.
+ */
+async function maybeSendRecapEmail(opts: {
+  workspaceId: string;
+  sponsorBrandId?: string | null;
+  eventId: string;
+  url: string;
+}): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  if (!opts.sponsorBrandId) {
+    console.log('[recap-delivery] no sponsorBrandId on recap; skipping recap email.');
+    return;
+  }
+  const sponsor = await db.sponsorBrandProfile.findFirst({
+    where: { id: opts.sponsorBrandId, workspaceId: opts.workspaceId },
+    select: { contactEmail: true },
+  });
+  if (!sponsor?.contactEmail) {
+    console.log('[recap-delivery] sponsor has no contactEmail; skipping recap email. sponsorBrandId=%s', opts.sponsorBrandId);
+    return;
+  }
+  const event = await db.event.findFirst({
+    where: { id: opts.eventId, workspaceId: opts.workspaceId },
+    select: { title: true },
+  });
+  const eventName = event?.title ?? 'your event';
+  try {
+    const { resend } = await import('@/lib/resend');
+    const { recapReadyEmail } = await import('@/lib/email-templates');
+    await resend.emails.send({
+      from: 'NoBC <team@thenobadcompany.com>',
+      to: sponsor.contactEmail,
+      ...recapReadyEmail(eventName, opts.url),
+    });
+  } catch (err) {
+    console.error('[recap-delivery] recap email failed:', err);
+  }
+}
+
 export interface GenerateRecapArgs extends AssembleArgs {
   password?: string | null;
   generatedBySession?: string | null;
@@ -91,6 +133,7 @@ export async function generateAndStoreRecap(args: GenerateRecapArgs): Promise<Ge
   });
 
   const delivered = await storeAndDeliver(payload, { workspaceId, sponsorBrandId, password, generatedBySession });
+  await maybeSendRecapEmail({ workspaceId, sponsorBrandId, eventId, url: delivered.url });
   return { ...delivered, snapshotId: snapshot.id };
 }
 
