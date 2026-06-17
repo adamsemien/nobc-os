@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
+import { OrganizationSwitcher, UserButton } from '@clerk/nextjs';
 import { ExternalLink } from 'lucide-react';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { isAdmin } from '@/lib/operator-role';
@@ -87,6 +87,7 @@ export default async function OperatorLayout({
               <ExternalLink className="h-[13px] w-[13px]" aria-hidden />
               Apply Form
             </a>
+            <OrganizationSwitcher hidePersonal afterSelectOrganizationUrl="/operator" />
             <UserButton />
           </div>
           {children}
