@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { stripe } from '@/lib/stripe';
+import { alert } from '@/lib/alerting';
 
 // Called nightly by Vercel cron. Captures authorized holds for events starting within 24h.
 // Configure in vercel.json: { "crons": [{ "path": "/api/cron/capture-payments", "schedule": "0 12 * * *" }] }
@@ -60,7 +61,18 @@ export async function GET(req: NextRequest) {
       });
       results.push({ id: rsvp.id, status: 'captured' });
     } catch (err) {
-      results.push({ id: rsvp.id, status: `error: ${err instanceof Error ? err.message : 'unknown'}` });
+      const message = err instanceof Error ? err.message : 'unknown';
+      // A swallowed capture failure means money was authorized but never
+      // captured, with no signal to the operator. Log + alert per failure;
+      // the batch structure (results array) is unchanged.
+      console.error('[capture-payments] capture failed', { rsvpId: rsvp.id, err: message });
+      await alert({
+        severity: 'error',
+        event: 'stripe.capture.failed',
+        workspaceId: rsvp.workspaceId,
+        context: { rsvpId: rsvp.id, paymentIntentId: rsvp.stripePaymentIntentId, error: message },
+      });
+      results.push({ id: rsvp.id, status: `error: ${message}` });
     }
   }
 
