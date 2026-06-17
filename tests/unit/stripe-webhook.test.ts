@@ -36,6 +36,7 @@ const m = vi.hoisted(() => ({
   txRsvpUpdateMany: vi.fn(),
   txStripeEventCreate: vi.fn(),
   txExecuteRaw: vi.fn(),
+  alert: vi.fn(),
 }));
 
 vi.mock('next/server', async (importOriginal) => {
@@ -62,7 +63,7 @@ vi.mock('@/lib/ticket-confirmation', () => ({
   resolveTicketRecipient: vi.fn(() => ({ email: 'x@y.com', name: 'X' })),
   shouldSendConfirmationEmail: vi.fn(() => false),
 }));
-vi.mock('@/lib/alerting', () => ({ alert: vi.fn() }));
+vi.mock('@/lib/alerting', () => ({ alert: m.alert }));
 
 import { POST } from '@/app/api/webhooks/nobc/stripe/route';
 
@@ -207,6 +208,77 @@ describe('stripe webhook: charge.refunded', () => {
     expect(m.txRsvpUpdateMany).not.toHaveBeenCalled();
     expect(m.txExecuteRaw).not.toHaveBeenCalled();
     expect(m.txStripeEventCreate).toHaveBeenCalledOnce();
+  });
+});
+
+describe('stripe webhook: payment_intent.payment_failed', () => {
+  // The alert lives in a deferred closure (runs via after()). Capture the
+  // after() callback and await it explicitly so the assertion is deterministic.
+  let runDeferred: (() => Promise<void>) | undefined;
+  beforeEach(() => {
+    runDeferred = undefined;
+    m.after.mockImplementation((fn: () => Promise<void>) => {
+      runDeferred = fn;
+    });
+    m.constructEvent.mockReturnValue({
+      id: 'evt_fail',
+      type: 'payment_intent.payment_failed',
+      data: { object: { id: 'pi_fail', amount: 5000, metadata: { workspaceId: 'w1', memberId: 'm1' } } },
+    });
+    m.txRsvpFindFirst.mockResolvedValue({ id: 'r_fail' });
+  });
+
+  it('flips the held RSVP to payment_failed and records the dedup row', async () => {
+    const res = await POST(makeReq('sig'));
+    expect(await res.json()).toMatchObject({ received: true });
+
+    expect(m.txRsvpUpdateMany).toHaveBeenCalledOnce();
+    const call = m.txRsvpUpdateMany.mock.calls[0][0];
+    expect(call.where).toMatchObject({
+      stripePaymentIntentId: 'pi_fail',
+      workspaceId: 'w1',
+      ticketStatus: { in: ['held'] },
+    });
+    expect(call.data).toMatchObject({ ticketStatus: 'payment_failed', status: 'DECLINED', paymentStatus: 'FAILED' });
+
+    // Dedup row written in the SAME transaction, tagged with the resolved workspace.
+    expect(m.txStripeEventCreate).toHaveBeenCalledWith({
+      data: { stripeId: 'evt_fail', type: 'payment_intent.payment_failed', workspaceId: 'w1' },
+    });
+  });
+
+  it('fires an operator alert (severity error) instead of failing silently', async () => {
+    await POST(makeReq('sig'));
+    await runDeferred?.();
+
+    expect(m.alert).toHaveBeenCalledOnce();
+    const payload = m.alert.mock.calls[0][0];
+    expect(payload).toMatchObject({
+      severity: 'error',
+      event: 'stripe.payment_intent.failed',
+      workspaceId: 'w1',
+    });
+    expect(payload.context).toMatchObject({
+      rsvpId: 'r_fail',
+      paymentIntentId: 'pi_fail',
+      reason: 'payment_intent.payment_failed',
+    });
+  });
+
+  it('payment_intent.canceled also alerts (same branch)', async () => {
+    m.constructEvent.mockReturnValue({
+      id: 'evt_cancel',
+      type: 'payment_intent.canceled',
+      data: { object: { id: 'pi_cancel', amount: 5000, metadata: { workspaceId: 'w1' } } },
+    });
+    await POST(makeReq('sig'));
+    await runDeferred?.();
+
+    expect(m.alert).toHaveBeenCalledOnce();
+    expect(m.alert.mock.calls[0][0]).toMatchObject({
+      event: 'stripe.payment_intent.failed',
+      context: { reason: 'payment_intent.canceled' },
+    });
   });
 });
 

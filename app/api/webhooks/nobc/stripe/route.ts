@@ -318,6 +318,16 @@ export async function POST(req: NextRequest) {
                 metadata: { reason },
               });
             });
+            // A failed/canceled payment must not be silent — surface it to the
+            // operator. Mirrors the dispute alert above (PII auto-redacted).
+            deferred.push(async () => {
+              await alert({
+                severity: 'error',
+                event: 'stripe.payment_intent.failed',
+                workspaceId: piWorkspaceId,
+                context: { rsvpId: failedRsvp.id, paymentIntentId: pi.id, reason, amount: pi.amount },
+              });
+            });
           }
           break;
         }
