@@ -27,7 +27,7 @@ export async function POST(
 
   const event = await db.event.findFirst({
     where: { id: eventId, workspaceId },
-    select: { id: true, title: true, slug: true, startAt: true, location: true },
+    select: { id: true, title: true, slug: true, startAt: true, location: true, capacity: true },
   });
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
@@ -50,31 +50,48 @@ export async function POST(
     await db.member.update({ where: { id: member.id }, data: { memberQrCode } });
   }
 
-  const existing = await db.rSVP.findFirst({
-    where: { workspaceId, eventId, memberId: member.id },
-    select: { id: true },
-  });
-  if (existing) {
-    return NextResponse.json(
-      { error: 'This person already has a registration for this event.' },
-      { status: 409 },
-    );
-  }
+  // Atomic capacity gate + duplicate guard + create. Locking the Event row
+  // serializes concurrent comps so neither the duplicate check nor the capacity
+  // count can be raced past (audit: the old non-transactional path could oversell
+  // a capped event and let two concurrent comps both clear the duplicate check).
+  // Capacity count mirrors lib/rsvp-submit.ts.
+  const result = await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
 
-  const rsvp = await db.rSVP.create({
-    data: {
-      workspaceId,
-      eventId,
-      memberId: member.id,
-      status: 'CONFIRMED',
-      ticketStatus: 'confirmed',
-      origin: 'comp',
-      isComp: true,
-      compType,
-      guestEmail: email.trim().toLowerCase(),
-      guestName: fullName,
-    },
+    const existing = await tx.rSVP.findFirst({
+      where: { workspaceId, eventId, memberId: member.id },
+      select: { id: true },
+    });
+    if (existing) return { error: 'already_comped' as const };
+
+    if (event.capacity) {
+      const taken = await tx.rSVP.count({
+        where: { workspaceId, eventId, ticketStatus: { in: ['confirmed', 'held'] } },
+      });
+      if (taken >= event.capacity) return { error: 'event_at_capacity' as const };
+    }
+
+    const created = await tx.rSVP.create({
+      data: {
+        workspaceId,
+        eventId,
+        memberId: member.id,
+        status: 'CONFIRMED',
+        ticketStatus: 'confirmed',
+        origin: 'comp',
+        isComp: true,
+        compType,
+        guestEmail: email.trim().toLowerCase(),
+        guestName: fullName,
+      },
+    });
+    return { rsvp: created };
   });
+
+  if ('error' in result) {
+    return NextResponse.json({ error: result.error }, { status: 409 });
+  }
+  const rsvp = result.rsvp;
 
   await db.auditEvent.create({
     data: {
