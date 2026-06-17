@@ -159,3 +159,21 @@ export function eventCancelledEmail(
 <p>- adam &amp; chloe</p>`,
   };
 }
+
+export function recapReadyEmail(
+  eventName: string,
+  url: string,
+): { subject: string; html: string } {
+  return {
+    subject: `Your ${eventName} recap is ready.`,
+    html: `<p>Hi,</p>
+
+<p>Your activation recap for <strong>${eventName}</strong> is ready to view.</p>
+
+<p><a href="${url}">View your recap</a></p>
+
+<p>The link is private to you. If anything looks off or you have questions, just reply to this note.</p>
+
+<p>- the No Bad Company team</p>`,
+  };
+}
