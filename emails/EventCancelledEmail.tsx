@@ -37,7 +37,7 @@ export default function EventCancelledEmail({
 
           <Text style={paragraph}>
             There&apos;s nothing you need to do - your access for this event has been released.
-            If you paid for a ticket, we&apos;ll make sure you&apos;re refunded.
+            If you purchased a ticket, a full refund is on its way - allow a few days to process.
           </Text>
 
           <Text style={paragraph}>
