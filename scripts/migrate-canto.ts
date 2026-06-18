@@ -23,6 +23,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaNeon } from '@prisma/adapter-neon';
 import { exiftool } from 'exiftool-vendored';
@@ -30,7 +32,7 @@ import { Vibrant } from 'node-vibrant/node';
 import Replicate from 'replicate';
 import { toSql } from 'pgvector';
 import sharp from 'sharp';
-import { uploadObject, damKey } from '../lib/dam/storage';
+import { uploadObject, uploadFile, damKey } from '../lib/dam/storage';
 import { processImage, type ProcessedImage } from '../lib/dam/image';
 import { isHeic, convertHeicToJpeg } from '../lib/dam/heic';
 
@@ -45,7 +47,7 @@ const WORKSPACE_SLUG = clean(process.env.DAM_SEED_WORKSPACE_SLUG) || 'no-bad-com
 const REPLICATE_MODEL =
   'andreasjansson/clip-features:75b33f253f7714a281ad3e9b28f63e3232d583716ef6718f2e46641077ea040a';
 const UPLOADED_BY = 'canto-migration';
-const CONCURRENCY = 5;
+const CONCURRENCY = Number(clean(process.env.MIGRATE_CONCURRENCY)) || 5;
 // Faces are hard-gated off. No Rekognition client is imported or called.
 const FACES_ENABLED = false;
 
@@ -319,6 +321,59 @@ async function downloadOriginal(a: CantoAsset): Promise<Buffer> {
   throw new Error(`no downloadable original for asset ${a.id} (${a.name})`);
 }
 
+/** Streaming download to a file (constant memory) for large originals. Mirrors
+ *  downloadBytes' retry / 429 handling. Returns true on success. */
+async function downloadToFile(url: string, useAuth: boolean, dest: string, attempt = 0): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      headers: useAuth
+        ? { Authorization: `Bearer ${TOKEN}`, 'User-Agent': 'nobc-os-canto-migration' }
+        : { 'User-Agent': 'nobc-os-canto-migration' },
+    });
+    if (res.status === 429 && attempt < 5) {
+      await sleep(Math.min(30000, 500 * 2 ** attempt));
+      return downloadToFile(url, useAuth, dest, attempt + 1);
+    }
+    if (!res.ok || !res.body) return false;
+    await pipeline(Readable.fromWeb(res.body as unknown as import('stream/web').ReadableStream), fs.createWriteStream(dest));
+    return true;
+  } catch {
+    try { if (fs.existsSync(dest)) fs.unlinkSync(dest); } catch { /* ignore */ }
+    if (attempt < 4) {
+      await sleep(Math.min(30000, 500 * 2 ** attempt));
+      return downloadToFile(url, useAuth, dest, attempt + 1);
+    }
+    return false;
+  }
+}
+
+/** Stream the original master to a temp file: public directUrlOriginal first, then the
+ *  auth download endpoint. Throws if neither is reachable. */
+async function downloadOriginalToFile(a: CantoAsset, dest: string): Promise<void> {
+  const direct = a.url?.directUrlOriginal;
+  if (direct && (await downloadToFile(direct, false, dest))) return;
+  const dl = a.url?.download;
+  if (dl && (await downloadToFile(dl, true, dest))) return;
+  throw new Error(`no downloadable original for asset ${a.id} (${a.name})`);
+}
+
+/** Streaming SHA-256 of a file on disk (constant memory). */
+async function sha256File(filePath: string): Promise<string> {
+  const hash = crypto.createHash('sha256');
+  await pipeline(fs.createReadStream(filePath), hash);
+  return hash.digest('hex');
+}
+
+/** EXIF for a file already on disk (no re-write). */
+async function readExifFile(filePath: string): Promise<Record<string, unknown> | null> {
+  try {
+    const tags = await exiftool.read(filePath);
+    return JSON.parse(JSON.stringify(tags)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 async function readExif(bytes: Buffer, ext: string): Promise<Record<string, unknown> | null> {
   const tmp = path.join(os.tmpdir(), `canto-${crypto.randomBytes(6).toString('hex')}.${ext}`);
   try {
@@ -414,6 +469,112 @@ async function resolveFolder(ctx: Ctx, album: Album): Promise<string> {
   return folder.id;
 }
 
+/**
+ * Video path: stream the master through a temp file so a multi-GB original is never held
+ * in memory. No thumbnail / color / embedding (spec: video = bytes + EXIF/duration only).
+ */
+async function processVideoAsset(ctx: Ctx, album: Album, folderId: string, a: CantoAsset, c: Counters): Promise<void> {
+  const ext = (String(a.name).split('.').pop() || 'mp4').toLowerCase();
+  const tmp = path.join(os.tmpdir(), `canto-vid-${crypto.randomBytes(6).toString('hex')}.${ext}`);
+  try {
+    try {
+      await downloadOriginalToFile(a, tmp);
+    } catch (err) {
+      c.failed++;
+      console.error(`[migrate] video download failed ${a.id} ${a.name}: ${err instanceof Error ? err.message : err}`);
+      return;
+    }
+    const size = fs.statSync(tmp).size;
+    const sha = await sha256File(tmp);
+
+    // Exact-duplicate: merge this album's tags into the existing row, no PUT, no bytes.
+    const existing = await ctx.db.asset.findFirst({
+      where: { workspaceId: ctx.workspaceId, sha256: sha },
+      select: { id: true, tags: true },
+    });
+    if (existing) {
+      const merged = dedupeTags([...existing.tags, ...(a.tag ?? [])]);
+      if (merged.length !== existing.tags.length) {
+        await ctx.db.asset.update({ where: { id: existing.id }, data: { tags: merged } });
+      }
+      ctx.skip.add(a.id);
+      c.deduped++;
+      return;
+    }
+
+    let asset: { id: string };
+    try {
+      asset = await ctx.db.asset.create({
+        data: {
+          workspaceId: ctx.workspaceId,
+          filename: String(a.name),
+          url: '',
+          thumbnailUrl: '',
+          fileType: 'VIDEO',
+          size,
+          tags: dedupeTags(a.tag ?? []),
+          sourceSystem: 'canto',
+          sourceId: a.id,
+          sha256: sha,
+          folderId,
+          eventId: album.id,
+          uploadedBy: UPLOADED_BY,
+        },
+        select: { id: true },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        ctx.skip.add(a.id);
+        c.skipped++;
+        return;
+      }
+      throw err;
+    }
+
+    const originalKey = damKey(ctx.workspaceId, asset.id, `original.${ext}`);
+    try {
+      await uploadFile(originalKey, tmp, mimeFromExt(ext), size);
+    } catch (err) {
+      await ctx.db.asset.delete({ where: { id: asset.id } }).catch(() => {});
+      c.failed++;
+      console.error(`[migrate] R2 video upload failed ${a.id} ${a.name}: ${err instanceof Error ? err.message : err}`);
+      return;
+    }
+
+    await ctx.db.$transaction([
+      ctx.db.asset.update({ where: { id: asset.id }, data: { url: originalKey, thumbnailUrl: '' } }),
+      ctx.db.workspace.update({
+        where: { id: ctx.workspaceId },
+        data: { storageBytes: { increment: BigInt(size) } },
+      }),
+    ]);
+    ctx.skip.add(a.id);
+    c.created++;
+    c.bytes += size;
+    c.byType.video += 1;
+
+    // EXIF + duration (non-fatal); read straight from the temp file.
+    const exif = await readExifFile(tmp);
+    let duration: number | undefined;
+    if (exif) {
+      const d = Number((exif as Record<string, unknown>).Duration ?? (exif as Record<string, unknown>).MediaDuration);
+      if (Number.isFinite(d) && d > 0) duration = d;
+    }
+    if (exif || duration !== undefined) {
+      try {
+        await ctx.db.asset.update({
+          where: { id: asset.id },
+          data: { exif: exif ? (exif as Prisma.InputJsonValue) : undefined, duration },
+        });
+      } catch (err) {
+        console.error(`[migrate] video enrich update failed ${a.id}: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+  } finally {
+    try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch { /* ignore */ }
+  }
+}
+
 async function processAsset(ctx: Ctx, album: Album, folderId: string, a: CantoAsset, c: Counters): Promise<void> {
   try {
     if (ctx.skip.has(a.id)) {
@@ -441,6 +602,12 @@ async function processAsset(ctx: Ctx, album: Album, folderId: string, a: CantoAs
     const type = classify(a);
     if (type !== 'image' && type !== 'video') {
       c.skippedNonMedia++;
+      return;
+    }
+    // Video masters can be multi-GB - stream them through a temp file so they are never
+    // held in memory (the in-memory image path below would OOM on a 1.4GB original).
+    if (type === 'video') {
+      await processVideoAsset(ctx, album, folderId, a, c);
       return;
     }
     const isImage = type === 'image';
