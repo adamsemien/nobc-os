@@ -29,6 +29,7 @@ import { exiftool } from 'exiftool-vendored';
 import { Vibrant } from 'node-vibrant/node';
 import Replicate from 'replicate';
 import { toSql } from 'pgvector';
+import sharp from 'sharp';
 import { uploadObject, damKey } from '../lib/dam/storage';
 import { processImage, type ProcessedImage } from '../lib/dam/image';
 import { isHeic, convertHeicToJpeg } from '../lib/dam/heic';
@@ -184,6 +185,27 @@ async function pool<T>(items: T[], concurrency: number, fn: (t: T) => Promise<vo
   await Promise.all(workers);
 }
 
+/** Global limiter for Replicate prediction creation, which is aggressively rate-limited. */
+class Semaphore {
+  private active = 0;
+  private queue: Array<() => void> = [];
+  constructor(private readonly max: number) {}
+  async acquire(): Promise<void> {
+    if (this.active < this.max) {
+      this.active++;
+      return;
+    }
+    await new Promise<void>((r) => this.queue.push(r));
+    this.active++;
+  }
+  release(): void {
+    this.active--;
+    const next = this.queue.shift();
+    if (next) next();
+  }
+}
+const embedSem = new Semaphore(2);
+
 // ---------------------------------------------------------------------------
 // Phase 1 - inventory (read-only)
 // ---------------------------------------------------------------------------
@@ -315,9 +337,16 @@ async function readExif(bytes: Buffer, ext: string): Promise<Record<string, unkn
   }
 }
 
-async function readColor(thumb: Buffer): Promise<{ dominantColor: string | null; colorPalette: string[] }> {
+async function readColor(input: Buffer): Promise<{ dominantColor: string | null; colorPalette: string[] }> {
   try {
-    const palette = (await new Vibrant(thumb).getPalette()) as Record<string, { hex: string; population: number } | null>;
+    // node-vibrant v4 cannot decode webp (and chokes on some originals); sharp-convert
+    // to a small JPEG first so any source format yields a palette.
+    const jpeg = await sharp(input, { failOn: 'none' })
+      .rotate()
+      .resize({ width: 800, withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    const palette = (await new Vibrant(jpeg).getPalette()) as Record<string, { hex: string; population: number } | null>;
     const swatches = Object.values(palette).filter((s): s is { hex: string; population: number } => !!s);
     if (!swatches.length) return { dominantColor: null, colorPalette: [] };
     const dom = swatches.reduce((a, b) => (b.population > a.population ? b : a));
@@ -328,12 +357,23 @@ async function readColor(thumb: Buffer): Promise<{ dominantColor: string | null;
 }
 
 async function embed(replicate: Replicate, imageUrl: string): Promise<number[] | null> {
+  await embedSem.acquire();
   try {
-    const out = (await replicate.run(REPLICATE_MODEL, { input: { inputs: imageUrl } })) as Array<{ embedding: number[] }>;
-    const e = out?.[0]?.embedding;
-    return Array.isArray(e) && e.length === 768 ? e : null;
-  } catch {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        const out = (await replicate.run(REPLICATE_MODEL, { input: { inputs: imageUrl } })) as Array<{ embedding: number[] }>;
+        const e = out?.[0]?.embedding;
+        if (Array.isArray(e) && e.length === 768) return e;
+        await sleep(1500);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const throttled = msg.includes('429') || /throttl|too many/i.test(msg);
+        await sleep(throttled ? Math.min(45000, 8000 * (attempt + 1)) : Math.min(8000, 1000 * 2 ** attempt));
+      }
+    }
     return null;
+  } finally {
+    embedSem.release();
   }
 }
 
@@ -502,7 +542,7 @@ async function processAsset(ctx: Ctx, album: Album, folderId: string, a: CantoAs
       const d = Number((exif as Record<string, unknown>).Duration ?? (exif as Record<string, unknown>).MediaDuration);
       if (Number.isFinite(d) && d > 0) duration = d;
     }
-    const color = isImage && processed ? await readColor(processed.thumbnail) : { dominantColor: null, colorPalette: [] as string[] };
+    const color = isImage ? await readColor(webBuffer) : { dominantColor: null, colorPalette: [] as string[] };
     try {
       await ctx.db.asset.update({
         where: { id: asset.id },
@@ -627,17 +667,18 @@ async function runMigrate(smokeOnly: boolean): Promise<void> {
         `[album] ${album.id} "${album.name}" media=${media.length} -> created=${c.created} deduped=${c.deduped} skipped=${c.skipped} failed=${c.failed} (${human(c.bytes)})`,
       );
 
-      // Smoke gate on the first album that has media. If it created nothing, a
-      // universal precondition (storage/creds) is broken - abort before churning
-      // the whole back-catalog. Otherwise verify, then continue (or stop if --smoke).
-      if (!smokeVerified) {
+      // Universal-failure guard: an album that produced no rows yet had failures
+      // means a broken precondition (storage/creds) - abort before churning the rest.
+      // (0 created with 0 failures is a clean resume - all assets already migrated.)
+      if (c.created === 0 && c.failed > 0) {
+        console.error(`[migrate] album "${album.name}" created 0 rows with ${c.failed} failures. Aborting - check storage/credentials.`);
+        process.exitCode = 5;
+        return;
+      }
+      // Smoke gate: verify the first album that actually creates rows, then continue.
+      if (!smokeVerified && c.created > 0) {
         smokeVerified = true;
-        if (c.created === 0) {
-          console.error(`[migrate] first media album "${album.name}" created 0 rows (failed=${c.failed}). Aborting before processing the rest - check storage/credentials.`);
-          process.exitCode = 5;
-          return;
-        }
-        const ok = await verifyAlbum(ctx, album, media.length);
+        const ok = await verifyAlbum(ctx, album, media.length - c.deduped);
         if (!ok) {
           console.error('[migrate] SMOKE VERIFICATION FAILED - stopping before processing the rest.');
           process.exitCode = 5;
