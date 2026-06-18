@@ -1602,6 +1602,17 @@ model Asset {
   qualityScores Json? // breakdown { sharpness, exposure, ... }
   energyLevel   String? // low | medium | high (inferred from scene labels)
   shooterCredit String? // photographer credit
+  // Canto migration (Stage 0): provenance, content hash, and enriched media metadata.
+  sourceSystem  String? // "canto" for migrated assets; null for in-app uploads
+  sourceId      String? // source asset id (Canto asset id); idempotent re-import key
+  sha256        String? // hex sha256 of the original bytes; exact-duplicate key
+  exif          Json? // full EXIF / IPTC / XMP block (exiftool-vendored)
+  dominantColor String? // hex, dominant swatch (node-vibrant)
+  colorPalette  Json? // array of hex swatches (node-vibrant)
+  /// CLIP image embedding, 768-dim (andreasjansson/clip-features). Written via raw
+  /// SQL + pgvector since the typed client cannot write an Unsupported column; the
+  /// HNSW cosine index is created out-of-band (not representable in schema.prisma).
+  embedding     Unsupported("vector(768)")?
   /// Full-text search vector — maintained by the dam_asset_search_vector trigger
   /// (filename + tags + aiTags + sponsorName). GIN-indexed in prisma/sql/dam-search-vector.sql.
   searchVector  Unsupported("tsvector")?
@@ -1622,6 +1633,7 @@ model Asset {
   @@index([folderId])
   @@index([eventId])
   @@index([deletedAt])
+  @@index([workspaceId, sha256])
 }
 
 model MediaFolder {
