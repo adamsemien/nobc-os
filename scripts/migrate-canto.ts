@@ -627,10 +627,17 @@ async function runMigrate(smokeOnly: boolean): Promise<void> {
         `[album] ${album.id} "${album.name}" media=${media.length} -> created=${c.created} deduped=${c.deduped} skipped=${c.skipped} failed=${c.failed} (${human(c.bytes)})`,
       );
 
-      // Smoke gate: verify the first album that actually produced rows, then continue.
-      if (!smokeVerified && c.created > 0) {
-        const ok = await verifyAlbum(ctx, album, media.length);
+      // Smoke gate on the first album that has media. If it created nothing, a
+      // universal precondition (storage/creds) is broken - abort before churning
+      // the whole back-catalog. Otherwise verify, then continue (or stop if --smoke).
+      if (!smokeVerified) {
         smokeVerified = true;
+        if (c.created === 0) {
+          console.error(`[migrate] first media album "${album.name}" created 0 rows (failed=${c.failed}). Aborting before processing the rest - check storage/credentials.`);
+          process.exitCode = 5;
+          return;
+        }
+        const ok = await verifyAlbum(ctx, album, media.length);
         if (!ok) {
           console.error('[migrate] SMOKE VERIFICATION FAILED - stopping before processing the rest.');
           process.exitCode = 5;
