@@ -128,6 +128,7 @@ const EASTER_EGGS: string[] = [
   'Switch to AIM theme — away message banner (Settings → Theme)',
   'Switch to MySpace theme — now playing banner (Settings → Theme)',
   'Type "frogger" on /apply — playable game',
+  'Type "knockknock" anywhere (outside a text field) — the Back Room opens; click the record to flip sides (4 procedural tracks)',
 ];
 
 const ROOM_FLOURISHES = 'Arrival chime · sellout confetti · ✦ Purple-List VIP markers';
