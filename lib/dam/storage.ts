@@ -7,6 +7,7 @@
  * display, 24 hr for downloads). Self-contained client so the legacy event-hero
  * path stays untouched.
  */
+import { createReadStream } from 'fs';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -68,6 +69,32 @@ export async function uploadObject(key: string, body: Buffer, contentType: strin
   if (!client || !b) throw new StorageNotConfiguredError();
   await client.send(
     new PutObjectCommand({ Bucket: b, Key: key, Body: body, ContentType: contentType }),
+  );
+}
+
+/**
+ * Stream a file from disk to a private R2 object without buffering it in memory.
+ * Used for large originals (e.g. multi-GB video masters) that must not be held as a
+ * Buffer. `contentLength` must be the exact file size so the SDK streams the body
+ * instead of buffering it to compute the length.
+ */
+export async function uploadFile(
+  key: string,
+  filePath: string,
+  contentType: string,
+  contentLength: number,
+): Promise<void> {
+  const client = s3Client();
+  const b = bucket();
+  if (!client || !b) throw new StorageNotConfiguredError();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: b,
+      Key: key,
+      Body: createReadStream(filePath),
+      ContentType: contentType,
+      ContentLength: contentLength,
+    }),
   );
 }
 
