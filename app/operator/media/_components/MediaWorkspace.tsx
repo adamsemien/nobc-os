@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Folders } from 'lucide-react';
+import { Folders, SlidersHorizontal } from 'lucide-react';
 import { useDensity } from './useDensity';
 import { useViewMode } from './useViewMode';
 import { MediaToolbar } from './MediaToolbar';
@@ -15,9 +15,6 @@ import { UploadDropzone } from './UploadDropzone';
 import { classifyColor } from '@/lib/dam/color';
 import type { MediaAsset } from './types';
 
-/** Owns assets fetch, selection, preview, upload, view-mode, and reorder state
- *  across the DAM surfaces. Grid and list views are pure subscribers — switching
- *  between them never re-fetches and never resets selection. */
 export function MediaWorkspace({ options }: { options: FilterOptions }) {
   const [density, setDensity] = useDensity();
   const [viewMode, setViewMode] = useViewMode();
@@ -35,8 +32,16 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [isWide, setIsWide] = useState(true);
   const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  // Mobile long-press selection mode — true when !isWide and user long-pressed a tile
+  const [selectionMode, setSelectionMode] = useState(false);
+  // Ref to focus the Cancel button when selectionMode becomes true
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
   const lastClicked = useRef<number | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Keep displayAssets in a ref so the ⌘A keyboard handler always has latest
+  const displayAssetsRef = useRef<MediaAsset[]>([]);
 
   // Force grid mode below the md: breakpoint — the list view is desktop-only.
   useEffect(() => {
@@ -50,6 +55,20 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
   }, []);
+
+  // Auto-exit selectionMode when nothing is selected on mobile
+  useEffect(() => {
+    if (!isWide && selection.size === 0) {
+      setSelectionMode(false);
+    }
+  }, [selection.size, isWide]);
+
+  // Focus the Cancel button when selectionMode activates (accessibility)
+  useEffect(() => {
+    if (selectionMode && cancelBtnRef.current) {
+      cancelBtnRef.current.focus();
+    }
+  }, [selectionMode]);
 
   // Assets fetch — resets on sp/reloadKey change, handles semantic mode
   useEffect(() => {
@@ -143,10 +162,11 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
           fetch(url)
             .then((r) => r.json())
             .then((d) => {
-              // Dedupe: infinite-scroll appends must not duplicate already-loaded ids
               setAssets((prev) => {
                 const existingIds = new Set(prev.map((a) => a.id));
-                const fresh = (d.assets ?? []).filter((a: MediaAsset) => !existingIds.has(a.id));
+                const fresh = (d.assets ?? []).filter(
+                  (a: MediaAsset) => !existingIds.has(a.id),
+                );
                 return [...prev, ...fresh];
               });
               setNextCursor(d.nextCursor ?? null);
@@ -161,15 +181,15 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     return () => observer.disconnect();
   }, [nextCursor, loading, loadingMore, sp]);
 
-  // Keyboard: Esc clears selection; ⌘A / Ctrl+A selects all visible assets
+  // Keyboard: Esc clears selection (+ exits selectionMode); ⌘A / Ctrl+A selects all
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSelection(new Set());
+        setSelectionMode(false);
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-        // Only intercept if the user isn't focused in a text input/textarea
         const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
         if (tag === 'input' || tag === 'textarea') return;
         e.preventDefault();
@@ -183,27 +203,16 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
 
   const reload = useCallback(() => {
     setSelection(new Set());
+    setSelectionMode(false);
     setReloadKey((k) => k + 1);
   }, []);
 
-  /** Toggle selection. Called from:
-   *  - Checkbox click (always additive-mode: true for ⌘/shift; false for plain click)
-   *  - Marquee drag (additive = true — always adds, never removes on marquee)
-   *
-   *  Existing behavior:
-   *    - shift = range select from lastClicked to idx
-   *    - meta/ctrl = toggle single without changing others (additive=true but range=false implied by the else branch)
-   *  This matches existing onToggle semantics from MediaGrid's:
-   *    onToggle(a.id, e.shiftKey || e.metaKey || e.ctrlKey)
-   *  shift → range; meta/ctrl → single toggle (existing "else if next.has" branch handles it)
-   */
   const onToggle = useCallback(
     (id: string, range: boolean) => {
       const idx = assets.findIndex((a) => a.id === id);
       setSelection((prev) => {
         const next = new Set(prev);
         if (range && lastClicked.current != null && idx >= 0) {
-          // shift-click: range add
           const lo = Math.min(lastClicked.current, idx);
           const hi = Math.max(lastClicked.current, idx);
           for (let i = lo; i <= hi; i++) next.add(assets[i].id);
@@ -219,26 +228,21 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     [assets],
   );
 
-  // Optimistic reorder: update local assets array immediately, then persist
   const onReorder = useCallback(
     (orderedIds: string[]) => {
-      // Build a lookup from id → asset for the current list
       const byId = new Map(assets.map((a) => [a.id, a]));
-      const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as MediaAsset[];
+      const reordered = orderedIds
+        .map((id) => byId.get(id))
+        .filter(Boolean) as MediaAsset[];
       setAssets(reordered);
-
-      // Persist via the existing bulk 'reorder' endpoint
       fetch('/api/media/dam/assets/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'reorder',
-          assetIds: orderedIds,
-          orderedIds,
-        }),
+        body: JSON.stringify({ action: 'reorder', assetIds: orderedIds, orderedIds }),
       })
         .then((r) => {
-          if (!r.ok) console.error('[MediaWorkspace] reorder persist failed', r.status);
+          if (!r.ok)
+            console.error('[MediaWorkspace] reorder persist failed', r.status);
         })
         .catch((e) => console.error('[MediaWorkspace] reorder persist error', e));
     },
@@ -249,16 +253,19 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     setAssets((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
   }, []);
 
+  const onEnterSelectionMode = useCallback(() => {
+    setSelectionMode(true);
+  }, []);
+
   const effectiveViewMode = isWide ? viewMode : 'grid';
 
-  // Client-side color filter
   const colorFilter = sp.get('color') ?? '';
   const displayAssets = colorFilter
-    ? assets.filter((a) => (a.dominantColor ? classifyColor(a.dominantColor) === colorFilter : false))
+    ? assets.filter((a) =>
+        a.dominantColor ? classifyColor(a.dominantColor) === colorFilter : false,
+      )
     : assets;
 
-  // Ref so the keyboard handler can read displayAssets without stale closure
-  const displayAssetsRef = useRef<MediaAsset[]>(displayAssets);
   displayAssetsRef.current = displayAssets;
 
   return (
@@ -269,24 +276,71 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
       />
       <UploadDropzone onDone={reload}>
         <div className="flex h-full min-w-0 flex-col overflow-y-auto px-3 md:px-4">
-          {/* Mobile folder button — visible only below md breakpoint */}
+          {/* Mobile sticky selection header — only visible in selectionMode on mobile */}
+          {!isWide && selectionMode && (
+            <div
+              className="sticky top-0 z-20 flex items-center justify-between border-b px-3"
+              style={{
+                height: '48px',
+                background: 'var(--card)',
+                borderColor: 'var(--border)',
+              }}
+            >
+              <span
+                className="text-[13px] font-medium"
+                style={{ color: 'var(--primary)' }}
+                aria-live="polite"
+              >
+                {selection.size} selected
+              </span>
+              <button
+                ref={cancelBtnRef}
+                type="button"
+                className="rounded-[6px] px-3 py-1.5 text-[13px]"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => {
+                  setSelection(new Set());
+                  setSelectionMode(false);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* Mobile top action bar: Folders + Filters buttons (md:hidden) */}
           <div className="flex items-center gap-2 pt-3 md:hidden">
             <button
               type="button"
               aria-label="Open folders"
               className="flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[13px]"
-              style={{ borderColor: 'var(--border)', background: 'var(--card)', color: 'var(--text-secondary)' }}
+              style={{
+                borderColor: 'var(--border)',
+                background: 'var(--card)',
+                color: 'var(--text-secondary)',
+              }}
               onClick={() => setFolderDrawerOpen(true)}
             >
               <Folders className="h-4 w-4" />
               Folders
             </button>
+            <button
+              type="button"
+              aria-label="Open filters"
+              className="flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[13px]"
+              style={{
+                borderColor: 'var(--border)',
+                background: 'var(--card)',
+                color: 'var(--text-secondary)',
+              }}
+              onClick={() => setFilterSheetOpen(true)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+            </button>
           </div>
-          <MediaToolbar
-            onDensity={setDensity}
-            viewMode={viewMode}
-            onViewMode={setViewMode}
-          />
+
+          <MediaToolbar onDensity={setDensity} viewMode={viewMode} onViewMode={setViewMode} />
           {isDegraded && (
             <div
               className="mb-2 rounded-[6px] px-3 py-2 text-[13px]"
@@ -318,6 +372,9 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
               onReorder={onReorder}
               sortMode={sortMode}
               loadingMore={loadingMore}
+              isWide={isWide}
+              selectionMode={selectionMode}
+              onEnterSelectionMode={onEnterSelectionMode}
             />
           )}
           <div ref={sentinelRef} className="h-4" />
@@ -325,22 +382,32 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
             <div className="flex justify-center py-4">
               <div
                 className="h-5 w-5 animate-spin rounded-full border-2"
-                style={{ borderColor: 'var(--border)', borderTopColor: 'var(--primary)' }}
+                style={{
+                  borderColor: 'var(--border)',
+                  borderTopColor: 'var(--primary)',
+                }}
               />
             </div>
           )}
         </div>
       </UploadDropzone>
-      <FilterPanel options={options} />
-
-      {/* Always mounted so the slide-up/down transition plays correctly */}
-      <BulkActionBar
-        selectedIds={[...selection]}
-        isTrash={isTrash}
-        onDone={reload}
-        onClear={() => setSelection(new Set())}
+      <FilterPanel
+        options={options}
+        mobileOpen={filterSheetOpen}
+        onMobileClose={() => setFilterSheetOpen(false)}
       />
-
+      {selection.size > 0 && (
+        <BulkActionBar
+          selectedIds={[...selection]}
+          isTrash={isTrash}
+          onDone={reload}
+          onClear={() => {
+            setSelection(new Set());
+            setSelectionMode(false);
+          }}
+          isWide={isWide}
+        />
+      )}
       {previewIndex != null && displayAssets[previewIndex] && (
         <MediaPreview
           assets={displayAssets}
