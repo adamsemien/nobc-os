@@ -15,14 +15,15 @@ import { UploadDropzone } from './UploadDropzone';
 import { classifyColor } from '@/lib/dam/color';
 import type { MediaAsset } from './types';
 
-/** Owns assets fetch, selection, preview, upload, and view-mode state across the
- *  DAM surfaces. Grid and list views are pure subscribers — switching between
- *  them never re-fetches and never resets selection. */
+/** Owns assets fetch, selection, preview, upload, view-mode, and reorder state
+ *  across the DAM surfaces. Grid and list views are pure subscribers — switching
+ *  between them never re-fetches and never resets selection. */
 export function MediaWorkspace({ options }: { options: FilterOptions }) {
   const [density, setDensity] = useDensity();
   const [viewMode, setViewMode] = useViewMode();
   const sp = useSearchParams();
   const isTrash = sp.get('view') === 'trash';
+  const sortMode = sp.get('sort') ?? 'date';
 
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,7 +143,12 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
           fetch(url)
             .then((r) => r.json())
             .then((d) => {
-              setAssets((prev) => [...prev, ...(d.assets ?? [])]);
+              // Dedupe: infinite-scroll appends must not duplicate already-loaded ids
+              setAssets((prev) => {
+                const existingIds = new Set(prev.map((a) => a.id));
+                const fresh = (d.assets ?? []).filter((a: MediaAsset) => !existingIds.has(a.id));
+                return [...prev, ...fresh];
+              });
               setNextCursor(d.nextCursor ?? null);
             })
             .catch((e) => console.error('[MediaWorkspace] loadMore failed', e))
@@ -155,17 +161,49 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     return () => observer.disconnect();
   }, [nextCursor, loading, loadingMore, sp]);
 
+  // Keyboard: Esc clears selection; ⌘A / Ctrl+A selects all visible assets
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelection(new Set());
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+        // Only intercept if the user isn't focused in a text input/textarea
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea') return;
+        e.preventDefault();
+        setSelection(new Set(displayAssetsRef.current.map((a) => a.id)));
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const reload = useCallback(() => {
     setSelection(new Set());
     setReloadKey((k) => k + 1);
   }, []);
 
+  /** Toggle selection. Called from:
+   *  - Checkbox click (always additive-mode: true for ⌘/shift; false for plain click)
+   *  - Marquee drag (additive = true — always adds, never removes on marquee)
+   *
+   *  Existing behavior:
+   *    - shift = range select from lastClicked to idx
+   *    - meta/ctrl = toggle single without changing others (additive=true but range=false implied by the else branch)
+   *  This matches existing onToggle semantics from MediaGrid's:
+   *    onToggle(a.id, e.shiftKey || e.metaKey || e.ctrlKey)
+   *  shift → range; meta/ctrl → single toggle (existing "else if next.has" branch handles it)
+   */
   const onToggle = useCallback(
     (id: string, range: boolean) => {
       const idx = assets.findIndex((a) => a.id === id);
       setSelection((prev) => {
         const next = new Set(prev);
         if (range && lastClicked.current != null && idx >= 0) {
+          // shift-click: range add
           const lo = Math.min(lastClicked.current, idx);
           const hi = Math.max(lastClicked.current, idx);
           for (let i = lo; i <= hi; i++) next.add(assets[i].id);
@@ -181,6 +219,32 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     [assets],
   );
 
+  // Optimistic reorder: update local assets array immediately, then persist
+  const onReorder = useCallback(
+    (orderedIds: string[]) => {
+      // Build a lookup from id → asset for the current list
+      const byId = new Map(assets.map((a) => [a.id, a]));
+      const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as MediaAsset[];
+      setAssets(reordered);
+
+      // Persist via the existing bulk 'reorder' endpoint
+      fetch('/api/media/dam/assets/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reorder',
+          assetIds: orderedIds,
+          orderedIds,
+        }),
+      })
+        .then((r) => {
+          if (!r.ok) console.error('[MediaWorkspace] reorder persist failed', r.status);
+        })
+        .catch((e) => console.error('[MediaWorkspace] reorder persist error', e));
+    },
+    [assets],
+  );
+
   const onAssetUpdated = useCallback((updated: MediaAsset) => {
     setAssets((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
   }, []);
@@ -192,6 +256,10 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   const displayAssets = colorFilter
     ? assets.filter((a) => (a.dominantColor ? classifyColor(a.dominantColor) === colorFilter : false))
     : assets;
+
+  // Ref so the keyboard handler can read displayAssets without stale closure
+  const displayAssetsRef = useRef<MediaAsset[]>(displayAssets);
+  displayAssetsRef.current = displayAssets;
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -247,6 +315,8 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
               selection={selection}
               onToggle={onToggle}
               onOpen={(i) => setPreviewIndex(i)}
+              onReorder={onReorder}
+              sortMode={sortMode}
               loadingMore={loadingMore}
             />
           )}

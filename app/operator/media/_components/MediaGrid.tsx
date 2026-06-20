@@ -1,8 +1,21 @@
 'use client';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import justifiedLayout from 'justified-layout';
 import { useSearchParams } from 'next/navigation';
 import { ImagePlus, Upload } from 'lucide-react';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { EmptyState } from '@/components/ui';
 import { invert } from '@/lib/dam/flip';
 import { MediaTile } from './MediaTile';
@@ -10,8 +23,94 @@ import { useUpload } from './UploadDropzone';
 import type { MediaAsset } from './types';
 import { ROW_HEIGHT, type Density } from './useDensity';
 
-/** Justified grid with selection, click-to-open, FLIP transitions, and
- *  viewport windowing for performance at 1000+ tiles. */
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface Box {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+// ---------------------------------------------------------------------------
+// SortableTile — wraps a tile wrapper with useSortable (only rendered in manual mode)
+// ---------------------------------------------------------------------------
+
+function SortableTile({
+  id,
+  box,
+  inWindow,
+  isDraggingActive,
+  children,
+  tileRefCallback,
+}: {
+  id: string;
+  box: Box;
+  inWindow: boolean;
+  isDraggingActive: boolean;
+  children: React.ReactNode;
+  tileRefCallback: (el: HTMLDivElement | null) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    position: 'absolute',
+    top: box.top,
+    left: box.left,
+    width: box.width,
+    height: box.height,
+    // dnd-kit applies transform during drag; we apply transition only when
+    // dnd-kit provides one so it doesn't fight FLIP outside drag.
+    transform: CSS.Transform.toString(transform),
+    transition: isDraggingActive ? transition : undefined,
+    opacity: isDragging ? 0.35 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    touchAction: 'none',
+  };
+
+  if (!inWindow && !isDragging) return null;
+
+  return (
+    <div
+      ref={(el) => {
+        setNodeRef(el);
+        tileRefCallback(el);
+      }}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Marquee rectangle
+// ---------------------------------------------------------------------------
+
+interface MarqueeRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+function rectsOverlap(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number,
+): boolean {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+/** Justified grid with selection, FLIP transitions, drag-to-rearrange (manual sort),
+ *  and marquee select on the grid background. */
 export function MediaGrid({
   assets,
   loading,
@@ -19,6 +118,8 @@ export function MediaGrid({
   selection,
   onToggle,
   onOpen,
+  onReorder,
+  sortMode,
   loadingMore = false,
 }: {
   assets: MediaAsset[];
@@ -27,18 +128,23 @@ export function MediaGrid({
   selection: Set<string>;
   onToggle: (id: string, additive: boolean) => void;
   onOpen: (index: number) => void;
+  /** Called with the full new ordered id list when user finishes a drag. Only fires in manual mode. */
+  onReorder?: (orderedIds: string[]) => void;
+  /** Current sort mode — drag is only active when 'manual'. */
+  sortMode?: string;
   loadingMore?: boolean;
 }) {
+  const isManual = sortMode === 'manual';
+
   const sp = useSearchParams();
   const { open } = useUpload();
   const isTrash = sp.get('view') === 'trash';
   const query = sp.get('q')?.trim() ?? '';
   const isSemantic = sp.get('mode') === 'semantic';
-  // A search/filter is active when the operator is narrowing results, not browsing
-  // the empty library — drives a "no matches" empty state instead of the upload CTA.
   const searchActive = Boolean(
     query || sp.get('color') || sp.get('eventId') || sp.get('sponsor') || sp.get('tag') || sp.get('fileType'),
   );
+
   const [containerWidth, setContainerWidth] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(800);
@@ -46,6 +152,22 @@ export function MediaGrid({
   const tileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevPos = useRef<Map<string, { top: number; left: number }>>(new Map());
 
+  // Active drag id — used to skip FLIP on dragged tile
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  // Marquee state
+  const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
+  const marqueeStart = useRef<{ x: number; y: number } | null>(null);
+  const marqueeRef = useRef<HTMLDivElement>(null);
+
+  // dnd-kit sensors: PointerSensor with 8px activation distance prevents
+  // accidental drags on click; KeyboardSensor for a11y.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  // ResizeObserver for container width
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -54,7 +176,7 @@ export function MediaGrid({
     return () => ro.disconnect();
   }, []);
 
-  // Walk up DOM to find scroll container; track scrollTop + height for windowing
+  // Walk up DOM for scroll container
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -85,9 +207,9 @@ export function MediaGrid({
     );
   }, [assets, containerWidth, density]);
 
-  // FLIP: animate each tile wrapper from its old position to the new one.
+  // FLIP: skip during active drag (dnd-kit owns the transform then)
   useLayoutEffect(() => {
-    if (!layout) return;
+    if (!layout || activeDragId) return;
     const next = new Map<string, { top: number; left: number }>();
     assets.forEach((a, i) => {
       const bx = layout.boxes[i];
@@ -109,12 +231,185 @@ export function MediaGrid({
       }
     }
     prevPos.current = next;
-  }, [layout, assets]);
+  }, [layout, assets, activeDragId]);
+
+  // ---------------------------------------------------------------------------
+  // Marquee select — only starts on pointer-down on EMPTY background (not on a tile)
+  // ---------------------------------------------------------------------------
+
+  const onGridPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      // Only start marquee if click is directly on the grid container (not on a tile child)
+      if (e.target !== e.currentTarget) return;
+      // Only primary button
+      if (e.button !== 0) return;
+      // Bail in manual/drag mode — pointer could be a drag start
+      if (isManual) return;
+      const el = ref.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top + scrollTop;
+      marqueeStart.current = { x, y };
+      setMarquee({ x, y, w: 0, h: 0 });
+      el.setPointerCapture(e.pointerId);
+    },
+    [isManual, scrollTop],
+  );
+
+  const onGridPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!marqueeStart.current) return;
+      const el = ref.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top + scrollTop;
+      const { x: sx, y: sy } = marqueeStart.current;
+      setMarquee({
+        x: Math.min(sx, cx),
+        y: Math.min(sy, cy),
+        w: Math.abs(cx - sx),
+        h: Math.abs(cy - sy),
+      });
+    },
+    [scrollTop],
+  );
+
+  const onGridPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!marqueeStart.current || !marquee || !layout) {
+        marqueeStart.current = null;
+        setMarquee(null);
+        return;
+      }
+      // Only commit marquee selection if it has meaningful size (avoid accidental clicks)
+      if (marquee.w > 4 && marquee.h > 4) {
+        const selected: string[] = [];
+        assets.forEach((a, i) => {
+          const bx = layout.boxes[i];
+          if (!bx) return;
+          if (rectsOverlap(marquee.x, marquee.y, marquee.w, marquee.h, bx.left, bx.top, bx.width, bx.height)) {
+            selected.push(a.id);
+          }
+        });
+        // Add intersecting tiles to selection (additive marquee)
+        selected.forEach((id) => onToggle(id, true));
+      }
+      marqueeStart.current = null;
+      setMarquee(null);
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    },
+    [marquee, layout, assets, onToggle],
+  );
+
+  // ---------------------------------------------------------------------------
+  // dnd-kit drag handlers
+  // ---------------------------------------------------------------------------
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setActiveDragId(null);
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      // computeReorder is imported lazily to avoid module-level import cost
+      import('@/lib/dam/reorder').then(({ computeReorder }) => {
+        const orderedIds = assets.map((a) => a.id);
+        const { orderedIds: next } = computeReorder(orderedIds, String(active.id), String(over.id));
+        onReorder?.(next);
+      }).catch((err) => {
+        console.error('[MediaGrid] reorder import failed', err);
+      });
+    },
+    [assets, onReorder],
+  );
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragId(null);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Active drag asset (for DragOverlay ghost)
+  // ---------------------------------------------------------------------------
+  const activeDragAsset = activeDragId ? assets.find((a) => a.id === activeDragId) : null;
+  const activeDragBox = activeDragId
+    ? layout?.boxes[assets.findIndex((a) => a.id === activeDragId)] ?? null
+    : null;
 
   const overscan = viewH * 1.5;
+  const sortableIds = useMemo(() => assets.map((a) => a.id), [assets]);
 
-  return (
-    <div ref={ref} className="relative w-full pb-12">
+  // ---------------------------------------------------------------------------
+  // Inner tile list — shared between manual and non-manual render
+  // ---------------------------------------------------------------------------
+
+  const tileList = layout
+    ? assets.map((a, i) => {
+        const bx = layout.boxes[i];
+        if (!bx) return null;
+        const inWindow =
+          bx.top + bx.height > scrollTop - overscan && bx.top < scrollTop + viewH + overscan;
+
+        const tileRefCallback = (el: HTMLDivElement | null) => {
+          if (el) tileRefs.current.set(a.id, el);
+          else tileRefs.current.delete(a.id);
+        };
+
+        const tileContent = (
+          <MediaTile
+            asset={a}
+            selected={selection.has(a.id)}
+            onToggleSelect={(e) => onToggle(a.id, e.shiftKey || e.metaKey || e.ctrlKey)}
+            onOpen={() => onOpen(i)}
+          />
+        );
+
+        if (isManual) {
+          return (
+            <SortableTile
+              key={a.id}
+              id={a.id}
+              box={bx}
+              inWindow={inWindow}
+              isDraggingActive={activeDragId !== null}
+              tileRefCallback={tileRefCallback}
+            >
+              {tileContent}
+            </SortableTile>
+          );
+        }
+
+        if (!inWindow) return null;
+        return (
+          <div
+            key={a.id}
+            ref={tileRefCallback}
+            className="absolute"
+            style={{ top: bx.top, left: bx.left, width: bx.width, height: bx.height }}
+          >
+            {tileContent}
+          </div>
+        );
+      })
+    : null;
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  const gridContent = (
+    <div
+      ref={ref}
+      className="relative w-full pb-12"
+      onPointerDown={onGridPointerDown}
+      onPointerMove={onGridPointerMove}
+      onPointerUp={onGridPointerUp}
+    >
       {!loading && assets.length === 0 && isTrash && (
         <EmptyState title="Trash is empty" subtitle="Deleted media appears here for 30 days." />
       )}
@@ -122,9 +417,9 @@ export function MediaGrid({
         <EmptyState
           title={
             isSemantic && query
-              ? `No vibes matched “${query}”`
+              ? `No vibes matched "${query}"`
               : query
-                ? `No media matches “${query}”`
+                ? `No media matches "${query}"`
                 : 'No media matches these filters'
           }
           subtitle={
@@ -169,35 +464,27 @@ export function MediaGrid({
       )}
       {layout && (
         <div className="relative" style={{ height: layout.containerHeight }}>
-          {assets.map((a, i) => {
-            const bx = layout.boxes[i];
-            if (!bx) return null;
-            // Viewport windowing: skip tiles outside the visible window + overscan
-            const inWindow =
-              bx.top + bx.height > scrollTop - overscan &&
-              bx.top < scrollTop + viewH + overscan;
-            if (!inWindow) return null;
-            return (
-              <div
-                key={a.id}
-                ref={(el) => {
-                  if (el) tileRefs.current.set(a.id, el);
-                  else tileRefs.current.delete(a.id);
-                }}
-                className="absolute"
-                style={{ top: bx.top, left: bx.left, width: bx.width, height: bx.height }}
-              >
-                <MediaTile
-                  asset={a}
-                  selected={selection.has(a.id)}
-                  onToggleSelect={(e) => onToggle(a.id, e.shiftKey || e.metaKey || e.ctrlKey)}
-                  onOpen={() => onOpen(i)}
-                />
-              </div>
-            );
-          })}
+          {tileList}
         </div>
       )}
+
+      {/* Marquee selection rectangle */}
+      {marquee && marquee.w > 2 && marquee.h > 2 && (
+        <div
+          ref={marqueeRef}
+          className="pointer-events-none absolute rounded-[3px]"
+          style={{
+            left: marquee.x,
+            top: marquee.y - scrollTop,
+            width: marquee.w,
+            height: marquee.h,
+            border: '1.5px solid var(--primary)',
+            background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+            zIndex: 50,
+          }}
+        />
+      )}
+
       {loadingMore && (
         <div className="flex gap-2 pt-2 pb-6">
           {[1, 2, 3].map((k) => (
@@ -210,5 +497,49 @@ export function MediaGrid({
         </div>
       )}
     </div>
+  );
+
+  if (!isManual) {
+    return gridContent;
+  }
+
+  // Manual sort: wrap in DndContext + SortableContext
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+      accessibility={{
+        announcements: {
+          onDragStart: ({ active }) => `Picked up asset ${active.id}. Use arrow keys to move.`,
+          onDragOver: ({ active, over }) =>
+            over ? `Asset ${active.id} is over position ${over.id}.` : `Asset ${active.id} is no longer over a drop target.`,
+          onDragEnd: ({ active, over }) =>
+            over ? `Asset ${active.id} was dropped at position ${over.id}.` : `Asset ${active.id} was dropped and returned to its original position.`,
+          onDragCancel: ({ active }) => `Drag cancelled. Asset ${active.id} was returned to its original position.`,
+        },
+      }}
+    >
+      <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+        {gridContent}
+      </SortableContext>
+      <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
+        {activeDragAsset && activeDragBox ? (
+          <div
+            className="overflow-hidden rounded-[6px] opacity-90 shadow-2xl"
+            style={{ width: activeDragBox.width, height: activeDragBox.height }}
+          >
+            <img
+              src={`/api/media/dam/asset/${activeDragAsset.id}/thumb`}
+              alt={activeDragAsset.filename}
+              className="h-full w-full object-cover"
+              style={{ pointerEvents: 'none' }}
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }

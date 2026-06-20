@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload, LayoutGrid, List } from 'lucide-react';
+import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload, LayoutGrid, List, GripVertical } from 'lucide-react';
 import { useDensity, type Density } from './useDensity';
 import { useUpload } from './UploadDropzone';
 import type { ViewMode } from './useViewMode';
@@ -172,6 +172,17 @@ export function MediaToolbar({
             );
           })}
         </div>
+      )}
+      {/* "Drag to arrange" hint — only shown in manual sort, desktop only */}
+      {sp.get('sort') === 'manual' && (
+        <span
+          className="hidden items-center gap-1 text-[12px] md:flex"
+          style={{ color: 'var(--text-muted)' }}
+          aria-live="polite"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+          Drag to arrange
+        </span>
       )}
       <button
         type="button"
