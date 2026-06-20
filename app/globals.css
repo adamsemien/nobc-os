@@ -735,6 +735,14 @@ h1, h2, h3 {
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
 }
+/* DAM drag-overlay pick-up lift — one-shot, springs into final ghost position */
+@keyframes dam-lift {
+  from { transform: scale(1) rotate(0deg); opacity: 0.7; }
+  to   { transform: scale(1.04) rotate(1.5deg); opacity: 0.92; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes dam-lift { from { opacity: 0.92; } to { opacity: 0.92; } }
+}
 
 /* Buttons — press feedback */
 button:not(:disabled),

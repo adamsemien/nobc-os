@@ -333,14 +333,13 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
       </UploadDropzone>
       <FilterPanel options={options} />
 
-      {selection.size > 0 && (
-        <BulkActionBar
-          selectedIds={[...selection]}
-          isTrash={isTrash}
-          onDone={reload}
-          onClear={() => setSelection(new Set())}
-        />
-      )}
+      {/* Always mounted so the slide-up/down transition plays correctly */}
+      <BulkActionBar
+        selectedIds={[...selection]}
+        isTrash={isTrash}
+        onDone={reload}
+        onClear={() => setSelection(new Set())}
+      />
 
       {previewIndex != null && displayAssets[previewIndex] && (
         <MediaPreview

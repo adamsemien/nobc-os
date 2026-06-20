@@ -83,14 +83,29 @@ export function BulkActionBar({
   const btn = 'flex items-center gap-1.5 rounded-[6px] px-2.5 py-1.5 text-[13px] disabled:opacity-50';
   const btnStyle = { background: 'var(--card)', border: '1px solid var(--border)' } as const;
 
+  const count = selectedIds.length;
+  const visible = count > 0;
+
   return (
     <>
+      {/* Desktop slide-up bar — always mounted so the slide-out animates smoothly.
+          Mobile sheet is Touch's responsibility; we don't render a second bar here. */}
       <div
-        className="fixed bottom-4 left-1/2 z-40 flex w-[min(calc(100vw-2rem),640px)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-[10px] px-3 py-2 font-[family-name:var(--font-dm-sans)]"
-        style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: '0 8px 30px rgba(0,0,0,0.18)' }}
+        aria-hidden={!visible}
+        className="fixed bottom-4 left-1/2 z-40 hidden w-[min(calc(100vw-2rem),640px)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-[10px] px-3 py-2 font-[family-name:var(--font-dm-sans)] sm:flex"
+        style={{
+          background: 'var(--card)',
+          border: '1px solid var(--border)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.18)',
+          transform: visible ? 'translateY(0)' : 'translateY(calc(100% + 1rem))',
+          opacity: visible ? 1 : 0,
+          pointerEvents: visible ? undefined : 'none',
+          transition: 'transform 220ms ease-out, opacity 220ms ease-out',
+        }}
       >
-        <span className="px-1 text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
-          {selectedIds.length} selected
+        <span className="px-1 text-[13px]" style={{ color: 'var(--text-primary)' }}>
+          <span className="font-semibold" style={{ color: 'var(--primary)' }}>{count}</span>{' '}
+          <span style={{ color: 'var(--text-primary)' }}>selected</span>
         </span>
         {isTrash ? (
           <>

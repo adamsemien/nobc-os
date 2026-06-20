@@ -1,5 +1,9 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+
+// Reduced-motion check — evaluated once at module load; safe in 'use client' modules.
+const prefersReducedMotion =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 import justifiedLayout from 'justified-layout';
 import { useSearchParams } from 'next/navigation';
 import { ImagePlus, Upload } from 'lucide-react';
@@ -61,10 +65,14 @@ function SortableTile({
     left: box.left,
     width: box.width,
     height: box.height,
-    // dnd-kit applies transform during drag; we apply transition only when
-    // dnd-kit provides one so it doesn't fight FLIP outside drag.
+    // dnd-kit applies transform during drag; we append opacity fade for the source tile.
+    // Under reduced-motion both collapse to instant.
     transform: CSS.Transform.toString(transform),
-    transition: isDraggingActive ? transition : undefined,
+    transition: prefersReducedMotion
+      ? undefined
+      : isDraggingActive
+        ? [transition, 'opacity 160ms ease'].filter(Boolean).join(', ') || undefined
+        : 'opacity 160ms ease',
     opacity: isDragging ? 0.35 : 1,
     zIndex: isDragging ? 10 : undefined,
     touchAction: 'none',
@@ -121,6 +129,9 @@ export function MediaGrid({
   onReorder,
   sortMode,
   loadingMore = false,
+  isWide = true,
+  selectionMode = false,
+  onEnterSelectionMode,
 }: {
   assets: MediaAsset[];
   loading: boolean;
@@ -133,6 +144,12 @@ export function MediaGrid({
   /** Current sort mode — drag is only active when 'manual'. */
   sortMode?: string;
   loadingMore?: boolean;
+  /** True on md+ viewport — passed through to MediaTile to gate mobile touch logic */
+  isWide?: boolean;
+  /** True when mobile long-press selection mode is active */
+  selectionMode?: boolean;
+  /** Called when long-press activates selection mode on mobile */
+  onEnterSelectionMode?: () => void;
 }) {
   const isManual = sortMode === 'manual';
 
@@ -224,7 +241,7 @@ export function MediaGrid({
           el.style.transition = 'none';
           el.style.transform = `translate(${dx}px, ${dy}px)`;
           requestAnimationFrame(() => {
-            el.style.transition = 'transform 220ms ease';
+            el.style.transition = prefersReducedMotion ? 'none' : 'transform 220ms ease';
             el.style.transform = '';
           });
         }
@@ -309,11 +326,13 @@ export function MediaGrid({
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(String(event.active.id));
+    document.body.style.cursor = 'grabbing';
   }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveDragId(null);
+      document.body.style.cursor = '';
       const { active, over } = event;
       if (!over || active.id === over.id) return;
 
@@ -331,6 +350,7 @@ export function MediaGrid({
 
   const handleDragCancel = useCallback(() => {
     setActiveDragId(null);
+    document.body.style.cursor = '';
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -366,6 +386,9 @@ export function MediaGrid({
             selected={selection.has(a.id)}
             onToggleSelect={(e) => onToggle(a.id, e.shiftKey || e.metaKey || e.ctrlKey)}
             onOpen={() => onOpen(i)}
+            isWide={isWide}
+            selectionMode={selectionMode}
+            onEnterSelectionMode={onEnterSelectionMode}
           />
         );
 
@@ -469,18 +492,19 @@ export function MediaGrid({
       )}
 
       {/* Marquee selection rectangle */}
-      {marquee && marquee.w > 2 && marquee.h > 2 && (
+      {marquee && marquee.w > 4 && marquee.h > 4 && (
         <div
           ref={marqueeRef}
-          className="pointer-events-none absolute rounded-[3px]"
+          className="pointer-events-none absolute"
           style={{
             left: marquee.x,
             top: marquee.y - scrollTop,
             width: marquee.w,
             height: marquee.h,
-            border: '1.5px solid var(--primary)',
-            background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
-            zIndex: 50,
+            border: '1px solid var(--primary)',
+            background: 'var(--primary-soft)',
+            borderRadius: '3px',
+            zIndex: 40,
           }}
         />
       )}
@@ -513,23 +537,57 @@ export function MediaGrid({
       onDragCancel={handleDragCancel}
       accessibility={{
         announcements: {
-          onDragStart: ({ active }) => `Picked up asset ${active.id}. Use arrow keys to move.`,
-          onDragOver: ({ active, over }) =>
-            over ? `Asset ${active.id} is over position ${over.id}.` : `Asset ${active.id} is no longer over a drop target.`,
-          onDragEnd: ({ active, over }) =>
-            over ? `Asset ${active.id} was dropped at position ${over.id}.` : `Asset ${active.id} was dropped and returned to its original position.`,
-          onDragCancel: ({ active }) => `Drag cancelled. Asset ${active.id} was returned to its original position.`,
+          onDragStart: ({ active }) => {
+            const filename = assets.find((a) => a.id === active.id)?.filename ?? String(active.id);
+            const pos = assets.findIndex((a) => a.id === active.id) + 1;
+            return `${filename} grabbed. Current position: ${pos} of ${assets.length}. Use arrow keys to move.`;
+          },
+          onDragOver: ({ active, over }) => {
+            if (!over) return '';
+            const filename = assets.find((a) => a.id === active.id)?.filename ?? String(active.id);
+            const pos = assets.findIndex((a) => a.id === over.id) + 1;
+            return `${filename} moved to position ${pos} of ${assets.length}.`;
+          },
+          onDragEnd: ({ active, over }) => {
+            const filename = assets.find((a) => a.id === active.id)?.filename ?? String(active.id);
+            if (!over) return `Reorder cancelled. ${filename} returned to position ${assets.findIndex((a) => a.id === active.id) + 1}.`;
+            const pos = assets.findIndex((a) => a.id === over.id) + 1;
+            return `${filename} dropped at position ${pos}. Order saved.`;
+          },
+          onDragCancel: ({ active }) => {
+            const filename = assets.find((a) => a.id === active.id)?.filename ?? String(active.id);
+            const pos = assets.findIndex((a) => a.id === active.id) + 1;
+            return `Reorder cancelled. ${filename} returned to position ${pos}.`;
+          },
         },
       }}
     >
       <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
         {gridContent}
       </SortableContext>
-      <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
+      <DragOverlay
+        dropAnimation={
+          prefersReducedMotion
+            ? null
+            : { duration: 200, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
+        }
+      >
         {activeDragAsset && activeDragBox ? (
           <div
-            className="overflow-hidden rounded-[6px] opacity-90 shadow-2xl"
-            style={{ width: activeDragBox.width, height: activeDragBox.height }}
+            className="overflow-hidden rounded-[6px]"
+            style={{
+              width: activeDragBox.width,
+              height: activeDragBox.height,
+              opacity: 0.92,
+              transform: 'scale(1.04) rotate(1.5deg)',
+              transformOrigin: 'top left',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.28), 0 4px 12px rgba(0,0,0,0.14)',
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              outline: '2px solid var(--primary)',
+              cursor: 'grabbing',
+              animation: prefersReducedMotion ? undefined : 'dam-lift 160ms cubic-bezier(0.34,1.56,0.64,1) both',
+            }}
           >
             <img
               src={`/api/media/dam/asset/${activeDragAsset.id}/thumb`}
