@@ -10,9 +10,8 @@ import { useUpload } from './UploadDropzone';
 import type { MediaAsset } from './types';
 import { ROW_HEIGHT, type Density } from './useDensity';
 
-/** Justified grid with selection, click-to-open, and hand-rolled FLIP transitions.
- *  Data + loading state are owned by the parent (MediaWorkspace) so grid and list
- *  views share the same fetched assets without re-loading on toggle. */
+/** Justified grid with selection, click-to-open, FLIP transitions, and
+ *  viewport windowing for performance at 1000+ tiles. */
 export function MediaGrid({
   assets,
   loading,
@@ -20,6 +19,7 @@ export function MediaGrid({
   selection,
   onToggle,
   onOpen,
+  loadingMore = false,
 }: {
   assets: MediaAsset[];
   loading: boolean;
@@ -27,11 +27,21 @@ export function MediaGrid({
   selection: Set<string>;
   onToggle: (id: string, additive: boolean) => void;
   onOpen: (index: number) => void;
+  loadingMore?: boolean;
 }) {
   const sp = useSearchParams();
   const { open } = useUpload();
   const isTrash = sp.get('view') === 'trash';
+  const query = sp.get('q')?.trim() ?? '';
+  const isSemantic = sp.get('mode') === 'semantic';
+  // A search/filter is active when the operator is narrowing results, not browsing
+  // the empty library — drives a "no matches" empty state instead of the upload CTA.
+  const searchActive = Boolean(
+    query || sp.get('color') || sp.get('eventId') || sp.get('sponsor') || sp.get('tag') || sp.get('fileType'),
+  );
   const [containerWidth, setContainerWidth] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewH, setViewH] = useState(800);
   const ref = useRef<HTMLDivElement>(null);
   const tileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevPos = useRef<Map<string, { top: number; left: number }>>(new Map());
@@ -42,6 +52,29 @@ export function MediaGrid({
     const ro = new ResizeObserver((entries) => setContainerWidth(entries[0].contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  // Walk up DOM to find scroll container; track scrollTop + height for windowing
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let parent: HTMLElement | null = el.parentElement;
+    while (parent && parent !== document.documentElement) {
+      const overflow = window.getComputedStyle(parent).overflowY;
+      if (overflow === 'auto' || overflow === 'scroll') break;
+      parent = parent.parentElement;
+    }
+    if (!parent) return;
+    const scrollEl = parent;
+    setViewH(scrollEl.clientHeight);
+    const onScroll = () => setScrollTop(scrollEl.scrollTop);
+    scrollEl.addEventListener('scroll', onScroll, { passive: true });
+    const ro = new ResizeObserver(() => setViewH(scrollEl.clientHeight));
+    ro.observe(scrollEl);
+    return () => {
+      scrollEl.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+    };
   }, []);
 
   const layout = useMemo(() => {
@@ -78,12 +111,30 @@ export function MediaGrid({
     prevPos.current = next;
   }, [layout, assets]);
 
+  const overscan = viewH * 1.5;
+
   return (
     <div ref={ref} className="relative w-full pb-12">
       {!loading && assets.length === 0 && isTrash && (
         <EmptyState title="Trash is empty" subtitle="Deleted media appears here for 30 days." />
       )}
-      {!loading && assets.length === 0 && !isTrash && (
+      {!loading && assets.length === 0 && !isTrash && searchActive && (
+        <EmptyState
+          title={
+            isSemantic && query
+              ? `No vibes matched “${query}”`
+              : query
+                ? `No media matches “${query}”`
+                : 'No media matches these filters'
+          }
+          subtitle={
+            isSemantic && query
+              ? 'Try fewer or simpler words, or switch to Keyword search.'
+              : 'Try a different search or clear your filters.'
+          }
+        />
+      )}
+      {!loading && assets.length === 0 && !isTrash && !searchActive && (
         <button
           type="button"
           onClick={open}
@@ -121,6 +172,11 @@ export function MediaGrid({
           {assets.map((a, i) => {
             const bx = layout.boxes[i];
             if (!bx) return null;
+            // Viewport windowing: skip tiles outside the visible window + overscan
+            const inWindow =
+              bx.top + bx.height > scrollTop - overscan &&
+              bx.top < scrollTop + viewH + overscan;
+            if (!inWindow) return null;
             return (
               <div
                 key={a.id}
@@ -140,6 +196,17 @@ export function MediaGrid({
               </div>
             );
           })}
+        </div>
+      )}
+      {loadingMore && (
+        <div className="flex gap-2 pt-2 pb-6">
+          {[1, 2, 3].map((k) => (
+            <div
+              key={k}
+              className="h-[160px] flex-1 animate-pulse rounded-[6px]"
+              style={{ background: 'var(--raised)' }}
+            />
+          ))}
         </div>
       )}
     </div>

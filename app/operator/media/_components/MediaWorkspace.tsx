@@ -12,6 +12,7 @@ import { FilterPanel, type FilterOptions } from './FilterPanel';
 import { BulkActionBar } from './BulkActionBar';
 import { MediaPreview } from './MediaPreview';
 import { UploadDropzone } from './UploadDropzone';
+import { classifyColor } from '@/lib/dam/color';
 import type { MediaAsset } from './types';
 
 /** Owns assets fetch, selection, preview, upload, and view-mode state across the
@@ -25,23 +26,23 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
 
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isDegraded, setIsDegraded] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [isWide, setIsWide] = useState(true);
-  // Mobile folder drawer open/close state.
   const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
   const lastClicked = useRef<number | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Force grid mode below the md: breakpoint — the list view is desktop-only.
-  // The user's saved preference is preserved in localStorage; we just ignore it
-  // below 768px so the page renders the grid regardless of toggle state.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mq = window.matchMedia('(min-width: 768px)');
     const update = () => {
       setIsWide(mq.matches);
-      // Close the mobile drawer when resizing to desktop.
       if (mq.matches) setFolderDrawerOpen(false);
     };
     update();
@@ -49,29 +50,110 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     return () => mq.removeEventListener('change', update);
   }, []);
 
-  // Assets fetch — single source of truth for both grid and list. Re-fires
-  // whenever the search/sort/filter URL changes or a bulk action calls onDone
-  // (which bumps reloadKey).
+  // Assets fetch — resets on sp/reloadKey change, handles semantic mode
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetch(`/api/media/dam/assets?${sp.toString()}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!active) return;
-        setAssets(d.assets ?? []);
-      })
-      .catch((e) => {
-        console.error('[MediaWorkspace] assets fetch failed', e);
-        if (active) setAssets([]);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    setAssets([]);
+    setNextCursor(null);
+    setIsDegraded(false);
+
+    const isSemantic = sp.get('mode') === 'semantic';
+    const q = sp.get('q') ?? '';
+
+    const doKeywordFetch = () =>
+      fetch(`/api/media/dam/assets?${sp.toString()}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (!active) return;
+          setAssets(d.assets ?? []);
+          setNextCursor(d.nextCursor ?? null);
+        })
+        .catch((e) => {
+          console.error('[MediaWorkspace] assets fetch failed', e);
+          if (active) setAssets([]);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+
+    if (isSemantic && q) {
+      const params = new URLSearchParams();
+      params.set('q', q);
+      const fileType = sp.get('fileType');
+      const folderId = sp.get('folderId');
+      const eventId = sp.get('eventId');
+      if (fileType) params.set('fileType', fileType);
+      if (folderId) params.set('folderId', folderId);
+      if (eventId) params.set('eventId', eventId);
+
+      fetch(`/api/media/dam/assets/semantic?${params.toString()}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (!active) return;
+          if (d.degraded === true) {
+            setIsDegraded(true);
+            return doKeywordFetch();
+          }
+          setAssets(d.assets ?? []);
+          setNextCursor(d.nextCursor ?? null);
+          setLoading(false);
+        })
+        .catch((e) => {
+          console.error('[MediaWorkspace] semantic fetch failed', e);
+          if (active) return doKeywordFetch();
+        });
+    } else {
+      doKeywordFetch();
+    }
+
     return () => {
       active = false;
     };
   }, [sp, reloadKey]);
+
+  // Infinite scroll via IntersectionObserver on sentinelRef
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && nextCursor && !loading && !loadingMore) {
+          setLoadingMore(true);
+          const isSemantic = sp.get('mode') === 'semantic';
+          const q = sp.get('q') ?? '';
+          let url: string;
+          if (isSemantic && q) {
+            const params = new URLSearchParams();
+            params.set('q', q);
+            const fileType = sp.get('fileType');
+            const folderId = sp.get('folderId');
+            const eventId = sp.get('eventId');
+            if (fileType) params.set('fileType', fileType);
+            if (folderId) params.set('folderId', folderId);
+            if (eventId) params.set('eventId', eventId);
+            params.set('cursor', nextCursor);
+            url = `/api/media/dam/assets/semantic?${params.toString()}`;
+          } else {
+            const params = new URLSearchParams(sp.toString());
+            params.set('cursor', nextCursor);
+            url = `/api/media/dam/assets?${params.toString()}`;
+          }
+          fetch(url)
+            .then((r) => r.json())
+            .then((d) => {
+              setAssets((prev) => [...prev, ...(d.assets ?? [])]);
+              setNextCursor(d.nextCursor ?? null);
+            })
+            .catch((e) => console.error('[MediaWorkspace] loadMore failed', e))
+            .finally(() => setLoadingMore(false));
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [nextCursor, loading, loadingMore, sp]);
 
   const reload = useCallback(() => {
     setSelection(new Set());
@@ -105,6 +187,12 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
 
   const effectiveViewMode = isWide ? viewMode : 'grid';
 
+  // Client-side color filter
+  const colorFilter = sp.get('color') ?? '';
+  const displayAssets = colorFilter
+    ? assets.filter((a) => (a.dominantColor ? classifyColor(a.dominantColor) === colorFilter : false))
+    : assets;
+
   return (
     <div className="flex h-full w-full overflow-hidden">
       <FolderTree
@@ -131,9 +219,21 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
             viewMode={viewMode}
             onViewMode={setViewMode}
           />
+          {isDegraded && (
+            <div
+              className="mb-2 rounded-[6px] px-3 py-2 text-[13px]"
+              style={{
+                background: 'color-mix(in srgb, var(--primary) 8%, var(--card))',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              Vibe search is warming up — showing keyword results
+            </div>
+          )}
           {effectiveViewMode === 'list' ? (
             <MediaList
-              assets={assets}
+              assets={displayAssets}
               loading={loading}
               selection={selection}
               onToggle={onToggle}
@@ -141,13 +241,23 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
             />
           ) : (
             <MediaGrid
-              assets={assets}
+              assets={displayAssets}
               loading={loading}
               density={density}
               selection={selection}
               onToggle={onToggle}
               onOpen={(i) => setPreviewIndex(i)}
+              loadingMore={loadingMore}
             />
+          )}
+          <div ref={sentinelRef} className="h-4" />
+          {loadingMore && (
+            <div className="flex justify-center py-4">
+              <div
+                className="h-5 w-5 animate-spin rounded-full border-2"
+                style={{ borderColor: 'var(--border)', borderTopColor: 'var(--primary)' }}
+              />
+            </div>
           )}
         </div>
       </UploadDropzone>
@@ -162,9 +272,9 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
         />
       )}
 
-      {previewIndex != null && assets[previewIndex] && (
+      {previewIndex != null && displayAssets[previewIndex] && (
         <MediaPreview
-          assets={assets}
+          assets={displayAssets}
           index={previewIndex}
           onClose={() => setPreviewIndex(null)}
           onIndexChange={setPreviewIndex}

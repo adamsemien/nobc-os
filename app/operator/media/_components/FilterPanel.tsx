@@ -1,5 +1,6 @@
 'use client';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { COLOR_BUCKETS } from '@/lib/dam/color';
 
 export interface FilterOptions {
   events: { id: string; title: string }[];
@@ -71,6 +72,40 @@ export function FilterPanel({ options }: { options: FilterOptions }) {
         />
         Selects only
       </label>
+      <div>
+        <div className={lbl} style={lblStyle}>Color</div>
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {COLOR_BUCKETS.map((bucket, i) => {
+            const active = sp.get('color') === bucket.name;
+            return (
+              <button
+                key={`${bucket.name}-${i}`}
+                type="button"
+                aria-label={bucket.name}
+                aria-pressed={active}
+                title={bucket.name}
+                onClick={() => set('color', active ? '' : bucket.name)}
+                className="h-6 w-6 rounded-full transition-all"
+                style={{
+                  background: bucket.hex,
+                  outline: active ? '2px solid var(--primary)' : '2px solid transparent',
+                  outlineOffset: '2px',
+                }}
+              />
+            );
+          })}
+        </div>
+        {sp.get('color') && (
+          <button
+            type="button"
+            onClick={() => set('color', '')}
+            className="mt-1 text-[11px]"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Clear color
+          </button>
+        )}
+      </div>
     </aside>
   );
 }

@@ -16,4 +16,5 @@ export interface MediaAsset {
   createdAt: string;
   size: number;
   shooterCredit: string | null;
+  dominantColor?: string | null;
 }
