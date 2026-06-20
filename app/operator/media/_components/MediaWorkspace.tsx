@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Folders, SlidersHorizontal } from 'lucide-react';
 import { useDensity } from './useDensity';
 import { useViewMode } from './useViewMode';
+import { toggleSelection, selectAll, clearSelection } from '@/lib/dam/selection';
 import { MediaToolbar } from './MediaToolbar';
 import { MediaGrid } from './MediaGrid';
 import { MediaList } from './MediaList';
@@ -185,7 +186,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setSelection(new Set());
+        setSelection(clearSelection());
         setSelectionMode(false);
         return;
       }
@@ -193,7 +194,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
         const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
         if (tag === 'input' || tag === 'textarea') return;
         e.preventDefault();
-        setSelection(new Set(displayAssetsRef.current.map((a) => a.id)));
+        setSelection(selectAll(displayAssetsRef.current.map((a) => a.id)));
       }
     };
     window.addEventListener('keydown', handler);
@@ -202,28 +203,25 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   }, []);
 
   const reload = useCallback(() => {
-    setSelection(new Set());
+    setSelection(clearSelection());
     setSelectionMode(false);
     setReloadKey((k) => k + 1);
   }, []);
 
   const onToggle = useCallback(
     (id: string, range: boolean) => {
-      const idx = assets.findIndex((a) => a.id === id);
+      const orderedIds = assets.map((a) => a.id);
       setSelection((prev) => {
-        const next = new Set(prev);
-        if (range && lastClicked.current != null && idx >= 0) {
-          const lo = Math.min(lastClicked.current, idx);
-          const hi = Math.max(lastClicked.current, idx);
-          for (let i = lo; i <= hi; i++) next.add(assets[i].id);
-        } else if (next.has(id)) {
-          next.delete(id);
-        } else {
-          next.add(id);
-        }
-        return next;
+        const { selection, nextAnchor } = toggleSelection(
+          prev,
+          id,
+          range,
+          orderedIds,
+          lastClicked.current,
+        );
+        if (nextAnchor != null) lastClicked.current = nextAnchor;
+        return selection;
       });
-      if (idx >= 0) lastClicked.current = idx;
     },
     [assets],
   );

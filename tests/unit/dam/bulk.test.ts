@@ -48,4 +48,23 @@ describe('parseBulkAction', () => {
       expect(parseBulkAction({ action, assetIds: ['a'] }).ok).toBe(true);
     }
   });
+
+  it('reorder: filters non-string entries from orderedIds', () => {
+    // Mixed array — only string entries survive; the two strings pass validation
+    const result = parseBulkAction({
+      action: 'reorder',
+      assetIds: ['a'],
+      orderedIds: ['id-1', 42, null, 'id-2'],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload).toEqual({ orderedIds: ['id-1', 'id-2'] });
+    }
+  });
+
+  it('reorder: rejects when all orderedIds entries are non-string', () => {
+    expect(
+      parseBulkAction({ action: 'reorder', assetIds: ['a'], orderedIds: [1, null, true] }).ok,
+    ).toBe(false);
+  });
 });

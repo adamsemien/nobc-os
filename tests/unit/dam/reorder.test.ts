@@ -145,6 +145,26 @@ describe('computeReorder — changed diff', () => {
 // computeReorder — post-infinite-scroll correctness
 // ---------------------------------------------------------------------------
 
+describe('computeReorder — changed sortOrder values', () => {
+  it('adjacent forward swap: changed entries carry correct {id, sortOrder}', () => {
+    // [a,b,c,d,e] move a→b yields [b,a,c,d,e]; a→sortOrder 1, b→sortOrder 0
+    const { changed } = computeReorder(IDS, 'a', 'b');
+    expect(changed).toEqual(
+      expect.arrayContaining([
+        { id: 'b', sortOrder: 0 },
+        { id: 'a', sortOrder: 1 },
+      ]),
+    );
+    expect(changed.length).toBe(2);
+  });
+
+  it('new array reference returned after a real move (not same ref as input)', () => {
+    const ids = ['a', 'b', 'c'];
+    const { orderedIds } = computeReorder(ids, 'a', 'c');
+    expect(orderedIds).not.toBe(ids);
+  });
+});
+
 describe('computeReorder — works on large lists (post-append)', () => {
   const bigList = Array.from({ length: 200 }, (_, i) => `asset-${i}`);
 
