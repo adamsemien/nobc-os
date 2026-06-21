@@ -10,7 +10,6 @@ const SORTS: { value: string; label: string }[] = [
   { value: 'date', label: 'Date' },
   { value: 'event', label: 'Event' },
   { value: 'sponsor', label: 'Sponsor' },
-  { value: 'fileType', label: 'File type' },
   { value: 'selects', label: 'Selects first' },
   { value: 'quality', label: 'Quality' },
   { value: 'manual', label: 'Manual' },
@@ -97,6 +96,7 @@ export function MediaToolbar({
       <button
         type="button"
         aria-pressed={isSemantic}
+        title="Search by mood or visual feel instead of keywords (AI vibe search)"
         onClick={toggleMode}
         className="flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[13px]"
         style={isSemantic ? activeStyle : ctlStyle}
@@ -122,6 +122,7 @@ export function MediaToolbar({
       <button
         type="button"
         aria-pressed={!!sp.get('minQuality')}
+        title="Show only the highest-quality shots (auto-scored for sharpness & exposure)"
         onClick={() => {
           const next = new URLSearchParams(sp.toString());
           if (sp.get('minQuality')) next.delete('minQuality');
