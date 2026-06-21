@@ -107,8 +107,25 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[\r\n"\\]/g, '_').slice(0, 200);
 }
 
-/** Delete a private R2 object (permanent-delete path). No-op when unconfigured/empty. */
+/** Delete a private R2 object (permanent-delete path). No-op when unconfigured/empty.
+ *
+ *  SAFETY GUARD: preview/sandbox deployments share PRODUCTION's R2 bucket (the
+ *  R2_EVENT_MEDIA_BUCKET + credentials are scoped to both Preview and Production),
+ *  and the sandbox DB is a copy-on-write clone of prod that carries real asset
+ *  keys. So a "Permanent delete" or "Clear Demo Media" run in a non-production
+ *  env would erase real production media from the shared bucket. Hard-skip the
+ *  actual R2 delete outside production — the sandbox DB row still gets removed,
+ *  the prod object is left intact. Set ALLOW_PREVIEW_DELETE=true (e.g. once a
+ *  separate preview bucket is wired) to re-enable deletes in non-prod. */
 export async function deleteObject(key: string): Promise<void> {
+  if (process.env.VERCEL_ENV !== 'production' && process.env.ALLOW_PREVIEW_DELETE !== 'true') {
+    console.warn(
+      '[dam/storage] deleteObject skipped: non-production env shares the production R2 bucket. key=%s VERCEL_ENV=%s — set ALLOW_PREVIEW_DELETE=true to override.',
+      key,
+      process.env.VERCEL_ENV ?? 'undefined',
+    );
+    return;
+  }
   const client = s3Client();
   const b = bucket();
   if (!client || !b || !key.trim()) return;
