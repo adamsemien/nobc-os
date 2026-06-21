@@ -140,13 +140,15 @@ INSTAGRAM_ACCESS_TOKEN=<your_...*_token>
 
 ✅ **Migration deployed to Neon**  
 ✅ **Prisma client regenerated**  
-✅ **Schema synced**  
+✅ **Schema synced** (applied additively via `prisma db execute`)  
 
 ```bash
-# Verify locally:
+# Inspect schema drift — READ-ONLY (NEVER `db push` on this repo):
 cd ~/code/nobc-os
-npx prisma db push # Should show "database is in sync"
+npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
 ```
+
+> ⚠️ `prisma db push` is forbidden here — it drops the out-of-band DAM indexes (`Asset_searchVector_idx`, `Asset_embedding_hnsw_idx`). Apply additive SQL only, via `prisma db execute --file <sql>`. See CLAUDE.md.
 
 ---
 

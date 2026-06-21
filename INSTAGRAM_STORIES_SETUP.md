@@ -58,14 +58,11 @@ INSTAGRAM_ACCESS_TOKEN=IGBusiness|abc...xyz
 
 ## 🚀 Quick Start (Local Testing)
 
-### 1. Ensure Database is Synced
+### 1. Database is already migrated
 
-The migration has been applied. Verify:
+The additive Stories migration (`InstagramStory` + `InstagramStoryBatch` + `StoryStatus`) is already applied to prod via `prisma db execute` — nothing to run here.
 
-```bash
-cd ~/code/nobc-os
-npx prisma db push # Should show "database is in sync"
-```
+> ⚠️ **Never run `prisma db push` on this repo.** It drops the out-of-band DAM indexes (`Asset_searchVector_idx`, `Asset_embedding_hnsw_idx`) and breaks `/operator/media` search. To inspect schema drift use `prisma migrate diff` (read-only); to apply additive SQL use `prisma db execute --file <sql>`. See CLAUDE.md → "Schema changes: never `prisma db push`."
 
 ### 2. Start Dev Server
 
