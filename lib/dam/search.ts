@@ -23,6 +23,7 @@ export interface AssetQuery {
   from?: string; // ISO date
   to?: string; // ISO date
   minQuality?: number; // Top Picks filter — qualityScore >=
+  recent?: boolean; // Recent smart folder — added within the last 30 days
   cursor?: string;
 }
 
@@ -59,6 +60,7 @@ export function parseAssetQuery(sp: URLSearchParams): AssetQuery {
     from: sp.get('from') || undefined,
     to: sp.get('to') || undefined,
     minQuality,
+    recent: sp.get('recent') === '1' || sp.get('recent') === 'true' ? true : undefined,
     cursor: sp.get('cursor') || undefined,
   };
 }
@@ -88,6 +90,10 @@ export function buildAssetWhere(
   if (p.from) clauses.push(Prisma.sql`"shootDate" >= ${new Date(p.from)}`);
   if (p.to) clauses.push(Prisma.sql`"shootDate" <= ${new Date(p.to)}`);
   if (p.minQuality != null) clauses.push(Prisma.sql`"qualityScore" >= ${p.minQuality}`);
+  if (p.recent) {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    clauses.push(Prisma.sql`"createdAt" >= ${since}`);
+  }
   if (p.q) {
     const eventMatch = matchingEventIds.length
       ? Prisma.sql`OR "eventId" IN (${Prisma.join(matchingEventIds)})`
