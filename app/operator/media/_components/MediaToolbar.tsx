@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload, LayoutGrid, List } from 'lucide-react';
+import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload, LayoutGrid, List, GripVertical } from 'lucide-react';
 import { useDensity, type Density } from './useDensity';
 import { useUpload } from './UploadDropzone';
 import type { ViewMode } from './useViewMode';
@@ -44,6 +44,15 @@ export function MediaToolbar({
   const [q, setQ] = useState(sp.get('q') ?? '');
   const [density, setDensity] = useDensity();
 
+  const isSemantic = sp.get('mode') === 'semantic';
+
+  const toggleMode = () => {
+    const next = new URLSearchParams(sp.toString());
+    if (isSemantic) next.delete('mode');
+    else next.set('mode', 'semantic');
+    router.push(`${pathname}?${next.toString()}`);
+  };
+
   useEffect(() => {
     const t = setTimeout(() => {
       const next = new URLSearchParams(sp.toString());
@@ -80,23 +89,36 @@ export function MediaToolbar({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search media…"
+          placeholder={isSemantic ? 'Describe a vibe…' : 'Search media…'}
           className="w-full rounded-[8px] border py-1.5 pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
           style={ctlStyle}
         />
       </div>
-      <select
-        value={sp.get('sort') ?? 'date'}
-        onChange={(e) => setSort(e.target.value)}
-        className="rounded-[8px] border px-2 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
-        style={ctlStyle}
+      <button
+        type="button"
+        aria-pressed={isSemantic}
+        onClick={toggleMode}
+        className="flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[13px]"
+        style={isSemantic ? activeStyle : ctlStyle}
       >
-        {SORTS.map((s) => (
-          <option key={s.value} value={s.value}>
-            {s.label}
-          </option>
-        ))}
-      </select>
+        <Sparkles className="h-4 w-4" /> Vibe
+      </button>
+      {isSemantic ? (
+        <span className="text-[13px]" style={{ color: 'var(--text-muted)' }}>Sorted by relevance</span>
+      ) : (
+        <select
+          value={sp.get('sort') ?? 'date'}
+          onChange={(e) => setSort(e.target.value)}
+          className="rounded-[8px] border px-2 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
+          style={ctlStyle}
+        >
+          {SORTS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      )}
       <button
         type="button"
         aria-pressed={!!sp.get('minQuality')}
@@ -150,6 +172,17 @@ export function MediaToolbar({
             );
           })}
         </div>
+      )}
+      {/* "Drag to arrange" hint — only shown in manual sort, desktop only */}
+      {sp.get('sort') === 'manual' && (
+        <span
+          className="hidden items-center gap-1 text-[12px] md:flex"
+          style={{ color: 'var(--text-muted)' }}
+          aria-live="polite"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+          Drag to arrange
+        </span>
       )}
       <button
         type="button"

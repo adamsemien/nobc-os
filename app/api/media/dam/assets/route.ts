@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   const rows = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
     SELECT "id", "filename", "blurhash", "width", "height", "fileType", "isSelect",
            "shootDate", "sponsorName", "eventId", "tags", "aiTags", "qualityScore", "createdAt",
-           "size", "shooterCredit"
+           "size", "shooterCredit", "dominantColor"
     FROM "Asset"
     WHERE ${where}
     ORDER BY ${order}
