@@ -25,3 +25,18 @@ export type ACContactsPage = {
     total?: string;
   };
 };
+
+/** A list as returned by GET /api/3/lists. Used to resolve list NAMES → ids for the
+ *  scoped, firewalled contact pull. */
+export type ACList = {
+  id: string;
+  name: string;
+  stringid?: string;
+};
+
+export type ACListsPage = {
+  lists: ACList[];
+  meta?: {
+    total?: string;
+  };
+};
