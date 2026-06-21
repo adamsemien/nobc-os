@@ -198,7 +198,7 @@ export function StoryGeneratorPanel({
               )}
               {selectedEvent && (
                 <p className="text-sm text-gray-600">
-                  <span className="font-semibold">Event:</span> {selectedEvent.name}
+                  <span className="font-semibold">Event:</span> {selectedEvent.title}
                 </p>
               )}
             </div>
@@ -322,7 +322,7 @@ export function StoryGeneratorPanel({
               <option value="">— No event —</option>
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.name}
+                  {event.title}
                 </option>
               ))}
             </select>
