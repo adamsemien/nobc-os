@@ -2,7 +2,7 @@
 
 > **If you are a fresh Claude Code session, read this first.** It is the live
 > handoff for the in-flight security + strategy work. Single owner: the "Apex /
-> security-and-strategy" session (Opus 4.8). Last updated: **2026-06-15**.
+> security-and-strategy" session (Opus 4.8). Last updated: **2026-06-21**.
 > Update this file whenever the state below changes — it is the resume point.
 
 ---
@@ -10,6 +10,22 @@
 ## 0. Current shared state — 2026-06-15 (live; read before §1)
 
 > Canonical handoff across all active sessions (Adam + multiple CC clones). Verified facts only.
+
+### 2026-06-21 — Sandbox env + AC-import Phase 1 (branch `feat/ac-import-phase1`, worktree `feat-public-ticket-page`)
+
+**Sandbox stood up & preview login fixed.** Vercel **Preview** = dev Clerk instance (`pk_test`/`sk_test`, `allowed-zebra-34.clerk.accounts.dev`) + Neon **sandbox branch** (`ep-tiny-mode-aj7qv6ar`, a copy-on-write clone of prod). Preview alias: `nobc-os-git-feat-ac-import-phase1-adam-semiens-projects.vercel.app`. Three fixes shipped on the branch, all deployed READY:
+- **azp handshake loop FIXED** (`27df336`, `middleware.ts`): `authorizedParties` listed only prod + `NEXT_PUBLIC_APP_URL` + localhost (localhost gated by `NODE_ENV`, which is `production` on previews too) → the preview origin was never authorized → infinite `GET /operator 307` "unable to resolve handshake" loop → **no preview could ever be logged into**. Now also adds `VERCEL_BRANCH_URL`/`VERCEL_URL`/`VERCEL_PROJECT_PRODUCTION_URL` (runtime, bare host → `https://`). Verified in live preview logs + Clerk/Vercel docs.
+- **Env switcher FIXED** (`8602d58`, `lib/app-env.ts`): Sandbox entry always present (fallback `NEXT_PUBLIC_SANDBOX_URL` → `VERCEL_BRANCH_URL` → stable alias), both links → `/operator`. `NEXT_PUBLIC_SANDBOX_URL` now optional.
+- **DAM prod-data guard FIXED** (`05764b6`, `lib/dam/storage.ts`): preview/sandbox **share PROD's R2 bucket** (`R2_*` env scoped Preview+Production) and the sandbox DB is a clone with real asset keys — so a sandbox "Permanent delete" / "Clear Demo Media" would erase **real production media**. `deleteObject` now no-ops + logs outside production (`VERCEL_ENV !== 'production'`); override `ALLOW_PREVIEW_DELETE=true`. Prod delete path unchanged.
+
+Sandbox workspace `cmpd6xckn…` = 176 members / **368 render-ready DAM assets** (all have searchVector + thumbnail + url + blurhash) / 19 events; DAM `Asset_searchVector_idx` GIN index present; bound to dev org `org_3DfmrFG9…`. **Onboarding verified working end-to-end** (azp was the only blocker; `getOrCreateWorkspaceForUser` auto-provisions + Clerk-org floor grants ADMIN). AC import Phase 1 code (lossless ingest + suppression guard + AC list firewall + connector UI) committed `8597fbd`; **not yet run**.
+
+**OPEN / NEXT (this session):**
+- 🔑 **Rotate the dev Clerk `sk_test_…`** (accidentally printed in a session transcript) — Clerk Dev → roll Secret Key → update Vercel Preview `CLERK_SECRET_KEY`.
+- **Run the AC import in the sandbox** (`/operator/members/import` → ActiveCampaign): verify list firewall (Network / Industry Partner / Sphere only; realtors + full-DB denied) + suppression flags + dedupe vs the 176 members. Then promote to prod (gated on Adam: merge → deploy → confirm contact-spine schema additive-applied → run).
+- **Separate preview R2 bucket** (warden's option 1) before other operators use the sandbox; then set `ALLOW_PREVIEW_DELETE=true` in Preview.
+- **Auth hardening (multi-tenant only, deferred — sensitive path, not touched):** `getOrCreateWorkspaceForUser` `bySlug` rebind should require a placeholder `clerkOrgId` (cross-tenant takeover vector once multi-tenant); replace find-then-create with `upsert` (first-load race → cosmetic `/onboarding` bounce).
+- ⚠️ Recent **`main` PROD builds are in ERROR** on Vercel (stories-route / pgvector / delivery-summary commits); prod still serves the last good build. Unrelated to this branch — needs a look.
 
 **PROD:** `app.thenobadcompany.com` → `main` @ `2dde584` (#106/#107/#109). Event-save bug fixed (hero input `type=url` → `text`). Public event page `/e/[slug]` renders for anonymous visitors — verified live: `/e/no-bad-monday` → HTTP 200.
 
