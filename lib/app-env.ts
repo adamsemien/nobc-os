@@ -26,6 +26,9 @@ export type AppEnvInfo = {
 };
 
 const PROD_URL = 'https://app.thenobadcompany.com';
+/** Stable git-branch alias — always points at the latest sandbox build. */
+const STABLE_SANDBOX_URL =
+  'https://nobc-os-git-feat-ac-import-phase1-adam-semiens-projects.vercel.app';
 
 const META: Record<AppEnvKind, { label: string; colorVar: string; softVar: string }> = {
   production: { label: 'PRODUCTION', colorVar: 'var(--danger)', softVar: 'var(--danger-soft)' },
@@ -46,18 +49,32 @@ function resolveKind(): AppEnvKind {
   }
 }
 
+/**
+ * Resolve the canonical sandbox origin. Priority:
+ * 1. Explicit NEXT_PUBLIC_SANDBOX_URL (build-time, set in Vercel Preview scope).
+ * 2. When running inside a preview deployment, use the current deploy's own branch-alias
+ *    origin (VERCEL_BRANCH_URL is a bare host, available at runtime in the Node env).
+ * 3. Fallback to the known stable sandbox alias so the switcher entry is never missing.
+ */
+function resolveSandboxOrigin(kind: AppEnvKind): string {
+  if (process.env.NEXT_PUBLIC_SANDBOX_URL) return process.env.NEXT_PUBLIC_SANDBOX_URL;
+  if (kind === 'sandbox' && process.env.VERCEL_BRANCH_URL) {
+    return `https://${process.env.VERCEL_BRANCH_URL}`;
+  }
+  return STABLE_SANDBOX_URL;
+}
+
 export function getAppEnv(): AppEnvInfo {
   const kind = resolveKind();
   const meta = META[kind];
-  const sandboxUrl = process.env.NEXT_PUBLIC_SANDBOX_URL || null;
   const deploymentUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
 
+  const sandboxOrigin = resolveSandboxOrigin(kind);
+
   const environments: AppEnvLink[] = [
-    { label: 'Production', url: PROD_URL, current: kind === 'production' },
+    { label: 'Production', url: `${PROD_URL}/operator`, current: kind === 'production' },
+    { label: 'Sandbox', url: `${sandboxOrigin}/operator`, current: kind === 'sandbox' },
   ];
-  if (sandboxUrl) {
-    environments.push({ label: 'Sandbox', url: sandboxUrl, current: kind === 'sandbox' });
-  }
 
   return {
     kind,
