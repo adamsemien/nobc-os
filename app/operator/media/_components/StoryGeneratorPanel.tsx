@@ -62,8 +62,6 @@ export function StoryGeneratorPanel({
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
 
-  if (!isOpen || !workspaceId) return null;
-
   const selectedAsset = assets.find((a) => a.id === selectedAssetId);
   const selectedEvent = events.find((e) => e.id === selectedEventId);
 
@@ -153,6 +151,9 @@ export function StoryGeneratorPanel({
       setIsScheduling(false);
     }
   }, [generatedStory, selectedEventId, title, onClose]);
+
+  // All hooks above are now called unconditionally; safe to bail out here.
+  if (!isOpen || !workspaceId) return null;
 
   // ─────────────────────────────────────────────────────────────────
   // Render by step
