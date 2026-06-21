@@ -14,7 +14,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { format } from 'date-fns';
 import { ChevronRight, Loader2, Check, AlertCircle } from 'lucide-react';
 import { useOrganization } from '@clerk/nextjs';
 import type { Asset, Event } from '@prisma/client';
@@ -305,7 +304,7 @@ export function StoryGeneratorPanel({
             </select>
             {selectedAsset && (
               <div className="mt-2 text-xs text-gray-600">
-                Size: {selectedAsset.width}×{selectedAsset.height} | Uploaded: {format(selectedAsset.createdAt, 'MMM d, h:mm a')}
+                Size: {selectedAsset.width}×{selectedAsset.height} | Uploaded: {new Date(selectedAsset.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
               </div>
             )}
           </div>
