@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload, LayoutGrid, List, GripVertical } from 'lucide-react';
+import { Search, Grid3x3, Grid2x2, Square, Sparkles, Upload, LayoutGrid, List, GripVertical, Clapperboard } from 'lucide-react';
 import { useDensity, type Density } from './useDensity';
 import { useUpload } from './UploadDropzone';
 import type { ViewMode } from './useViewMode';
@@ -32,10 +32,12 @@ export function MediaToolbar({
   onDensity,
   viewMode,
   onViewMode,
+  onCreateStory,
 }: {
   onDensity: (d: Density) => void;
   viewMode: ViewMode;
   onViewMode: (m: ViewMode) => void;
+  onCreateStory?: () => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -183,6 +185,17 @@ export function MediaToolbar({
           <GripVertical className="h-3.5 w-3.5" />
           Drag to arrange
         </span>
+      )}
+      {onCreateStory && (
+        <button
+          type="button"
+          onClick={onCreateStory}
+          className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[13px] font-medium"
+          style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+        >
+          <Clapperboard className="h-4 w-4" />
+          Create Story
+        </button>
       )}
       <button
         type="button"

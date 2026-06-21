@@ -6,6 +6,9 @@ import { useDensity } from './useDensity';
 import { useViewMode } from './useViewMode';
 import { toggleSelection, selectAll, clearSelection } from '@/lib/dam/selection';
 import { MediaToolbar } from './MediaToolbar';
+import { StoryGeneratorPanel } from './StoryGeneratorPanel';
+import { useStoryGeneratorPanel } from './useStoryGenerator';
+import type { Asset } from '@prisma/client';
 import { MediaGrid } from './MediaGrid';
 import { MediaList } from './MediaList';
 import { FolderTree } from './FolderTree';
@@ -24,6 +27,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   const sortMode = sp.get('sort') ?? 'date';
 
   const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const story = useStoryGeneratorPanel();
   const [loading, setLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isDegraded, setIsDegraded] = useState(false);
@@ -338,7 +342,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
             </button>
           </div>
 
-          <MediaToolbar onDensity={setDensity} viewMode={viewMode} onViewMode={setViewMode} />
+          <MediaToolbar onDensity={setDensity} viewMode={viewMode} onViewMode={setViewMode} onCreateStory={story.open} />
           {isDegraded && (
             <div
               className="mb-2 rounded-[6px] px-3 py-2 text-[13px]"
@@ -415,6 +419,11 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
           onAssetUpdated={onAssetUpdated}
         />
       )}
+      <StoryGeneratorPanel
+        isOpen={story.isOpen}
+        onClose={story.close}
+        assets={assets as unknown as Asset[]}
+      />
     </div>
   );
 }
