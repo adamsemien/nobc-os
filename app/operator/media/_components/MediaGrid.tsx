@@ -6,7 +6,7 @@ const prefersReducedMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 import justifiedLayout from 'justified-layout';
 import { useSearchParams } from 'next/navigation';
-import { ImagePlus, Upload } from 'lucide-react';
+import { ImagePlus, Upload, Search, Images } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -157,7 +157,6 @@ export function MediaGrid({
   const { open } = useUpload();
   const isTrash = sp.get('view') === 'trash';
   const query = sp.get('q')?.trim() ?? '';
-  const isSemantic = sp.get('mode') === 'semantic';
   const searchActive = Boolean(
     query || sp.get('color') || sp.get('eventId') || sp.get('sponsor') || sp.get('tag') || sp.get('fileType'),
   );
@@ -437,53 +436,85 @@ export function MediaGrid({
         <EmptyState title="Trash is empty" subtitle="Deleted media appears here for 30 days." />
       )}
       {!loading && assets.length === 0 && !isTrash && searchActive && (
-        <EmptyState
-          title={
-            isSemantic && query
-              ? `No vibes matched "${query}"`
-              : query
-                ? `No media matches "${query}"`
-                : 'No media matches these filters'
-          }
-          subtitle={
-            isSemantic && query
-              ? 'Try fewer or simpler words, or switch to Keyword search.'
-              : 'Try a different search or clear your filters.'
-          }
-        />
-      )}
-      {!loading && assets.length === 0 && !isTrash && !searchActive && (
-        <button
-          type="button"
-          onClick={open}
-          className="group mx-auto mt-10 flex w-full max-w-xl flex-col items-center gap-4 rounded-[18px] border-2 border-dashed px-8 py-16 text-center transition-colors hover:border-[color:var(--primary)]"
-          style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
-        >
+        <div className="mx-auto mt-10 flex max-w-sm flex-col items-center gap-3 px-4 text-center font-[family-name:var(--font-dm-sans)]">
           <span
-            className="flex h-16 w-16 items-center justify-center rounded-full"
+            className="flex h-[64px] w-[64px] items-center justify-center rounded-full"
             style={{ background: 'color-mix(in srgb, var(--primary) 10%, transparent)' }}
           >
-            <ImagePlus className="h-7 w-7" style={{ color: 'var(--primary)' }} />
+            <Search className="h-[28px] w-[28px]" style={{ color: 'var(--primary)', strokeWidth: 1.5 }} />
           </span>
+          <p className="text-[18px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {query ? `No results for “${query}”` : 'No results for these filters'}
+          </p>
+          <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            Try different words, remove some filters, or browse all media.
+          </p>
+          <div className="mt-1 flex flex-wrap justify-center gap-2">
+            {query && (
+              <button
+                onClick={() => {
+                  const next = new URLSearchParams(sp.toString());
+                  next.delete('q');
+                  window.history.pushState({}, '', `?${next.toString()}`);
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
+                className="rounded-full border px-3 py-1 text-[12px] transition-colors hover:border-[color:var(--primary)] focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+              >
+                Clear search
+              </button>
+            )}
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '?');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="rounded-full border px-3 py-1 text-[12px] transition-colors hover:border-[color:var(--primary)] focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+            >
+              Browse all media
+            </button>
+            <button
+              onClick={open}
+              className="rounded-full border px-3 py-1 text-[12px] transition-colors hover:border-[color:var(--primary)] focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+            >
+              Upload new photos
+            </button>
+          </div>
+        </div>
+      )}
+      {!loading && assets.length === 0 && !isTrash && !searchActive && (
+        <div className="mx-auto mt-10 flex max-w-md flex-col items-center gap-4 px-4 text-center font-[family-name:var(--font-dm-sans)]">
           <span
-            className="font-[family-name:var(--font-display)] text-[26px] leading-tight"
+            className="flex h-[72px] w-[72px] items-center justify-center rounded-full"
+            style={{ background: 'color-mix(in srgb, var(--primary) 10%, transparent)' }}
+          >
+            <Images className="h-[36px] w-[36px]" style={{ color: 'var(--primary)', strokeWidth: 1.5 }} />
+          </span>
+          <p
+            className="font-[family-name:var(--font-display)] text-[24px] leading-tight"
             style={{ color: 'var(--text-primary)' }}
           >
-            Drag photos &amp; folders here
-          </span>
-          <span className="font-[family-name:var(--font-dm-sans)] text-[14px]" style={{ color: 'var(--text-muted)' }}>
-            Drop anywhere on this page, paste from your clipboard, or
-          </span>
-          <span
-            className="inline-flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-[14px] font-medium"
+            Your media library is empty
+          </p>
+          <div className="flex flex-col gap-1 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            <p>Upload event photos, sponsor assets, and member moments.</p>
+            <p>AI automatically tags every photo after upload.</p>
+            <p>Drag anywhere on this page or paste from your clipboard.</p>
+          </div>
+          <button
+            type="button"
+            onClick={open}
+            className="mt-2 inline-flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-[14px] font-medium focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
             style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
           >
-            <Upload className="h-4 w-4" /> Browse files
+            <Upload className="h-4 w-4" /> Upload your first files
+          </button>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)' }}>
+            JPG · PNG · WebP · HEIC — up to 50MB each
           </span>
-          <span className="font-[family-name:var(--font-mono)] text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            JPG · PNG · WebP — up to 50MB each
-          </span>
-        </button>
+        </div>
       )}
       {layout && (
         <div className="relative" style={{ height: layout.containerHeight }}>
