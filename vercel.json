@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/backup-applications",
-      "schedule": "0 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
