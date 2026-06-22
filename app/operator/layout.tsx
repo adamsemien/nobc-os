@@ -4,8 +4,10 @@ import { OrganizationSwitcher, UserButton } from '@clerk/nextjs';
 import { ExternalLink } from 'lucide-react';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { isAdmin } from '@/lib/operator-role';
+import { getAppEnv } from '@/lib/app-env';
 import { db } from '@/lib/db';
 import { OperatorNav } from './operator-nav';
+import { EnvBadge } from './_components/EnvBadge';
 import { AgentPanel } from './_components/AgentPanel';
 import { ObsidianIdleEgg } from './_components/ObsidianIdleEgg';
 import { AimEasterEgg } from './_components/AimEasterEgg';
@@ -67,6 +69,7 @@ export default async function OperatorLayout({
             className="flex items-center justify-end gap-3 px-6 pt-3 sm:px-10 lg:px-14 xl:px-20"
             aria-label="Operator utility strip"
           >
+            <EnvBadge info={getAppEnv()} />
             <a
               href="/m/events"
               target="_blank"
