@@ -410,6 +410,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
           onClose={() => setPreviewIndex(null)}
           onIndexChange={setPreviewIndex}
           onAssetUpdated={onAssetUpdated}
+          onAssetCreated={reload}
         />
       )}
     </div>

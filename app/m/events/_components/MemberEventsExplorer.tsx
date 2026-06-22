@@ -48,7 +48,7 @@ function EventCard({ row }: { row: MemberEventsExplorerRow }) {
       href={`/m/events/${row.slug}`}
       className="group flex flex-col overflow-hidden rounded-lg border border-events-ref-rule bg-events-ref-cream-warm transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--nobc-red)]"
     >
-      <div className="relative aspect-[16/9] w-full overflow-hidden">
+      <div className="relative aspect-[3/4] w-full overflow-hidden">
         {row.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
