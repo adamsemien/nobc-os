@@ -11,7 +11,7 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
   const start = parseDate(event.startAt);
 
   return (
-    <div className="flex min-h-screen flex-col bg-events-paper text-[var(--apply-ink)]">
+    <div className="flex min-h-dvh flex-col bg-events-paper text-[var(--apply-ink)]">
       {/* Minimal nav — wordmark centered */}
       <header className="mx-auto w-full max-w-xl px-6 pt-10 text-center">
         <Link

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { isStorageConfigured, uploadObject } from '@/lib/dam/storage';
 import { applicationPhotoKey } from '@/lib/apply-photo';
+import { isAllowedImageBytes, type SniffedImageType } from '@/lib/image-magic-bytes';
 
 // Membership-application photos are PII-adjacent, so they land in PRIVATE R2
 // (not public Vercel Blob) and are read back only through the role-gated
@@ -14,6 +15,7 @@ export const runtime = 'nodejs';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+const ALLOWED_BYTES = new Set<SniffedImageType>(['jpeg', 'png', 'webp']);
 
 export async function POST(req: NextRequest) {
   const form = await req.formData().catch(() => null);
@@ -37,9 +39,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Workspace not found' }, { status: 500 });
   }
 
+  const buf = Buffer.from(await file.arrayBuffer());
+  // Don't trust client-declared MIME — verify real image bytes (defense-in-depth).
+  if (!isAllowedImageBytes(buf, ALLOWED_BYTES)) {
+    console.warn('[apply/upload] rejected file with mismatched magic bytes', {
+      declaredType: file.type,
+      size: buf.length,
+    });
+    return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
+  }
+
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
   const key = applicationPhotoKey(workspace.id, ext);
-  const buf = Buffer.from(await file.arrayBuffer());
   await uploadObject(key, buf, file.type);
 
   return NextResponse.json({ key });

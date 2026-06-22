@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Playfair_Display, Cormorant_Garamond, DM_Sans, DM_Mono, Plus_Jakarta_Sans, Fraunces, DM_Serif_Display, Space_Grotesk, Syne, Instrument_Serif } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -84,6 +84,14 @@ export const metadata: Metadata = {
   title: "NoBC OS",
   description: "No Bad Company member platform",
   manifest: "/manifest.json",
+};
+
+// viewport-fit=cover lets env(safe-area-inset-*) engage so fixed/sticky bars can
+// clear the iPhone notch / home indicator. (MOBILE-IPHONE-AUDIT-2026-06-22, #1.)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

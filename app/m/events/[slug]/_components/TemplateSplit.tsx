@@ -21,10 +21,10 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   const description = event.description?.trim() ?? '';
 
   return (
-    <div className="flex min-h-screen flex-col bg-events-paper text-[var(--apply-ink)] lg:h-screen lg:flex-row lg:overflow-hidden">
+    <div className="flex min-h-dvh flex-col bg-events-paper text-[var(--apply-ink)] lg:h-dvh lg:flex-row lg:overflow-hidden">
       {/* Left: full-height hero — true 50/50 on desktop, ~40vh full-bleed on mobile.
           Branded fallback panel when there's no hero image. */}
-      <div className="relative w-full lg:h-screen lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
+      <div className="relative w-full lg:h-dvh lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -39,7 +39,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
 
       {/* Right: content — true 50/50; scrolls independently on desktop. Left-aligned
           throughout. pb-28 on mobile clears the sticky CTA bar. */}
-      <div className="flex flex-1 flex-col lg:h-screen lg:w-1/2 lg:overflow-y-auto">
+      <div className="flex flex-1 flex-col lg:h-dvh lg:w-1/2 lg:overflow-y-auto">
         <MemberShellNav applyHref={applyHref} />
 
         <div className="ev-stagger flex flex-1 flex-col px-6 pb-28 pt-8 text-left sm:px-12 sm:pt-12 lg:pb-14">

@@ -417,7 +417,10 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
     </div>
 
       {mobileSticky && isCtaState ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--apply-rule)] bg-events-paper-card/95 px-5 py-4 backdrop-blur lg:hidden">
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--apply-rule)] bg-events-paper-card/95 px-5 py-4 backdrop-blur lg:hidden"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        >
           <button
             type="button"
             onClick={() => setFlowOpen(true)}

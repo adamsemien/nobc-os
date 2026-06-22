@@ -131,10 +131,10 @@ describe('promoteFromWaitlist — atomic claim', () => {
     expect(expiresMs).toBeGreaterThan(23.9 * 60 * 60 * 1000);
     expect(expiresMs).toBeLessThan(24.1 * 60 * 60 * 1000);
 
-    // Locked from-address, correct recipient.
+    // Locked from-address + locked "The No Bad Company" display name, correct recipient.
     expect(resendSend).toHaveBeenCalledOnce();
     expect(resendSend.mock.calls[0][0]).toMatchObject({
-      from: 'NoBC <team@thenobadcompany.com>',
+      from: 'The No Bad Company <team@thenobadcompany.com>',
       to: 'ana@example.com',
     });
   });

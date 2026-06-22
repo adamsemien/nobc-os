@@ -400,6 +400,7 @@ model Application {
 
   answers  ApplicationAnswer[]
   template ApplicationTemplate? @relation(fields: [templateId], references: [id])
+  backup   ApplicationBackup?
 
   @@index([workspaceId])
   @@index([templateId])
@@ -414,6 +415,38 @@ model ApplicationAnswer {
   createdAt     DateTime    @default(now())
 
   @@index([applicationId])
+}
+
+enum BackupStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+/// Durable off-platform backup of a single membership application (the company's
+/// most critical data asset). One row per application; the write-through hook on
+/// submit and the hourly reconciliation cron both drive it toward DONE. The actual
+/// JSON document + photo live in the external destination (Google Drive); this row
+/// is the local ledger of backup state. Workspace-scoped like every user-data table.
+model ApplicationBackup {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  applicationId String       @unique
+  application   Application? @relation(fields: [applicationId], references: [id])
+  status        BackupStatus @default(PENDING)
+  destination   String       @default("google_drive")
+  /// Drive file id of the uploaded JSON document.
+  externalId    String?
+  /// sha256 of the serialized JSON payload, for integrity verification.
+  checksum      String?
+  attempts      Int          @default(0)
+  lastError     String?
+  backedUpAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([workspaceId])
+  @@index([status])
 }
 
 enum EventAccessMode {

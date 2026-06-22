@@ -14,7 +14,7 @@ export default async function PortalLayout({ children }: { children: React.React
   return (
     <>
       <MemberPortalNav firstName={ctx.firstName ?? undefined} />
-      <main className="min-h-screen pb-20 sm:pb-0 pt-0" style={{ background: 'var(--events-canvas)' }}>
+      <main className="min-h-dvh pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-0 pt-0" style={{ background: 'var(--events-canvas)' }}>
         {children}
       </main>
     </>

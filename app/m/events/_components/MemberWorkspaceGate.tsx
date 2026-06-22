@@ -1,7 +1,7 @@
 /** Shown when the signed-in user's account cannot be linked to a membership. */
 export function MemberWorkspaceGate() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-events-ref-cream px-6 py-24 text-center text-events-ref-ink">
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-events-ref-cream px-6 py-24 text-center text-events-ref-ink">
       <p className="max-w-md text-base font-normal leading-relaxed">
         This area is for members only.
       </p>

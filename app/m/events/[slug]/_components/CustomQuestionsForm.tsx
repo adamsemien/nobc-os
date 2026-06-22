@@ -54,7 +54,7 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
               required={q.required}
               value={String(answers[q.id] ?? '')}
               onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-              className="w-full resize-none border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full resize-none border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-base text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             />
           ) : q.type === 'select' && q.options ? (
             <select
@@ -62,7 +62,7 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
               required={q.required}
               value={String(answers[q.id] ?? '')}
               onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-base text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             >
               <option value="">Select…</option>
               {q.options.map(opt => (
@@ -92,7 +92,7 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
               required={q.required}
               value={String(answers[q.id] ?? '')}
               onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-base text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             />
           )}
         </div>

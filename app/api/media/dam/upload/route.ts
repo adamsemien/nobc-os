@@ -14,6 +14,7 @@ import { db } from '@/lib/db';
 import { processImage } from '@/lib/dam/image';
 import { isHeic, convertHeicToJpeg } from '@/lib/dam/heic';
 import { damKey, isStorageConfigured, uploadObject } from '@/lib/dam/storage';
+import { sniffImageType, type SniffedImageType } from '@/lib/image-magic-bytes';
 
 export const runtime = 'nodejs'; // Sharp requires the Node runtime, not edge.
 export const maxDuration = 60; // WASM HEIC decode of a ~12MP photo adds ~1-3s
@@ -59,6 +60,23 @@ export async function POST(req: NextRequest) {
   const shooterCredit = strOrNull(form?.get('shooterCredit'));
 
   const original = Buffer.from(await file.arrayBuffer());
+
+  // Don't trust client-declared MIME — verify real image bytes (defense-in-depth).
+  // HEIC uploads must sniff as 'heic'; everything else must be a real jpeg/png/webp.
+  const sniffed = sniffImageType(original);
+  const allowedBytes: ReadonlySet<SniffedImageType> = heic
+    ? new Set<SniffedImageType>(['heic'])
+    : new Set<SniffedImageType>(['jpeg', 'png', 'webp']);
+  if (sniffed === null || !allowedBytes.has(sniffed)) {
+    console.warn('[dam/upload] rejected file with mismatched magic bytes', {
+      workspaceId,
+      declaredType: file.type,
+      filename: file.name,
+      sniffed,
+      size: original.length,
+    });
+    return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
+  }
 
   // HEIC can't be decoded by sharp on Vercel — convert to JPEG first, and read
   // EXIF from the original HEIC (the converted JPEG loses it).

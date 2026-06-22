@@ -100,7 +100,7 @@ export default function MemberEventsExplorer({
   applyHref: string;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[#F9F7F2] text-events-ref-ink">
+    <div className="flex min-h-dvh flex-col bg-[#F9F7F2] text-events-ref-ink">
       <MemberShellNav applyHref={applyHref} />
 
       <header className="w-full px-6 pb-8 pt-6 sm:px-10 sm:pt-8 lg:px-16 xl:px-24">

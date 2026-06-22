@@ -650,6 +650,13 @@
   --font-dm-sans: var(--font-dm-sans);
 }
 
+/* Cheap insurance against a leaky child scrolling the whole page sideways on
+   mobile. (MOBILE-IPHONE-AUDIT-2026-06-22, #9.) */
+html,
+body {
+  overflow-x: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

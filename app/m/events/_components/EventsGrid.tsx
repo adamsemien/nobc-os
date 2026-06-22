@@ -100,7 +100,7 @@ export function EventsGrid({ events }: Props) {
 
   if (events.length === 0) {
     return (
-      <div className="flex min-h-screen flex-col bg-events-ref-cream text-events-ref-ink">
+      <div className="flex min-h-dvh flex-col bg-events-ref-cream text-events-ref-ink">
         <MemberShellNav applyHref={applyHref} />
         <header className="mx-auto w-full max-w-6xl px-6 pb-10 pt-2 sm:px-8">
           <p className="text-[0.65rem] font-medium uppercase tracking-[0.35em] text-events-ref-accent">EVENTS</p>
@@ -119,7 +119,7 @@ export function EventsGrid({ events }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-events-ref-cream text-events-ref-ink">
+    <div className="min-h-dvh bg-events-ref-cream text-events-ref-ink">
       <MemberShellNav applyHref={applyHref} />
 
       <header className="mx-auto flex max-w-6xl flex-col gap-8 px-6 pb-8 pt-2 sm:px-8 lg:flex-row lg:items-start lg:justify-between lg:pb-12">

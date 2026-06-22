@@ -30,7 +30,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
   const venueCaps = event.location ? event.location.toUpperCase() : null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-events-paper text-[var(--apply-ink)]">
+    <div className="flex min-h-dvh flex-col bg-events-paper text-[var(--apply-ink)]">
       {/* Hero — full-bleed photograph, or the deep-red NoBC mark panel */}
       <section
         className="relative isolate w-full"

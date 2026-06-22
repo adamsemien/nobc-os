@@ -73,7 +73,11 @@ export default function MemberPortalNav({ firstName: _firstName }: MemberPortalN
       {/* Mobile bottom nav */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-20 flex sm:hidden border-t"
-        style={{ background: 'var(--events-canvas)', borderColor: 'var(--events-line-soft)' }}
+        style={{
+          background: 'var(--events-canvas)',
+          borderColor: 'var(--events-line-soft)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
       >
         {NAV_LINKS.map((link) => (
           <Link

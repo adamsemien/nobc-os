@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped — live at `/apply` |
+| **State** | ✅ Shipped — live at `/apply` (+ application-backup feature code-complete, dormant on a branch) |
 | **V1 item** | #1, #5 |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-06-22 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Backlog: reconcile the three competing answer-key generations (see Known issues). No structural form changes. (2026-05-21: demo seed rewritten to emit the live form's real dotted keys; one-time archetypeScores 0–1 → 0–100 migration done.) |
+| **Next** | Launch-hardening landed on `feat/apply-hardening` (BLOCKERs 1–5 from FULL-AUDIT-2026-06-21): sender display name → "The No Bad Company" across all transactional sends; submit + create idempotency guards; in-codebase per-IP rate limit (`publicRateLimit`) on both public apply POSTs; photo-upload failures now surfaced to the applicant. **Decisions for Adam:** (1) **rate-limiting** is in-memory per-instance (resets on cold start) — decide whether to add Vercel WAF or an Upstash shared store for production-grade distributed limiting (FLAGGED, no infra added); (2) the optional durable dedup index in `prisma/sql/apply-dedup-partial-unique.sql` (partial-unique on PENDING `(workspaceId, lower(email))`) is **NOT applied** — review + apply by hand if wanted (code already P2002-defensive without it). Prior threads unchanged: apply `prisma/sql/application-backup.sql` + set `GOOGLE_DRIVE_*`, then merge `feat/application-backup`; reconcile the three competing answer-key generations. |
 
 ## Scope
 
@@ -25,11 +25,20 @@ app/apply/_components/MembershipForm.tsx        ← 8-screen client form (~990 l
 app/apply/_components/FroggerGame.tsx           ← South Congress easter egg
 app/api/apply/membership/route.ts               ← POST: create draft Application
 app/api/apply/membership/[id]/route.ts          ← GET + PATCH: read/update draft
-app/api/apply/membership/[id]/submit/route.ts   ← POST: dual Claude calls
-app/api/apply/membership/upload/route.ts        ← photo upload to Vercel Blob
+app/api/apply/membership/[id]/submit/route.ts   ← POST: dual Claude calls + after() backup hook
+app/api/apply/membership/upload/route.ts        ← photo upload to private R2
 config/archetypes.ts                            ← ALL archetype copy lives here
 lib/scoring.ts                                  ← Member Worth axes + threshold logic
 scripts/fix-archetype-scores-scale.ts           ← one-time backfill: archetypeScores 0–1 → 0–100 (run 2026-05-21)
+lib/applications/backup.ts                       ← application-backup core: serialize + dependency-free Google Drive adapter + fail-closed orchestrator
+app/api/cron/backup-applications/route.ts        ← hourly reconciliation cron (CRON_SECRET-gated)
+prisma/sql/application-backup.sql                ← additive migration: BackupStatus enum + ApplicationBackup ledger (apply by hand, never db push)
+prisma/sql/apply-dedup-partial-unique.sql        ← OPTIONAL additive partial-unique index hardening submit idempotency (NOT applied; code is P2002-defensive without it)
+lib/public-rate-limit.ts                         ← shared in-memory per-IP limiter (reused by the apply create + submit POSTs; v1.1 → Upstash)
+lib/applications/approve.ts                       ← (Stage 02) welcome-email send — sender display name fixed to "The No Bad Company"
+tests/unit/apply-submit-route.test.ts            ← submit route: idempotency + rate-limit + branch coverage
+tests/unit/apply-create-route.test.ts            ← create route: dedup + P2002 recovery + rate-limit
+tests/unit/apply-hardening.test.ts               ← sender-name + photo-failure source-scan invariants
 ```
 
 ## Schema models owned
@@ -37,6 +46,7 @@ scripts/fix-archetype-scores-scale.ts           ← one-time backfill: archetype
 - **Application** (form data + scoring outputs), **ApplicationAnswer** (per-question payloads, including the `_photos` system key)
 - **ApplicationTemplate** (form variant definitions)
 - **QuestionDefinition** (the canonical question library — APPLY_QUESTIONS lives here when surfaced via DB)
+- **ApplicationBackup** (one-per-application durable-backup ledger: status/checksum/externalId/attempts) + **BackupStatus** enum (PENDING/DONE/FAILED)
 
 ## Inputs
 
