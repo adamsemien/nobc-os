@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped — live at `/apply` |
+| **State** | ✅ Shipped — live at `/apply` (+ application-backup feature code-complete, dormant on a branch) |
 | **V1 item** | #1, #5 |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-06-21 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Backlog: reconcile the three competing answer-key generations (see Known issues). No structural form changes. (2026-05-21: demo seed rewritten to emit the live form's real dotted keys; one-time archetypeScores 0–1 → 0–100 migration done.) |
+| **Next** | Apply the additive `prisma/sql/application-backup.sql` to Neon (UNPOOLED `DIRECT_URL`, never `db push`), set the three `GOOGLE_DRIVE_*` env vars in Vercel, then merge `feat/application-backup`. Until creds are set the backup stays dormant (fail-closed) and the hourly cron leaves rows PENDING. Backlog (unchanged): reconcile the three competing answer-key generations. |
 
 ## Scope
 
@@ -25,11 +25,14 @@ app/apply/_components/MembershipForm.tsx        ← 8-screen client form (~990 l
 app/apply/_components/FroggerGame.tsx           ← South Congress easter egg
 app/api/apply/membership/route.ts               ← POST: create draft Application
 app/api/apply/membership/[id]/route.ts          ← GET + PATCH: read/update draft
-app/api/apply/membership/[id]/submit/route.ts   ← POST: dual Claude calls
-app/api/apply/membership/upload/route.ts        ← photo upload to Vercel Blob
+app/api/apply/membership/[id]/submit/route.ts   ← POST: dual Claude calls + after() backup hook
+app/api/apply/membership/upload/route.ts        ← photo upload to private R2
 config/archetypes.ts                            ← ALL archetype copy lives here
 lib/scoring.ts                                  ← Member Worth axes + threshold logic
 scripts/fix-archetype-scores-scale.ts           ← one-time backfill: archetypeScores 0–1 → 0–100 (run 2026-05-21)
+lib/applications/backup.ts                       ← application-backup core: serialize + dependency-free Google Drive adapter + fail-closed orchestrator
+app/api/cron/backup-applications/route.ts        ← hourly reconciliation cron (CRON_SECRET-gated)
+prisma/sql/application-backup.sql                ← additive migration: BackupStatus enum + ApplicationBackup ledger (apply by hand, never db push)
 ```
 
 ## Schema models owned
@@ -37,6 +40,7 @@ scripts/fix-archetype-scores-scale.ts           ← one-time backfill: archetype
 - **Application** (form data + scoring outputs), **ApplicationAnswer** (per-question payloads, including the `_photos` system key)
 - **ApplicationTemplate** (form variant definitions)
 - **QuestionDefinition** (the canonical question library — APPLY_QUESTIONS lives here when surfaced via DB)
+- **ApplicationBackup** (one-per-application durable-backup ledger: status/checksum/externalId/attempts) + **BackupStatus** enum (PENDING/DONE/FAILED)
 
 ## Inputs
 

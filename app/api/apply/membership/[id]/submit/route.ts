@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { render } from '@react-email/render';
 import { db } from '@/lib/db';
 import { resend } from '@/lib/resend';
@@ -8,6 +8,7 @@ import { scoreApplication } from '@/lib/scoring';
 import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
 import { resolveMember, promoteMemberToApproved } from '@/lib/member-identity';
 import { maybeFireSlack } from '@/lib/comments-notify';
+import { backupApplication } from '@/lib/applications/backup';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -148,6 +149,21 @@ Write 2-3 sentences that feel like we truly read their application and see them.
       aiReasoning: result.aiReasoning,
       personalizedCopy,
     },
+  });
+
+  // Durable off-platform backup of the completed application — the company's most
+  // critical data asset. Runs OUT OF BAND via after() so it never affects this
+  // response or its timing; backupApplication is itself fail-closed and never
+  // throws, the try/catch is a final belt-and-suspenders guard.
+  after(async () => {
+    try {
+      await backupApplication(id);
+    } catch (e) {
+      console.error('[application-backup] write-through hook failed', {
+        applicationId: id,
+        err: e instanceof Error ? e.message : String(e),
+      });
+    }
   });
 
   // Slack notify — fire-and-forget. Distinct events for "new application"
