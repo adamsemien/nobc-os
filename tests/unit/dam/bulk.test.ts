@@ -67,4 +67,99 @@ describe('parseBulkAction', () => {
       parseBulkAction({ action: 'reorder', assetIds: ['a'], orderedIds: [1, null, true] }).ok,
     ).toBe(false);
   });
+
+  // Wave 3 new actions -------------------------------------------------------
+
+  describe('removeTags', () => {
+    it('rejects missing tags array', () => {
+      expect(parseBulkAction({ action: 'removeTags', assetIds: ['a'] }).ok).toBe(false);
+    });
+
+    it('rejects all-whitespace tags', () => {
+      expect(
+        parseBulkAction({ action: 'removeTags', assetIds: ['a'], tags: ['  ', ''] }).ok,
+      ).toBe(false);
+    });
+
+    it('rejects empty tags array', () => {
+      expect(parseBulkAction({ action: 'removeTags', assetIds: ['a'], tags: [] }).ok).toBe(false);
+    });
+
+    it('parses valid removeTags with correct payload', () => {
+      const result = parseBulkAction({ action: 'removeTags', assetIds: ['a', 'b'], tags: ['outdoor', 'summer'] });
+      expect(result).toMatchObject({
+        ok: true,
+        action: 'removeTags',
+        assetIds: ['a', 'b'],
+        payload: { tags: ['outdoor', 'summer'] },
+      });
+    });
+
+    it('filters non-string entries from tags', () => {
+      const result = parseBulkAction({ action: 'removeTags', assetIds: ['a'], tags: ['valid', 42, null] });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.payload).toEqual({ tags: ['valid'] });
+    });
+  });
+
+  describe('setCredit', () => {
+    it('rejects missing credit', () => {
+      expect(parseBulkAction({ action: 'setCredit', assetIds: ['a'] }).ok).toBe(false);
+    });
+
+    it('rejects non-string credit', () => {
+      expect(parseBulkAction({ action: 'setCredit', assetIds: ['a'], credit: 42 }).ok).toBe(false);
+      expect(parseBulkAction({ action: 'setCredit', assetIds: ['a'], credit: null }).ok).toBe(false);
+    });
+
+    it('parses setCredit with a string value (including empty string)', () => {
+      const result = parseBulkAction({ action: 'setCredit', assetIds: ['a'], credit: 'Jane Doe' });
+      expect(result).toMatchObject({
+        ok: true,
+        action: 'setCredit',
+        assetIds: ['a'],
+        payload: { credit: 'Jane Doe' },
+      });
+    });
+
+    it('accepts empty string credit (clearing a credit is valid)', () => {
+      const result = parseBulkAction({ action: 'setCredit', assetIds: ['a'], credit: '' });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.payload).toEqual({ credit: '' });
+    });
+
+    it('rejects empty assetIds', () => {
+      expect(parseBulkAction({ action: 'setCredit', assetIds: [], credit: 'Jane' }).ok).toBe(false);
+    });
+  });
+
+  describe('setSponsor', () => {
+    it('rejects missing sponsor', () => {
+      expect(parseBulkAction({ action: 'setSponsor', assetIds: ['a'] }).ok).toBe(false);
+    });
+
+    it('rejects non-string sponsor', () => {
+      expect(parseBulkAction({ action: 'setSponsor', assetIds: ['a'], sponsor: true }).ok).toBe(false);
+    });
+
+    it('parses setSponsor with a string value', () => {
+      const result = parseBulkAction({ action: 'setSponsor', assetIds: ['x'], sponsor: 'Acme Corp' });
+      expect(result).toMatchObject({
+        ok: true,
+        action: 'setSponsor',
+        assetIds: ['x'],
+        payload: { sponsor: 'Acme Corp' },
+      });
+    });
+
+    it('accepts empty string sponsor (clearing a sponsor is valid)', () => {
+      const result = parseBulkAction({ action: 'setSponsor', assetIds: ['x'], sponsor: '' });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.payload).toEqual({ sponsor: '' });
+    });
+
+    it('rejects empty assetIds', () => {
+      expect(parseBulkAction({ action: 'setSponsor', assetIds: [], sponsor: 'Acme' }).ok).toBe(false);
+    });
+  });
 });
