@@ -9,9 +9,23 @@ import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
 import { resolveMember, promoteMemberToApproved } from '@/lib/member-identity';
 import { maybeFireSlack } from '@/lib/comments-notify';
 import { backupApplication } from '@/lib/applications/backup';
+import { publicRateLimit } from '@/lib/public-rate-limit';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Abuse protection: cap submit floods before any DB / Anthropic / Resend work.
+  // Each submit fans out to two Sonnet calls + an email, so an unthrottled flood
+  // is unbounded AI cost. In-memory per-IP limiter (resets on cold start) — see
+  // the FLAG in the hardening report: production-grade distributed limiting needs
+  // a shared store (Upstash/Vercel WAF). The idempotency guard below compounds it.
+  const rateCheck = publicRateLimit(req);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfterSecs) } },
+    );
+  }
+
   const { id } = await params;
 
   const application = await db.application.findUnique({
@@ -19,6 +33,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     include: { answers: true },
   });
   if (!application) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  // ── 0. Idempotency guard ──────────────────────────────────────────────
+  // A double-tap, network retry, or script replay must not re-run scoring (two
+  // billed Sonnet calls) or re-send the welcome email. Once an application has
+  // been scored (aiScore set) we return the persisted reveal shape unchanged —
+  // the client only reads archetype / archetypeScores / tags / personalizedCopy,
+  // all of which are durably stored on the row.
+  if (application.aiScore !== null) {
+    return NextResponse.json({
+      cached: true,
+      archetype: application.archetype ?? '',
+      archetypeScores: (application.archetypeScores ?? {}) as Record<string, number>,
+      tags: application.aiTags,
+      personalizedCopy: application.personalizedCopy ?? '',
+    });
+  }
+  // A terminal status with no score means the BLOCKED auto-reject path already
+  // ran (BLOCKED short-circuits before scoring). Replaying it must stay a no-op.
+  if (application.status === 'REJECTED') {
+    return NextResponse.json({ blocked: true, cached: true });
+  }
 
   // ── 1. Duplicate check ────────────────────────────────────────────────
   const isDuplicate = await checkDuplicate(

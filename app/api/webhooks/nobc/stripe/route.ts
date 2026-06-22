@@ -60,7 +60,7 @@ function deferConfirmationEmail(
       Boolean(member.memberQrCode),
     );
     await resend.emails.send({
-      from: 'NoBC <team@thenobadcompany.com>',
+      from: 'The No Bad Company <team@thenobadcompany.com>',
       to: toEmail,
       subject,
       html,

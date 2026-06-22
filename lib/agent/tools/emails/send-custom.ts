@@ -53,7 +53,7 @@ const sendCustomEmail: AgentTool<Input, unknown> = {
     try {
       const { resend } = await import('@/lib/resend');
       await resend.emails.send({
-        from: 'NoBC <team@thenobadcompany.com>',
+        from: 'The No Bad Company <team@thenobadcompany.com>',
         to: recipient.email,
         subject: input.subject,
         html: `<div style="font-family:sans-serif;white-space:pre-wrap;font-size:15px;line-height:1.6">${escapeHtml(

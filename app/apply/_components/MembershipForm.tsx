@@ -786,14 +786,30 @@ export default function MembershipForm() {
     try {
       // Upload returns a private R2 object key (not a public URL); the operator
       // review surfaces resolve it through the role-gated presign proxy.
+      // A failed upload must NOT be silently swallowed — losing a photo the
+      // applicant chose to share is a data-loss bug. Surface it and block the
+      // submission so they can retry, rather than landing an empty photo key.
       const uploadedUrls: string[] = [];
       for (const file of photoFiles) {
         try {
           const fd = new FormData();
           fd.append('file', file);
           const r = await fetch('/api/apply/membership/upload', { method: 'POST', body: fd });
-          uploadedUrls.push(r.ok ? (await r.json()).key : '');
-        } catch { uploadedUrls.push(''); }
+          if (!r.ok) {
+            const detail = await r.json().catch(() => null);
+            throw new Error(detail?.error || `Photo upload failed (${r.status}).`);
+          }
+          const { key } = await r.json();
+          if (!key) throw new Error('Photo upload failed.');
+          uploadedUrls.push(key);
+        } catch (uploadErr) {
+          console.error('[apply/photo-upload]', uploadErr);
+          throw new Error(
+            uploadErr instanceof Error && uploadErr.message
+              ? `${uploadErr.message} Please try a different photo or remove it and resubmit.`
+              : 'One of your photos could not be uploaded. Please try a different photo or remove it and resubmit.',
+          );
+        }
       }
 
       const patchRes = await fetch(`/api/apply/membership/${applicationId}`, {

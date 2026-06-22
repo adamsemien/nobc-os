@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.thenobadcompany.com';
     const eventUrl = `${appUrl}/m/events/${event.slug}`;
     await resend.emails.send({
-      from: 'NoBC <team@thenobadcompany.com>',
+      from: 'The No Bad Company <team@thenobadcompany.com>',
       to: guestEmail,
       subject: `You're on the guest list for ${event.title}`,
       html: `<p>Hi ${escapeHtml(guestName)},</p>

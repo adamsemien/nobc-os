@@ -223,7 +223,7 @@ export async function submitMemberRsvp(
       const emailAddress = clerkUserForEmail.emailAddresses[0]?.emailAddress;
       if (emailAddress) {
         resend.emails.send({
-          from: 'NoBC <team@thenobadcompany.com>',
+          from: 'The No Bad Company <team@thenobadcompany.com>',
           to: emailAddress,
           ...rsvpConfirmedEmail(memberName, eventRecord.title, eventRecord.startAt, eventRecord.location, eventRecord.slug, rsvp.id),
         }).catch(err => console.error('[rsvp] confirmation email failed:', err));

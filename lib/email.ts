@@ -17,7 +17,7 @@ export type SendResult =
   | { ok: true; messageId?: string }
   | { ok: false; reason: 'disabled' | 'template_missing' | 'send_failed' | 'no_resend_key'; error?: string };
 
-const FROM = 'NoBC <team@thenobadcompany.com>';
+const FROM = 'The No Bad Company <team@thenobadcompany.com>';
 
 /** Flatten {member: {firstName: 'X'}} → {'member.firstName': 'X'} so callers can
  *  pass nested objects too. */
