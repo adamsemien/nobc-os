@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Star, Camera, Calendar, HelpCircle } from 'lucide-react';
 import type { MediaAsset } from './types';
 import type { ExifSummary } from '@/lib/dam/exif';
+import { AssetExportPanel } from './AssetExportPanel';
 
 export function formatBytes(n: number): string {
   if (!n) return '—';
@@ -629,6 +630,8 @@ export function MediaPreview({
               />
               {asset.isSelect ? 'Selected' : 'Mark as select'}
             </button>
+
+            <AssetExportPanel assetId={asset.id} fileType={asset.fileType} />
 
             <dl
               className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-[family-name:var(--font-mono)] text-[12px]"
