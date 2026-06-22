@@ -72,6 +72,10 @@ model Workspace {
   shareLinks     ShareLink[]
   assetDownloads AssetDownload[]
 
+  // Instagram Story Automation
+  instagramStories       InstagramStory[]
+  instagramStoryBatches  InstagramStoryBatch[]
+
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
   // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
@@ -1711,4 +1715,78 @@ model StripeEvent {
 
   @@index([type])
   @@index([processedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Instagram Story Automation (New Feature)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum StoryStatus {
+  DRAFT      // Story generated, not yet scheduled
+  QUEUED     // Scheduled, pending publishing
+  PUBLISHED  // Successfully posted to Instagram
+  FAILED     // Publication attempt failed
+  CANCELLED  // Operator cancelled the story
+}
+
+model InstagramStory {
+  id              String        @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  eventId         String?       // Associated event (optional)
+  sourceAssetId   String?       // Original DAM asset ID
+  
+  // Story metadata
+  status          StoryStatus   @default(DRAFT)
+  title           String?       // Event name or story name
+  dayCounter      Int?          // Day 1, Day 2, etc. (optional)
+  
+  // Generated story
+  storyImageUrl   String?       // R2 signed URL for the generated 1080x1920 PNG
+  storyR2Key      String?       // R2 object key (for expiry/presign refresh)
+  
+  // Instagram metadata
+  instagramMediaId String?      // The actual Instagram post ID after publishing
+  scheduledAt     DateTime?     // When it should be posted
+  publishedAt     DateTime?     // When it was actually posted
+  
+  // Workflow tracking
+  createdBy       String        // Clerk userId
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Retry tracking for failed stories
+  lastError       String?
+  attemptCount    Int           @default(0)
+  
+  @@index([workspaceId])
+  @@index([eventId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([publishedAt])
+}
+
+model InstagramStoryBatch {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  // Batch metadata
+  name            String
+  eventId         String?               // Associated event
+  
+  // Scheduling
+  startDate       DateTime              // First story publish date
+  publishInterval Int                   @default(1) // days between posts
+  
+  // Track what's in this batch
+  storyIds        String[]              @default([]) // InstagramStory IDs
+  
+  createdBy       String                // Clerk userId
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  
+  @@index([workspaceId])
+  @@index([eventId])
 }

@@ -2,7 +2,7 @@
 
 > **If you are a fresh Claude Code session, read this first.** It is the live
 > handoff for the in-flight security + strategy work. Single owner: the "Apex /
-> security-and-strategy" session (Opus 4.8). Last updated: **2026-06-15**.
+> security-and-strategy" session (Opus 4.8). Last updated: **2026-06-21**.
 > Update this file whenever the state below changes — it is the resume point.
 
 ---
@@ -10,6 +10,18 @@
 ## 0. Current shared state — 2026-06-15 (live; read before §1)
 
 > Canonical handoff across all active sessions (Adam + multiple CC clones). Verified facts only.
+
+### 2026-06-21 — Production recovery + Instagram Stories rollout (Opus 4.8 session)
+
+- **Outage fixed.** `app.thenobadcompany.com` was 500ing on every DB route (`P1000`) — Vercel prod `DATABASE_URL`/`DIRECT_URL` held a stale password. Replaced with the valid Neon **production**-branch string (`ep-twilight-forest-aj09y301`) + redeployed. Verified `/e/no-bad-monday` → 200; data intact (19 events, 177 members).
+- **`main`-HEAD build break fixed.** Every prod build had been failing `next build` since the Instagram-Stories commits — 3 bugs in `app/operator/media/_components/StoryGeneratorPanel.tsx`: conditional `useCallback` (rules-of-hooks), phantom `date-fns` import (never in `package.json`), `event.name`→`event.title`. Fixed on `fix/story-generator-hook`, fast-forwarded to `main` (`9f7984e`). tsc 0, preview build green.
+- **Stories DB migration applied (additive, `prisma db execute`).** `InstagramStory` + `InstagramStoryBatch` tables + `StoryStatus` enum. ⚠️ The `prisma migrate diff` output included **false-drift `DROP INDEX Asset_searchVector_idx` + `Asset_embedding_hnsw_idx`** — **stripped before applying**; both DAM indexes verified still present post-migration. Reviewed + APPROVED by tonone:flux.
+- **Prod credential rotated.** Old `neondb_owner` password `npg_n2VT6ikmzIOs` was exposed in-session → Adam rotated the **production** branch to `npg_B9o2RnCbHKLA`. Vercel prod `DATABASE_URL`/`DIRECT_URL` updated to the new password as **`--sensitive`** (was briefly `--no-sensitive` for verification) + redeployed; verified green. **Dev (`ep-sweet-term`) + sandbox (`ep-tiny-mode`) have independent passwords — unaffected, NOT rotated (Adam's call); the leaked old password still opens them** (non-prod data, lower risk).
+- **Doc landmine fixed.** Removed the dangerous `prisma db push` instructions from `INSTAGRAM_STORIES_SETUP.md`, `DELIVERY_SUMMARY.md`, `BUILD_STATUS.md` (they'd drop the DAM indexes).
+- **PROD now:** `main` @ `9f7984e`+ (full feature set incl. Stories UI live).
+- **Still owed (Adam):** (1) set `INSTAGRAM_ACCESS_TOKEN` + `INSTAGRAM_BUSINESS_ACCOUNT_ID` in Vercel prod for Stories to actually post (long-lived token, ~60-day expiry); (2) optional — rotate the leaked dev Clerk `sk_test_…` + dev/sandbox Neon passwords; (3) `REPLICATE_API_TOKEN` still unset (DAM vibe search no-ops). **The §0 entry below (2026-06-15) predates this and may be stale on the DATABASE_URL line.**
+
+---
 
 **PROD:** `app.thenobadcompany.com` → `main` @ `2dde584` (#106/#107/#109). Event-save bug fixed (hero input `type=url` → `text`). Public event page `/e/[slug]` renders for anonymous visitors — verified live: `/e/no-bad-monday` → HTTP 200.
 

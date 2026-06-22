@@ -24,6 +24,8 @@ import { SaveSearchPopover } from './SaveSearchPopover';
 const SORTS: { value: string; label: string; title: string }[] = [
   { value: 'date', label: 'Date', title: 'Sort by upload date' },
   { value: 'shootDate', label: 'Shoot date', title: 'Sort by when the photo was taken' },
+  { value: 'event', label: 'Event', title: 'Group by event' },
+  { value: 'sponsor', label: 'Sponsor', title: 'Group by sponsor' },
   { value: 'selects', label: 'Selects first', title: 'Show flagged photos at the top' },
   { value: 'quality', label: 'Quality', title: 'Sort by sharpness, exposure, and composition score' },
   { value: 'manual', label: 'Manual', title: 'Drag photos into your preferred order' },

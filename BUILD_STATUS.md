@@ -200,7 +200,7 @@ Enums created: `MemberStatus`, `ApplicationStatus`, `EventAccessMode`, `EventSta
 
 ---
 
-## Push Command
+## Apply Schema
 
 When ready (after filling in `DATABASE_URL`):
 
@@ -208,17 +208,19 @@ When ready (after filling in `DATABASE_URL`):
 cp .env.local.example .env.local
 # edit .env.local with your real DATABASE_URL
 
-npx prisma db push
+# ⚠️ NEVER `prisma db push` on this repo — it drops the out-of-band DAM indexes
+# (Asset_searchVector_idx, Asset_embedding_hnsw_idx). Apply additive SQL only:
+npx prisma db execute --file <migration.sql>
 ```
 
-> Prisma 7 auto-detects `prisma.config.ts` — no extra flags needed.
+> Prisma 7 auto-detects `prisma.config.ts` — no extra flags needed. See CLAUDE.md → "Schema changes: never `prisma db push`."
 
 ---
 
 ## Pending
 
 - [ ] `.env.local` — copy from `.env.local.example`, fill in real values
-- [ ] `prisma db push` — run manually after setting DATABASE_URL
+- [ ] Apply schema via `prisma db execute --file <sql>` (NEVER `db push`) after setting DATABASE_URL
 - [ ] Clerk dashboard — create app, copy publishable key + secret key
 - [ ] Add Clerk sign-in/sign-up UI routes (`app/(auth)/sign-in`, `app/(auth)/sign-up`)
 - [ ] Member portal routes under `app/m/`

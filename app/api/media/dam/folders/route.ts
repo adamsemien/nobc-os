@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest) {
 
   const folders = await db.mediaFolder.findMany({
     where: { workspaceId, deletedAt: null },
-    select: { id: true, name: true, type: true, eventId: true, parentId: true, sortOrder: true },
+    select: { id: true, name: true, type: true, eventId: true, parentId: true, sortOrder: true, createdAt: true },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
   });
 
@@ -28,11 +28,23 @@ export async function GET(_req: NextRequest) {
   const counts: Record<string, number> = {};
   for (const g of grouped) if (g.folderId) counts[g.folderId] = g._count._all;
 
-  const trashCount = await db.asset.count({
-    where: { workspaceId, deletedAt: { not: null } },
-  });
+  // Counts for the evergreen "smart" folders — virtual filters, not stored rows.
+  const recentSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const live = { workspaceId, deletedAt: null };
+  const [trashCount, photos, videos, selects, recent] = await Promise.all([
+    db.asset.count({ where: { workspaceId, deletedAt: { not: null } } }),
+    db.asset.count({ where: { ...live, fileType: 'PHOTO' } }),
+    db.asset.count({ where: { ...live, fileType: 'VIDEO' } }),
+    db.asset.count({ where: { ...live, isSelect: true } }),
+    db.asset.count({ where: { ...live, createdAt: { gte: recentSince } } }),
+  ]);
 
-  return NextResponse.json({ folders, counts, trashCount });
+  return NextResponse.json({
+    folders,
+    counts,
+    trashCount,
+    smartCounts: { photos, videos, selects, recent },
+  });
 }
 
 /** Create a folder (move-to-folder target + batch-upload auto-create). STAFF. */
@@ -59,4 +71,27 @@ export async function POST(req: NextRequest) {
     },
   });
   return NextResponse.json({ folder }, { status: 201 });
+}
+
+/** Reorder folders (drag-to-arrange in the sidebar). Persists sortOrder. STAFF. */
+export async function PATCH(req: NextRequest) {
+  const gate = await requireRole(OperatorRole.STAFF);
+  if (!gate.ok) return gate.response;
+  const { workspaceId } = gate;
+
+  const b = await req.json().catch(() => null);
+  const orderedIds: string[] = Array.isArray(b?.orderedIds)
+    ? b.orderedIds.filter((x: unknown): x is string => typeof x === 'string')
+    : [];
+  if (orderedIds.length === 0) {
+    return NextResponse.json({ error: 'orderedIds required' }, { status: 400 });
+  }
+
+  // updateMany scoped by workspaceId, so a foreign folder id is a silent no-op (IDOR-safe).
+  await db.$transaction(
+    orderedIds.map((id, i) =>
+      db.mediaFolder.updateMany({ where: { id, workspaceId }, data: { sortOrder: i } }),
+    ),
+  );
+  return NextResponse.json({ ok: true });
 }
