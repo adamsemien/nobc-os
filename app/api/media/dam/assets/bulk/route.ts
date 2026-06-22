@@ -1,6 +1,7 @@
 /**
  * POST /api/media/dam/assets/bulk — bulk operations on selected assets (STAFF).
- * actions: flagSelect | addTags | move | softDelete | restore | permanentDelete | reorder.
+ * actions: flagSelect | addTags | removeTags | move | softDelete | restore |
+ *          permanentDelete | reorder | setCredit | setSponsor.
  * Workspace-scoped. permanentDelete also removes R2 objects + decrements storageBytes.
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -69,6 +70,33 @@ export async function POST(req: NextRequest) {
           db.asset.updateMany({ where: { id, workspaceId }, data: { sortOrder: i } }),
         ),
       );
+      break;
+    case 'removeTags': {
+      const rows = await db.asset.findMany({ where: scope, select: { id: true, tags: true } });
+      const toRemove = new Set(parsed.payload.tags);
+      await db.$transaction(
+        rows.map((a) =>
+          db.asset.update({
+            where: { id: a.id },
+            data: { tags: a.tags.filter((t) => !toRemove.has(t)) },
+          }),
+        ),
+      );
+      break;
+    }
+    case 'setCredit':
+      // Empty string clears the credit (null-like, consistent with optional String? field).
+      await db.asset.updateMany({
+        where: scope,
+        data: { shooterCredit: parsed.payload.credit || null },
+      });
+      break;
+    case 'setSponsor':
+      // Empty string clears the sponsor.
+      await db.asset.updateMany({
+        where: scope,
+        data: { sponsorName: parsed.payload.sponsor || null },
+      });
       break;
   }
 
