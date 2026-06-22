@@ -71,7 +71,8 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     }
   }, [selectionMode]);
 
-  // Assets fetch — resets on sp/reloadKey change, handles semantic mode
+  // Assets fetch — resets on sp/reloadKey change.
+  // When ?q is present, always tries semantic first and falls back transparently.
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -79,7 +80,6 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     setNextCursor(null);
     setIsDegraded(false);
 
-    const isSemantic = sp.get('mode') === 'semantic';
     const q = sp.get('q') ?? '';
 
     const doKeywordFetch = () =>
@@ -98,7 +98,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
           if (active) setLoading(false);
         });
 
-    if (isSemantic && q) {
+    if (q) {
       const params = new URLSearchParams();
       params.set('q', q);
       const fileType = sp.get('fileType');
@@ -141,10 +141,9 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
       (entries) => {
         if (entries[0]?.isIntersecting && nextCursor && !loading && !loadingMore) {
           setLoadingMore(true);
-          const isSemantic = sp.get('mode') === 'semantic';
           const q = sp.get('q') ?? '';
           let url: string;
-          if (isSemantic && q) {
+          if (q) {
             const params = new URLSearchParams();
             params.set('q', q);
             const fileType = sp.get('fileType');
@@ -340,16 +339,13 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
 
           <MediaToolbar onDensity={setDensity} viewMode={viewMode} onViewMode={setViewMode} />
           {isDegraded && (
-            <div
-              className="mb-2 rounded-[6px] px-3 py-2 text-[13px]"
-              style={{
-                background: 'color-mix(in srgb, var(--primary) 8%, var(--card))',
-                color: 'var(--text-secondary)',
-                border: '1px solid var(--border)',
-              }}
+            <p
+              aria-live="polite"
+              className="mb-2 text-[12px] italic"
+              style={{ color: 'var(--text-muted)' }}
             >
-              Vibe search is warming up — showing keyword results
-            </div>
+              Showing keyword results — visual search is temporarily unavailable.
+            </p>
           )}
           {effectiveViewMode === 'list' ? (
             <MediaList
@@ -404,6 +400,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
             setSelectionMode(false);
           }}
           isWide={isWide}
+          sponsors={options.sponsors}
         />
       )}
       {previewIndex != null && displayAssets[previewIndex] && (
