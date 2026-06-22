@@ -1,8 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { X, ChevronLeft, ChevronRight, Star, Camera, Calendar, HelpCircle } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Star, Camera, Calendar, HelpCircle, Pencil } from 'lucide-react';
 import type { MediaAsset } from './types';
 import type { ExifSummary } from '@/lib/dam/exif';
+import { AssetExportPanel } from './AssetExportPanel';
+import { ImageEditor } from './ImageEditor';
 
 export function formatBytes(n: number): string {
   if (!n) return '—';
@@ -48,6 +50,7 @@ export function MediaPreview({
   const [, setDetailLoading] = useState(false);
   const [showPanel, setShowPanel] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   // Mouse-drag state (desktop pan)
@@ -451,6 +454,18 @@ export function MediaPreview({
           <X className="h-6 w-6" />
         </button>
 
+        {editing && (
+          <ImageEditor
+            assetId={asset.id}
+            filename={asset.filename}
+            onClose={() => setEditing(false)}
+            onSaved={() => {
+              setEditing(false);
+              onClose();
+            }}
+          />
+        )}
+
         {/* Help button */}
         <button
           aria-label="Keyboard shortcuts"
@@ -629,6 +644,19 @@ export function MediaPreview({
               />
               {asset.isSelect ? 'Selected' : 'Mark as select'}
             </button>
+
+            {asset.fileType === 'PHOTO' && (
+              <button
+                className="flex items-center gap-2 self-start rounded-[6px] border px-2.5 py-1.5 text-[13px]"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                onClick={() => setEditing(true)}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit image
+              </button>
+            )}
+
+            <AssetExportPanel assetId={asset.id} fileType={asset.fileType} />
 
             <dl
               className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-[family-name:var(--font-mono)] text-[12px]"
