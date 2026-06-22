@@ -246,8 +246,8 @@ export function AgentPanel() {
           title="AI agent — ⌘⇧⌥A"
           style={{
             position: 'fixed',
-            bottom: 64,
-            right: 20,
+            bottom: 'max(64px, env(safe-area-inset-bottom))',
+            right: 'max(20px, env(safe-area-inset-right))',
             width: 48,
             height: 48,
             borderRadius: '50%',
@@ -278,7 +278,7 @@ export function AgentPanel() {
           right: 0,
           bottom: 0,
           width: 384,
-          maxWidth: '100vw',
+          maxWidth: '100%',
           display: 'flex',
           flexDirection: 'column',
           background: PANEL_BG,

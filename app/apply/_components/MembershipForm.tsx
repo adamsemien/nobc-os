@@ -1001,7 +1001,7 @@ export default function MembershipForm() {
       {/* Header */}
       <nav style={{
         position: 'sticky', top: 0, left: 0, right: 0, zIndex: 50,
-        height: 56, padding: '0 24px',
+        height: 56, padding: '0 24px', paddingTop: 'env(safe-area-inset-top)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         background: theme.bg,
       }}>
@@ -1013,6 +1013,8 @@ export default function MembershipForm() {
           cursor: 'pointer',
           fontSize: 14,
           padding: '6px 10px',
+          minHeight: 44,
+          minWidth: 44,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1489,6 +1491,7 @@ export default function MembershipForm() {
                   color: THEME.night.text,
                   lineHeight: 0.95,
                   margin: '0 0 24px 0',
+                  overflowWrap: 'break-word',
                   animation: 'fadeInUp 500ms ease 0ms forwards',
                   opacity: 0,
                 }}>

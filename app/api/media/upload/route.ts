@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireWorkspaceId } from '@/lib/auth';
 import { isStorageConfigured, uploadObject } from '@/lib/dam/storage';
+import { isAllowedImageBytes, type SniffedImageType } from '@/lib/image-magic-bytes';
 
 // Event-hero uploads go to PRIVATE R2 (not public Vercel Blob) under an
 // event-hero/{workspaceId}/ prefix and are read back through the public,
@@ -14,6 +15,7 @@ export const runtime = 'nodejs';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+const ALLOWED_BYTES = new Set<SniffedImageType>(['jpeg', 'png', 'webp']);
 
 function extFromMime(mime: string): string {
   if (mime === 'image/png') return 'png';
@@ -42,9 +44,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Uploads unavailable' }, { status: 503 });
   }
 
+  const buf = Buffer.from(await file.arrayBuffer());
+  // Don't trust client-declared MIME — verify real image bytes (defense-in-depth).
+  if (!isAllowedImageBytes(buf, ALLOWED_BYTES)) {
+    console.warn('[media/upload] rejected file with mismatched magic bytes', {
+      workspaceId,
+      declaredType: file.type,
+      size: buf.length,
+    });
+    return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
+  }
+
   const ext = extFromMime(file.type);
   const key = `event-hero/${workspaceId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-  const buf = Buffer.from(await file.arrayBuffer());
   await uploadObject(key, buf, file.type);
 
   return NextResponse.json({ key });

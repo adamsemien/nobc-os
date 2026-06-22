@@ -408,6 +408,8 @@ function DeliverablesBlock({ proofs }: { proofs: DeliverableProof[] }) {
       {proofs.map((p, i) => (
         <View key={i} style={s.proofCard} wrap={false}>
           {p.imageDataUri ? (
+            // react-pdf's <Image> renders to PDF, not HTML — it has no `alt` prop, so the a11y rule is a false positive here.
+            // eslint-disable-next-line jsx-a11y/alt-text
             <Image style={s.proofImg} src={p.imageDataUri} />
           ) : (
             <View style={s.proofPlaceholder}>

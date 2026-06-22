@@ -325,7 +325,7 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
               onBack={goBack}
               onClose={onClose}
             />
-            <div className="px-6 pb-7 sm:px-8 sm:pb-8">
+            <div className="px-4 pb-7 sm:px-8 sm:pb-8">
               <ScreenFade screenKey={screen?.key ?? 'x'}>
                 {screen?.kind === 'auth' && <AuthStep />}
 
@@ -461,7 +461,7 @@ function FlowHeader({
   onClose: () => void;
 }) {
   return (
-    <div className="px-6 pt-5 sm:px-8 sm:pt-6">
+    <div className="px-4 pt-5 sm:px-8 sm:pt-6">
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -945,7 +945,7 @@ function DoneScreen({
   }).format(start);
 
   return (
-    <div className="px-6 pb-8 pt-9 text-center sm:px-8">
+    <div className="px-4 pb-8 pt-9 text-center sm:px-8">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--nobc-red)] text-xl text-[var(--nobc-on-red)]">
         {confirmed ? '✓' : '◷'}
       </div>
