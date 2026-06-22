@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { X } from 'lucide-react';
 import { COLOR_BUCKETS } from '@/lib/dam/color';
+import type { ColorBucket } from '@/lib/dam/color';
 
 export interface FilterOptions {
   events: { id: string; title: string }[];
@@ -21,6 +22,92 @@ const ctlStyle = {
   accentColor: 'var(--primary)',
 } as const;
 const lblStyle = { color: 'var(--text-secondary)' } as const;
+
+// ------------------------------------------------------------------
+// ColorSwatches — hover + focus tooltip, selected name display
+// ------------------------------------------------------------------
+
+function ColorSwatch({
+  bucket,
+  active,
+  onToggle,
+}: {
+  bucket: ColorBucket;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const [showTip, setShowTip] = useState(false);
+  return (
+    <div className="relative" onMouseEnter={() => setShowTip(true)} onMouseLeave={() => setShowTip(false)}>
+      <button
+        type="button"
+        aria-label={`Filter by ${bucket.name} — ${active ? 'selected' : 'not selected'}`}
+        aria-pressed={active}
+        onClick={onToggle}
+        onFocus={() => setShowTip(true)}
+        onBlur={() => setShowTip(false)}
+        className="h-6 w-6 rounded-full transition-all motion-reduce:transition-none focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+        style={{
+          background: bucket.hex,
+          outline: active ? '2px solid var(--primary)' : '2px solid transparent',
+          outlineOffset: '2px',
+        }}
+      />
+      {showTip && (
+        <div
+          className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-[4px] px-1.5 py-0.5 text-[11px]"
+          style={{ background: 'var(--text-primary)', color: 'var(--card)' }}
+          role="tooltip"
+        >
+          {bucket.name}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ColorSwatches({
+  sp,
+  set,
+}: {
+  sp: ReturnType<typeof useSearchParams>;
+  set: (k: string, v: string) => void;
+}) {
+  const activeColor = sp.get('color') ?? '';
+  const activeBucket = COLOR_BUCKETS.find((b) => b.name === activeColor);
+  return (
+    <div>
+      <div className={lbl} style={lblStyle}>
+        Color
+      </div>
+      <div className="flex flex-wrap gap-1.5 pt-1">
+        {COLOR_BUCKETS.map((bucket) => (
+          <ColorSwatch
+            key={bucket.name}
+            bucket={bucket}
+            active={activeColor === bucket.name}
+            onToggle={() => set('color', activeColor === bucket.name ? '' : bucket.name)}
+          />
+        ))}
+      </div>
+      {activeBucket && (
+        <div className="mt-1.5 flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+          <span>Color: {activeBucket.name}</span>
+          <span style={{ color: 'var(--text-muted)' }}>·</span>
+          <button
+            type="button"
+            onClick={() => set('color', '')}
+            className="text-[12px] focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label="Clear color filter"
+          >
+            ×
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ------------------------------------------------------------------
 // Inner component — extracted so both sidebar and sheet share the same JSX
@@ -57,7 +144,7 @@ function FilterControls({
       </div>
       <div>
         <label className={lbl} style={lblStyle}>
-          File type
+          Type
         </label>
         <select
           className={ctl}
@@ -126,42 +213,7 @@ function FilterControls({
         />
         Selects only
       </label>
-      <div>
-        <div className={lbl} style={lblStyle}>
-          Color
-        </div>
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {COLOR_BUCKETS.map((bucket, i) => {
-            const active = sp.get('color') === bucket.name;
-            return (
-              <button
-                key={`${bucket.name}-${i}`}
-                type="button"
-                aria-label={bucket.name}
-                aria-pressed={active}
-                title={bucket.name}
-                onClick={() => set('color', active ? '' : bucket.name)}
-                className="h-6 w-6 rounded-full transition-all motion-reduce:transition-none"
-                style={{
-                  background: bucket.hex,
-                  outline: active ? '2px solid var(--primary)' : '2px solid transparent',
-                  outlineOffset: '2px',
-                }}
-              />
-            );
-          })}
-        </div>
-        {sp.get('color') && (
-          <button
-            type="button"
-            onClick={() => set('color', '')}
-            className="mt-1 text-[11px]"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            Clear color
-          </button>
-        )}
-      </div>
+      <ColorSwatches sp={sp} set={set} />
     </>
   );
 }

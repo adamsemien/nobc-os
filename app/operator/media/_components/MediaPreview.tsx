@@ -1,8 +1,22 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { X, ChevronLeft, ChevronRight, Star, Camera, Calendar, HelpCircle, Pencil } from 'lucide-react';
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Star,
+  Camera,
+  Calendar,
+  HelpCircle,
+  Copy,
+  Check,
+  Download,
+  ScanSearch,
+  Pencil,
+} from 'lucide-react';
 import type { MediaAsset } from './types';
 import type { ExifSummary } from '@/lib/dam/exif';
+import { classifyColor } from '@/lib/dam/color';
 import { AssetExportPanel } from './AssetExportPanel';
 import { ImageEditor } from './ImageEditor';
 
@@ -47,9 +61,13 @@ export function MediaPreview({
   const [exifData, setExifData] = useState<ExifSummary | null>(null);
   const [palette, setPalette] = useState<string[]>([]);
   const [similarAssets, setSimilarAssets] = useState<MediaAsset[]>([]);
+  const [showSimilar, setShowSimilar] = useState(false);
   const [, setDetailLoading] = useState(false);
   const [showPanel, setShowPanel] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [filenameCopied, setFilenameCopied] = useState(false);
+  const [creditCopied, setCreditCopied] = useState(false);
+  const [downloadSize, setDownloadSize] = useState<'small' | 'medium' | 'large' | 'original'>('original');
   const [editing, setEditing] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -100,6 +118,7 @@ export function MediaPreview({
     setExifData(null);
     setPalette([]);
     setSimilarAssets([]);
+    setShowSimilar(false);
     setDetailLoading(true);
     setTagText('');
     setZoom(1);
@@ -107,6 +126,8 @@ export function MediaPreview({
     setShowPanel(true);
     setDismissY(0);
     setIsDismissing(false);
+    setFilenameCopied(false);
+    setCreditCopied(false);
 
     Promise.all([
       fetch(`/api/media/dam/asset/${asset.id}`).then((r) => r.json()).catch(() => null),
@@ -616,34 +637,30 @@ export function MediaPreview({
           style={{ background: 'var(--card)', touchAction: 'pan-y' }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex flex-col gap-4 p-5 font-[family-name:var(--font-dm-sans)]">
-            <div className="flex items-start justify-between gap-2">
-              <h2
-                className="font-[family-name:var(--font-display)] text-[18px] leading-tight"
-                style={{ color: 'var(--text-primary)' }}
+          <div className="flex flex-col gap-5 p-5 font-[family-name:var(--font-dm-sans)]">
+            {/* Header row */}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                className="flex items-center gap-2 rounded-[6px] border px-2.5 py-1.5 text-[13px] focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                onClick={() => patch({ isSelect: !asset.isSelect })}
+                aria-pressed={asset.isSelect}
               >
-                {asset.filename}
-              </h2>
-              <button aria-label="Close" onClick={onClose}>
+                <Star
+                  className="h-4 w-4"
+                  style={asset.isSelect ? { color: 'var(--primary)', fill: 'var(--primary)' } : undefined}
+                />
+                {asset.isSelect ? 'Best photo' : 'Mark as best'}
+              </button>
+              <button
+                aria-label="Close info panel"
+                onClick={onClose}
+                className="rounded-[6px] p-1.5 focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
-
-            <button
-              className="flex items-center gap-2 self-start rounded-[6px] border px-2.5 py-1.5 text-[13px]"
-              style={{ borderColor: 'var(--border)' }}
-              onClick={() => patch({ isSelect: !asset.isSelect })}
-            >
-              <Star
-                className="h-4 w-4"
-                style={
-                  asset.isSelect
-                    ? { color: 'var(--primary)', fill: 'var(--primary)' }
-                    : undefined
-                }
-              />
-              {asset.isSelect ? 'Selected' : 'Mark as select'}
-            </button>
 
             {asset.fileType === 'PHOTO' && (
               <button
@@ -658,164 +675,129 @@ export function MediaPreview({
 
             <AssetExportPanel assetId={asset.id} fileType={asset.fileType} />
 
-            <dl
-              className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-[family-name:var(--font-mono)] text-[12px]"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              <dt>Dimensions</dt>
-              <dd>
-                {asset.width ?? '—'} × {asset.height ?? '—'}
-              </dd>
-              <dt>Size</dt>
-              <dd>{formatBytes(asset.size)}</dd>
-              <dt>Uploaded</dt>
-              <dd>{new Date(asset.createdAt).toLocaleDateString()}</dd>
-              {asset.qualityScore != null && (
-                <>
-                  <dt>Quality</dt>
-                  <dd>{Math.round(asset.qualityScore)}</dd>
-                </>
-              )}
-              {asset.sponsorName && (
-                <>
-                  <dt>Sponsor</dt>
-                  <dd>{asset.sponsorName}</dd>
-                </>
-              )}
-              {asset.shooterCredit && (
-                <>
-                  <dt>Credit</dt>
-                  <dd>{asset.shooterCredit}</dd>
-                </>
-              )}
-            </dl>
-
-            {exifData && (
-              <div>
-                <div
-                  className="mb-1 text-[11px] uppercase tracking-wide"
-                  style={labelStyle}
-                >
-                  Capture details
-                </div>
-                <dl
-                  className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px] font-[family-name:var(--font-mono)]"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {exifData.camera && (
-                    <>
-                      <dt className="flex items-center gap-1">
-                        <Camera className="h-3 w-3" />
-                        Camera
-                      </dt>
-                      <dd>{exifData.camera}</dd>
-                    </>
-                  )}
-                  {exifData.lens && (
-                    <>
-                      <dt>Lens</dt>
-                      <dd>{exifData.lens}</dd>
-                    </>
-                  )}
-                  {exifData.iso && (
-                    <>
-                      <dt>ISO</dt>
-                      <dd>{exifData.iso}</dd>
-                    </>
-                  )}
-                  {exifData.aperture && (
-                    <>
-                      <dt>Aperture</dt>
-                      <dd>{exifData.aperture}</dd>
-                    </>
-                  )}
-                  {exifData.shutter && (
-                    <>
-                      <dt>Shutter</dt>
-                      <dd>{exifData.shutter}</dd>
-                    </>
-                  )}
-                  {exifData.focalLength && (
-                    <>
-                      <dt>Focal</dt>
-                      <dd>{exifData.focalLength}</dd>
-                    </>
-                  )}
-                  {exifData.megapixels && (
-                    <>
-                      <dt>MP</dt>
-                      <dd>{exifData.megapixels.toFixed(1)}</dd>
-                    </>
-                  )}
-                  {exifData.takenAt && (
-                    <>
-                      <dt className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Shot
-                      </dt>
-                      <dd>{new Date(exifData.takenAt).toLocaleDateString()}</dd>
-                    </>
-                  )}
-                </dl>
+            {/* FILENAME */}
+            <section aria-label="Filename">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest" style={labelStyle}>
+                Filename
               </div>
-            )}
-
-            {palette.length > 0 && (
-              <div>
-                <div
-                  className="mb-1 text-[11px] uppercase tracking-wide"
-                  style={labelStyle}
+              <div className="flex items-center gap-2">
+                <span
+                  className="flex-1 truncate text-[13px]"
+                  style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}
+                  title={asset.filename}
                 >
+                  {asset.filename}
+                </span>
+                <button
+                  aria-label="Copy filename"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(asset.filename);
+                      setFilenameCopied(true);
+                      setTimeout(() => setFilenameCopied(false), 1500);
+                    } catch (e) {
+                      console.error('[MediaPreview] copy filename failed', e);
+                    }
+                  }}
+                  className="shrink-0 rounded-[4px] p-1 focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {filenameCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+              <span aria-live="polite" className="sr-only">
+                {filenameCopied ? 'Filename copied' : ''}
+              </span>
+            </section>
+
+            {/* FILE */}
+            <section aria-label="File details">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest" style={labelStyle}>
+                File
+              </div>
+              <dl
+                className="grid grid-cols-[80px_1fr] gap-x-3 gap-y-1 text-[12px]"
+                style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)' }}
+              >
+                <dt style={{ color: 'var(--text-muted)' }}>Type</dt>
+                <dd>{asset.fileType === 'VIDEO' ? 'Video' : 'Photo'}</dd>
+                <dt style={{ color: 'var(--text-muted)' }}>Dimensions</dt>
+                <dd>{asset.width && asset.height ? `${asset.width} × ${asset.height}` : '—'}</dd>
+                <dt style={{ color: 'var(--text-muted)' }}>Size</dt>
+                <dd>{formatBytes(asset.size)}</dd>
+              </dl>
+            </section>
+
+            {/* CAPTURE */}
+            <section aria-label="Capture details">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest" style={labelStyle}>
+                Capture
+              </div>
+              <dl
+                className="grid grid-cols-[80px_1fr] gap-x-3 gap-y-1 text-[12px]"
+                style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)' }}
+              >
+                <dt style={{ color: 'var(--text-muted)' }}>Date</dt>
+                <dd>
+                  {exifData?.takenAt
+                    ? new Date(exifData.takenAt).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : '—'}
+                </dd>
+                <dt className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                  <Camera className="h-3 w-3" />
+                  Camera
+                </dt>
+                <dd>{exifData?.camera ?? '—'}</dd>
+                <dt style={{ color: 'var(--text-muted)' }}>Lens</dt>
+                <dd>{exifData?.lens ?? '—'}</dd>
+                <dt style={{ color: 'var(--text-muted)' }}>ISO</dt>
+                <dd>{exifData?.iso ?? '—'}</dd>
+                <dt style={{ color: 'var(--text-muted)' }}>Aperture</dt>
+                <dd>{exifData?.aperture ? `ƒ/${exifData.aperture}` : '—'}</dd>
+              </dl>
+            </section>
+
+            {/* COLORS */}
+            {palette.length > 0 && (
+              <section aria-label="Colors">
+                <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest" style={labelStyle}>
                   Colors
                 </div>
-                <div className="flex gap-1.5">
-                  {palette.map((hex, i) => (
+                {/* Dominant swatch */}
+                <div className="mb-2 flex items-center gap-2">
+                  <div
+                    className="h-6 w-6 rounded-full"
+                    style={{ background: palette[0], outline: '1px solid var(--border)', outlineOffset: '1px' }}
+                    aria-label={`Dominant color: ${classifyColor(palette[0])}`}
+                  />
+                  <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                    {classifyColor(palette[0])}
+                  </span>
+                </div>
+                {/* Palette strip */}
+                <div className="flex gap-1">
+                  {palette.slice(0, 6).map((hex, i) => (
                     <div
                       key={i}
-                      className="h-6 w-6 rounded-full"
-                      style={{ background: hex }}
-                      title={hex}
+                      className="h-5 w-5 rounded-full"
+                      style={{ background: hex, outline: '1px solid var(--border)', outlineOffset: '1px' }}
+                      title={classifyColor(hex)}
+                      aria-label={classifyColor(hex)}
                     />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
-            {similarAssets.length > 0 && (
-              <div>
-                <div
-                  className="mb-1 text-[11px] uppercase tracking-wide"
-                  style={labelStyle}
-                >
-                  More like this
-                </div>
-                <div className="flex gap-1.5 overflow-x-auto pb-1">
-                  {similarAssets.slice(0, 12).map((sim) => (
-                    <button
-                      key={sim.id}
-                      type="button"
-                      className="h-16 w-16 shrink-0 overflow-hidden rounded-[4px]"
-                      onClick={() => {
-                        const idx = assets.findIndex((a) => a.id === sim.id);
-                        if (idx >= 0) onIndexChange(idx);
-                      }}
-                      title={sim.filename}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`/api/media/dam/asset/${sim.id}/thumb`}
-                        alt={sim.filename}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <div className="mb-1 text-[11px] uppercase tracking-wide" style={labelStyle}>
+            {/* TAGS */}
+            <section aria-label="Tags">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest" style={labelStyle}>
                 Tags
               </div>
               <div className="flex flex-wrap gap-1">
@@ -823,12 +805,13 @@ export function MediaPreview({
                   <span
                     key={t}
                     className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px]"
-                    style={{ background: 'var(--raised)' }}
+                    style={{ background: 'var(--raised)', color: 'var(--text-primary)' }}
                   >
                     {t}
                     <button
                       onClick={() => patch({ tags: asset.tags.filter((x) => x !== t) })}
-                      aria-label={`Remove ${t}`}
+                      aria-label={`Remove tag ${t}`}
+                      className="focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-1 rounded-sm"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -842,31 +825,142 @@ export function MediaPreview({
                   if (e.key === 'Enter') addTag();
                 }}
                 placeholder="Add tag…"
-                className="mt-2 w-full rounded-[6px] border px-2 py-1 text-[13px]"
-                style={{ borderColor: 'var(--border)' }}
+                aria-label="Add tag"
+                className="mt-2 w-full rounded-[6px] border px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
+                style={{ borderColor: 'var(--border)', background: 'var(--card)', color: 'var(--text-primary)' }}
               />
-            </div>
-
-            {asset.aiTags.length > 0 && (
-              <div>
-                <div
-                  className="mb-1 text-[11px] uppercase tracking-wide"
-                  style={labelStyle}
-                >
-                  AI tags
-                </div>
-                <div className="flex flex-wrap gap-1">
+              {asset.aiTags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1" aria-label="AI-generated tags">
                   {asset.aiTags.map((t) => (
                     <span
                       key={t}
-                      className="rounded-full px-2 py-0.5 text-[12px]"
+                      className="rounded-full px-2 py-0.5 text-[11px]"
                       style={{ background: 'var(--raised)', color: 'var(--text-muted)' }}
+                      title="AI-generated tag"
                     >
                       {t}
                     </span>
                   ))}
                 </div>
+              )}
+            </section>
+
+            {/* LOCATION */}
+            <section aria-label="Location and attribution">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest" style={labelStyle}>
+                Location
               </div>
+              <dl
+                className="grid grid-cols-[80px_1fr] gap-x-3 gap-y-1 text-[12px]"
+                style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)' }}
+              >
+                <dt style={{ color: 'var(--text-muted)' }}>Folder</dt>
+                <dd>—</dd>
+                <dt style={{ color: 'var(--text-muted)' }}>Sponsor</dt>
+                <dd>{asset.sponsorName ?? '—'}</dd>
+                <dt style={{ color: 'var(--text-muted)' }}>Credit</dt>
+                <dd className="flex items-center gap-1">
+                  {asset.shooterCredit ?? '—'}
+                  {asset.shooterCredit && (
+                    <button
+                      aria-label="Copy credit"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(asset.shooterCredit!);
+                          setCreditCopied(true);
+                          setTimeout(() => setCreditCopied(false), 1500);
+                        } catch (e) {
+                          console.error('[MediaPreview] copy credit failed', e);
+                        }
+                      }}
+                      className="rounded-[3px] p-0.5 focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-1"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      {creditCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    </button>
+                  )}
+                </dd>
+              </dl>
+            </section>
+
+            {/* DOWNLOAD */}
+            <section aria-label="Download">
+              <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest" style={labelStyle}>
+                Download
+              </div>
+              <div className="flex gap-2">
+                {asset.fileType !== 'VIDEO' && (
+                  <select
+                    value={downloadSize}
+                    onChange={(e) => setDownloadSize(e.target.value as typeof downloadSize)}
+                    className="flex-1 rounded-[6px] border px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
+                    style={{ borderColor: 'var(--border)', background: 'var(--card)', color: 'var(--text-secondary)' }}
+                    aria-label="Download size"
+                  >
+                    <option value="small">Small — 640px</option>
+                    <option value="medium">Medium — 1280px</option>
+                    <option value="large">Large — 2048px</option>
+                    <option value="original">Original</option>
+                  </select>
+                )}
+                <a
+                  href={`/api/media/dam/asset/${asset.id}/download${asset.fileType !== 'VIDEO' ? `?size=${downloadSize}` : ''}`}
+                  download={asset.filename}
+                  className="flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-[12px] font-medium focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                  style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                  aria-label={`Download ${asset.fileType === 'VIDEO' ? 'original video' : `at ${downloadSize} size`}`}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download
+                </a>
+              </div>
+            </section>
+
+            {/* Find similar photos */}
+            {asset.fileType !== 'VIDEO' && (
+              <section aria-label="Similar photos">
+                <button
+                  onClick={() => setShowSimilar((v) => !v)}
+                  className="flex items-center gap-2 text-[13px] focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 rounded-[4px]"
+                  style={{ color: showSimilar ? 'var(--primary)' : 'var(--text-secondary)' }}
+                  aria-expanded={showSimilar}
+                >
+                  <ScanSearch className="h-4 w-4 shrink-0" />
+                  {showSimilar ? 'Showing similar photos' : 'Find similar photos'}
+                </button>
+                {showSimilar && (
+                  <div className="mt-2">
+                    {similarAssets.length === 0 ? (
+                      <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        No similar photos found.
+                      </p>
+                    ) : (
+                      <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Similar photos strip">
+                        {similarAssets.slice(0, 12).map((sim) => (
+                          <button
+                            key={sim.id}
+                            type="button"
+                            className="h-16 w-16 shrink-0 overflow-hidden rounded-[4px] focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-1"
+                            onClick={() => {
+                              const idx = assets.findIndex((a) => a.id === sim.id);
+                              if (idx >= 0) onIndexChange(idx);
+                            }}
+                            title={sim.filename}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`/api/media/dam/asset/${sim.id}/thumb`}
+                              alt={sim.filename}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
             )}
           </div>
         </aside>

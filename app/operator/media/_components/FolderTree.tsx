@@ -12,7 +12,12 @@ import {
   FolderPlus,
   GripVertical,
   X,
+  Bookmark,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
+import { useSavedSearches } from './useSavedSearches';
 import {
   DndContext,
   closestCenter,
@@ -91,6 +96,10 @@ export function FolderTree({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [folderSort, setFolderSort] = useState<FolderSort>('manual');
+  const [savedViewsOpen, setSavedViewsOpen] = useState(true);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState('');
+  const { saved, rename, remove } = useSavedSearches();
 
   const activeFolder = sp.get('folderId');
   const isTrash = sp.get('view') === 'trash';
@@ -320,6 +329,109 @@ export function FolderTree({
           <span className="flex-1">New folder</span>
         </button>
       )}
+      {/* Saved views section */}
+      {saved.length > 0 && (
+        <div className="mt-2">
+          <button
+            onClick={() => setSavedViewsOpen((v) => !v)}
+            className="flex w-full items-center gap-1 rounded-[4px] px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+            style={{ color: 'var(--text-secondary)' }}
+            aria-expanded={savedViewsOpen}
+          >
+            {savedViewsOpen ? (
+              <ChevronDown className="h-3 w-3 shrink-0" />
+            ) : (
+              <ChevronRight className="h-3 w-3 shrink-0" />
+            )}
+            Saved views
+          </button>
+          {savedViewsOpen && (
+            <nav aria-label="Saved views" className="mt-0.5">
+              {saved.map((s) => (
+                <div key={s.id} className="group flex items-center gap-1">
+                  {renamingId === s.id ? (
+                    <input
+                      autoFocus
+                      value={renameText}
+                      onChange={(e) => setRenameText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          rename(s.id, renameText.trim() || s.name);
+                          setRenamingId(null);
+                        } else if (e.key === 'Escape') {
+                          setRenamingId(null);
+                        }
+                      }}
+                      onBlur={() => {
+                        rename(s.id, renameText.trim() || s.name);
+                        setRenamingId(null);
+                      }}
+                      className="flex-1 rounded-[5px] border px-2 py-1 text-[12px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
+                      style={{ borderColor: 'var(--border)', background: 'var(--card)', color: 'var(--text-primary)' }}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => {
+                        const next = new URLSearchParams(s.params);
+                        router.push(`${pathname}?${next.toString()}`);
+                        onMobileClose?.();
+                      }}
+                      className="flex flex-1 items-center gap-2 rounded-[6px] py-1.5 pr-1 text-left text-[13px] transition-colors focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                      style={{ paddingLeft: 8, color: 'var(--text-secondary)' }}
+                    >
+                      <Bookmark className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} />
+                      <span className="flex-1 truncate">{s.name}</span>
+                    </button>
+                  )}
+                  <div className="relative shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      aria-label={`Options for ${s.name}`}
+                      className="rounded-[4px] p-1 focus-visible:outline-[2px] focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                      style={{ color: 'var(--text-muted)' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Toggle a tiny inline action popover via a sibling div trick:
+                        // We use dataset attribute to track which is open
+                        const btn = e.currentTarget;
+                        const popover = btn.nextElementSibling as HTMLElement | null;
+                        if (popover) {
+                          popover.hidden = !popover.hidden;
+                        }
+                      }}
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                    <div
+                      hidden
+                      className="absolute right-0 top-full z-30 mt-0.5 rounded-[6px] p-1"
+                      style={{ background: 'var(--card)', border: '1px solid var(--border)', minWidth: 100 }}
+                    >
+                      <button
+                        className="block w-full rounded-[4px] px-2 py-1 text-left text-[12px]"
+                        style={{ color: 'var(--text-primary)' }}
+                        onClick={() => {
+                          setRenameText(s.name);
+                          setRenamingId(s.id);
+                        }}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        className="block w-full rounded-[4px] px-2 py-1 text-left text-[12px]"
+                        style={{ color: 'var(--primary)' }}
+                        onClick={() => remove(s.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </nav>
+          )}
+        </div>
+      )}
+
       <button
         onClick={() => go({ view: 'trash', folderId: null, ...SMART_CLEAR })}
         className="mt-auto flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-left transition-colors"

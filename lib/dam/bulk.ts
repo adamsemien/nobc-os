@@ -1,22 +1,28 @@
 export type BulkAction =
   | { action: 'flagSelect'; assetIds: string[]; payload: { value: boolean } }
   | { action: 'addTags'; assetIds: string[]; payload: { tags: string[] } }
+  | { action: 'removeTags'; assetIds: string[]; payload: { tags: string[] } }
   | { action: 'move'; assetIds: string[]; payload: { folderId: string | null } }
   | { action: 'softDelete'; assetIds: string[]; payload: Record<string, never> }
   | { action: 'restore'; assetIds: string[]; payload: Record<string, never> }
   | { action: 'permanentDelete'; assetIds: string[]; payload: Record<string, never> }
-  | { action: 'reorder'; assetIds: string[]; payload: { orderedIds: string[] } };
+  | { action: 'reorder'; assetIds: string[]; payload: { orderedIds: string[] } }
+  | { action: 'setCredit'; assetIds: string[]; payload: { credit: string } }
+  | { action: 'setSponsor'; assetIds: string[]; payload: { sponsor: string } };
 
 export type ParseResult = ({ ok: true } & BulkAction) | { ok: false; error: string };
 
 const ACTIONS = [
   'flagSelect',
   'addTags',
+  'removeTags',
   'move',
   'softDelete',
   'restore',
   'permanentDelete',
   'reorder',
+  'setCredit',
+  'setSponsor',
 ] as const;
 
 /** Validate + narrow a bulk-action request body. Pure — no DB, unit-testable. */
@@ -42,6 +48,21 @@ export function parseBulkAction(body: unknown): ParseResult {
         : [];
       if (tags.length === 0) return { ok: false, error: 'tags[] required' };
       return { ok: true, action, assetIds, payload: { tags } };
+    }
+    case 'removeTags': {
+      const tags = Array.isArray(b.tags)
+        ? b.tags.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+        : [];
+      if (tags.length === 0) return { ok: false, error: 'tags[] required' };
+      return { ok: true, action, assetIds, payload: { tags } };
+    }
+    case 'setCredit': {
+      if (typeof b.credit !== 'string') return { ok: false, error: 'credit (string) required' };
+      return { ok: true, action, assetIds, payload: { credit: b.credit } };
+    }
+    case 'setSponsor': {
+      if (typeof b.sponsor !== 'string') return { ok: false, error: 'sponsor (string) required' };
+      return { ok: true, action, assetIds, payload: { sponsor: b.sponsor } };
     }
     case 'move':
       return {
