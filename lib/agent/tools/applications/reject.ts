@@ -46,7 +46,7 @@ const rejectApplication: AgentTool<Input, unknown> = {
       const { resend } = await import('@/lib/resend');
       const { subject, html } = applicationRejectedEmail(app.fullName);
       resend.emails
-        .send({ from: 'NoBC <team@thenobadcompany.com>', to: app.email, subject, html })
+        .send({ from: 'The No Bad Company <team@thenobadcompany.com>', to: app.email, subject, html })
         .catch((e) => console.error('[agent reject] email failed:', e));
     }
 

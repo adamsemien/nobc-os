@@ -99,7 +99,7 @@ export async function approveApplication(params: {
   if (process.env.RESEND_API_KEY) {
     const { subject, html } = welcomeEmail(app.fullName, passUrls);
     await resend.emails
-      .send({ from: 'NoBC <team@thenobadcompany.com>', to: app.email, subject, html })
+      .send({ from: 'The No Bad Company <team@thenobadcompany.com>', to: app.email, subject, html })
       .catch((err) => console.error('[approve] email failed:', err));
   }
 

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { resolveMember } from '@/lib/member-identity';
+import { publicRateLimit } from '@/lib/public-rate-limit';
 import { emailSchema, phoneSchema, shortText, answersMap, normalizePhone } from '@/lib/validation';
 
 const PostSchema = z.object({
@@ -54,6 +56,17 @@ async function upsertAnswer(applicationId: string, questionKey: string, answer: 
 }
 
 export async function POST(req: NextRequest) {
+  // Abuse protection: cap rapid automated draft creation before any DB work.
+  // In-memory per-IP limiter (resets on cold start) — see the FLAG in the
+  // hardening report: production-grade distributed limiting needs a shared store.
+  const rateCheck = publicRateLimit(req);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfterSecs) } },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -76,6 +89,33 @@ export async function POST(req: NextRequest) {
   const workspace = await resolveDefaultApplyWorkspace();
   if (!workspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 500 });
 
+  // Idempotency: a network timeout before the client receives the new `id` (and
+  // appends `?id=` to the URL) makes the user retry screen 0 — without this guard
+  // that retry mints a second Application for the same person. If an in-progress
+  // (PENDING) application already exists for (workspaceId, email), reuse it so the
+  // draft converges to a single row. APPROVED/REJECTED rows are NOT reused — a
+  // genuine re-application after a decision should create a fresh row.
+  const existingPending = await db.application.findFirst({
+    where: {
+      workspaceId: workspace.id,
+      email: { equals: email, mode: 'insensitive' },
+      status: 'PENDING',
+    },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+  if (existingPending) {
+    // Persist any answers carried in this retry, then return the existing draft.
+    if (Object.keys(answers).length > 0) {
+      await Promise.all(
+        Object.entries(answers).map(([questionKey, answer]) =>
+          upsertAnswer(existingPending.id, questionKey, String(answer ?? '')),
+        ),
+      );
+    }
+    return NextResponse.json({ id: existingPending.id });
+  }
+
   // Link identity at submission: resolve (or mint) the GUEST Member now so the
   // applicant has one continuous record before approval, not only at it.
   const member = await resolveMember({
@@ -86,19 +126,51 @@ export async function POST(req: NextRequest) {
     source: 'apply_membership',
   });
 
-  const application = await db.application.create({
-    data: {
+  let application: { id: string };
+  try {
+    application = await db.application.create({
+      data: {
+        workspaceId: workspace.id,
+        memberId: member.id,
+        email,
+        fullName: fullName ?? '',
+        phone: normalizePhone(phone ?? null),
+        city: city ?? null,
+        referredBy: referredBy ?? null,
+        consentEmail: false,
+        consentSms: false,
+      },
+      select: { id: true },
+    });
+  } catch (e) {
+    // Defensive: if the additive partial-unique index has been applied (see
+    // prisma/sql/apply-dedup-partial-unique.sql), a concurrent double-submit that
+    // races past the findFirst above surfaces as P2002. Recover by re-reading the
+    // row the other request created rather than 500-ing the applicant. Works
+    // correctly whether or not the index is live yet.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      const raced = await db.application.findFirst({
+        where: { workspaceId: workspace.id, email: { equals: email, mode: 'insensitive' } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (raced) {
+        if (Object.keys(answers).length > 0) {
+          await Promise.all(
+            Object.entries(answers).map(([questionKey, answer]) =>
+              upsertAnswer(raced.id, questionKey, String(answer ?? '')),
+            ),
+          );
+        }
+        return NextResponse.json({ id: raced.id });
+      }
+    }
+    console.error('[apply/membership] application.create failed', {
       workspaceId: workspace.id,
-      memberId: member.id,
-      email,
-      fullName: fullName ?? '',
-      phone: normalizePhone(phone ?? null),
-      city: city ?? null,
-      referredBy: referredBy ?? null,
-      consentEmail: false,
-      consentSms: false,
-    },
-  });
+      err: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.json({ error: 'Could not save application' }, { status: 500 });
+  }
 
   if (Object.keys(answers).length > 0) {
     await Promise.all(

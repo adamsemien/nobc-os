@@ -101,7 +101,7 @@ async function maybeSendRecapEmail(opts: {
     const { resend } = await import('@/lib/resend');
     const { recapReadyEmail } = await import('@/lib/email-templates');
     await resend.emails.send({
-      from: 'NoBC <team@thenobadcompany.com>',
+      from: 'The No Bad Company <team@thenobadcompany.com>',
       to: sponsor.contactEmail,
       ...recapReadyEmail(eventName, opts.url),
     });

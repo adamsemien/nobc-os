@@ -8,10 +8,10 @@
 |---|---|
 | **State** | ✅ Shipped — live at `/apply` (+ application-backup feature code-complete, dormant on a branch) |
 | **V1 item** | #1, #5 |
-| **Last updated** | 2026-06-21 |
+| **Last updated** | 2026-06-22 |
 | **Owner** | Adam |
 | **Blocked on** | Nothing |
-| **Next** | Apply the additive `prisma/sql/application-backup.sql` to Neon (UNPOOLED `DIRECT_URL`, never `db push`), set the three `GOOGLE_DRIVE_*` env vars in Vercel, then merge `feat/application-backup`. Until creds are set the backup stays dormant (fail-closed) and the hourly cron leaves rows PENDING. Backlog (unchanged): reconcile the three competing answer-key generations. |
+| **Next** | Launch-hardening landed on `feat/apply-hardening` (BLOCKERs 1–5 from FULL-AUDIT-2026-06-21): sender display name → "The No Bad Company" across all transactional sends; submit + create idempotency guards; in-codebase per-IP rate limit (`publicRateLimit`) on both public apply POSTs; photo-upload failures now surfaced to the applicant. **Decisions for Adam:** (1) **rate-limiting** is in-memory per-instance (resets on cold start) — decide whether to add Vercel WAF or an Upstash shared store for production-grade distributed limiting (FLAGGED, no infra added); (2) the optional durable dedup index in `prisma/sql/apply-dedup-partial-unique.sql` (partial-unique on PENDING `(workspaceId, lower(email))`) is **NOT applied** — review + apply by hand if wanted (code already P2002-defensive without it). Prior threads unchanged: apply `prisma/sql/application-backup.sql` + set `GOOGLE_DRIVE_*`, then merge `feat/application-backup`; reconcile the three competing answer-key generations. |
 
 ## Scope
 
@@ -33,6 +33,12 @@ scripts/fix-archetype-scores-scale.ts           ← one-time backfill: archetype
 lib/applications/backup.ts                       ← application-backup core: serialize + dependency-free Google Drive adapter + fail-closed orchestrator
 app/api/cron/backup-applications/route.ts        ← hourly reconciliation cron (CRON_SECRET-gated)
 prisma/sql/application-backup.sql                ← additive migration: BackupStatus enum + ApplicationBackup ledger (apply by hand, never db push)
+prisma/sql/apply-dedup-partial-unique.sql        ← OPTIONAL additive partial-unique index hardening submit idempotency (NOT applied; code is P2002-defensive without it)
+lib/public-rate-limit.ts                         ← shared in-memory per-IP limiter (reused by the apply create + submit POSTs; v1.1 → Upstash)
+lib/applications/approve.ts                       ← (Stage 02) welcome-email send — sender display name fixed to "The No Bad Company"
+tests/unit/apply-submit-route.test.ts            ← submit route: idempotency + rate-limit + branch coverage
+tests/unit/apply-create-route.test.ts            ← create route: dedup + P2002 recovery + rate-limit
+tests/unit/apply-hardening.test.ts               ← sender-name + photo-failure source-scan invariants
 ```
 
 ## Schema models owned

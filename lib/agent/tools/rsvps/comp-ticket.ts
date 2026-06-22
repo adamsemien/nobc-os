@@ -86,7 +86,7 @@ const compTicket: AgentTool<Input, CompOutput> = {
         const { resend } = await import('@/lib/resend');
         const { compTicketEmail } = await import('@/lib/email-templates');
         await resend.emails.send({
-          from: 'NoBC <team@thenobadcompany.com>',
+          from: 'The No Bad Company <team@thenobadcompany.com>',
           to: member.email,
           ...compTicketEmail(
             `${member.firstName} ${member.lastName}`.trim(),

@@ -64,7 +64,7 @@ export async function POST(
     const { resend } = await import('@/lib/resend');
     const { subject, html } = applicationRejectedEmail(app.fullName);
     resend.emails.send({
-      from: 'NoBC <team@thenobadcompany.com>',
+      from: 'The No Bad Company <team@thenobadcompany.com>',
       to: app.email,
       subject,
       html,
