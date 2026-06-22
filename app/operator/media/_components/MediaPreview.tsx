@@ -49,12 +49,15 @@ export function MediaPreview({
   onClose,
   onIndexChange,
   onAssetUpdated,
+  onAssetCreated,
 }: {
   assets: MediaAsset[];
   index: number;
   onClose: () => void;
   onIndexChange: (i: number) => void;
   onAssetUpdated: (a: MediaAsset) => void;
+  /** Called after a non-destructive edit saves a NEW asset — refresh the grid. */
+  onAssetCreated?: () => void;
 }) {
   const asset = assets[index];
   const [tagText, setTagText] = useState('');
@@ -482,6 +485,9 @@ export function MediaPreview({
             onClose={() => setEditing(false)}
             onSaved={() => {
               setEditing(false);
+              // The edit saved a brand-new asset; refresh the grid so it appears,
+              // then close the preview (the original's index may have shifted).
+              onAssetCreated?.();
               onClose();
             }}
           />
