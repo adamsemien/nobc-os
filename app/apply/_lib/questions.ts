@@ -89,6 +89,10 @@ export const SECTIONS: Section[] = [
 export const INTRO = {
   lead:
     'No Bad Company exists because the right introduction at the right moment changes everything. This application is how we make that happen with intention.',
+  body: [
+    'Answer as specifically as you can. Not the polished version - the real one. The more honestly you show up here, the more precisely we can curate who walks into the same room as you.',
+    "Sometimes you'll know exactly who you need to meet. Sometimes you won't - and that's where we come in.",
+  ],
   bold: 'We read every application. Nothing goes unnoticed.',
 };
 
