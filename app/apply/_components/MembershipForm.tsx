@@ -166,21 +166,36 @@ function sampleValue(q: Question, sub?: SubField): string {
  * serif title enter with a restrained fade + slow upward translate, staggered.
  * Motion is CSS-only (no framer-motion) and is suppressed under
  * prefers-reduced-motion. Mobile-safe: vertical motion only, safe-area padding.
+ *
+ * The `opening` variant (Section 01) carries the membership manifesto — the
+ * italic lead line and the bold closing line — and does NOT auto-dismiss. The
+ * applicant reads it and taps "Begin" to enter the form. Tap-anywhere dismissal
+ * is disabled in this variant so the words can be read without an accidental
+ * skip; the quick title-cards for later sections keep tap-anywhere.
  */
 function SectionIntro({
   eyebrow,
   title,
   onDone,
+  opening = false,
+  lead,
+  bold,
+  accent = 'var(--primary)',
 }: {
   eyebrow: string;
   title: string;
   onDone: () => void;
+  opening?: boolean;
+  lead?: string;
+  bold?: string;
+  accent?: string;
 }) {
   return (
     <div
-      onClick={onDone}
-      className="apply-interstitial fixed inset-0 z-[70] flex cursor-pointer flex-col items-center justify-center bg-bg px-6 text-center"
+      onClick={opening ? undefined : onDone}
+      className="apply-interstitial fixed inset-0 z-[70] flex flex-col items-center justify-center bg-bg px-6 text-center"
       style={{
+        cursor: opening ? 'default' : 'pointer',
         paddingTop: 'max(env(safe-area-inset-top), 24px)',
         paddingBottom: 'max(env(safe-area-inset-bottom), 24px)',
       }}
@@ -191,8 +206,42 @@ function SectionIntro({
       <h1 className="apply-interstitial-title font-display max-w-[14ch] text-4xl italic leading-tight text-text-primary sm:text-6xl">
         {title}
       </h1>
+      {opening && (
+        <>
+          {lead && (
+            <p className="font-display mt-8 max-w-[34ch] text-lg italic leading-relaxed text-text-primary sm:text-2xl">
+              {lead}
+            </p>
+          )}
+          {bold && (
+            <p className="mt-6 max-w-[42ch] text-sm font-semibold leading-snug text-text-primary sm:text-base">
+              {bold}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={onDone}
+            className="mt-10 inline-flex min-h-[52px] items-center justify-center px-14 text-sm font-medium uppercase tracking-[0.16em] transition-opacity hover:opacity-90"
+            style={{ background: accent, color: '#ffffff' }}
+          >
+            Begin
+          </button>
+        </>
+      )}
     </div>
   );
+}
+
+/** Section 01 focus-pull gate: play once per tab-session, never under reduced motion. */
+function shouldPlayOpeningPull(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    if (sessionStorage.getItem('apply:openingPulled')) return false;
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 export default function MembershipForm() {
@@ -219,7 +268,10 @@ export default function MembershipForm() {
   const [devHovered, setDevHovered] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [bannerFading, setBannerFading] = useState(false);
-  const [interstitial, setInterstitial] = useState<{ eyebrow: string; title: string } | null>(null);
+  const [interstitial, setInterstitial] = useState<{ eyebrow: string; title: string; opening?: boolean } | null>(null);
+  // First-load focus-pull on Section 01: the header settles as the focus, then the
+  // fields rise. Plays once per tab-session and is suppressed under reduced-motion.
+  const [openingPull, setOpeningPull] = useState(false);
   // Speech-to-text (Web Speech API) - additive dictation on long-form fields only.
   const [speechSupported, setSpeechSupported] = useState(false);
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
@@ -401,9 +453,26 @@ export default function MembershipForm() {
     const sectionId = page[0].section;
     const isFirstPageOfSection = step === 0 || PAGES[step - 1][0].section !== sectionId;
     if (!isFirstPageOfSection || seenSections.current.has(sectionId)) return;
-    seenSections.current.add(sectionId);
     const section = SECTION_BY_ID[sectionId];
-    setInterstitial({ eyebrow: section.eyebrow, title: section.title });
+    const opening = sectionId === SECTIONS[0].id;
+    // Returning applicants are dropped mid-form (resume via ?id= or a saved local
+    // draft) and must NOT re-see the opening manifesto. Mark the section seen and
+    // bail so it can't fire now or later this session. The later title-cards are
+    // unaffected.
+    if (opening) {
+      const resuming =
+        !!searchParams.get('id') ||
+        (typeof window !== 'undefined' && !!window.localStorage.getItem(DRAFT_KEY));
+      if (resuming) {
+        seenSections.current.add(sectionId);
+        return;
+      }
+    }
+    seenSections.current.add(sectionId);
+    setInterstitial({ eyebrow: section.eyebrow, title: section.title, opening });
+    // The opening manifesto (Section 01) stays until the applicant taps "Begin".
+    // The later section title-cards still auto-dismiss after they settle.
+    if (opening) return;
     const t = setTimeout(() => setInterstitial(null), 2200);
     return () => clearTimeout(t);
   }, [step]);
@@ -1008,6 +1077,25 @@ export default function MembershipForm() {
           opacity: 0;
           animation: fadeIn 420ms ease forwards;
         }
+        /* Section 01 first-load focus-pull: header settles (~500ms), holds (~500ms),
+           then the fields rise. Class is applied on Begin; see openingPull. */
+        @keyframes openingCopyIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes openingFieldsIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .apply-opening-copy {
+          opacity: 0;
+          animation: openingCopyIn 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .apply-opening-fields {
+          opacity: 0;
+          transform: translateY(12px);
+          animation: openingFieldsIn 600ms cubic-bezier(0.16, 1, 0.3, 1) 1000ms forwards;
+        }
         @keyframes micPulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.35; }
@@ -1028,7 +1116,9 @@ export default function MembershipForm() {
           .apply-interstitial,
           .apply-interstitial-eyebrow,
           .apply-interstitial-title,
-          .apply-page-enter {
+          .apply-page-enter,
+          .apply-opening-copy,
+          .apply-opening-fields {
             animation: none !important;
             opacity: 1 !important;
             transform: none !important;
@@ -1055,7 +1145,18 @@ export default function MembershipForm() {
         <SectionIntro
           eyebrow={interstitial.eyebrow}
           title={interstitial.title}
-          onDone={() => setInterstitial(null)}
+          onDone={() => {
+            const playPull = interstitial?.opening === true && shouldPlayOpeningPull();
+            setInterstitial(null);
+            if (playPull) {
+              try { sessionStorage.setItem('apply:openingPulled', '1'); } catch {}
+              setOpeningPull(true);
+            }
+          }}
+          opening={interstitial.opening}
+          lead={interstitial.opening ? INTRO.lead : undefined}
+          bold={interstitial.opening ? INTRO.bold : undefined}
+          accent={theme.accent}
         />
       )}
 
@@ -1193,10 +1294,11 @@ export default function MembershipForm() {
           const page = PAGES[step];
           const section = SECTION_BY_ID[page[0].section];
           const isFirstPageOfSection = step === 0 || PAGES[step - 1][0].section !== page[0].section;
-          const isFirstSection = section.id === SECTIONS[0].id;
           // The one-time mic hint attaches to the first textarea on this page.
           const firstTextarea = page.find(q => q.type === 'textarea');
           const hintKey = speechSupported && !micHintSeen && firstTextarea ? firstTextarea.id : null;
+          // First-load focus-pull: pull focus to the Section 01 header, then rise the fields.
+          const openingFirstLoad = step === 0 && openingPull;
           return (
             <div
               key={step}
@@ -1208,38 +1310,32 @@ export default function MembershipForm() {
                 padding: step === 0 ? '56px 24px 120px 24px' : undefined,
               }}
             >
-              <span style={chapterLabelStyle}>{section.eyebrow}</span>
-              {/* The full serif title appears only on a section's first page -
-                  the interstitial owns the section moment. On continuation
-                  pages the small uppercase eyebrow above carries orientation. */}
-              {isFirstPageOfSection ? (
-                <h1 style={{
-                  fontFamily: displayFont,
-                  fontSize: 'clamp(34px, 5vw, 52px)',
-                  fontWeight: 400,
-                  fontStyle: 'italic',
-                  lineHeight: 1.1,
-                  color: theme.text,
-                  margin: '0 0 48px 0',
-                }}>{section.title}</h1>
-              ) : (
-                <div style={{ height: 28 }} />
-              )}
+              <div className={openingFirstLoad ? 'apply-opening-copy' : undefined}>
+                <span style={chapterLabelStyle}>{section.eyebrow}</span>
+                {/* The full serif title appears only on a section's first page -
+                    the interstitial owns the section moment. On continuation
+                    pages the small uppercase eyebrow above carries orientation. */}
+                {isFirstPageOfSection ? (
+                  <h1 style={{
+                    fontFamily: displayFont,
+                    fontSize: 'clamp(34px, 5vw, 52px)',
+                    fontWeight: 400,
+                    fontStyle: 'italic',
+                    lineHeight: 1.1,
+                    color: theme.text,
+                    margin: '0 0 48px 0',
+                  }}>{section.title}</h1>
+                ) : (
+                  <div style={{ height: 28 }} />
+                )}
+              </div>
 
-              {isFirstPageOfSection && isFirstSection && (
-                <div style={{ marginBottom: 56 }}>
-                  <p style={{ fontFamily: displayFont, fontSize: 20, fontStyle: 'italic', lineHeight: 1.6, color: theme.text, margin: '0 0 24px 0' }}>{INTRO.lead}</p>
-                  {INTRO.body.map((para, i) => (
-                    <p key={i} style={{ fontFamily: bodyFont, fontSize: 15, lineHeight: 1.75, color: theme.muted, margin: '0 0 18px 0' }}>{para}</p>
-                  ))}
-                  <p style={{ fontFamily: bodyFont, fontSize: 15, fontWeight: 600, lineHeight: 1.6, color: theme.text, margin: 0 }}>{INTRO.bold}</p>
-                </div>
-              )}
+              <div className={openingFirstLoad ? 'apply-opening-fields' : undefined}>
+                {page.map((q) => renderQuestion(q, hintKey))}
 
-              {page.map((q) => renderQuestion(q, hintKey))}
-
-              {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-              {navBlock(() => submitPage(step))}
+                {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
+                {navBlock(() => submitPage(step))}
+              </div>
             </div>
           );
         })()}
