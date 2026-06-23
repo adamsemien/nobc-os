@@ -332,7 +332,10 @@ export default function MembershipForm() {
     margin: '0 0 14px 0',
   };
 
-  const fieldGroup: React.CSSProperties = { marginBottom: 48 };
+  // Single inter-field rhythm, ~30% tighter than the old 48px so short fields
+  // (Section 01) stop reading stretched. Group sub-fields use the grid row-gap
+  // instead of their own margin, so a group never leaves a double gap after it.
+  const fieldGroup: React.CSSProperties = { marginBottom: 32 };
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -780,13 +783,19 @@ export default function MembershipForm() {
               aria-pressed={recording}
               title={recording ? 'Stop dictation' : 'Dictate your answer'}
               style={{
+                // 44x44 tap target (Apple touch minimum); the visible 16px glyph
+                // is centered so it stays where it was (~bottom-right of the field).
                 position: 'absolute',
-                right: 0,
-                bottom: 12,
+                right: -10,
+                bottom: 2,
+                width: 44,
+                height: 44,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 background: 'none',
                 border: 'none',
-                padding: 4,
-                lineHeight: 0,
+                padding: 0,
                 cursor: 'pointer',
                 color: recording ? theme.accent : theme.muted,
                 transition: 'color 200ms ease',
@@ -889,7 +898,7 @@ export default function MembershipForm() {
           {/* One column on phones, two columns from 600px up (see .apply-group-grid). */}
           <div className="apply-group-grid" style={{ marginTop: 12 }}>
             {(q.fields ?? []).map(sub => (
-              <div key={sub.id} style={fieldGroup}>
+              <div key={sub.id}>
                 {sub.label && <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>{sub.label}</label>}
                 {renderSubInput(q, sub)}
               </div>
@@ -985,10 +994,13 @@ export default function MembershipForm() {
         .apply-group-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 0 24px;
+          gap: 18px 24px; /* tight row-gap when stacked on phones */
         }
         @media (min-width: 600px) {
-          .apply-group-grid { grid-template-columns: repeat(2, 1fr); }
+          .apply-group-grid {
+            grid-template-columns: repeat(2, 1fr);
+            row-gap: 28px; /* roomier on desktop, still tighter than the old 48 */
+          }
         }
         @media (prefers-reduced-motion: reduce) {
           .apply-interstitial,
@@ -1380,7 +1392,7 @@ export default function MembershipForm() {
                     fontSize: 20,
                     fontStyle: 'italic',
                     lineHeight: 1.8,
-                    color: THEME.night.muted,
+                    color: THEME.night.text,
                     maxWidth: 520,
                     margin: 0,
                   }}>{nightStory}</p>
