@@ -110,27 +110,32 @@ export function OperatorNav({
 
   return (
     <aside
-      className="sticky top-0 z-30 flex h-screen w-[68px] shrink-0 flex-col bg-[var(--sidebar)] md:w-[240px]"
+      className="z-30 flex w-[68px] shrink-0 flex-col bg-[var(--sidebar)] md:w-[240px]"
       style={{ boxShadow: 'var(--sidebar-shadow)' }}
     >
-      {/* Wordmark */}
-      <div className="flex h-[60px] items-center px-3 md:px-5">
-        <Link
-          href="/operator"
-          className="font-[family-name:var(--font-dm-sans)] text-[15px] font-semibold leading-tight tracking-tight"
-          style={{ color: 'var(--primary)' }}
-        >
-          <span className="hidden md:inline">No Bad Company</span>
-          <span className="md:hidden">NoBC</span>
-        </Link>
+      {/* Sticky inner column stays in the viewport while the page scrolls, so the
+          rail background fills the full document height (no cut-off on long pages)
+          while the nav itself never leaves view. */}
+      <div className="sticky top-0 flex h-screen flex-col">
+        {/* Wordmark */}
+        <div className="flex h-[60px] items-center px-3 md:px-5">
+          <Link
+            href="/operator"
+            className="font-[family-name:var(--font-dm-sans)] text-[15px] font-semibold leading-tight tracking-tight"
+            style={{ color: 'var(--primary)' }}
+          >
+            <span className="hidden md:inline">No Bad Company</span>
+            <span className="md:hidden">NoBC</span>
+          </Link>
+        </div>
+
+        <nav className="flex flex-1 flex-col gap-1 px-2 py-3 md:px-3">
+          {PRIMARY_ITEMS.map(renderItem)}
+        </nav>
+
+        {/* Settings pinned to bottom */}
+        <div className="px-2 pb-3 md:px-3">{renderItem(FOOTER_ITEM)}</div>
       </div>
-
-      <nav className="flex flex-1 flex-col gap-1 px-2 py-3 md:px-3">
-        {PRIMARY_ITEMS.map(renderItem)}
-      </nav>
-
-      {/* Settings pinned to bottom */}
-      <div className="px-2 pb-3 md:px-3">{renderItem(FOOTER_ITEM)}</div>
     </aside>
   );
 }
