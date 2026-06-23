@@ -5,6 +5,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { alert } from '@/lib/alerting';
+import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 
 // AI Event Builder — single structured generation. The model proposes a draft
 // event scaffold; it writes nothing to the DB and registers no tools. The operator
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
   let object: z.infer<typeof EventDraftSchema>;
   try {
     const result = await generateObject({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: anthropic(JUDGMENT_MODEL),
       schema: EventDraftSchema,
       prompt: `You are a creative director for No Bad Company, a premium curated member club. Today is ${today}.
 

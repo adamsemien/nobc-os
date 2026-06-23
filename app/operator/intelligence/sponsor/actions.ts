@@ -5,12 +5,10 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { db } from '@/lib/db';
 
-// MODEL NOTE: claude-haiku-4-5-20251001 is used here per Adam's explicit
-// instruction for this sponsor-narrative feature (cheap, high-level editorial
-// summarization). The repo lock is claude-sonnet-4-20250514; this is an
-// Adam-authorized per-feature choice, mirroring the documented Haiku exception
-// for /api/sms/categorize (see CLAUDE.md → Locked Decisions). It does not relax
-// the lock anywhere else.
+// MODEL NOTE: claude-haiku-4-5-20251001 is used here for this sponsor-narrative
+// feature (cheap, high-level editorial summarization) - the MECHANICAL_MODEL tier
+// (lib/ai/runtime-models.ts). Kept inline; per CLAUDE.md > Locked Decisions,
+// model bumps and tier moves are Adam's call.
 const NARRATIVE_MODEL = 'claude-haiku-4-5-20251001';
 
 const SYSTEM_PROMPT =

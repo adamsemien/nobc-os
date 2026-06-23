@@ -107,8 +107,9 @@ export function ModelSwitcher({
         </p>
       ) : null}
       <p className="text-xs text-text-muted">
-        Application scoring is locked to claude-sonnet-4-20250514 for consistency across the
-        member pipeline. Your selection here powers chat, vibe reads, and the event-builder.
+        Runtime models follow a two-tier policy (lib/ai/runtime-models.ts): the JUDGMENT_MODEL
+        tier (Sonnet 4.6) for scoring and member-facing tasks, and the MECHANICAL_MODEL tier
+        (Haiku 4.5) for mechanical work.
       </p>
     </div>
   );

@@ -1,6 +1,6 @@
 /** AI Insight Composer — natural-language → custom dashboard.
  *
- *  Two Claude calls (claude-sonnet-4-20250514):
+ *  Two Claude calls (JUDGMENT_MODEL):
  *   1. selection — given the metric catalog + the question, pick 2-4 metrics
  *   2. synthesis — given the question + metric results, write the narrative
  *
@@ -12,8 +12,9 @@ import { z } from 'zod';
 import { createHash } from 'crypto';
 import { getMetric, listMetrics, runMetric } from './registry';
 import { toMetricMeta, type MetricContext, type MetricMeta, type MetricResult } from './types';
+import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 
-const MODEL = 'claude-sonnet-4-20250514';
+const MODEL = JUDGMENT_MODEL;
 const CACHE_TTL_MS = 10 * 60_000;
 
 export type ComposedTile = { meta: MetricMeta; result: MetricResult };

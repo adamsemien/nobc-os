@@ -12,10 +12,10 @@ export const dynamic = 'force-dynamic';
 // one topic label. The Intelligence tab calls this (debounced) on load, then
 // refetches analytics.
 //
-// MODEL NOTE: this uses claude-haiku-4-5-20251001, NOT the repo-locked
-// claude-sonnet-4-20250514. This is an explicit, Adam-authorized exception for
-// SMS categorization only — a cheap high-volume classification task. Per
-// CLAUDE.md, model bumps are Adam's call; this one was requested directly.
+// MODEL NOTE: this uses claude-haiku-4-5-20251001 (the MECHANICAL_MODEL tier,
+// lib/ai/runtime-models.ts), correct for cheap high-volume SMS classification.
+// Kept inline; House Phone runtime is not repointed. Per CLAUDE.md, model bumps
+// and tier moves are Adam's call.
 const CATEGORIZE_MODEL = 'claude-haiku-4-5-20251001';
 
 // Bound latency + cost per request. Remaining messages are picked up on the

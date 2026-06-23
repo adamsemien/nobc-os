@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
+import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 import type { AiApplicationRecommendation } from '@prisma/client';
 
 // Development-only route — verifies the full apply → AI scoring pipeline.
@@ -81,7 +82,7 @@ Respond ONLY with valid JSON:
 
   try {
     const { text } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: anthropic(JUDGMENT_MODEL),
       messages: [{ role: 'user', content: scoringPrompt }],
       maxOutputTokens: 512,
     });

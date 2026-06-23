@@ -32,9 +32,10 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { db } from '../lib/db';
 import { isReservedKey } from '../lib/member-editable';
+import { MECHANICAL_MODEL } from '../lib/ai/runtime-models';
 
 // Locked model — every Anthropic call in this repo uses this exact id (see CLAUDE.md).
-const EXTRACT_MODEL = 'claude-sonnet-4-20250514';
+const EXTRACT_MODEL = MECHANICAL_MODEL;
 
 // The ONLY columns this script may write. Each is a first-class Member scalar column and a
 // sponsor-safe firmographic field. Nothing psychographic, nothing identity, nothing computed.

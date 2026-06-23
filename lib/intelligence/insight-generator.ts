@@ -1,7 +1,7 @@
 /** Nightly change-detection — generates the Intelligence "Insights" feed.
  *
  *  SCAFFOLD: the per-metric iteration, threshold check, and IntelligenceInsight
- *  write are wired. The Claude narrative call (claude-sonnet-4-20250514) is
+ *  write are wired. The Claude narrative call (MECHANICAL_MODEL tier) is
  *  stubbed — see the TODO. Runs from app/api/cron/intelligence-insights. */
 import { db } from '../db';
 import { listMetrics, runMetric } from './registry';
@@ -11,7 +11,7 @@ import { buildContext, DEFAULT_FILTER_STATE } from './filters';
 export const SIGNIFICANT_CHANGE_PCT = 15;
 
 /** Placeholder narrative until the nightly Claude call is wired (next session).
- *  TODO: replace with a generateText call to claude-sonnet-4-20250514 that
+ *  TODO: replace with a generateText call on the MECHANICAL_MODEL tier that
  *  writes a 2-sentence operator-facing narrative from the metric + delta. */
 function placeholderNarrative(metricName: string, percent: number): string {
   const dir = percent >= 0 ? 'up' : 'down';

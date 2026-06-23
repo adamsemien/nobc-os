@@ -31,8 +31,8 @@ async function query(ctx: MetricContext): Promise<MetricResult> {
     };
   }
 
-  // Live mode: brand-level clustering is a nightly AI batch (Claude
-  // claude-sonnet-4-20250514, deferred). On page load we show advocacy-question
+  // Live mode: brand-level clustering is a nightly AI batch (MECHANICAL_MODEL
+  // tier, deferred). On page load we show advocacy-question
   // response volume — cheap, honest, and DB-only.
   const answers = await db.applicationAnswer.findMany({
     where: {

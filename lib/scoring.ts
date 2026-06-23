@@ -10,8 +10,9 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { resolveAnswer } from '@/lib/question-key-map';
+import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 
-const SCORING_MODEL = 'claude-sonnet-4-20250514';
+const SCORING_MODEL = JUDGMENT_MODEL;
 
 export const ScoringResultSchema = z.object({
   archetype: z.enum(['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron']),
