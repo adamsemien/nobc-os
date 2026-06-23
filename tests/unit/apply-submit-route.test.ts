@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const m = vi.hoisted(() => ({
   rateLimit: vi.fn(),
+  verifyDraftToken: vi.fn(),
   appFindUnique: vi.fn(),
   appUpdate: vi.fn(),
   auditCreate: vi.fn(),
@@ -34,6 +35,10 @@ const m = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/public-rate-limit', () => ({ publicRateLimit: m.rateLimit }));
+vi.mock('@/lib/apply-draft-token', () => ({
+  APPLY_DRAFT_COOKIE: 'nobc_apply_draft',
+  verifyApplyDraftToken: m.verifyDraftToken,
+}));
 vi.mock('@/lib/db', () => ({
   db: {
     application: { findUnique: m.appFindUnique, update: m.appUpdate },
@@ -66,7 +71,10 @@ vi.mock('next/server', async (orig) => {
 import { POST } from '@/app/api/apply/membership/[id]/submit/route';
 
 const post = (id = 'app1') =>
-  POST({ headers: { get: () => '1.2.3.4' } } as never, { params: Promise.resolve({ id }) });
+  POST(
+    { headers: { get: () => '1.2.3.4' }, cookies: { get: () => ({ value: 'tok' }) } } as never,
+    { params: Promise.resolve({ id }) },
+  );
 
 const baseApp = {
   id: 'app1',
@@ -96,6 +104,7 @@ const scoreResult = {
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
   m.rateLimit.mockReturnValue({ allowed: true, retryAfterSecs: 0 });
+  m.verifyDraftToken.mockReturnValue(true);
   m.checkDuplicate.mockResolvedValue(false);
   m.checkWatchList.mockResolvedValue(null);
   m.scoreApplication.mockResolvedValue(scoreResult);
@@ -114,6 +123,16 @@ describe('apply submit: rate limit', () => {
     const res = await post();
     expect(res.status).toBe(429);
     expect(res.headers.get('Retry-After')).toBe('42');
+    expect(m.appFindUnique).not.toHaveBeenCalled();
+    expect(m.scoreApplication).not.toHaveBeenCalled();
+  });
+});
+
+describe('apply submit: ownership', () => {
+  it('returns 403 before any DB call when the draft cookie is missing/invalid', async () => {
+    m.verifyDraftToken.mockReturnValue(false);
+    const res = await post();
+    expect(res.status).toBe(403);
     expect(m.appFindUnique).not.toHaveBeenCalled();
     expect(m.scoreApplication).not.toHaveBeenCalled();
   });

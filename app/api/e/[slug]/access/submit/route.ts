@@ -15,6 +15,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { publicRateLimit } from '@/lib/public-rate-limit';
 import { resolveViewer, flowNeedsApproval } from '@/lib/event-access';
 import {
   loadAccessContext,
@@ -39,6 +40,18 @@ export async function POST(
 ) {
   const { slug } = await params;
   const { userId } = await auth();
+
+  // Abuse cap on the anonymous guest path (the public surface). Signed-in
+  // members submit through their session and are not throttled here.
+  if (!userId) {
+    const rate = publicRateLimit(req, { bucket: 'access-submit', max: 20 });
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rate.retryAfterSecs) } },
+      );
+    }
+  }
 
   // F4: Two-step workspace resolve — never accept workspaceId from client input.
   // Step 1: slug → workspaceId (server-derived only).

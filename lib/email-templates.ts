@@ -2,6 +2,23 @@
 // so an unset NEXT_PUBLIC_APP_URL can't point the email QR <img> at a route-less host.
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.thenobadcompany.com';
 
+/**
+ * Escape user/operator-supplied text before interpolating it into email HTML.
+ * Names (applicant/guest-controlled), event titles and locations would otherwise
+ * inject markup - a name containing an anchor tag becomes a live link in the
+ * recipient's inbox. Applied to text contexts only; email SUBJECTS are plain
+ * text (not HTML) and internal appUrl-based hrefs are trusted, so neither is
+ * escaped here.
+ */
+function esc(s: string | null | undefined): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Events are operated from Austin; render every date/time in Central
 // (America/Chicago). Without an explicit timeZone, these render in the server
 // zone (UTC on Vercel), turning an evening event into a next-day "1:00 AM".
@@ -21,7 +38,7 @@ export function rsvpConfirmedEmail(
   rsvpId: string,
   qrAvailable?: boolean,
 ): { subject: string; html: string } {
-  const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
+  const locationLine = location ? `<p><strong>Location:</strong> ${esc(location)}</p>` : '';
   // Fallback points at the public, no-login ticket page so guest ticket-holders
   // are never bounced to the Clerk-gated /m confirmed page. eventSlug is kept in
   // the signature for caller stability (no longer used to build the URL).
@@ -41,9 +58,9 @@ export function rsvpConfirmedEmail(
 <p><a href="${confirmedUrl}">${confirmedUrl}</a></p>`;
   return {
     subject: `you're in: ${eventTitle}`,
-    html: `<p>Hi ${name},</p>
+    html: `<p>Hi ${esc(name)},</p>
 
-<p>You're confirmed for <strong>${eventTitle}</strong>.</p>
+<p>You're confirmed for <strong>${esc(eventTitle)}</strong>.</p>
 
 <p><strong>Date:</strong> ${dateStr}<br><strong>Time:</strong> ${timeStr}</p>
 ${locationLine}
@@ -60,14 +77,14 @@ export function compTicketEmail(
   location: string | null | undefined,
   rsvpId: string,
 ): { subject: string; html: string } {
-  const locationLine = location ? `<p><strong>Location:</strong> ${location}</p>` : '';
+  const locationLine = location ? `<p><strong>Location:</strong> ${esc(location)}</p>` : '';
   // Fallback points at the public, no-login ticket page so comp guests are never
   // bounced to the Clerk-gated /check-in route.
   const verifyUrl = `${appUrl}/ticket/${rsvpId}`;
   return {
     subject: `Your invitation: ${eventTitle}`,
-    html: `<p>Hi ${name},</p>
-<p>You're confirmed for <strong>${eventTitle}</strong>. This one's on us.</p>
+    html: `<p>Hi ${esc(name)},</p>
+<p>You're confirmed for <strong>${esc(eventTitle)}</strong>. This one's on us.</p>
 <p><strong>Date:</strong> ${formatDate(startAt)}</p>
 ${locationLine}
 <p>Show this QR code at the door and staff will scan you in:</p>
@@ -83,7 +100,7 @@ export function applicationApprovedEmail(
 ): { subject: string; html: string } {
   return {
     subject: 'Welcome to No Bad Company',
-    html: `<p>Hi ${name},</p>
+    html: `<p>Hi ${esc(name)},</p>
 <p>You're in. Welcome to No Bad Company.</p>
 <p>You're now a member of a community built around good people and great experiences. Check the app for upcoming events. We'll see you there.</p>
 <p>adam &amp; chloe</p>`,
@@ -95,7 +112,7 @@ export function applicationRejectedEmail(
 ): { subject: string; html: string } {
   return {
     subject: 'Your NoBC Application',
-    html: `<p>Hi ${name},</p>
+    html: `<p>Hi ${esc(name)},</p>
 <p>Thank you for taking the time to apply to No Bad Company.</p>
 <p>After careful consideration, we don't think the community is the right fit at this time. That said, things change. Keep an eye out for future opportunities.</p>
 <p>We appreciate your interest and wish you well.</p>
@@ -111,8 +128,8 @@ export function waitlistPromotedEmail(
   const eventUrl = `${appUrl}/m/events/${eventSlug}`;
   return {
     subject: `Good news: a spot just opened for ${eventTitle}`,
-    html: `<p>Hi ${name},</p>
-<p>A spot just opened up for <strong>${eventTitle}</strong>. You have 24 hours to claim it before it moves to the next person on the list.</p>
+    html: `<p>Hi ${esc(name)},</p>
+<p>A spot just opened up for <strong>${esc(eventTitle)}</strong>. You have 24 hours to claim it before it moves to the next person on the list.</p>
 <p><a href="${eventUrl}">Claim your spot →</a></p>
 <p>adam &amp; chloe</p>`,
   };
@@ -132,7 +149,7 @@ ${opts.googleWalletUrl ? `<p><a href="${opts.googleWalletUrl}" style="display:in
 
   return {
     subject: "You're in.",
-    html: `<p>Hi ${fullName},</p>
+    html: `<p>Hi ${esc(fullName)},</p>
 
 <p>Welcome to No Bad Company.</p>
 
@@ -157,9 +174,9 @@ export function eventCancelledEmail(
   });
   return {
     subject: `Cancelled: ${eventTitle}`,
-    html: `<p>Hi ${name},</p>
+    html: `<p>Hi ${esc(name)},</p>
 
-<p>We're sorry to share that <strong>${eventTitle}</strong>, scheduled for ${dateStr}, has been cancelled.</p>
+<p>We're sorry to share that <strong>${esc(eventTitle)}</strong>, scheduled for ${dateStr}, has been cancelled.</p>
 
 <p>There's nothing you need to do - your access for this event has been released. If you paid for a ticket, we'll make sure you're refunded.</p>
 
@@ -177,7 +194,7 @@ export function recapReadyEmail(
     subject: `Your ${eventName} recap is ready.`,
     html: `<p>Hi,</p>
 
-<p>Your activation recap for <strong>${eventName}</strong> is ready to view.</p>
+<p>Your activation recap for <strong>${esc(eventName)}</strong> is ready to view.</p>
 
 <p><a href="${url}">View your recap</a></p>
 

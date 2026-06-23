@@ -91,6 +91,36 @@ describe('app-URL fallback targets app.thenobadcompany.com, not the marketing ho
   }
 });
 
+describe('user-supplied text is HTML-escaped (no injection into email markup)', () => {
+  const evil = '<script>alert(1)</script><img src=x onerror=alert(1)>';
+
+  it('rsvpConfirmedEmail escapes a malicious name and event title', () => {
+    const { html } = rsvpConfirmedEmail(
+      evil, evil, startAt, evil, 'test-event', 'rsvp_abc12345', true,
+    );
+    // The injected tags must be inert text, not live markup.
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('compTicketEmail escapes a malicious name, title, and location', () => {
+    const { html } = compTicketEmail(evil, evil, startAt, evil, 'rsvp_abc12345');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('keeps the QR <img> tag intact while escaping the surrounding text', () => {
+    // The escape must not clobber the template's own markup — only the
+    // interpolated values.
+    const { html } = rsvpConfirmedEmail(
+      evil, 'Normal Title', startAt, 'The Venue', 'test-event', 'rsvp_abc12345', true,
+    );
+    expect(html).toMatch(/<img src="https:\/\/[^"]*\/api\/qr\/rsvp_abc12345"/);
+  });
+});
+
 describe('plus-one guest email includes the event time in Central', () => {
   it('renders a Central-time clock, not just the date', () => {
     const s = src('app/api/rsvp/plus-one/route.ts');

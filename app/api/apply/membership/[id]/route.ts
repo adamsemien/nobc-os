@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { publicRateLimit } from '@/lib/public-rate-limit';
+import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
 import { emailSchema, phoneSchema, shortText, answersMap, normalizePhone } from '@/lib/validation';
 
 const ID_RE = /^[a-z0-9_-]{8,40}$/i;
@@ -19,6 +21,13 @@ const PatchSchema = z.object({
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!ID_RE.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+
+  // The id is exposed in the page URL, so it is not a credential. Require the
+  // httpOnly cookie minted when this draft was created — without it, GET would
+  // leak the applicant's PII to anyone who learns the id (IDOR).
+  if (!verifyApplyDraftToken(id, req.cookies.get(APPLY_DRAFT_COOKIE)?.value)) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  }
 
   // Only PENDING applications expose their draft via the resume flow.
   // Internal AI fields and reviewer notes are never returned through this endpoint.
@@ -54,6 +63,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!ID_RE.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+
+  // Generous per-IP backstop against pathological hammering of the public draft
+  // PATCH. A legitimate applicant makes ~6-8 saves per session, so the cap is set
+  // high enough to clear several applicants behind one NAT IP.
+  const rate = publicRateLimit(req, { bucket: 'apply-patch', max: 120 });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please slow down and try again.' },
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSecs) } },
+    );
+  }
+
+  // Ownership: the id is in the URL and not a credential — require the draft
+  // cookie so a leaked id cannot overwrite someone else's contact details.
+  if (!verifyApplyDraftToken(id, req.cookies.get(APPLY_DRAFT_COOKIE)?.value)) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  }
 
   let body: unknown;
   try {
