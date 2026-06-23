@@ -179,6 +179,7 @@ function SectionIntro({
   onDone,
   opening = false,
   lead,
+  body,
   bold,
   accent = 'var(--primary)',
 }: {
@@ -187,6 +188,7 @@ function SectionIntro({
   onDone: () => void;
   opening?: boolean;
   lead?: string;
+  body?: string[];
   bold?: string;
   accent?: string;
 }) {
@@ -213,6 +215,12 @@ function SectionIntro({
               {lead}
             </p>
           )}
+          {body &&
+            body.map((para, i) => (
+              <p key={i} className="mt-6 max-w-[40ch] text-[15px] leading-[1.75] text-text-secondary">
+                {para}
+              </p>
+            ))}
           {bold && (
             <p className="mt-6 max-w-[42ch] text-sm font-semibold leading-snug text-text-primary sm:text-base">
               {bold}
@@ -1155,6 +1163,7 @@ export default function MembershipForm() {
           }}
           opening={interstitial.opening}
           lead={interstitial.opening ? INTRO.lead : undefined}
+          body={interstitial.opening ? INTRO.body : undefined}
           bold={interstitial.opening ? INTRO.bold : undefined}
           accent={theme.accent}
         />
