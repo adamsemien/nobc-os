@@ -586,21 +586,32 @@ export default function MembershipForm() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fullName: data.fullName, email: data.email, phone: data.phone, answers }),
         });
-        if (res.ok) {
-          const result = await res.json();
-          id = result.id as string;
-          setApplicationId(id);
-          const newUrl = isDemo ? `?id=${id}&demo=true` : isDev ? `?id=${id}&dev=true` : `?id=${id}`;
-          window.history.replaceState(null, '', newUrl);
-        }
+        // A failed create leaves us with no applicationId. Advancing here would
+        // walk the applicant through the entire form only for submit to silently
+        // no-op (handleSubmit early-returns when applicationId is null). Block on
+        // failure and let them retry this page instead.
+        if (!res.ok) throw new Error('save-failed');
+        const result = await res.json();
+        id = result.id as string;
+        setApplicationId(id);
+        const newUrl = isDemo ? `?id=${id}&demo=true` : isDev ? `?id=${id}&dev=true` : `?id=${id}`;
+        window.history.replaceState(null, '', newUrl);
       } else {
-        await fetch(`/api/apply/membership/${id}`, {
+        const res = await fetch(`/api/apply/membership/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ answers }),
         });
+        // A swallowed PATCH means this page's answers never reach the server and
+        // are lost from scoring/review. Surface it rather than advancing.
+        if (!res.ok) throw new Error('save-failed');
       }
-    } catch { /* silent */ }
+    } catch {
+      setIsLoading(false);
+      setError("We couldn't save your progress. Please check your connection and try again.");
+      return;
+    }
+    setError('');
     setIsLoading(false);
     advance(nextStep);
   }
@@ -755,7 +766,9 @@ export default function MembershipForm() {
   const archetypeData = submitResult ? ARCHETYPES[submitResult.archetype as ArchetypeName] : null;
   const dayStory = archetypeData?.dayStory ?? '';
   const nightStory = archetypeData?.nightStory ?? '';
-  const personalizedStory = submitResult?.personalizedCopy || dayStory;
+  // The AI personalization (empty when scoring fell back). Do NOT default to
+  // dayStory — that made "YOUR STORY" render a verbatim copy of "BY DAY".
+  const personalizedStory = (submitResult?.personalizedCopy ?? '').trim();
 
   // ----- Generic question rendering -----
 
@@ -1395,6 +1408,7 @@ export default function MembershipForm() {
                   }}>{nightStory}</p>
                 </div>
 
+                {personalizedStory && (
                 <div style={{
                   marginBottom: 0,
                   animation: 'fadeInUp 500ms ease 1600ms forwards',
@@ -1420,6 +1434,7 @@ export default function MembershipForm() {
                     margin: 0,
                   }}>{personalizedStory}</p>
                 </div>
+                )}
 
                 {!isDemo && (
                   <p style={{
