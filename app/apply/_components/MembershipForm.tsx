@@ -1227,13 +1227,10 @@ export default function MembershipForm() {
           <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>THE FINE PRINT</span>
             <h1 style={sectionHeadingStyle}>Almost There</h1>
-            <p style={{ fontFamily: bodyFont, fontSize: 11, color: theme.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 32, marginTop: 0 }}>
-              This waiver is a draft for attorney review.
-            </p>
 
             <div style={{ maxHeight: 'clamp(200px, 40vw, 400px)', minHeight: 120, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', borderBottom: `1px solid ${theme.border}`, padding: '20px 0', marginBottom: 32 }}>
               <div style={{ fontFamily: bodyFont, fontSize: 13, lineHeight: 1.7, color: theme.text, whiteSpace: 'pre-line' }}>
-                <strong style={{ display: 'block', marginBottom: 16, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase' }}>MEMBERSHIP APPLICATION — TERMS AND CONDITIONS</strong>
+                <strong style={{ display: 'block', marginBottom: 16, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase' }}>MEMBERSHIP APPLICATION - TERMS AND CONDITIONS</strong>
 
                 <strong>1. MEMBERSHIP DISCRETION</strong>{'\n'}
                 No Bad Company (&quot;NoBC&quot;, &quot;we&quot;, &quot;us&quot;) reserves the sole and absolute right to accept or decline any membership application for any reason or no reason. Submission of this application does not create any obligation on NoBC to grant membership. Membership decisions are final and not subject to appeal.{'\n\n'}

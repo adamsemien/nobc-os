@@ -4,9 +4,9 @@ import MembershipForm from './_components/MembershipForm';
 import { LegalFooter } from '@/app/_components/LegalFooter';
 
 export const metadata: Metadata = {
-  title: 'apply — no bad company',
+  title: 'apply - no bad company',
   openGraph: {
-    title: 'apply — no bad company',
+    title: 'apply - no bad company',
     description: 'membership by application. ten minutes. we read every word.',
     images: [{ url: '/og-apply.svg', width: 1200, height: 630 }],
   },
