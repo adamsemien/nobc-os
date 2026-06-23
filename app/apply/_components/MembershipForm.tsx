@@ -72,9 +72,10 @@ const EMPTY_FORM: FormData = {
 // ---------------------------------------------------------------------------
 
 const CHAPTER_PAGE_IDS: string[][] = [
-  // Section 01 - Who You Are
-  ['firstName', 'lastName', 'email', 'cell', 'homeAddress', 'cities', 'birthInfo', 'gender', 'dietary', 'links', 'referrals', 'enneagram'],
-  ['whatYouDo', 'creativePursuits', 'otherTests'],
+  // Section 01 - Who You Are (pages follow module order; personality-test
+  // questions kept together on Page 2)
+  ['firstName', 'lastName', 'email', 'cell', 'homeAddress', 'cities', 'birthInfo', 'gender', 'dietary', 'links'],
+  ['whatYouDo', 'creativePursuits', 'referrals', 'enneagram', 'otherTests'],
   // Section 02 - How You Move Through the World
   ['lastConvinced', 'obsessedWith', 'recommendForPay', 'comeToYouFor', 'loyalBrands', 'expertIn'],
   ['splurgeSave', 'brandPartner', 'detailsRight', 'trustedTaste', 'recSources'],
@@ -222,6 +223,8 @@ export default function MembershipForm() {
   // Speech-to-text (Web Speech API) - additive dictation on long-form fields only.
   const [speechSupported, setSpeechSupported] = useState(false);
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
+  // One-time "tap to speak" hint shown beside the first textarea field.
+  const [micHintSeen, setMicHintSeen] = useState(false);
   // localStorage draft-resume prompt (logged-out applicants).
   const [draftPrompt, setDraftPrompt] = useState<{ answers: Record<string, string>; step: number; applicationId: string | null } | null>(null);
 
@@ -309,13 +312,16 @@ export default function MembershipForm() {
     textTransform: 'uppercase',
   };
 
+  // Matches the page-title treatment (PP Editorial New italic) so the legal
+  // screen's heading is consistent with every other section title.
   const sectionHeadingStyle: React.CSSProperties = {
-    fontFamily: bodyFont,
-    fontSize: 28,
-    fontWeight: 500,
-    lineHeight: 1.2,
+    fontFamily: displayFont,
+    fontSize: 'clamp(34px, 5vw, 52px)',
+    fontWeight: 400,
+    fontStyle: 'italic',
+    lineHeight: 1.1,
     color: theme.text,
-    margin: '0 0 40px 0',
+    margin: '0 0 16px 0',
   };
 
   const helpStyle: React.CSSProperties = {
@@ -410,7 +416,17 @@ export default function MembershipForm() {
     return () => { try { recognitionRef.current?.stop?.(); } catch { /* noop */ } };
   }, []);
 
+  // The mic hint is a once-ever affordance; remember dismissal across sessions.
+  useEffect(() => {
+    try { if (localStorage.getItem('nobc-apply-mic-hint') === '1') setMicHintSeen(true); } catch { /* noop */ }
+  }, []);
+  const dismissMicHint = useCallback(() => {
+    setMicHintSeen(true);
+    try { localStorage.setItem('nobc-apply-mic-hint', '1'); } catch { /* noop */ }
+  }, []);
+
   const toggleDictation = useCallback((key: string) => {
+    dismissMicHint();
     if (!speechSupported) return;
     if (recordingKey === key) { recognitionRef.current?.stop?.(); return; }
     try { recognitionRef.current?.stop?.(); } catch { /* noop */ }
@@ -436,7 +452,15 @@ export default function MembershipForm() {
     recognitionRef.current = rec;
     setRecordingKey(key);
     try { rec.start(); } catch { setRecordingKey(null); recognitionRef.current = null; }
-  }, [speechSupported, recordingKey, answers]);
+  }, [speechSupported, recordingKey, answers, dismissMicHint]);
+
+  // Auto-dismiss the hint a few seconds after it first appears on a textarea page.
+  useEffect(() => {
+    if (micHintSeen || !speechSupported || step >= LEGAL_STEP) return;
+    if (!PAGES[step]?.some(q => q.type === 'textarea')) return;
+    const t = setTimeout(dismissMicHint, 7000);
+    return () => clearTimeout(t);
+  }, [step, micHintSeen, speechSupported, dismissMicHint]);
 
   // --- localStorage draft resume (logged-out applicants) ---------------------
   // Restore on load only when there is no server ?id= resume in flight and we
@@ -732,7 +756,7 @@ export default function MembershipForm() {
 
   // ----- Generic question rendering -----
 
-  function renderSimpleInput(q: Question, key: string) {
+  function renderSimpleInput(q: Question, key: string, showHint = false) {
     const value = answers[key] ?? '';
     if (q.type === 'textarea') {
       const recording = recordingKey === key;
@@ -764,13 +788,30 @@ export default function MembershipForm() {
                 padding: 4,
                 lineHeight: 0,
                 cursor: 'pointer',
-                color: recording ? theme.accent : theme.tertiary,
+                color: recording ? theme.accent : theme.muted,
                 transition: 'color 200ms ease',
                 animation: recording ? 'micPulse 1.2s ease-in-out infinite' : 'none',
               }}
             >
               <Mic size={16} strokeWidth={1.75} />
             </button>
+          )}
+          {showHint && (
+            <p style={{
+              margin: '10px 0 0 0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontFamily: bodyFont,
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: theme.accent,
+              animation: 'fadeIn 500ms ease',
+            }}>
+              <Mic size={12} strokeWidth={2} /> Tap to speak your answer
+            </p>
           )}
         </div>
       );
@@ -839,13 +880,14 @@ export default function MembershipForm() {
     );
   }
 
-  function renderQuestion(q: Question) {
+  function renderQuestion(q: Question, hintKey: string | null = null) {
     if (q.type === 'group') {
       return (
         <div key={q.id} style={fieldGroup}>
           <label style={labelStyle}>{q.label}</label>
           {q.help && <p style={helpStyle}>{q.help}</p>}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 24px', marginTop: 12 }}>
+          {/* One column on phones, two columns from 600px up (see .apply-group-grid). */}
+          <div className="apply-group-grid" style={{ marginTop: 12 }}>
             {(q.fields ?? []).map(sub => (
               <div key={sub.id} style={fieldGroup}>
                 {sub.label && <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>{sub.label}</label>}
@@ -861,7 +903,7 @@ export default function MembershipForm() {
       <div key={q.id} style={fieldGroup}>
         <label style={labelStyle}>{q.label}</label>
         {q.help && <p style={helpStyle}>{q.help}</p>}
-        {renderSimpleInput(q, key)}
+        {renderSimpleInput(q, key, hintKey === key)}
       </div>
     );
   }
@@ -938,6 +980,15 @@ export default function MembershipForm() {
         @keyframes micPulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.35; }
+        }
+        /* Group sub-fields: single column on phones, two columns from 600px up. */
+        .apply-group-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0 24px;
+        }
+        @media (min-width: 600px) {
+          .apply-group-grid { grid-template-columns: repeat(2, 1fr); }
         }
         @media (prefers-reduced-motion: reduce) {
           .apply-interstitial,
@@ -1109,6 +1160,9 @@ export default function MembershipForm() {
           const section = SECTION_BY_ID[page[0].section];
           const isFirstPageOfSection = step === 0 || PAGES[step - 1][0].section !== page[0].section;
           const isFirstSection = section.id === SECTIONS[0].id;
+          // The one-time mic hint attaches to the first textarea on this page.
+          const firstTextarea = page.find(q => q.type === 'textarea');
+          const hintKey = speechSupported && !micHintSeen && firstTextarea ? firstTextarea.id : null;
           return (
             <div
               key={step}
@@ -1121,15 +1175,22 @@ export default function MembershipForm() {
               }}
             >
               <span style={chapterLabelStyle}>{section.eyebrow}</span>
-              <h1 style={{
-                fontFamily: displayFont,
-                fontSize: 'clamp(34px, 5vw, 52px)',
-                fontWeight: 400,
-                fontStyle: 'italic',
-                lineHeight: 1.1,
-                color: theme.text,
-                margin: '0 0 48px 0',
-              }}>{section.title}</h1>
+              {/* The full serif title appears only on a section's first page -
+                  the interstitial owns the section moment. On continuation
+                  pages the small uppercase eyebrow above carries orientation. */}
+              {isFirstPageOfSection ? (
+                <h1 style={{
+                  fontFamily: displayFont,
+                  fontSize: 'clamp(34px, 5vw, 52px)',
+                  fontWeight: 400,
+                  fontStyle: 'italic',
+                  lineHeight: 1.1,
+                  color: theme.text,
+                  margin: '0 0 48px 0',
+                }}>{section.title}</h1>
+              ) : (
+                <div style={{ height: 28 }} />
+              )}
 
               {isFirstPageOfSection && isFirstSection && (
                 <div style={{ marginBottom: 56 }}>
@@ -1141,7 +1202,7 @@ export default function MembershipForm() {
                 </div>
               )}
 
-              {page.map(renderQuestion)}
+              {page.map((q) => renderQuestion(q, hintKey))}
 
               {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
               {navBlock(() => submitPage(step))}
@@ -1154,7 +1215,7 @@ export default function MembershipForm() {
           <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>THE FINE PRINT</span>
             <h1 style={sectionHeadingStyle}>Almost There</h1>
-            <p style={{ fontFamily: bodyFont, fontSize: 11, color: theme.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 24, marginTop: -24 }}>
+            <p style={{ fontFamily: bodyFont, fontSize: 11, color: theme.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 32, marginTop: 0 }}>
               This waiver is a draft for attorney review.
             </p>
 
