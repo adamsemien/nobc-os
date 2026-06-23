@@ -18,8 +18,6 @@ const FroggerGame = dynamic(() => import('./FroggerGame'), { ssr: false });
 const displayFont = "'PP Editorial New', Georgia, serif";
 const bodyFont = "'Neue Haas Grotesk Display Pro', 'Helvetica Neue', Arial, sans-serif";
 
-const REACTIONS = ['interesting.', 'noted.', 'love that.', 'makes sense.', 'got it.', 'okay.'];
-
 const THEME = {
   day: {
     bg: 'var(--bg)',
@@ -201,8 +199,6 @@ export default function MembershipForm() {
   const [data, setData] = useState<FormData>(EMPTY_FORM);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [applicationId, setApplicationId] = useState<string | null>(null);
-  const [microReaction, setMicroReaction] = useState('');
-  const [showReaction, setShowReaction] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
@@ -249,11 +245,11 @@ export default function MembershipForm() {
 
   const labelStyle: React.CSSProperties = {
     fontFamily: bodyFont,
-    fontSize: 11,
-    fontWeight: 500,
-    color: theme.muted,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase',
+    fontSize: 15,
+    fontWeight: 600,
+    color: theme.text,
+    letterSpacing: '0',
+    lineHeight: 1.4,
     marginBottom: 10,
     display: 'block',
   };
@@ -263,10 +259,10 @@ export default function MembershipForm() {
     return {
       background: 'transparent',
       border: 'none',
-      borderBottom: `1px solid ${focused ? theme.accent : theme.border}`,
+      borderBottom: `1.5px solid ${focused ? theme.accent : theme.border}`,
       borderRadius: 0,
       padding: '8px 0 12px 0',
-      fontSize: 16,
+      fontSize: 17,
       fontFamily: bodyFont,
       color: theme.text,
       width: '100%',
@@ -408,22 +404,15 @@ export default function MembershipForm() {
     fillSample();
   }, [isDemo, fillSample]);
 
-  const showMicroReaction = useCallback(() => {
-    setMicroReaction(REACTIONS[Math.floor(Math.random() * REACTIONS.length)]);
-    setShowReaction(true);
-    setTimeout(() => setShowReaction(false), 1800);
-  }, []);
-
   const advance = useCallback((nextStep: number) => {
     setIsTransitioning(true);
     setTransitionDirection(nextStep > step ? 'forward' : 'backward');
     setTimeout(() => {
       setStep(nextStep);
       setIsTransitioning(false);
-      showMicroReaction();
       window.scrollTo({ top: 0, behavior: 'instant' });
     }, 400);
-  }, [showMicroReaction, step]);
+  }, [step]);
 
   const set = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
     setData(prev => ({ ...prev, [key]: value }));
@@ -727,7 +716,7 @@ export default function MembershipForm() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 24px', marginTop: 12 }}>
             {(q.fields ?? []).map(sub => (
               <div key={sub.id} style={fieldGroup}>
-                {sub.label && <label style={{ ...labelStyle, fontSize: 10 }}>{sub.label}</label>}
+                {sub.label && <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>{sub.label}</label>}
                 {renderSubInput(q, sub)}
               </div>
             ))}
@@ -864,8 +853,7 @@ export default function MembershipForm() {
         const pad = (n: number) => String(n).padStart(2, '0');
         return (
           <div style={{
-            position: 'fixed', top: 14, left: 14, zIndex: 60,
-            paddingTop: 'env(safe-area-inset-top)',
+            position: 'fixed', right: 24, top: 'calc(env(safe-area-inset-top) + 64px)', zIndex: 60,
             fontFamily: bodyFont, fontSize: 11, fontWeight: 500,
             letterSpacing: '0.16em', color: theme.muted,
             pointerEvents: 'none',
@@ -920,11 +908,6 @@ export default function MembershipForm() {
           <span style={{ opacity: isNight ? 1 : 0.4, transition: 'opacity 200ms ease', fontSize: 13 }}>&#127769;</span>
         </button>
       </nav>
-
-      {/* Micro reaction */}
-      <div style={{ position: 'fixed', top: 72, left: 0, right: 0, zIndex: 48, display: 'flex', justifyContent: 'center', pointerEvents: 'none', opacity: showReaction ? 1 : 0, transition: 'opacity 0.3s ease' }}>
-        <span style={{ fontFamily: displayFont, fontSize: 16, color: theme.accent, fontStyle: 'italic' }}>{microReaction}</span>
-      </div>
 
       <main style={{
         minHeight: 'calc(100vh - 56px)',

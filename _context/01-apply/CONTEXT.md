@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped — live at `/apply` (+ application-backup feature code-complete, dormant on a branch) |
+| **State** | ✅ Shipped — live at `/apply` · 🟡 full rebuild + editorial redesign on branch `feat/apply-rebuild-redesign` (not merged) · (+ application-backup feature code-complete, dormant on a branch) |
 | **V1 item** | #1, #5 |
 | **Last updated** | 2026-06-22 |
 | **Owner** | Adam |
-| **Blocked on** | Nothing |
-| **Next** | Launch-hardening landed on `feat/apply-hardening` (BLOCKERs 1–5 from FULL-AUDIT-2026-06-21): sender display name → "The No Bad Company" across all transactional sends; submit + create idempotency guards; in-codebase per-IP rate limit (`publicRateLimit`) on both public apply POSTs; photo-upload failures now surfaced to the applicant. **Decisions for Adam:** (1) **rate-limiting** is in-memory per-instance (resets on cold start) — decide whether to add Vercel WAF or an Upstash shared store for production-grade distributed limiting (FLAGGED, no infra added); (2) the optional durable dedup index in `prisma/sql/apply-dedup-partial-unique.sql` (partial-unique on PENDING `(workspaceId, lower(email))`) is **NOT applied** — review + apply by hand if wanted (code already P2002-defensive without it). Prior threads unchanged: apply `prisma/sql/application-backup.sql` + set `GOOGLE_DRIVE_*`, then merge `feat/application-backup`; reconcile the three competing answer-key generations. |
+| **Blocked on** | Apply rebuild (branch `feat/apply-rebuild-redesign`) awaits Adam's review of the preview before merge/deploy. Live `/apply` itself: nothing. |
+| **Next** | **Apply rebuild in review** (branch `feat/apply-rebuild-redesign`, not merged): theme-leak lock (`app/apply/layout.tsx`) + module-driven 3-section 39-question form (`app/apply/_lib/questions.ts` = single source of truth) + editorial redesign + cosmetic fixes (indicator placement, toast removed, label/answer contrast). Presentation + structure only; submission, scoring, consent byte-for-byte (verified). Two follow-ups OUTSIDE `/apply` before the new questions are fully wired: (1) operator review labels in `lib/legacy-answer-labels.ts` for the new answer keys; (2) the DB `ApplicationTemplate` QuestionDefinitions still describe the old questions, so scoring runs fail-safe but is not yet tuned to the new set. Adam deploys via `vercel --prod --archive=tgz`. Prior: Launch-hardening landed on `feat/apply-hardening` (BLOCKERs 1–5 from FULL-AUDIT-2026-06-21): sender display name → "The No Bad Company" across all transactional sends; submit + create idempotency guards; in-codebase per-IP rate limit (`publicRateLimit`) on both public apply POSTs; photo-upload failures now surfaced to the applicant. **Decisions for Adam:** (1) **rate-limiting** is in-memory per-instance (resets on cold start) — decide whether to add Vercel WAF or an Upstash shared store for production-grade distributed limiting (FLAGGED, no infra added); (2) the optional durable dedup index in `prisma/sql/apply-dedup-partial-unique.sql` (partial-unique on PENDING `(workspaceId, lower(email))`) is **NOT applied** — review + apply by hand if wanted (code already P2002-defensive without it). Prior threads unchanged: apply `prisma/sql/application-backup.sql` + set `GOOGLE_DRIVE_*`, then merge `feat/application-backup`; reconcile the three competing answer-key generations. |
 
 ## Scope
 
@@ -21,7 +21,9 @@ This stage owns everything from the moment a person lands on `/apply` to the mom
 
 ```
 app/apply/page.tsx                              ← server wrapper with Suspense
-app/apply/_components/MembershipForm.tsx        ← 8-screen client form (~990 lines)
+app/apply/layout.tsx                            ← pins /apply to data-theme="nobc" (theme-leak lock; rebuild branch)
+app/apply/_lib/questions.ts                     ← the 39-question set + 3 sections, single source of truth (rebuild branch)
+app/apply/_components/MembershipForm.tsx        ← module-driven 3-section client form (rebuild branch; was 8-screen)
 app/apply/_components/FroggerGame.tsx           ← South Congress easter egg
 app/api/apply/membership/route.ts               ← POST: create draft Application
 app/api/apply/membership/[id]/route.ts          ← GET + PATCH: read/update draft
