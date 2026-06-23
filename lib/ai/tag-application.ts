@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { answerQuestions, APPLY_QUESTIONS } from '@/lib/apply-config';
 import { referrerLines } from '@/lib/operator-application-display';
+import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 
 const ApplicationTaggingSchema = z.object({
   aiTags: z
@@ -74,7 +75,7 @@ ${qaLines.join('\n\n')}
 `;
 
   const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: anthropic(JUDGMENT_MODEL),
     schema: ApplicationTaggingSchema,
     system: SYSTEM,
     prompt: userPrompt,

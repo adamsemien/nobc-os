@@ -1,6 +1,6 @@
 /**
  * POST /api/media/dam/asset/[id]/alt-text — generate accessibility alt-text for a
- * photo via Claude vision (locked model claude-sonnet-4-20250514). STAFF-gated,
+ * photo via Claude vision (MECHANICAL_MODEL, Haiku 4.5). STAFF-gated,
  * workspace-scoped. Returns the suggested text (not persisted — there is no
  * altText column yet; the operator copies it into their newsletter/post).
  */
@@ -11,11 +11,12 @@ import { OperatorRole } from '@prisma/client';
 import { requireRole } from '@/lib/operator-role';
 import { db } from '@/lib/db';
 import { presignGet } from '@/lib/dam/storage';
+import { MECHANICAL_MODEL } from '@/lib/ai/runtime-models';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-const ALT_TEXT_MODEL = 'claude-sonnet-4-20250514';
+const ALT_TEXT_MODEL = MECHANICAL_MODEL;
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const gate = await requireRole(OperatorRole.STAFF);

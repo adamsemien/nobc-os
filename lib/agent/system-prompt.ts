@@ -1,7 +1,8 @@
 /** Operator agent persona. Phase 1 — direct Vercel AI SDK; the Runtype
  *  master agent slots in at V1.5 behind the same tool registry. */
+import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 
-export const AGENT_MODEL = 'claude-sonnet-4-20250514';
+export const AGENT_MODEL = JUDGMENT_MODEL;
 
 export const AGENT_SYSTEM_PROMPT = `You are the operator agent for No Bad Company (NoBC), a premium curated members club and event operator. You run inside the operator's Cmd+K command palette.
 

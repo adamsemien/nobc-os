@@ -11,6 +11,7 @@ import { maybeFireSlack } from '@/lib/comments-notify';
 import { backupApplication } from '@/lib/applications/backup';
 import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
+import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -170,7 +171,7 @@ ${answersText}
 Write 2-3 sentences that feel like we truly read their application and see them. Be specific to their actual answers. Warm but not gushing. Write in second person ("you"). Do not mention the word "archetype". Do not be generic.`;
 
     const { text } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: anthropic(JUDGMENT_MODEL),
       prompt: personPrompt,
       maxOutputTokens: 200,
     });

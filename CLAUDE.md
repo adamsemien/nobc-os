@@ -36,7 +36,7 @@ Methodology: see the `nobc-icm` skill.
 - **Auth:** Clerk with Organizations (org = workspace = tenant)
 - **Email:** Resend (transactional only)
 - **Payments:** Stripe (authorize/capture)
-- **AI:** `claude-sonnet-4-20250514` via Vercel AI SDK + the Anthropic API directly (the locked model — see Locked Decisions). The operator chat panel runs in-process through `lib/agent/`; the MCP server at `/api/mcp` is an unconsumed surface awaiting a future agent client. **There is no external agent runtime.** Runtype was evaluated and scratched.
+- **AI:** two-tier Claude policy via the Vercel AI SDK + the Anthropic API directly, defined in `lib/ai/runtime-models.ts`: `JUDGMENT_MODEL` (`claude-sonnet-4-6`) for judgment / member-facing tasks, `MECHANICAL_MODEL` (`claude-haiku-4-5-20251001`) for mechanical / bulk tasks (see Locked Decisions). The operator chat panel runs in-process through `lib/agent/`; the MCP server at `/api/mcp` is an unconsumed surface awaiting a future agent client. **There is no external agent runtime.** Runtype was evaluated and scratched.
 - **Deploy:** Vercel
 - **Testing:** Vitest (unit) + Playwright (E2E). Unit harness added 2026-05-22 (`npm run test:unit`).
 
@@ -122,10 +122,9 @@ A May-2026 session added the House Phone SMS inbox (Runtype evaluated and **scra
 These are hard constants. Any agent that violates them is broken.
 
 - **Email `from` address:** `team@thenobadcompany.com` — always, every transactional email, every welcome, every notification
-- **AI model:** `claude-sonnet-4-20250514` — every Anthropic call. Do not substitute a different model, do not "upgrade" to a newer version, do not swap to a cheaper one. Adam decides model bumps explicitly.
-  - **Authorized Haiku exceptions** (`claude-haiku-4-5-20251001`) — explicit, Adam-authorized uses for cheap, high-volume or non-critical editorial summarization. These do NOT relax the lock anywhere else; any other model choice still requires Adam's sign-off:
-    1. **House Phone SMS** — inbound triage (the Railway service) and SMS topic categorization (`GET /api/sms/categorize`). Cheap high-volume SMS classification.
-    2. **Sponsor Intelligence narrative** — the Sentiment & Alignment narrative on `/operator/intelligence/sponsor` (`app/operator/intelligence/sponsor/actions.ts`). Authorized 2026-05-25 for editorial sponsor-briefing summarization.
+- **AI models (two-tier):** every runtime Anthropic call uses one of two models defined in `lib/ai/runtime-models.ts`. Do not substitute a different model, do not swap providers, do not move a site to a cheaper tier to save cost. Adam decides model bumps and tier moves explicitly. (The prior single locked Sonnet model was retired by Anthropic and now returns 404, which is why this is a two-tier policy.)
+  - **`JUDGMENT_MODEL`** = `claude-sonnet-4-6` - judgment / member-facing tasks: application scoring (`lib/scoring.ts`), reveal personalization, application tagging (`lib/ai/tag-application.ts`), the AI event builder, event-description generation, the Intelligence composer (`lib/intelligence/composer.ts`), and the operator chat agent (`lib/agent/`).
+  - **`MECHANICAL_MODEL`** = `claude-haiku-4-5-20251001` - mechanical / bulk tasks: DAM alt-text, firmographics backfill, House Phone SMS triage + categorization (`GET /api/sms/categorize`), and the recap / sponsor-briefing narratives (`app/operator/intelligence/sponsor/actions.ts`).
 - **Never modify legal copy** in /apply screen 7 (waiver). Pending attorney review. Any change requires Adam's explicit sign-off.
 - **Never break /apply, archetype config (config/archetypes.ts), or the AI scoring system.** These are shipped and live. Changes require explicit task authorization.
 

@@ -4,6 +4,7 @@ import { generateText } from 'ai';
 import { OperatorRole } from '@prisma/client';
 import { requireRole } from '@/lib/operator-role';
 import { anthropic } from '@ai-sdk/anthropic';
+import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 
 /** POST /api/operator/events/generate-description — drafts a short event (or
  *  series) description in NoBC voice from the event facts. STAFF-gated; uses the
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { text } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: anthropic(JUDGMENT_MODEL),
       system: SYSTEM,
       prompt,
       maxOutputTokens: 300,
