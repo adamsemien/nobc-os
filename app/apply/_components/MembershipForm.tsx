@@ -64,7 +64,7 @@ const EMPTY_FORM: FormData = {
 };
 
 // ---------------------------------------------------------------------------
-// Page packing — the questions module is the single source of truth. We pack
+// Page packing - the questions module is the single source of truth. We pack
 // each section's questions (in declared order) into pages by weight
 // (textarea | group = 2, everything else = 1), starting a new page whenever
 // adding the next question would exceed weight 4. Pages never cross a section
@@ -155,6 +155,40 @@ function sampleValue(q: Question, sub?: SubField): string {
   }
 }
 
+/**
+ * Full-screen interstitial card shown at a section boundary. Eyebrow + big
+ * serif title enter with a restrained fade + slow upward translate, staggered.
+ * Motion is CSS-only (no framer-motion) and is suppressed under
+ * prefers-reduced-motion. Mobile-safe: vertical motion only, safe-area padding.
+ */
+function SectionIntro({
+  eyebrow,
+  title,
+  onDone,
+}: {
+  eyebrow: string;
+  title: string;
+  onDone: () => void;
+}) {
+  return (
+    <div
+      onClick={onDone}
+      className="apply-interstitial fixed inset-0 z-[70] flex cursor-pointer flex-col items-center justify-center bg-bg px-6 text-center"
+      style={{
+        paddingTop: 'max(env(safe-area-inset-top), 24px)',
+        paddingBottom: 'max(env(safe-area-inset-bottom), 24px)',
+      }}
+    >
+      <span className="apply-interstitial-eyebrow mb-6 block text-xs font-medium uppercase tracking-[0.24em] text-primary">
+        {eyebrow}
+      </span>
+      <h1 className="apply-interstitial-title font-display max-w-[14ch] text-4xl italic leading-tight text-text-primary sm:text-6xl">
+        {title}
+      </h1>
+    </div>
+  );
+}
+
 export default function MembershipForm() {
   const searchParams = useSearchParams();
   const isDev = process.env.NODE_ENV === 'development' || searchParams.get('dev') === 'true';
@@ -181,8 +215,10 @@ export default function MembershipForm() {
   const [devHovered, setDevHovered] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [bannerFading, setBannerFading] = useState(false);
+  const [interstitial, setInterstitial] = useState<{ eyebrow: string; title: string } | null>(null);
 
   const froggerBuffer = useRef('');
+  const seenSections = useRef<Set<string>>(new Set());
 
   const theme = isNight ? THEME.night : THEME.day;
 
@@ -218,15 +254,16 @@ export default function MembershipForm() {
     color: theme.muted,
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
-    marginBottom: 0,
+    marginBottom: 10,
     display: 'block',
   };
 
   function getInputStyle(id: string): React.CSSProperties {
+    const focused = focusedField === id;
     return {
       background: 'transparent',
       border: 'none',
-      borderBottom: `1px solid ${focusedField === id ? theme.accent : theme.border}`,
+      borderBottom: `1px solid ${focused ? theme.accent : theme.border}`,
       borderRadius: 0,
       padding: '8px 0 12px 0',
       fontSize: 16,
@@ -236,7 +273,9 @@ export default function MembershipForm() {
       boxSizing: 'border-box',
       outline: 'none',
       caretColor: theme.accent,
-      transition: 'border-color 200ms ease',
+      // Soft token focus ring under the editorial underline (primary-soft).
+      boxShadow: focused ? `0 1px 0 0 var(--primary-soft)` : 'none',
+      transition: 'border-color 200ms ease, box-shadow 200ms ease',
     };
   }
 
@@ -272,12 +311,12 @@ export default function MembershipForm() {
   const helpStyle: React.CSSProperties = {
     fontFamily: bodyFont,
     fontSize: 13,
-    lineHeight: 1.6,
+    lineHeight: 1.65,
     color: theme.muted,
-    margin: '6px 0 14px 0',
+    margin: '0 0 14px 0',
   };
 
-  const fieldGroup: React.CSSProperties = { marginBottom: 40 };
+  const fieldGroup: React.CSSProperties = { marginBottom: 48 };
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -333,6 +372,22 @@ export default function MembershipForm() {
   useEffect(() => {
     return () => { photoPreviewUrls.forEach(u => URL.revokeObjectURL(u)); };
   }, [photoPreviewUrls]);
+
+  // Section interstitial: the first time a section's first page is reached,
+  // show a full-screen card before the form. CSS handles the motion; we just
+  // auto-dismiss after it settles (and a tap/click dismisses early).
+  useEffect(() => {
+    if (step >= LEGAL_STEP) return;
+    const page = PAGES[step];
+    const sectionId = page[0].section;
+    const isFirstPageOfSection = step === 0 || PAGES[step - 1][0].section !== sectionId;
+    if (!isFirstPageOfSection || seenSections.current.has(sectionId)) return;
+    seenSections.current.add(sectionId);
+    const section = SECTION_BY_ID[sectionId];
+    setInterstitial({ eyebrow: section.eyebrow, title: section.title });
+    const t = setTimeout(() => setInterstitial(null), 2200);
+    return () => clearTimeout(t);
+  }, [step]);
 
   const fillSample = useCallback(() => {
     const filled: Record<string, string> = {};
@@ -541,9 +596,9 @@ export default function MembershipForm() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           {step > 0 ? (
             <button onClick={() => { setIsTransitioning(true); setTransitionDirection('backward'); setTimeout(() => { setStep(s => Math.max(0, s - 1)); setIsTransitioning(false); window.scrollTo({ top: 0, behavior: 'instant' }); }, 400); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: bodyFont, fontSize: 22, color: theme.muted, padding: '8px 0', minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', lineHeight: 1 }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: bodyFont, fontSize: 15, fontWeight: 500, letterSpacing: '0.06em', color: theme.muted, padding: '8px 4px', minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, lineHeight: 1 }}
               aria-label="Go back">
-              &#8249;
+              <span style={{ fontSize: 22, lineHeight: 1 }}>&#8249;</span> back
             </button>
           ) : <div />}
           <button
@@ -742,8 +797,44 @@ export default function MembershipForm() {
         @keyframes barGrow {
           from { width: 0; }
         }
+        @keyframes editorialRise {
+          from { opacity: 0; transform: translateY(28px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .apply-interstitial { animation: fadeIn 360ms ease forwards; }
+        .apply-interstitial-eyebrow {
+          opacity: 0;
+          animation: editorialRise 720ms cubic-bezier(0.16, 1, 0.3, 1) 120ms forwards;
+        }
+        .apply-interstitial-title {
+          opacity: 0;
+          animation: editorialRise 780ms cubic-bezier(0.16, 1, 0.3, 1) 260ms forwards;
+        }
+        .apply-page-enter {
+          opacity: 0;
+          animation: fadeIn 420ms ease forwards;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .apply-interstitial,
+          .apply-interstitial-eyebrow,
+          .apply-interstitial-title,
+          .apply-page-enter {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+          }
+        }
       `}</style>
       <div style={{ background: theme.bg, minHeight: '100vh', fontFamily: bodyFont, color: theme.text, transition: 'background 300ms ease, color 300ms ease' }}>
+
+      {/* Section interstitial */}
+      {interstitial && step < REVEAL_STEP && (
+        <SectionIntro
+          eyebrow={interstitial.eyebrow}
+          title={interstitial.title}
+          onDone={() => setInterstitial(null)}
+        />
+      )}
 
       {/* DEMO badge */}
       {isDemo && step < REVEAL_STEP && (
@@ -766,12 +857,23 @@ export default function MembershipForm() {
         </div>
       )}
 
-      {/* Progress bar */}
-      {step < REVEAL_STEP && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 60, height: 2, background: theme.border }}>
-          <div style={{ height: '100%', width: `${((step + 1) / (REVEAL_STEP)) * 100}%`, background: theme.accent, transition: 'width 0.4s ease', borderRadius: 0 }} />
-        </div>
-      )}
+      {/* Quiet section indicator (replaces the progress bar) */}
+      {step < LEGAL_STEP && (() => {
+        const sectionId = PAGES[step][0].section;
+        const sectionNo = SECTION_BY_ID[sectionId].index;
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return (
+          <div style={{
+            position: 'fixed', top: 14, left: 14, zIndex: 60,
+            paddingTop: 'env(safe-area-inset-top)',
+            fontFamily: bodyFont, fontSize: 11, fontWeight: 500,
+            letterSpacing: '0.16em', color: theme.muted,
+            pointerEvents: 'none',
+          }}>
+            {pad(sectionNo)} / {pad(SECTIONS.length)}
+          </div>
+        );
+      })()}
 
       {/* Resume banner */}
       {showResumeBanner && (
@@ -840,22 +942,34 @@ export default function MembershipForm() {
           const isFirstPageOfSection = step === 0 || PAGES[step - 1][0].section !== page[0].section;
           const isFirstSection = section.id === SECTIONS[0].id;
           return (
-            <div style={{
-              maxWidth: 560,
-              width: '100%',
-              margin: '0 auto',
-              padding: step === 0 ? '48px 24px 100px 24px' : undefined,
-            }}>
+            <div
+              key={step}
+              className="apply-page-enter"
+              style={{
+                maxWidth: 620,
+                width: '100%',
+                margin: '0 auto',
+                padding: step === 0 ? '56px 24px 120px 24px' : undefined,
+              }}
+            >
               <span style={chapterLabelStyle}>{section.eyebrow}</span>
-              <h1 style={sectionHeadingStyle}>{section.title}</h1>
+              <h1 style={{
+                fontFamily: displayFont,
+                fontSize: 'clamp(34px, 5vw, 52px)',
+                fontWeight: 400,
+                fontStyle: 'italic',
+                lineHeight: 1.1,
+                color: theme.text,
+                margin: '0 0 48px 0',
+              }}>{section.title}</h1>
 
               {isFirstPageOfSection && isFirstSection && (
-                <div style={{ marginBottom: 40 }}>
-                  <p style={{ fontFamily: displayFont, fontSize: 18, fontStyle: 'italic', lineHeight: 1.6, color: theme.text, margin: '0 0 20px 0' }}>{INTRO.lead}</p>
+                <div style={{ marginBottom: 56 }}>
+                  <p style={{ fontFamily: displayFont, fontSize: 20, fontStyle: 'italic', lineHeight: 1.6, color: theme.text, margin: '0 0 24px 0' }}>{INTRO.lead}</p>
                   {INTRO.body.map((para, i) => (
-                    <p key={i} style={{ fontFamily: bodyFont, fontSize: 14, lineHeight: 1.7, color: theme.muted, margin: '0 0 16px 0' }}>{para}</p>
+                    <p key={i} style={{ fontFamily: bodyFont, fontSize: 15, lineHeight: 1.75, color: theme.muted, margin: '0 0 18px 0' }}>{para}</p>
                   ))}
-                  <p style={{ fontFamily: bodyFont, fontSize: 14, fontWeight: 600, lineHeight: 1.6, color: theme.text, margin: 0 }}>{INTRO.bold}</p>
+                  <p style={{ fontFamily: bodyFont, fontSize: 15, fontWeight: 600, lineHeight: 1.6, color: theme.text, margin: 0 }}>{INTRO.bold}</p>
                 </div>
               )}
 
