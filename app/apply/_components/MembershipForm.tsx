@@ -1280,7 +1280,7 @@ export default function MembershipForm() {
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontFamily: bodyFont, fontSize: 13, color: theme.text, lineHeight: 1.5 }}>
                 <input type="checkbox" checked={data.consentSms} onChange={e => set('consentSms', e.target.checked)} style={{ marginTop: 2, accentColor: theme.accent }} />
-                I&apos;d like to receive event reminders and updates via text message (optional)
+                I&apos;d like to receive event reminders and updates via text message (optional). Message and data rates may apply. Reply STOP to opt out.
               </label>
             </div>
             <div style={{ marginBottom: 40 }}>
