@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { publicRateLimit } from '@/lib/public-rate-limit';
 import { runSerializable } from '@/lib/serializable-retry';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { isStaff } from '@/lib/operator-role';
@@ -28,6 +29,18 @@ export async function POST(
 ) {
   const { slug } = await params;
   const { userId } = await auth();
+
+  // Abuse cap on the anonymous guest path (the public surface). Signed-in
+  // members/operators submit through their session and are not throttled here.
+  if (!userId) {
+    const rate = publicRateLimit(req, { bucket: 'access-submit', max: 20 });
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rate.retryAfterSecs) } },
+      );
+    }
+  }
 
   // Resolve workspace: prefer member workspace; otherwise look up by slug for guest access.
   // operatorWorkspaceId (resolved from Clerk org membership) doubles as the "is operator

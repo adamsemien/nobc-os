@@ -580,6 +580,24 @@ export default function MembershipForm() {
     setIsLoading(true);
     let id = applicationId;
     try {
+      if (id) {
+        const res = await fetch(`/api/apply/membership/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers }),
+        });
+        if (res.status === 403) {
+          // This draft can't be saved from this browser — its access cookie is
+          // missing or expired. Abandon the stale id and start a fresh draft
+          // rather than looping on a save that will never succeed.
+          id = null;
+          setApplicationId(null);
+        } else if (!res.ok) {
+          // A swallowed PATCH means this page's answers never reach the server and
+          // are lost from scoring/review. Surface it rather than advancing.
+          throw new Error('save-failed');
+        }
+      }
       if (!id) {
         const res = await fetch('/api/apply/membership', {
           method: 'POST',
@@ -596,15 +614,6 @@ export default function MembershipForm() {
         setApplicationId(id);
         const newUrl = isDemo ? `?id=${id}&demo=true` : isDev ? `?id=${id}&dev=true` : `?id=${id}`;
         window.history.replaceState(null, '', newUrl);
-      } else {
-        const res = await fetch(`/api/apply/membership/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers }),
-        });
-        // A swallowed PATCH means this page's answers never reach the server and
-        // are lost from scoring/review. Surface it rather than advancing.
-        if (!res.ok) throw new Error('save-failed');
       }
     } catch {
       setIsLoading(false);

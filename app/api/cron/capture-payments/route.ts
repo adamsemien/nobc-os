@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { stripe } from '@/lib/stripe';
 import { alert } from '@/lib/alerting';
+import { verifyCronSecret } from '@/lib/cron-auth';
 
 // Called nightly by Vercel cron. Captures authorized holds for events starting within 24h.
 // Configure in vercel.json: { "crons": [{ "path": "/api/cron/capture-payments", "schedule": "0 12 * * *" }] }
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

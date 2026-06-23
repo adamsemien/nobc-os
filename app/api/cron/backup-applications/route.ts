@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { backupApplication, isDriveBackupConfigured } from '@/lib/applications/backup';
+import { verifyCronSecret } from '@/lib/cron-auth';
 
 /** Reconciliation cron — backs up any application not yet durably backed up.
  *
@@ -23,11 +24,7 @@ const BATCH = 50;
 const MAX_FAILED_ATTEMPTS = 5;
 
 export async function GET(req: NextRequest) {
-  const provided =
-    req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
-    req.headers.get('x-vercel-cron-secret') ??
-    req.nextUrl.searchParams.get('secret');
-  if (!process.env.CRON_SECRET || provided !== process.env.CRON_SECRET) {
+  if (!verifyCronSecret(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

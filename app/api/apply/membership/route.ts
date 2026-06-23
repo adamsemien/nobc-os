@@ -4,7 +4,29 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { resolveMember } from '@/lib/member-identity';
 import { publicRateLimit } from '@/lib/public-rate-limit';
+import {
+  APPLY_DRAFT_COOKIE,
+  APPLY_DRAFT_COOKIE_MAX_AGE,
+  signApplyDraftToken,
+} from '@/lib/apply-draft-token';
 import { emailSchema, phoneSchema, shortText, answersMap, normalizePhone } from '@/lib/validation';
+
+/** JSON `{ id }` response that also sets the httpOnly draft-access cookie, so
+ *  only the creating browser can later GET/PATCH/submit this draft. */
+function draftCreated(id: string): NextResponse {
+  const res = NextResponse.json({ id });
+  const token = signApplyDraftToken(id);
+  if (token) {
+    res.cookies.set(APPLY_DRAFT_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: APPLY_DRAFT_COOKIE_MAX_AGE,
+    });
+  }
+  return res;
+}
 
 const PostSchema = z.object({
   fullName: shortText(100).optional(),
@@ -113,7 +135,7 @@ export async function POST(req: NextRequest) {
         ),
       );
     }
-    return NextResponse.json({ id: existingPending.id });
+    return draftCreated(existingPending.id);
   }
 
   // Link identity at submission: resolve (or mint) the GUEST Member now so the
@@ -162,7 +184,7 @@ export async function POST(req: NextRequest) {
             ),
           );
         }
-        return NextResponse.json({ id: raced.id });
+        return draftCreated(raced.id);
       }
     }
     console.error('[apply/membership] application.create failed', {
@@ -180,5 +202,5 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ id: application.id });
+  return draftCreated(application.id);
 }

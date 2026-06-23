@@ -10,6 +10,7 @@ import { resolveMember, promoteMemberToApproved } from '@/lib/member-identity';
 import { maybeFireSlack } from '@/lib/comments-notify';
 import { backupApplication } from '@/lib/applications/backup';
 import { publicRateLimit } from '@/lib/public-rate-limit';
+import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +28,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
+
+  // Ownership: submit triggers scoring (billed AI) + a welcome email and mutates
+  // the application. The id is exposed in the URL, so require the draft cookie —
+  // a leaked id must not let a stranger submit someone else's draft.
+  if (!verifyApplyDraftToken(id, req.cookies.get(APPLY_DRAFT_COOKIE)?.value)) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  }
 
   const application = await db.application.findUnique({
     where: { id },

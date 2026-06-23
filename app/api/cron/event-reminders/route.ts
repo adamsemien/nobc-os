@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sendTemplatedEmail, getPlatformBool } from '@/lib/email';
+import { verifyCronSecret } from '@/lib/cron-auth';
 
 /** Day-of reminder cron — runs once a day per Vercel cron schedule (`vercel.json`).
  *
@@ -15,11 +16,7 @@ import { sendTemplatedEmail, getPlatformBool } from '@/lib/email';
  *  invocations need to pass it explicitly.
  */
 export async function GET(req: NextRequest) {
-  const provided =
-    req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
-    req.headers.get('x-vercel-cron-secret') ??
-    req.nextUrl.searchParams.get('secret');
-  if (!process.env.CRON_SECRET || provided !== process.env.CRON_SECRET) {
+  if (!verifyCronSecret(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
