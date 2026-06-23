@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName } from '@/config/archetypes';
 import dynamic from 'next/dynamic';
+import { Mic } from 'lucide-react';
 import {
   QUESTIONS,
   SECTIONS,
@@ -62,38 +63,44 @@ const EMPTY_FORM: FormData = {
 };
 
 // ---------------------------------------------------------------------------
-// Page packing - the questions module is the single source of truth. We pack
-// each section's questions (in declared order) into pages by weight
-// (textarea | group = 2, everything else = 1), starting a new page whenever
-// adding the next question would exceed weight 4. Pages never cross a section
-// boundary, so each page belongs to exactly one section.
+// Chapter pagination - the questions module is the single source of truth for
+// CONTENT; this map is the single source of truth for LAYOUT. The 39 questions
+// are grouped into 6 chapter-pages. Nothing is cut, renamed, or duplicated -
+// every id below resolves to a question in the module. Each page belongs to
+// exactly one section, so the three section interstitials still fire only at
+// the section boundaries (pages 1, 3, and 6).
 // ---------------------------------------------------------------------------
 
-function questionWeight(type: Question['type']): number {
-  return type === 'textarea' || type === 'group' ? 2 : 1;
-}
+const CHAPTER_PAGE_IDS: string[][] = [
+  // Section 01 - Who You Are
+  ['firstName', 'lastName', 'email', 'cell', 'homeAddress', 'cities', 'birthInfo', 'gender', 'dietary', 'links', 'referrals', 'enneagram'],
+  ['whatYouDo', 'creativePursuits', 'otherTests'],
+  // Section 02 - How You Move Through the World
+  ['lastConvinced', 'obsessedWith', 'recommendForPay', 'comeToYouFor', 'loyalBrands', 'expertIn'],
+  ['splurgeSave', 'brandPartner', 'detailsRight', 'trustedTaste', 'recSources'],
+  ['idealSaturday', 'workout', 'podcasts', 'scrollStopping', 'goodCompany', 'connectionCreated', 'loyalCommunity', 'karaoke'],
+  // Section 03 - What You're Here For
+  ['chapter', 'flowThrough', 'investedIn', 'friendDescribe', 'nominate'],
+];
+
+const QUESTION_BY_ID: Record<string, Question> = Object.fromEntries(
+  QUESTIONS.map((q) => [q.id, q]),
+);
 
 function buildPages(): Question[][] {
-  const pages: Question[][] = [];
-  let current: Question[] = [];
-  let currentWeight = 0;
-  let currentSection: string | null = null;
-  for (const q of QUESTIONS) {
-    const w = questionWeight(q.type);
-    if (currentSection !== null && (q.section !== currentSection || currentWeight + w > 4)) {
-      pages.push(current);
-      current = [];
-      currentWeight = 0;
-    }
-    current.push(q);
-    currentWeight += w;
-    currentSection = q.section;
-  }
-  if (current.length) pages.push(current);
-  return pages;
+  return CHAPTER_PAGE_IDS.map((ids) =>
+    ids.map((id) => {
+      const q = QUESTION_BY_ID[id];
+      if (!q) throw new Error(`[apply] chapter map references unknown question id: ${id}`);
+      return q;
+    }),
+  );
 }
 
 const PAGES = buildPages();
+
+/** localStorage key for the logged-out draft-resume feature. */
+const DRAFT_KEY = 'nobc-apply-draft';
 const QUESTION_STEPS = PAGES.length;
 const LEGAL_STEP = QUESTION_STEPS;
 const REVEAL_STEP = QUESTION_STEPS + 1;
@@ -212,9 +219,16 @@ export default function MembershipForm() {
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [bannerFading, setBannerFading] = useState(false);
   const [interstitial, setInterstitial] = useState<{ eyebrow: string; title: string } | null>(null);
+  // Speech-to-text (Web Speech API) - additive dictation on long-form fields only.
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [recordingKey, setRecordingKey] = useState<string | null>(null);
+  // localStorage draft-resume prompt (logged-out applicants).
+  const [draftPrompt, setDraftPrompt] = useState<{ answers: Record<string, string>; step: number; applicationId: string | null } | null>(null);
 
   const froggerBuffer = useRef('');
   const seenSections = useRef<Set<string>>(new Set());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   const theme = isNight ? THEME.night : THEME.day;
 
@@ -384,6 +398,97 @@ export default function MembershipForm() {
     const t = setTimeout(() => setInterstitial(null), 2200);
     return () => clearTimeout(t);
   }, [step]);
+
+  // --- Speech-to-text (Web Speech API) ---------------------------------------
+  // Feature-detect after mount (avoids any SSR/CSR divergence). Browsers without
+  // SpeechRecognition (Firefox, and Safari without the prefix) simply never get
+  // the mic button; the textarea still works by typing.
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SR) setSpeechSupported(true);
+    return () => { try { recognitionRef.current?.stop?.(); } catch { /* noop */ } };
+  }, []);
+
+  const toggleDictation = useCallback((key: string) => {
+    if (!speechSupported) return;
+    if (recordingKey === key) { recognitionRef.current?.stop?.(); return; }
+    try { recognitionRef.current?.stop?.(); } catch { /* noop */ }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    rec.continuous = true;
+    // Snapshot whatever is already typed; dictation appends to it so the user
+    // keeps full editing control over the final text.
+    const base = answers[key] ?? '';
+    const sep = base && !/\s$/.test(base) ? ' ' : '';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      let transcript = '';
+      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      setAnswer(key, base + sep + transcript);
+    };
+    rec.onend = () => { setRecordingKey(null); recognitionRef.current = null; };
+    rec.onerror = () => { setRecordingKey(null); recognitionRef.current = null; };
+    recognitionRef.current = rec;
+    setRecordingKey(key);
+    try { rec.start(); } catch { setRecordingKey(null); recognitionRef.current = null; }
+  }, [speechSupported, recordingKey, answers]);
+
+  // --- localStorage draft resume (logged-out applicants) ---------------------
+  // Restore on load only when there is no server ?id= resume in flight and we
+  // are not in demo/dev. We surface a prompt rather than silently jumping them.
+  useEffect(() => {
+    if (isDemo || isDev) return;
+    if (searchParams.get('id')) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.answers && Object.keys(parsed.answers).length > 0) {
+        setDraftPrompt({
+          answers: parsed.answers,
+          step: typeof parsed.step === 'number' ? parsed.step : 0,
+          applicationId: parsed.applicationId ?? null,
+        });
+      }
+    } catch { /* ignore a corrupt draft */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist the draft to localStorage on every advance (step change).
+  useEffect(() => {
+    if (isDemo || isDev) return;
+    if (step <= 0 || step >= REVEAL_STEP) return;
+    if (Object.keys(answers).length === 0) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers, step, applicationId }));
+    } catch { /* quota / unavailable - non-fatal */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // Clear the local draft once a submission has succeeded. Watching submitResult
+  // keeps the submission handler itself byte-for-byte untouched.
+  useEffect(() => {
+    if (!submitResult) return;
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
+  }, [submitResult]);
+
+  const resumeDraft = useCallback(() => {
+    if (!draftPrompt) return;
+    setAnswers(draftPrompt.answers);
+    setApplicationId(draftPrompt.applicationId);
+    setStep(Math.min(draftPrompt.step, LEGAL_STEP));
+    setDraftPrompt(null);
+  }, [draftPrompt]);
+
+  const startFresh = useCallback(() => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
+    setDraftPrompt(null);
+  }, []);
 
   const fillSample = useCallback(() => {
     const filled: Record<string, string> = {};
@@ -630,17 +735,44 @@ export default function MembershipForm() {
   function renderSimpleInput(q: Question, key: string) {
     const value = answers[key] ?? '';
     if (q.type === 'textarea') {
+      const recording = recordingKey === key;
       return (
-        <textarea
-          style={getTextareaStyle(key)}
-          ref={el => { if (el) autoResizeTextarea(el); }}
-          onInput={e => autoResizeTextarea(e.currentTarget)}
-          onFocus={() => setFocusedField(key)}
-          onBlur={() => setFocusedField(null)}
-          rows={1}
-          value={value}
-          onChange={e => setAnswer(key, e.target.value)}
-        />
+        <div style={{ position: 'relative' }}>
+          <textarea
+            style={{ ...getTextareaStyle(key), paddingRight: speechSupported ? 30 : undefined }}
+            ref={el => { if (el) autoResizeTextarea(el); }}
+            onInput={e => autoResizeTextarea(e.currentTarget)}
+            onFocus={() => setFocusedField(key)}
+            onBlur={() => setFocusedField(null)}
+            rows={1}
+            value={value}
+            onChange={e => setAnswer(key, e.target.value)}
+          />
+          {speechSupported && (
+            <button
+              type="button"
+              onClick={() => toggleDictation(key)}
+              aria-label={recording ? 'Stop dictation' : 'Dictate your answer'}
+              aria-pressed={recording}
+              title={recording ? 'Stop dictation' : 'Dictate your answer'}
+              style={{
+                position: 'absolute',
+                right: 0,
+                bottom: 12,
+                background: 'none',
+                border: 'none',
+                padding: 4,
+                lineHeight: 0,
+                cursor: 'pointer',
+                color: recording ? theme.accent : theme.tertiary,
+                transition: 'color 200ms ease',
+                animation: recording ? 'micPulse 1.2s ease-in-out infinite' : 'none',
+              }}
+            >
+              <Mic size={16} strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
       );
     }
     if (q.type === 'select') {
@@ -803,6 +935,10 @@ export default function MembershipForm() {
           opacity: 0;
           animation: fadeIn 420ms ease forwards;
         }
+        @keyframes micPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.35; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .apply-interstitial,
           .apply-interstitial-eyebrow,
@@ -813,8 +949,21 @@ export default function MembershipForm() {
             transform: none !important;
           }
         }
+        /* Suppress the browser-native autofill / contacts / credentials glyphs
+           (the blue icons) inside the editorial inputs - OS/browser chrome we
+           don't control, not part of the design. Typing/autofill still work. */
+        .apply-form input::-webkit-contacts-auto-fill-button,
+        .apply-form input::-webkit-credentials-auto-fill-button,
+        .apply-form textarea::-webkit-contacts-auto-fill-button,
+        .apply-form textarea::-webkit-credentials-auto-fill-button {
+          visibility: hidden !important;
+          display: none !important;
+          pointer-events: none !important;
+          position: absolute;
+          right: 0;
+        }
       `}</style>
-      <div style={{ background: theme.bg, minHeight: '100vh', fontFamily: bodyFont, color: theme.text, transition: 'background 300ms ease, color 300ms ease' }}>
+      <div className="apply-form" style={{ background: theme.bg, minHeight: '100vh', fontFamily: bodyFont, color: theme.text, transition: 'background 300ms ease, color 300ms ease' }}>
 
       {/* Section interstitial */}
       {interstitial && step < REVEAL_STEP && (
@@ -846,22 +995,7 @@ export default function MembershipForm() {
         </div>
       )}
 
-      {/* Quiet section indicator (replaces the progress bar) */}
-      {step < LEGAL_STEP && (() => {
-        const sectionId = PAGES[step][0].section;
-        const sectionNo = SECTION_BY_ID[sectionId].index;
-        const pad = (n: number) => String(n).padStart(2, '0');
-        return (
-          <div style={{
-            position: 'fixed', right: 24, top: 'calc(env(safe-area-inset-top) + 64px)', zIndex: 60,
-            fontFamily: bodyFont, fontSize: 11, fontWeight: 500,
-            letterSpacing: '0.16em', color: theme.muted,
-            pointerEvents: 'none',
-          }}>
-            {pad(sectionNo)} / {pad(SECTIONS.length)}
-          </div>
-        );
-      })()}
+      {/* Section progress is now shown by the global bar anchored to the header nav. */}
 
       {/* Resume banner */}
       {showResumeBanner && (
@@ -878,6 +1012,40 @@ export default function MembershipForm() {
           }}
         >
           Welcome back. Your draft is saved. <span style={{ opacity: 0.7, marginLeft: 8 }}>&times;</span>
+        </div>
+      )}
+
+      {/* localStorage draft-resume prompt (logged-out applicants, no ?id= link) */}
+      {draftPrompt && step === 0 && (
+        <div style={{
+          position: 'fixed', left: 16, right: 16, bottom: 'max(env(safe-area-inset-bottom), 16px)',
+          zIndex: 80, display: 'flex', justifyContent: 'center', pointerEvents: 'none',
+        }}>
+          <div style={{
+            pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 16, width: '100%', maxWidth: 440,
+            background: theme.bg, border: `1px solid ${theme.border}`,
+            boxShadow: '0 8px 28px rgba(0,0,0,0.14)', padding: '12px 16px',
+          }}>
+            <span style={{ fontFamily: bodyFont, fontSize: 13, color: theme.text, lineHeight: 1.4 }}>
+              Welcome back - resume your application?
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <button onClick={startFresh} style={{
+                background: 'none', border: 'none', cursor: 'pointer', fontFamily: bodyFont,
+                fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: theme.muted,
+              }}>
+                Start fresh
+              </button>
+              <button onClick={resumeDraft} style={{
+                background: theme.accent, color: '#ffffff', border: 'none', cursor: 'pointer',
+                fontFamily: bodyFont, fontSize: 11, fontWeight: 500, letterSpacing: '0.06em',
+                textTransform: 'uppercase', padding: '8px 14px', minHeight: 36,
+              }}>
+                Resume
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -907,6 +1075,23 @@ export default function MembershipForm() {
           <span style={{ opacity: isNight ? 0.4 : 1, transition: 'opacity 200ms ease', fontSize: 13 }}>&#9728;&#65039;</span>
           <span style={{ opacity: isNight ? 1 : 0.4, transition: 'opacity 200ms ease', fontSize: 13 }}>&#127769;</span>
         </button>
+
+        {/* Global progress bar - tracks the 6 chapter pages (Page 1 = 1/6 ... legal = full). */}
+        {step < REVEAL_STEP && (
+          <div
+            aria-hidden
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: theme.border }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${Math.round((step < QUESTION_STEPS ? (step + 1) / QUESTION_STEPS : 1) * 100)}%`,
+                background: theme.accent,
+                transition: 'width 450ms cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            />
+          </div>
+        )}
       </nav>
 
       <main style={{
