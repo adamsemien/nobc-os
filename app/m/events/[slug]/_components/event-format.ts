@@ -1,4 +1,5 @@
 import type { ResolvedAccess } from '@/lib/event-access';
+import { EVENT_TZ } from '@/lib/tz';
 
 /** Shared date/time formatting + warm access copy for the event templates.
  *  Extracted so Split / Editorial / Minimal stay consistent and DRY. */
@@ -13,19 +14,30 @@ type DateLineOpts = {
   year?: boolean;
 };
 
-/** "FRI · 6 JUN · 2026" by default; tune weekday/month length + year per template. */
+/** "FRI · 6 JUN · 2026" by default; tune weekday/month length + year per template.
+ *  Pinned to Central (America/Chicago) so the line reads identically for every
+ *  viewer, not in their browser's zone. day/year are read from the zoned parts -
+ *  d.getDate()/d.getFullYear() ignore the formatter's timeZone and read ambient
+ *  local, which is the bug this replaces. */
 export function formatDateLine(d: Date, opts: DateLineOpts = {}): string {
   const { weekday = 'short', month = 'short', year = true } = opts;
-  const wd = new Intl.DateTimeFormat('en-GB', { weekday }).format(d).toUpperCase();
-  const day = d.getDate();
-  const mon = new Intl.DateTimeFormat('en-GB', { month }).format(d).toUpperCase();
-  return year ? `${wd} · ${day} ${mon} · ${d.getFullYear()}` : `${wd} · ${day} ${mon}`;
+  const wd = new Intl.DateTimeFormat('en-GB', { weekday, timeZone: EVENT_TZ }).format(d).toUpperCase();
+  const mon = new Intl.DateTimeFormat('en-GB', { month, timeZone: EVENT_TZ }).format(d).toUpperCase();
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: EVENT_TZ,
+    day: 'numeric',
+    year: 'numeric',
+  }).formatToParts(d);
+  const day = parts.find(p => p.type === 'day')?.value ?? '';
+  const yr = parts.find(p => p.type === 'year')?.value ?? '';
+  return year ? `${wd} · ${day} ${mon} · ${yr}` : `${wd} · ${day} ${mon}`;
 }
 
 export function formatTimeLine(d: Date): string {
   return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: EVENT_TZ,
   }).format(d);
 }
 

@@ -17,7 +17,7 @@ function formatEventDate(d: Date): string {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
-    timeZone: 'America/New_York',
+    timeZone: 'America/Chicago',
   });
 }
 
@@ -25,7 +25,7 @@ function formatEventTime(d: Date): string {
   return d.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
-    timeZone: 'America/New_York',
+    timeZone: 'America/Chicago',
   });
 }
 
