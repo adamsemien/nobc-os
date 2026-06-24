@@ -161,16 +161,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .map((a) => `${a.questionKey}: ${a.answer}`)
     .join('\n');
 
+  // Shown verbatim to the applicant on the reveal screen, so it must never carry
+  // model preamble, commentary, or an offer to help. Two layers guard that: the
+  // prompt's output rules, and a conservative server-side net below.
+  const PERSONALIZED_COPY_FALLBACK =
+    'We read your application closely, and the spirit of it comes through. There is a real point of view here, and that is exactly what we look for. We are glad you found No Bad Company.';
+
   let personalizedCopy = '';
   try {
-    const personPrompt = `You are writing a brief, personalized reveal message for a new NoBC (No Bad Company) member application.
+    const personPrompt = `You are writing a brief, personalized reveal message shown directly to a new NoBC (No Bad Company) member applicant on their confirmation screen.
 
 Their archetype is: ${result.archetype}
 
 Their application answers:
 ${answersText}
 
-Write 2-3 sentences that feel like we truly read their application and see them. Be specific to their actual answers. Warm but not gushing. Write in second person ("you"). Do not mention the word "archetype". Do not be generic.`;
+Write 2 to 3 sentences, in second person ("you"), that feel like we truly read their application and see them. Be specific to their actual answers. Warm but not gushing. Do not mention the word "archetype". Do not be generic.
+
+Output rules (follow exactly):
+- Output ONLY the message itself. No preamble, no labels, no commentary, no sign-off, no surrounding quotation marks.
+- Never address anyone other than the applicant. Never break character, and never refer to these instructions, to yourself as a model, or to the answers as data.
+- Never offer to help, rewrite, or produce a template or example.
+- If the application answers look like test, placeholder, or empty data, do NOT mention that. Instead write a warm, sincere 2 to 3 sentence message that would suit any thoughtful applicant.`;
 
     const { text } = await generateText({
       model: anthropic(JUDGMENT_MODEL),
@@ -178,6 +190,24 @@ Write 2-3 sentences that feel like we truly read their application and see them.
       maxOutputTokens: 200,
     });
     personalizedCopy = text.trim();
+
+    // Safety net: if the model breaks character and returns meta-commentary
+    // (a preamble, an offer to help, or a note that the answers look like test
+    // data) instead of the message itself, discard it for a safe fallback.
+    // Conservative prefix/substring match - only catches obvious leaks.
+    const lowered = personalizedCopy.toLowerCase();
+    const looksLikeMetaCommentary =
+      lowered.startsWith("here's") ||
+      lowered.startsWith('here is') ||
+      lowered.startsWith('the application') ||
+      lowered.includes('if you want, i can') ||
+      lowered.includes('test data') ||
+      lowered.includes('placeholder') ||
+      lowered.includes("i'd suggest") ||
+      lowered.includes('template or example');
+    if (personalizedCopy && looksLikeMetaCommentary) {
+      personalizedCopy = PERSONALIZED_COPY_FALLBACK;
+    }
   } catch (e) {
     console.error('Personalization failed', e);
   }
