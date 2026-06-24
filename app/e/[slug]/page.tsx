@@ -2,8 +2,6 @@ import { notFound } from 'next/navigation';
 import { assemblePublicEventDTO } from '@/lib/public-event-loader';
 import { EventDetail } from '@/app/m/events/[slug]/_components/EventDetail';
 import { PublicEventShell } from './_components/PublicEventShell';
-import { DoorFork } from './_components/DoorFork';
-import { ACTIVE_EVENT_ID } from '@/lib/active-event';
 
 export default async function PublicEventPage({
   params,
@@ -14,17 +12,12 @@ export default async function PublicEventPage({
   const dto = await assemblePublicEventDTO(slug);
   if (!dto) notFound();
 
-  // The active event gets the two-choice fork (Become a member vs buy a ticket)
-  // in front of the existing buy flow. Every other event renders unchanged.
+  // Every event — including the active one — renders the full event page. The
+  // active event's two-choice fork lives in the access-card slot inside the
+  // template (see TemplateSplit), not as a whole-page replacement.
   return (
     <PublicEventShell>
-      {dto.eventId === ACTIVE_EVENT_ID ? (
-        <DoorFork>
-          <EventDetail event={dto} />
-        </DoorFork>
-      ) : (
-        <EventDetail event={dto} />
-      )}
+      <EventDetail event={dto} />
     </PublicEventShell>
   );
 }

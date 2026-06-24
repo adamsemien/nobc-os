@@ -7,6 +7,8 @@ import { EventHeroFallback } from './EventHeroFallback';
 import { parseDate, formatDateLine, formatTimeLine } from './event-format';
 import type { EventDetailDTO } from './EventDetail';
 import { accessTypeLabel } from '@/lib/event-access';
+import { ACTIVE_EVENT_ID } from '@/lib/active-event';
+import { DoorFork } from '@/app/e/[slug]/_components/DoorFork';
 
 export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   const applyHref = useMemberApplyHref();
@@ -20,6 +22,13 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   const showCapacity = event.showCapacity && event.capacity != null;
   const description = event.description?.trim() ?? '';
 
+  // Active-event-only presentational tweaks: the portrait launch poster shows in
+  // full (contain, not cropped) and the public (anon) view gets the two-choice
+  // fork in the access-card slot. The public loader forces viewer = 'anon', and
+  // the member page is auth-gated, so this never alters the member surface.
+  const isActiveEvent = event.eventId === ACTIVE_EVENT_ID;
+  const showFork = isActiveEvent && event.viewer === 'anon';
+
   return (
     <div className="flex min-h-dvh flex-col bg-events-paper text-[var(--apply-ink)] lg:h-dvh lg:flex-row lg:overflow-hidden">
       {/* Left: full-height hero — true 50/50 on desktop, ~40vh full-bleed on mobile.
@@ -30,7 +39,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           <img
             src={event.heroImageUrl}
             alt=""
-            className="h-[40vh] w-full object-cover sm:h-[44vh] lg:h-full"
+            className={`h-[40vh] w-full sm:h-[44vh] lg:h-full ${isActiveEvent ? 'object-contain object-center' : 'object-cover'}`}
           />
         ) : (
           <EventHeroFallback className="h-[40vh] w-full sm:h-[44vh] lg:h-full" />
@@ -79,9 +88,17 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
             </p>
           ) : null}
 
-          {/* CTA / ticket card — capped + left-aligned; sticky on mobile */}
+          {/* CTA / ticket card — capped + left-aligned; sticky on mobile. The
+              active event's public view shows the two-choice fork here; Choice B
+              reveals this same RsvpCard, whose CTA drives the existing buy flow. */}
           <div className="mt-8 w-full max-w-[400px]">
-            <RsvpCard event={event} hideHeader mobileSticky />
+            {showFork ? (
+              <DoorFork>
+                <RsvpCard event={event} hideHeader mobileSticky />
+              </DoorFork>
+            ) : (
+              <RsvpCard event={event} hideHeader mobileSticky />
+            )}
           </div>
 
           {/* how to attend (borderless, numbered steps) */}
