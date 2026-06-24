@@ -222,7 +222,7 @@ export function formatGateCTA(resolved: ResolvedAccess): string {
   const session = inSessionFlow(flow)
   if (session.includes("pay")) {
     const dollars = (resolved.priceCents / 100).toFixed(2).replace(/\.00$/, "")
-    return `Get Ticket — $${dollars}`
+    return `Get Ticket - $${dollars}`
   }
   if (flow.includes("approval")) return "Apply to Attend"
   if (resolved.kind === "member") return "Reserve My Spot"

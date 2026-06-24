@@ -1,4 +1,5 @@
 import { clerkClient } from "@clerk/nextjs/server"
+import { Prisma } from "@prisma/client"
 import { db } from "./db"
 import { generateMemberQrCode } from "./member-qr"
 import {
@@ -115,20 +116,35 @@ export async function findOrCreateGuestMember(
   const firstName = parts[0] ?? "Guest"
   const lastName = parts.slice(1).join(" ") || ""
 
-  const created = await db.member.create({
-    data: {
-      workspaceId,
-      clerkUserId: `guest:${normalizedEmail}`,
-      email: normalizedEmail,
-      firstName,
-      lastName,
-      status: "GUEST",
-      approved: false,
-      memberQrCode: generateMemberQrCode(),
-    },
-    select: { id: true, email: true, firstName: true, lastName: true, memberQrCode: true },
-  })
-  return created
+  try {
+    const created = await db.member.create({
+      data: {
+        workspaceId,
+        clerkUserId: `guest:${normalizedEmail}`,
+        email: normalizedEmail,
+        firstName,
+        lastName,
+        status: "GUEST",
+        approved: false,
+        memberQrCode: generateMemberQrCode(),
+      },
+      select: { id: true, email: true, firstName: true, lastName: true, memberQrCode: true },
+    })
+    return created
+  } catch (err) {
+    // Race: a concurrent/retried request (e.g. a buyer double-submitting their own
+    // purchase) inserted the same (workspaceId, email) Member between the findFirst
+    // above and this create. @@unique([workspaceId, email]) throws P2002; re-fetch
+    // the winning row and return it. Mirrors resolveMember's P2002 guard.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const raced = await db.member.findFirst({
+        where: { workspaceId, email: normalizedEmail },
+        select: { id: true, email: true, firstName: true, lastName: true, memberQrCode: true },
+      })
+      if (raced) return raced
+    }
+    throw err
+  }
 }
 
 /** Find or create the Member row that owns an operator's RSVP. Operators are Clerk

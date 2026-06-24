@@ -25,6 +25,20 @@ const BodySchema = z.object({
 
 export async function POST(
   req: NextRequest,
+  ctx: { params: Promise<{ slug: string }> },
+) {
+  try {
+    return await handlePost(req, ctx);
+  } catch (err) {
+    // Last-resort guard: any uncaught throw must still return a JSON body, so the
+    // client never receives a non-JSON 500 that breaks its response parsing.
+    console.error('[access-submit] unhandled error', err);
+    return NextResponse.json({ error: 'Could not complete registration' }, { status: 500 });
+  }
+}
+
+async function handlePost(
+  req: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
