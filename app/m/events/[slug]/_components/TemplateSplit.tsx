@@ -33,7 +33,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
     <div className="flex min-h-dvh flex-col bg-events-paper text-[var(--apply-ink)] lg:h-dvh lg:flex-row lg:overflow-hidden">
       {/* Left: full-height hero — true 50/50 on desktop, ~40vh full-bleed on mobile.
           Branded fallback panel when there's no hero image. */}
-      <div className="relative w-full lg:h-dvh lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
+      <div className="relative w-full bg-events-canvas-deep lg:h-dvh lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -49,17 +49,17 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
       {/* Right: content — true 50/50; scrolls independently on desktop. Left-aligned
           throughout. pb-28 on mobile clears the sticky CTA bar. */}
       <div className="flex flex-1 flex-col lg:h-dvh lg:w-1/2 lg:overflow-y-auto">
-        <MemberShellNav applyHref={applyHref} />
+        {event.viewer !== 'anon' ? <MemberShellNav applyHref={applyHref} /> : null}
 
         <div className="ev-stagger flex flex-1 flex-col px-6 pb-28 pt-8 text-left sm:px-12 sm:pt-12 lg:pb-14">
           {/* category tag */}
-          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
             {accessTypeLabel(event.resolved)}
           </p>
 
           {/* title */}
           <h1
-            className="mt-4 max-w-2xl font-medium leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]"
+            className="mt-4 max-w-2xl font-normal leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]"
             style={{ fontSize: 'calc(clamp(2.75rem, 5vw, 4.25rem) * var(--page-title-scale, 1))' }}
           >
             {event.title}
@@ -114,7 +114,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
 
           {/* bottom brand anchor — fills the lower panel intentionally on short-copy
               events, and reads as a closing mark on long-copy ones. */}
-          <div className="mt-auto pt-20">
+          <div className="mt-16">
             <div className="h-px w-full bg-[var(--apply-rule)]" />
             <div className="flex items-end justify-between gap-6 pt-6">
               <div>
