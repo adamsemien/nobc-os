@@ -10,6 +10,23 @@ import { accessTypeLabel } from '@/lib/event-access';
 import { ACTIVE_EVENT_ID } from '@/lib/active-event';
 import { DoorFork } from '@/app/e/[slug]/_components/DoorFork';
 
+// Render-only brand two-tone: a leading "No Bad" prints in NoBC red, the rest in
+// ink. Generic so any "No Bad ___" title splits (e.g. "No Bad Saturday"); titles
+// that don't start with "No Bad" render entirely in ink. Does NOT alter the
+// stored title copy - this is colour only.
+function renderBrandTitle(title: string) {
+  const prefix = 'No Bad';
+  if (title.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase()) {
+    return (
+      <>
+        <span className="text-[var(--nobc-red)]">{title.slice(0, prefix.length)}</span>
+        {title.slice(prefix.length)}
+      </>
+    );
+  }
+  return title;
+}
+
 export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   const applyHref = useMemberApplyHref();
   const start = parseDate(event.startAt);
@@ -32,14 +49,19 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   return (
     <div className="flex min-h-dvh flex-col bg-events-paper text-[var(--apply-ink)] lg:h-dvh lg:flex-row lg:overflow-hidden">
       {/* Left: full-height hero — true 50/50 on desktop, ~40vh full-bleed on mobile.
-          Branded fallback panel when there's no hero image. */}
-      <div className="relative w-full bg-events-canvas-deep lg:h-dvh lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
+          Plain paper behind the poster (any object-contain letterbox reads as
+          paper, not a matte). Branded fallback panel when there's no hero image.
+          Desktop height is capped in absolute viewport units (lg:h-dvh +
+          lg:max-h-dvh) rather than lg:h-full - a percentage height can fail to
+          constrain inside the flex row and let a portrait poster overflow into a
+          scroll. Mobile band (h-[40vh]/sm:h-[44vh]) is unchanged. */}
+      <div className="relative w-full bg-events-paper lg:h-dvh lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={event.heroImageUrl}
             alt=""
-            className={`h-[40vh] w-full sm:h-[44vh] lg:h-full ${isActiveEvent ? 'object-contain object-center' : 'object-cover'}`}
+            className={`h-[40vh] w-full sm:h-[44vh] lg:h-dvh lg:max-h-dvh ${isActiveEvent ? 'object-contain object-center' : 'object-cover'}`}
           />
         ) : (
           <EventHeroFallback className="h-[40vh] w-full sm:h-[44vh] lg:h-full" />
@@ -62,7 +84,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
             className="mt-4 max-w-2xl font-normal leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]"
             style={{ fontSize: 'calc(clamp(2.75rem, 5vw, 4.25rem) * var(--page-title-scale, 1))' }}
           >
-            {event.title}
+            {renderBrandTitle(event.title)}
           </h1>
 
           {/* date · time · venue */}
@@ -119,10 +141,11 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
             <div className="flex items-end justify-between gap-6 pt-6">
               <div>
                 <p
-                  className="italic leading-none text-[var(--apply-muted)] font-[family-name:var(--font-cormorant)]"
+                  className="italic leading-none font-[family-name:var(--font-cormorant)]"
                   style={{ fontSize: 'calc(clamp(1.5rem, 2.6vw, 2.25rem) * var(--footer-scale, 1))' }}
                 >
-                  No Bad Company
+                  <span className="text-[var(--nobc-red)]">No Bad</span>
+                  <span className="text-[var(--apply-ink)]"> Company</span>
                 </p>
                 <p className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
                   {event.location ? `${event.location} · Austin` : 'Austin'}
