@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
@@ -270,6 +271,13 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
   const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(event.memberQrCode);
   const [flowOpen, setFlowOpen] = useState(false);
+  // Portal the access flow to <body> so its fixed-position overlay escapes the
+  // template column's .ev-stagger transform. That transform becomes the
+  // containing block + stacking context and otherwise traps the modal beneath
+  // later siblings (the page footer), making it unclickable. Mounted guard
+  // keeps this SSR-safe (document.body is browser-only).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   function handleFlowComplete(result: {
     ticketStatus?: string;
@@ -431,12 +439,17 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
         </div>
       ) : null}
 
-      <EventAccessFlow
-        event={event}
-        open={flowOpen}
-        onClose={() => setFlowOpen(false)}
-        onComplete={handleFlowComplete}
-      />
+      {mounted
+        ? createPortal(
+            <EventAccessFlow
+              event={event}
+              open={flowOpen}
+              onClose={() => setFlowOpen(false)}
+              onComplete={handleFlowComplete}
+            />,
+            document.body,
+          )
+        : null}
     </>
   );
 }
