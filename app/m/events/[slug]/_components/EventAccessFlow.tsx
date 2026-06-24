@@ -306,7 +306,7 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-[460px] rounded-t-[14px] bg-events-paper shadow-[0_-2px_28px_rgba(0,0,0,0.22)] transition-all duration-300 ease-out sm:rounded-[14px] ${
+        className={`w-full max-w-[460px] max-h-[90dvh] overflow-y-auto overscroll-contain rounded-t-[14px] bg-events-paper shadow-[0_-2px_28px_rgba(0,0,0,0.22)] transition-all duration-300 ease-out sm:rounded-[14px] ${
           entered
             ? 'translate-y-0 opacity-100 sm:scale-100'
             : 'translate-y-full opacity-0 sm:translate-y-0 sm:scale-95'
