@@ -101,12 +101,16 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
             )}
           </div>
 
-          {/* how to attend (borderless, numbered steps) */}
-          {event.workflowPaths?.length && event.resolved.kind !== 'closed' ? (
-            <div className="mt-10 max-w-2xl">
-              <WorkflowPathsCard paths={event.workflowPaths} variant="bare" />
-            </div>
-          ) : null}
+          {/* how to attend (borderless, numbered steps) — hidden on ticketed flows
+              where the free-entry card would be contradictory */}
+          {(() => {
+            const isTicketed = event.resolved.kind !== 'closed' && event.resolved.flow.includes('pay');
+            return event.workflowPaths?.length && event.resolved.kind !== 'closed' && !isTicketed ? (
+              <div className="mt-10 max-w-2xl">
+                <WorkflowPathsCard paths={event.workflowPaths} variant="bare" />
+              </div>
+            ) : null;
+          })()}
 
           {/* bottom brand anchor — fills the lower panel intentionally on short-copy
               events, and reads as a closing mark on long-copy ones. */}

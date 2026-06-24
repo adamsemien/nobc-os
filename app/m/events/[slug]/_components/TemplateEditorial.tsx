@@ -118,11 +118,14 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
             </div>
           ) : null}
 
-          {event.workflowPaths?.length && event.resolved.kind !== 'closed' ? (
-            <div className="mt-10 max-w-2xl">
-              <WorkflowPathsCard paths={event.workflowPaths} />
-            </div>
-          ) : null}
+          {(() => {
+            const isTicketed = event.resolved.kind !== 'closed' && event.resolved.flow.includes('pay');
+            return event.workflowPaths?.length && event.resolved.kind !== 'closed' && !isTicketed ? (
+              <div className="mt-10 max-w-2xl">
+                <WorkflowPathsCard paths={event.workflowPaths} />
+              </div>
+            ) : null;
+          })()}
 
           {/* bottom brand anchor — hairline + muted wordmark + location; fills the
               lower panel intentionally on short-copy events (same as Split). */}

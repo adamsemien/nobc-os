@@ -74,11 +74,14 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
           <RsvpCard event={event} variant="borderless" />
         </div>
 
-        {event.workflowPaths?.length && event.resolved.kind !== 'closed' ? (
-          <div className="mx-auto mt-10 max-w-md text-left">
-            <WorkflowPathsCard paths={event.workflowPaths} />
-          </div>
-        ) : null}
+        {(() => {
+          const isTicketed = event.resolved.kind !== 'closed' && event.resolved.flow.includes('pay');
+          return event.workflowPaths?.length && event.resolved.kind !== 'closed' && !isTicketed ? (
+            <div className="mx-auto mt-10 max-w-md text-left">
+              <WorkflowPathsCard paths={event.workflowPaths} />
+            </div>
+          ) : null;
+        })()}
 
         <div className="my-10 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
 
