@@ -5,6 +5,7 @@
 import { MemberStatus, type Application, type AuditActorType, type Member } from '@prisma/client';
 import { db } from '@/lib/db';
 import { resolveMember } from '@/lib/member-identity';
+import { ACTIVE_EVENT_ID } from '@/lib/active-event';
 import { emitEvent } from '@/lib/emit-event';
 import { welcomeEmail } from '@/lib/email-templates';
 import { generateMemberPass } from '@/lib/wallet-pass';
@@ -85,6 +86,38 @@ export async function approveApplication(params: {
       entityId: member.id,
       metadata: { applicationId, email: app.email },
     });
+  }
+
+  // Door 1: confirm the application-issued comp RSVP for the active event. The
+  // comp was minted pending_approval on apply-submit; approving confirms the
+  // free ticket. Fail-closed — a missing comp or any error is logged, never
+  // throws, and never blocks the approval.
+  try {
+    const compRsvp = await db.rSVP.findFirst({
+      where: {
+        workspaceId,
+        eventId: ACTIVE_EVENT_ID,
+        memberId: member.id,
+        isComp: true,
+        compType: 'APPLICATION',
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, ticketStatus: true },
+    });
+    if (compRsvp) {
+      if (compRsvp.ticketStatus !== 'confirmed') {
+        await db.rSVP.update({
+          where: { id: compRsvp.id },
+          data: { ticketStatus: 'confirmed' },
+        });
+      }
+    } else {
+      console.warn(
+        `[door1-comp] approve: no application comp RSVP for member ${member.id} / event ${ACTIVE_EVENT_ID}`,
+      );
+    }
+  } catch (err) {
+    console.error('[door1-comp] approve: confirm failed:', err);
   }
 
   // Wallet pass — best effort; URLs flow into the welcome email.

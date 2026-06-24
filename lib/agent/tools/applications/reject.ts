@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { registerTool } from '@/lib/agent/registry';
+import { cancelRsvp } from '@/lib/waitlist';
+import { ACTIVE_EVENT_ID } from '@/lib/active-event';
 import type { AgentTool } from '@/lib/agent/types';
 
 const inputSchema = z.object({
@@ -40,6 +42,39 @@ const rejectApplication: AgentTool<Input, unknown> = {
         rejectionReason: input.reason ?? null,
       },
     });
+
+    // Door 1: cancel the application-issued comp RSVP for the active event.
+    // Resolve the applicant by email (Application.memberId is set only on
+    // approve), then cancelRsvp releases the seat. Fail-closed — logged, never
+    // throws.
+    try {
+      const member = await db.member.findFirst({
+        where: { workspaceId: ctx.workspaceId, email: app.email.trim().toLowerCase() },
+        select: { id: true },
+      });
+      if (member) {
+        const compRsvp = await db.rSVP.findFirst({
+          where: {
+            workspaceId: ctx.workspaceId,
+            eventId: ACTIVE_EVENT_ID,
+            memberId: member.id,
+            isComp: true,
+            compType: 'APPLICATION',
+          },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
+        if (compRsvp) {
+          await cancelRsvp(compRsvp.id, ctx.workspaceId);
+        } else {
+          console.warn(
+            `[door1-comp] agent reject: no application comp RSVP for ${app.email} / event ${ACTIVE_EVENT_ID}`,
+          );
+        }
+      }
+    } catch (err) {
+      console.error('[door1-comp] agent reject: cancel failed:', err);
+    }
 
     if (process.env.RESEND_API_KEY) {
       const { applicationRejectedEmail } = await import('@/lib/email-templates');
