@@ -210,20 +210,23 @@ Write 2-3 sentences that feel like we truly read their application and see them.
         err: e instanceof Error ? e.message : String(e),
       });
     }
+  });
 
-    // Door 1: issue a comp RSVP to the active event for this applicant. The
-    // applicant becomes the canonical GUEST member (resolveMember mints a QR);
-    // the comp is born pending_approval and is confirmed on operator approve /
-    // cancelled on reject. A PURPLE auto-approval already promoted the member to
-    // APPROVED above, so its comp is born confirmed. Fully fail-closed: any error
-    // is logged and swallowed so the submission always succeeds.
-    try {
-      const activeEvent = await db.event.findFirst({
-        where: { id: ACTIVE_EVENT_ID, workspaceId: application.workspaceId },
-        select: { id: true },
-      });
-      if (!activeEvent) return; // no active event in this workspace — skip silently
-
+  // Door 1: issue a comp RSVP to the active event for this applicant. The
+  // applicant becomes the canonical GUEST member (resolveMember mints a QR);
+  // the comp is born pending_approval and is confirmed on operator approve /
+  // cancelled on reject. A PURPLE auto-approval already promoted the member to
+  // APPROVED above, so its comp is born confirmed. Runs inline (not via after())
+  // so the minted rsvpId + member QR can be returned to the reveal screen. Fully
+  // fail-closed: any error is logged and swallowed so the submission still succeeds.
+  let door1RsvpId: string | null = null;
+  let door1MemberQrCode: string | null = null;
+  try {
+    const activeEvent = await db.event.findFirst({
+      where: { id: ACTIVE_EVENT_ID, workspaceId: application.workspaceId },
+      select: { id: true },
+    });
+    if (activeEvent) {
       const member = await resolveMember({
         workspaceId: application.workspaceId,
         email: application.email,
@@ -232,6 +235,7 @@ Write 2-3 sentences that feel like we truly read their application and see them.
         phone: application.phone ?? undefined,
         source: 'apply',
       });
+      door1MemberQrCode = member.memberQrCode;
 
       const existingComp = await db.rSVP.findFirst({
         where: {
@@ -243,30 +247,34 @@ Write 2-3 sentences that feel like we truly read their application and see them.
         },
         select: { id: true },
       });
-      if (existingComp) return; // already issued — idempotent
-
-      await db.rSVP.create({
-        data: {
-          workspaceId: application.workspaceId,
-          eventId: ACTIVE_EVENT_ID,
-          memberId: member.id,
-          status: 'CONFIRMED',
-          ticketStatus:
-            member.status === MemberStatus.APPROVED ? 'confirmed' : 'pending_approval',
-          origin: 'comp',
-          isComp: true,
-          compType: 'APPLICATION',
-          guestEmail: application.email.trim().toLowerCase(),
-          guestName: application.fullName,
-        },
-      });
-    } catch (e) {
-      console.error('[door1-comp] issue on submit failed', {
-        applicationId: id,
-        err: e instanceof Error ? e.message : String(e),
-      });
+      if (existingComp) {
+        door1RsvpId = existingComp.id; // already issued — idempotent
+      } else {
+        const createdRsvp = await db.rSVP.create({
+          data: {
+            workspaceId: application.workspaceId,
+            eventId: ACTIVE_EVENT_ID,
+            memberId: member.id,
+            status: 'CONFIRMED',
+            ticketStatus:
+              member.status === MemberStatus.APPROVED ? 'confirmed' : 'pending_approval',
+            origin: 'comp',
+            isComp: true,
+            compType: 'APPLICATION',
+            guestEmail: application.email.trim().toLowerCase(),
+            guestName: application.fullName,
+          },
+          select: { id: true },
+        });
+        door1RsvpId = createdRsvp.id;
+      }
     }
-  });
+  } catch (e) {
+    console.error('[door1-comp] issue on submit failed', {
+      applicationId: id,
+      err: e instanceof Error ? e.message : String(e),
+    });
+  }
 
   // Slack notify — fire-and-forget. Distinct events for "new application"
   // and "high-score application" (>= 22 on the 30 scale, i.e. ~0.73 on the
@@ -295,5 +303,7 @@ Write 2-3 sentences that feel like we truly read their application and see them.
     memberWorthTotal: result.memberWorthTotal,
     tags: result.tags,
     personalizedCopy,
+    rsvpId: door1RsvpId,
+    memberQrCode: door1MemberQrCode,
   });
 }
