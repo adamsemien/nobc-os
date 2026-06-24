@@ -15,6 +15,7 @@ import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
 import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 import WelcomeEmail from '@/emails/WelcomeEmail';
+import { sendGuestAccessConfirmation } from '@/emails/GuestAccessConfirmation';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Abuse protection: cap submit floods before any DB / Anthropic / Resend work.
@@ -251,10 +252,11 @@ Output rules (follow exactly):
   // fail-closed: any error is logged and swallowed so the submission still succeeds.
   let door1RsvpId: string | null = null;
   let door1MemberQrCode: string | null = null;
+  let door1EmailPayload: Parameters<typeof sendGuestAccessConfirmation>[0] | null = null;
   try {
     const activeEvent = await db.event.findFirst({
       where: { id: ACTIVE_EVENT_ID, workspaceId: application.workspaceId },
-      select: { id: true },
+      select: { id: true, title: true, startAt: true, location: true },
     });
     if (activeEvent) {
       const member = await resolveMember({
@@ -298,11 +300,46 @@ Output rules (follow exactly):
         });
         door1RsvpId = createdRsvp.id;
       }
+
+      // Build the Door 1 access confirmation email payload while the event +
+      // member are in scope; the send itself runs out of band below. Variant
+      // mirrors the comp's own ticketStatus (confirmed vs application received).
+      // Guarded so it only fires when the comp issued and we have an email to reach.
+      if (door1RsvpId && application.email) {
+        door1EmailPayload = {
+          to: application.email,
+          variant: member.status === MemberStatus.APPROVED ? 'confirmed' : 'pending_approval',
+          eventName: activeEvent.title,
+          eventDate: activeEvent.startAt,
+          eventLocation: activeEvent.location,
+          rsvpId: door1RsvpId,
+          qrAvailable: Boolean(door1MemberQrCode),
+          workspaceId: application.workspaceId,
+        };
+      }
     }
   } catch (e) {
     console.error('[door1-comp] issue on submit failed', {
       applicationId: id,
       err: e instanceof Error ? e.message : String(e),
+    });
+  }
+
+  // Door 1 access confirmation email - out of band (mirrors the backup after()
+  // above) so a Resend hiccup never affects the applicant response. Fires only
+  // when door1EmailPayload was set; the score early return above prevents a
+  // re-send on any retry of an already-scored application.
+  if (door1EmailPayload) {
+    const payload = door1EmailPayload;
+    after(async () => {
+      try {
+        await sendGuestAccessConfirmation(payload);
+      } catch (e) {
+        console.error('[door1-confirmation-email] send failed', {
+          applicationId: id,
+          err: e instanceof Error ? e.message : String(e),
+        });
+      }
     });
   }
 
