@@ -301,7 +301,7 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
       aria-label="Event registration"
       onClick={onClose}
       className={`fixed inset-0 z-50 flex items-end justify-center transition-colors duration-300 sm:items-center ${
-        entered ? 'bg-black/55' : 'bg-black/0'
+        entered ? 'bg-black/80' : 'bg-black/0'
       }`}
     >
       <div
