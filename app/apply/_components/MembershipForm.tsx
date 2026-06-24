@@ -209,12 +209,12 @@ function sampleValue(q: Question, sub?: SubField): string {
   const id = sub ? sub.id : q.id;
   if (id === 'firstName') return 'Jordan';
   if (id === 'lastName') return 'Voss';
-  if (id === 'email') return 'jordan.voss@test.com';
-  if (id === 'cell') return '512-555-0192';
+  if (id === 'email') return `qa+${Date.now()}@nobc-dev.test`;
+  if (id === 'cell') return `512-555-${String(Date.now()).slice(-4)}`;
   if (id === 'birthDate') return '1990-04-12';
   switch (type) {
-    case 'email': return 'jordan.voss@test.com';
-    case 'tel': return '512-555-0192';
+    case 'email': return `qa+${Date.now()}@nobc-dev.test`;
+    case 'tel': return `512-555-${String(Date.now()).slice(-4)}`;
     case 'url': return 'https://example.com';
     case 'date': return '1990-04-12';
     case 'time': return '08:30';
