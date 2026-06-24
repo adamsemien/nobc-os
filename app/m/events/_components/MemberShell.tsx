@@ -55,7 +55,7 @@ export function MemberShellNav({
           Events
         </Link>
         <Link
-          href={applyHref}
+          href="/apply"
           className={
             overlay
               ? 'border border-nobc-red bg-nobc-red px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-nobc-on-red transition-colors hover:bg-nobc-red-hover sm:px-4 sm:text-[0.65rem]'
