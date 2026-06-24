@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/operator-role';
 import { OperatorRole } from '@prisma/client';
 import { emitEvent } from '@/lib/emit-event';
+import { cancelRsvp } from '@/lib/waitlist';
+import { ACTIVE_EVENT_ID } from '@/lib/active-event';
 
 export async function POST(
   req: NextRequest,
@@ -48,6 +50,38 @@ export async function POST(
       reviewNote,
     },
   });
+
+  // Door 1: cancel the application-issued comp RSVP for the active event. The
+  // applicant is resolved by email (Application.memberId is only set on approve),
+  // then cancelRsvp releases the seat. Fail-closed — logged, never throws.
+  try {
+    const member = await db.member.findFirst({
+      where: { workspaceId, email: app.email.trim().toLowerCase() },
+      select: { id: true },
+    });
+    if (member) {
+      const compRsvp = await db.rSVP.findFirst({
+        where: {
+          workspaceId,
+          eventId: ACTIVE_EVENT_ID,
+          memberId: member.id,
+          isComp: true,
+          compType: 'APPLICATION',
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (compRsvp) {
+        await cancelRsvp(compRsvp.id, workspaceId);
+      } else {
+        console.warn(
+          `[door1-comp] reject: no application comp RSVP for ${app.email} / event ${ACTIVE_EVENT_ID}`,
+        );
+      }
+    }
+  } catch (err) {
+    console.error('[door1-comp] reject: cancel failed:', err);
+  }
 
   // emitEvent writes AuditEvent + Svix
   await emitEvent({

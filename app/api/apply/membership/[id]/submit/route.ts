@@ -7,6 +7,8 @@ import { generateText } from 'ai';
 import { scoreApplication } from '@/lib/scoring';
 import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
 import { resolveMember, promoteMemberToApproved } from '@/lib/member-identity';
+import { ACTIVE_EVENT_ID } from '@/lib/active-event';
+import { MemberStatus } from '@prisma/client';
 import { maybeFireSlack } from '@/lib/comments-notify';
 import { backupApplication } from '@/lib/applications/backup';
 import { publicRateLimit } from '@/lib/public-rate-limit';
@@ -204,6 +206,62 @@ Write 2-3 sentences that feel like we truly read their application and see them.
       await backupApplication(id);
     } catch (e) {
       console.error('[application-backup] write-through hook failed', {
+        applicationId: id,
+        err: e instanceof Error ? e.message : String(e),
+      });
+    }
+
+    // Door 1: issue a comp RSVP to the active event for this applicant. The
+    // applicant becomes the canonical GUEST member (resolveMember mints a QR);
+    // the comp is born pending_approval and is confirmed on operator approve /
+    // cancelled on reject. A PURPLE auto-approval already promoted the member to
+    // APPROVED above, so its comp is born confirmed. Fully fail-closed: any error
+    // is logged and swallowed so the submission always succeeds.
+    try {
+      const activeEvent = await db.event.findFirst({
+        where: { id: ACTIVE_EVENT_ID, workspaceId: application.workspaceId },
+        select: { id: true },
+      });
+      if (!activeEvent) return; // no active event in this workspace — skip silently
+
+      const member = await resolveMember({
+        workspaceId: application.workspaceId,
+        email: application.email,
+        name: application.fullName,
+        clerkUserId: `app_${application.id}`,
+        phone: application.phone ?? undefined,
+        source: 'apply',
+      });
+
+      const existingComp = await db.rSVP.findFirst({
+        where: {
+          workspaceId: application.workspaceId,
+          eventId: ACTIVE_EVENT_ID,
+          memberId: member.id,
+          isComp: true,
+          compType: 'APPLICATION',
+        },
+        select: { id: true },
+      });
+      if (existingComp) return; // already issued — idempotent
+
+      await db.rSVP.create({
+        data: {
+          workspaceId: application.workspaceId,
+          eventId: ACTIVE_EVENT_ID,
+          memberId: member.id,
+          status: 'CONFIRMED',
+          ticketStatus:
+            member.status === MemberStatus.APPROVED ? 'confirmed' : 'pending_approval',
+          origin: 'comp',
+          isComp: true,
+          compType: 'APPLICATION',
+          guestEmail: application.email.trim().toLowerCase(),
+          guestName: application.fullName,
+        },
+      });
+    } catch (e) {
+      console.error('[door1-comp] issue on submit failed', {
         applicationId: id,
         err: e instanceof Error ? e.message : String(e),
       });
