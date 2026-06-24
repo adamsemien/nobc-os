@@ -27,7 +27,7 @@ export function DoorFork({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <p className="text-[11px] uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      <p className="text-[13px] font-medium uppercase tracking-[0.24em] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
         Choose how to join us
       </p>
 
