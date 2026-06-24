@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName } from '@/config/archetypes';
 import dynamic from 'next/dynamic';
 import { Mic } from 'lucide-react';
+import QRCode from 'qrcode';
 import {
   QUESTIONS,
   SECTIONS,
@@ -54,6 +55,71 @@ interface SubmitResult {
   archetypeScores: Record<string, number>;
   tags: string[];
   personalizedCopy: string;
+  rsvpId?: string | null;
+  memberQrCode?: string | null;
+}
+
+// Door 1 reveal QR — mirrors the Door 2 confirmation QR treatment (qrcode -> SVG,
+// light code on a white field so it scans against the dark reveal background). The
+// code is the applicant's permanent member QR (always minted; QR law). The label
+// intentionally does NOT imply event approval — the comp may still be pending review.
+function QrReveal({ code }: { code: string }) {
+  const [svg, setSvg] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toString(code, {
+      type: 'svg',
+      width: 180,
+      margin: 2,
+      color: { dark: '#1C1008', light: '#FFFFFF' },
+    })
+      .then((s) => {
+        if (!cancelled) setSvg(s);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  return (
+    <div style={{ marginTop: 48, animation: 'fadeInUp 500ms ease 2000ms forwards', opacity: 0 }}>
+      <span
+        style={{
+          fontFamily: bodyFont,
+          fontSize: 11,
+          fontWeight: 500,
+          color: THEME.night.muted,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          display: 'block',
+          marginBottom: 16,
+        }}
+      >
+        YOUR MEMBER QR
+      </span>
+      {svg ? (
+        <div
+          style={{ display: 'inline-block', lineHeight: 0, borderRadius: 8, overflow: 'hidden' }}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      ) : (
+        <div style={{ width: 180, height: 180, borderRadius: 8, background: THEME.night.border }} />
+      )}
+      <p
+        style={{
+          fontFamily: bodyFont,
+          fontSize: 13,
+          color: THEME.night.muted,
+          marginTop: 16,
+          marginBottom: 0,
+          letterSpacing: '0.04em',
+        }}
+      >
+        We&apos;ll be in touch shortly.
+      </p>
+    </div>
+  );
 }
 
 const EMPTY_FORM: FormData = {
@@ -1564,6 +1630,8 @@ export default function MembershipForm() {
                     Your application is in. We read every one. We&apos;ll be in touch. &#x1F5A4;
                   </p>
                 )}
+
+                {submitResult.memberQrCode && <QrReveal code={submitResult.memberQrCode} />}
               </div>
 
               {/* Right Column — 42%, sticky on desktop */}
