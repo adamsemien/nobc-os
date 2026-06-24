@@ -8,6 +8,7 @@ import {
   parseEventAccess,
 } from '@/lib/event-access';
 import { deriveLegacyFromAccess } from '@/lib/event-access-derive';
+import { toZonedDateInput, toZonedTimeInput, zonedWallClockToUtc } from '@/lib/tz';
 import type { EventAccess } from '@/lib/event-access-schema';
 import {
   type AccessQuestion,
@@ -54,20 +55,25 @@ type EventFull = {
 
 type Props = { event: EventFull };
 
+// The stored value is a UTC instant; the operator reads and enters it in Central
+// (America/Chicago). Slicing the raw UTC ISO showed the UTC wall clock, and a
+// bare `new Date("...T...")` re-parsed the typed digits in the browser's zone -
+// the two disagreed and every save ratcheted the time by the Central offset.
+// Pinning the zone on both ends fixes the round-trip.
 function toDateInput(iso: string | null): string {
   if (!iso) return '';
-  return iso.slice(0, 10);
+  return toZonedDateInput(new Date(iso));
 }
 
 function toTimeInput(iso: string | null): string {
   if (!iso) return '';
-  return iso.slice(11, 16);
+  return toZonedTimeInput(new Date(iso));
 }
 
 function combineDatetime(date: string, time: string): string | null {
   if (!date) return null;
   const t = time || '00:00';
-  return new Date(`${date}T${t}`).toISOString();
+  return zonedWallClockToUtc(`${date}T${t}`).toISOString();
 }
 
 export function EventSettingsTab({ event }: Props) {
