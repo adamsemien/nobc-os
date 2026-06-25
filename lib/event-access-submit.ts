@@ -171,19 +171,36 @@ export async function findOrCreateOperatorMember(
     .trim()
     .toLowerCase()
 
-  return db.member.create({
-    data: {
-      workspaceId,
-      clerkUserId,
-      email,
-      firstName: user.firstName ?? "Operator",
-      lastName: user.lastName ?? "",
-      status: "GUEST",
-      approved: false,
-      memberQrCode: generateMemberQrCode(),
-    },
-    select: { id: true, memberQrCode: true },
-  })
+  try {
+    return await db.member.create({
+      data: {
+        workspaceId,
+        clerkUserId,
+        email,
+        firstName: user.firstName ?? "Operator",
+        lastName: user.lastName ?? "",
+        status: "GUEST",
+        approved: false,
+        memberQrCode: generateMemberQrCode(),
+      },
+      select: { id: true, memberQrCode: true },
+    })
+  } catch (err) {
+    // Pre-existing identity: this operator already has a Member row under the same
+    // (workspaceId, email) but a DIFFERENT clerkUserId (e.g. a `guest:email` row
+    // minted when they tested the buyer flow), so the clerkUserId pre-check above
+    // missed it and this create violates @@unique([workspaceId, email]). Re-fetch
+    // the winner by either identity key and return it, mirroring resolveMember /
+    // findOrCreateGuestMember's P2002 guard.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const raced = await db.member.findFirst({
+        where: { workspaceId, OR: [{ clerkUserId }, { email }] },
+        select: { id: true, memberQrCode: true },
+      })
+      if (raced) return raced
+    }
+    throw err
+  }
 }
 
 /** Capacity check; returns false if event is full. */
