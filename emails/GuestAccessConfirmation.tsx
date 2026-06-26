@@ -122,10 +122,24 @@ export default function GuestAccessConfirmation({
 
           {/* Pending approval variant */}
           {!isConfirmed ? (
-            <Text style={paragraph}>
-              we&apos;ve got your application. we&apos;ll be in touch once
-              it&apos;s reviewed.
-            </Text>
+            <>
+              <Text style={paragraph}>
+                we&apos;ve got your application. we&apos;ll be in touch once
+                it&apos;s reviewed.
+              </Text>
+              {qrAvailable ? (
+                <>
+                  <Text style={paragraph}>Show this QR at the door.</Text>
+                  <Img
+                    src={`${appUrl}/api/qr/${encodeURIComponent(rsvpId)}`}
+                    alt="Member QR code"
+                    width={200}
+                    height={200}
+                    style={qrImage}
+                  />
+                </>
+              ) : null}
+            </>
           ) : null}
 
           <Hr style={divider} />
