@@ -157,7 +157,11 @@ export function EventAccessFlow({ event, open, onClose, onComplete }: Props) {
     void (async () => {
       setState((s) => ({ ...s, submitting: true, errorMsg: null }));
       try {
-        const res = await fetch(`/api/m/events/${event.slug}/access/payment-intent`, {
+        const res = await fetch(
+          event.viewer === 'anon'
+            ? `/api/e/${event.slug}/access/payment-intent`
+            : `/api/m/events/${event.slug}/access/payment-intent`,
+          {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -115,7 +115,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
               reveals this same RsvpCard, whose CTA drives the existing buy flow. */}
           <div className="mt-8 w-full max-w-[400px]">
             {showFork ? (
-              <DoorFork>
+              <DoorFork priceCents={event.resolved.kind === 'closed' ? 0 : event.resolved.priceCents}>
                 <RsvpCard event={event} hideHeader mobileSticky />
               </DoorFork>
             ) : (
