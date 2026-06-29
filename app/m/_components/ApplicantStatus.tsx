@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
-import { resolvePendingApplicationForAccount } from '@/lib/apply-account-link';
+import { resolvePendingApplicationForAccount, getVerifiedClerkEmail } from '@/lib/apply-account-link';
+import { resolveDefaultApplyWorkspace } from '@/lib/apply-workspace';
 
 /**
  * Status-aware landing for a signed-in applicant (the orgless "buyer/applicant"
@@ -72,7 +73,7 @@ function selectView(
   // reapply CTA, no raw status shown, warm but with no false promise.
   return {
     heading: 'Thank you for applying.',
-    body: "Your application to No Bad Company has been reviewed. If there's a next step, we'll reach out to you directly by email.",
+    body: "Your application to No Bad Company has been reviewed. If there's a next step, we'll be in touch with you directly by email.",
   };
 }
 
@@ -88,11 +89,34 @@ export default async function ApplicantStatus() {
         select: { status: true, aiScore: true },
       });
     } else {
+      // Account-linked read — covers go-forward, where clerkUserId is stamped at
+      // creation by the account-first apply flow.
       app = await db.application.findFirst({
         where: { clerkUserId: userId },
         orderBy: { createdAt: 'desc' },
         select: { status: true, aiScore: true },
       });
+
+      // Legacy fallback: a fully anonymous application (clerkUserId never stamped)
+      // that was already DECIDED is invisible to both reads above. Detect it by the
+      // verified Clerk email so a declined legacy applicant sees the Decided state,
+      // not "Start your application." Read-only — never stamps/claims the row (a
+      // PENDING anonymous match would already have been claimed by step 1, and if
+      // one surfaces here it still renders Draft/Submitted per aiScore via selectView).
+      if (!app) {
+        const email = await getVerifiedClerkEmail(userId);
+        const workspace = email ? await resolveDefaultApplyWorkspace() : null;
+        if (email && workspace) {
+          app = await db.application.findFirst({
+            where: {
+              workspaceId: workspace.id,
+              email: { equals: email, mode: 'insensitive' },
+            },
+            orderBy: { createdAt: 'desc' },
+            select: { status: true, aiScore: true },
+          });
+        }
+      }
     }
   }
 
