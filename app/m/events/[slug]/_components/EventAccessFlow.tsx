@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -537,9 +538,9 @@ function AuthStep() {
       <p className="text-[15px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
         This event is open to NoBC members. Sign in to continue.
       </p>
-      <a href="/sign-in" className={primaryBtnCls + ' block'}>
+      <Link href="/sign-in" className={primaryBtnCls + ' block'}>
         Sign in
-      </a>
+      </Link>
     </div>
   );
 }
