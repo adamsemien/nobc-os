@@ -494,6 +494,12 @@ export default function MembershipForm() {
           fullName: application.fullName ?? '',
           email: application.email ?? '',
           phone: application.phone ?? '',
+          // Consent is captured at the front gate now; rehydrate it from the stored
+          // application so the unchanged handleSubmit agreedToTerms gate passes on
+          // resume without the removed LEGAL_STEP checkboxes. consentEmail is the
+          // persisted "agreed to terms" signal; consentSms is the optional opt-in.
+          agreedToTerms: !!application.consentEmail,
+          consentSms: !!application.consentSms,
         }));
         setStep(stepFromAnswers(ans));
         setShowResumeBanner(true);
@@ -1420,46 +1426,6 @@ export default function MembershipForm() {
           <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
             <span style={chapterLabelStyle}>THE FINE PRINT</span>
             <h1 style={sectionHeadingStyle}>Almost There</h1>
-
-            <div style={{ maxHeight: 'clamp(200px, 40vw, 400px)', minHeight: 120, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', borderBottom: `1px solid ${theme.border}`, padding: '20px 0', marginBottom: 32 }}>
-              <div style={{ fontFamily: bodyFont, fontSize: 13, lineHeight: 1.7, color: theme.text, whiteSpace: 'pre-line' }}>
-                <strong style={{ display: 'block', marginBottom: 16, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase' }}>MEMBERSHIP APPLICATION - TERMS AND CONDITIONS</strong>
-
-                <strong>1. MEMBERSHIP DISCRETION</strong>{'\n'}
-                No Bad Company (&quot;NoBC&quot;, &quot;we&quot;, &quot;us&quot;) reserves the sole and absolute right to accept or decline any membership application for any reason or no reason. Submission of this application does not create any obligation on NoBC to grant membership. Membership decisions are final and not subject to appeal.{'\n\n'}
-
-                <strong>2. AGE REQUIREMENT</strong>{'\n'}
-                You must be 18 years of age or older to apply for membership. By submitting this application, you represent and warrant that you are at least 18 years old.{'\n\n'}
-
-                <strong>3. COMMUNICATIONS CONSENT</strong>{'\n'}
-                By submitting this application, you consent to receive communications from NoBC via email. You are automatically enrolled in No Bad News, our member communications program, which includes event announcements, community updates, and curated content. You may opt out of email communications at any time by contacting team@thenobadcompany.com. SMS/text message communications are optional and require separate affirmative consent below.{'\n\n'}
-
-                <strong>4. PHOTO, VIDEO, AND CONTENT RELEASE</strong>{'\n'}
-                By submitting this application and participating in NoBC events and activities, you grant NoBC an irrevocable, royalty-free, worldwide license to use, reproduce, distribute, and display photographs, video recordings, and other content that may capture your likeness, image, or voice in connection with NoBC events, marketing materials, social media, and other promotional purposes. This license survives termination of membership.{'\n\n'}
-
-                <strong>5. DATA AND PRIVACY</strong>{'\n'}
-                NoBC collects and stores the personal information you provide in this application for membership administration purposes. We do not sell your personal data to third parties. We retain your information for 24 months following the date of your application or the termination of your membership, whichever is later. You may request deletion of your data by contacting team@thenobadcompany.com. Certain information may be retained as required by applicable law.{'\n\n'}
-
-                <strong>6. LIMITATION OF LIABILITY</strong>{'\n'}
-                To the maximum extent permitted by applicable law, NoBC and its officers, directors, employees, and agents shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or relating to your membership application, membership, or participation in NoBC events or activities.{'\n\n'}
-
-                <strong>7. GOVERNING LAW AND VENUE</strong>{'\n'}
-                This agreement shall be governed by and construed in accordance with the laws of the State of Texas. Any dispute arising under this agreement shall be resolved exclusively in the courts of Travis County, Texas.
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontFamily: bodyFont, fontSize: 13, color: theme.text, lineHeight: 1.5 }}>
-                <input type="checkbox" checked={data.consentSms} onChange={e => set('consentSms', e.target.checked)} style={{ marginTop: 2, accentColor: theme.accent }} />
-                I&apos;d like to receive event reminders and updates via text message (optional). Message and data rates may apply. Reply STOP to opt out.
-              </label>
-            </div>
-            <div style={{ marginBottom: 40 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontFamily: bodyFont, fontSize: 13, color: theme.text, lineHeight: 1.5 }}>
-                <input type="checkbox" checked={data.agreedToTerms} onChange={e => set('agreedToTerms', e.target.checked)} style={{ marginTop: 2, accentColor: theme.accent }} />
-                I have read and agree to the terms above
-              </label>
-            </div>
 
             {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
             {navBlock(handleSubmit, 'submit my application', !data.agreedToTerms)}

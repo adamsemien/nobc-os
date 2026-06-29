@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { resolveMember } from '@/lib/member-identity';
 import { resolveDefaultApplyWorkspace } from '@/lib/apply-workspace';
-import { stampApplicationOwner } from '@/lib/apply-account-link';
+import { stampApplicationOwner, getVerifiedClerkEmail } from '@/lib/apply-account-link';
 import { publicRateLimit } from '@/lib/public-rate-limit';
 import {
   APPLY_DRAFT_COOKIE,
@@ -128,6 +128,13 @@ export async function POST(req: NextRequest) {
     source: 'apply_membership',
   });
 
+  // D4c: for a signed-in applicant the verified Clerk email is the single source of
+  // truth — override any email in the request body server-side. Falls back to the
+  // validated body email only when unauthenticated or the Clerk email is
+  // unverified/unavailable. Scoped to this create (the sole body-email write site);
+  // the existingPending reuse + P2002 raced-recovery paths inherit the row's email.
+  const createEmail = userId ? ((await getVerifiedClerkEmail(userId)) ?? email) : email;
+
   let application: { id: string };
   try {
     application = await db.application.create({
@@ -135,7 +142,7 @@ export async function POST(req: NextRequest) {
         workspaceId: workspace.id,
         memberId: member.id,
         clerkUserId: userId ?? null,
-        email,
+        email: createEmail,
         fullName: fullName ?? '',
         phone: normalizePhone(phone ?? null),
         city: city ?? null,
