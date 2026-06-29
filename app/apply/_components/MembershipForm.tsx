@@ -1217,8 +1217,42 @@ export default function MembershipForm() {
           position: absolute;
           right: 0;
         }
+        @keyframes draftToastIn {
+          from { opacity: 0; transform: translate(-50%, 8px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
       `}</style>
       <div className="apply-form" style={{ background: theme.bg, minHeight: '100vh', fontFamily: bodyFont, color: theme.text, transition: 'background 300ms ease, color 300ms ease' }}>
+
+      {/* Transient "Draft saved" confirmation. Render-only: reads the existing
+          `draftSaved` flag set by handleSaveDraft (unchanged), whose own 2s reset
+          dismisses it. Complements the in-button "saved." label with a visible toast. */}
+      {draftSaved && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            bottom: 'calc(24px + env(safe-area-inset-bottom))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 50,
+            background: theme.text,
+            color: theme.bg,
+            fontFamily: bodyFont,
+            fontSize: 12,
+            fontWeight: 500,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            padding: '12px 22px',
+            borderRadius: 999,
+            pointerEvents: 'none',
+            animation: 'draftToastIn 220ms ease',
+          }}
+        >
+          Draft saved
+        </div>
+      )}
 
       {/* Section interstitial */}
       {interstitial && step < REVEAL_STEP && (
