@@ -1,11 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
+import { isApplicationAccountOwner } from '@/lib/apply-account-link';
 import { emailSchema, phoneSchema, shortText, answersMap, normalizePhone } from '@/lib/validation';
 
 const ID_RE = /^[a-z0-9_-]{8,40}$/i;
+
+/**
+ * Draft access (PR1, additive): authorized by EITHER the original device-bound
+ * draft cookie OR — only when that cookie is absent/invalid — a signed-in caller
+ * who owns this application by account (`Application.clerkUserId === userId`).
+ *
+ * The cookie path short-circuits first and is byte-for-byte unchanged, so
+ * anonymous callers and existing cookie holders behave exactly as before; the
+ * account branch is reachable only on a cookie miss (e.g. a second device).
+ */
+async function authorizeDraftAccess(req: NextRequest, id: string): Promise<boolean> {
+  if (verifyApplyDraftToken(id, req.cookies.get(APPLY_DRAFT_COOKIE)?.value)) return true;
+  const { userId } = await auth();
+  return isApplicationAccountOwner(id, userId);
+}
 
 const PatchSchema = z.object({
   fullName: shortText(100).optional(),
@@ -23,9 +40,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!ID_RE.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
 
   // The id is exposed in the page URL, so it is not a credential. Require the
-  // httpOnly cookie minted when this draft was created — without it, GET would
-  // leak the applicant's PII to anyone who learns the id (IDOR).
-  if (!verifyApplyDraftToken(id, req.cookies.get(APPLY_DRAFT_COOKIE)?.value)) {
+  // httpOnly cookie minted when this draft was created (or account ownership for a
+  // signed-in resume) — without it, GET would leak the applicant's PII to anyone
+  // who learns the id (IDOR).
+  if (!(await authorizeDraftAccess(req, id))) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   }
 
@@ -76,8 +94,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // Ownership: the id is in the URL and not a credential — require the draft
-  // cookie so a leaked id cannot overwrite someone else's contact details.
-  if (!verifyApplyDraftToken(id, req.cookies.get(APPLY_DRAFT_COOKIE)?.value)) {
+  // cookie (or account ownership for a signed-in resume) so a leaked id cannot
+  // overwrite someone else's contact details.
+  if (!(await authorizeDraftAccess(req, id))) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   }
 

@@ -11,8 +11,10 @@ import { ACTIVE_EVENT_ID } from '@/lib/active-event';
 import { MemberStatus } from '@prisma/client';
 import { maybeFireSlack } from '@/lib/comments-notify';
 import { backupApplication } from '@/lib/applications/backup';
+import { auth } from '@clerk/nextjs/server';
 import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
+import { isApplicationAccountOwner } from '@/lib/apply-account-link';
 import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 import { sendGuestAccessConfirmation } from '@/emails/GuestAccessConfirmation';
@@ -34,9 +36,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   // Ownership: submit triggers scoring (billed AI) + a welcome email and mutates
-  // the application. The id is exposed in the URL, so require the draft cookie —
-  // a leaked id must not let a stranger submit someone else's draft.
-  if (!verifyApplyDraftToken(id, req.cookies.get(APPLY_DRAFT_COOKIE)?.value)) {
+  // the application. The id is exposed in the URL, so require the draft cookie (or
+  // account ownership for a signed-in submit) — a leaked id must not let a
+  // stranger submit someone else's draft. The cookie path is checked first and is
+  // unchanged; the account branch runs only on a cookie miss.
+  const submitAuthorized =
+    verifyApplyDraftToken(id, req.cookies.get(APPLY_DRAFT_COOKIE)?.value) ||
+    (await isApplicationAccountOwner(id, (await auth()).userId));
+  if (!submitAuthorized) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   }
 

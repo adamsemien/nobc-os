@@ -373,6 +373,10 @@ model Application {
   workspaceId String
   workspace   Workspace         @relation(fields: [workspaceId], references: [id])
   memberId    String?
+  // Real Clerk user id once the applicant creates/links an account. Nullable +
+  // additive: pre-account (cookie) drafts and all existing rows stay null.
+  // Enables cross-device, account-based resume.
+  clerkUserId String?
   email       String
   fullName    String
   phone        String?
@@ -404,6 +408,7 @@ model Application {
 
   @@index([workspaceId])
   @@index([templateId])
+  @@index([clerkUserId])
 }
 
 model ApplicationAnswer {
