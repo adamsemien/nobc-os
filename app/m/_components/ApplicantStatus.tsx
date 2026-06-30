@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { resolvePendingApplicationForAccount, getVerifiedClerkEmail } from '@/lib/apply-account-link';
 import { resolveDefaultApplyWorkspace } from '@/lib/apply-workspace';
+import { getMemberPortalContext } from '@/lib/auth';
+import { MemberWorkspaceGate } from '@/app/m/events/_components/MemberWorkspaceGate';
 
 /**
  * Status-aware landing for a signed-in applicant (the orgless "buyer/applicant"
@@ -117,6 +119,19 @@ export default async function ApplicantStatus() {
           });
         }
       }
+    }
+  }
+
+  // Member-aware fallback — runs ONLY when there is no application at all. A
+  // signed-in user with no application who still resolves as a member (an
+  // APPROVED/GUEST Member row — e.g. a manually added member or a ticket buyer)
+  // must not be told to "Start your application", so show the existing
+  // members-only surface. Applicants always have an application row, so the
+  // draft / submitted / decided / approved states below are never intercepted.
+  if (!app && userId) {
+    const memberCtx = await getMemberPortalContext(userId);
+    if (memberCtx) {
+      return <MemberWorkspaceGate />;
     }
   }
 

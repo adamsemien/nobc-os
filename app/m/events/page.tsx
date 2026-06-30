@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { getPublishedEventsWithConfirmedCounts } from '@/lib/events';
 import { getEventHeroDisplayUrl } from '@/lib/event-hero-url';
-import { MemberWorkspaceGate } from './_components/MemberWorkspaceGate';
+import ApplicantStatus from '@/app/m/_components/ApplicantStatus';
 import MemberEventsExplorer, { type MemberEventsExplorerRow } from './_components/MemberEventsExplorer';
 import { LegalFooter } from '@/app/_components/LegalFooter';
 
@@ -17,7 +17,11 @@ export default async function EventsPage() {
   }
   const workspaceId = await getMemberWorkspaceId(userId);
   if (!workspaceId) {
-    return <MemberWorkspaceGate />;
+    // Orgless caller. ApplicantStatus renders the status-aware applicant landing
+    // for prospects/applicants, and (for a member with no application) falls back
+    // to the members-only surface itself — so members are never shown applicant
+    // copy and are never bounced into /apply.
+    return <ApplicantStatus />;
   }
   const raw = await getPublishedEventsWithConfirmedCounts(workspaceId);
 
