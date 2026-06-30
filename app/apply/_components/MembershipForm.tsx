@@ -496,9 +496,13 @@ export default function MembershipForm() {
           phone: application.phone ?? '',
           // Consent is captured at the front gate now; rehydrate it from the stored
           // application so the unchanged handleSubmit agreedToTerms gate passes on
-          // resume without the removed LEGAL_STEP checkboxes. consentEmail is the
-          // persisted "agreed to terms" signal; consentSms is the optional opt-in.
-          agreedToTerms: !!application.consentEmail,
+          // resume without the removed LEGAL_STEP checkboxes. PHASE B: the gate now
+          // reads the structured `agreedToMembershipTerms` signal. `consentEmail` is
+          // kept as a BACKFILL fallback so drafts created before Phase B — which have
+          // agreedToMembershipTerms=false but may have consentEmail=true — still pass
+          // the gate on resume; the final-submit PATCH then persists
+          // agreedToMembershipTerms=true server-side. consentSms is the optional opt-in.
+          agreedToTerms: !!application.agreedToMembershipTerms || !!application.consentEmail,
           consentSms: !!application.consentSms,
         }));
         setStep(stepFromAnswers(ans));

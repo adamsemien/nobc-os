@@ -6,6 +6,7 @@ import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
 import { isApplicationAccountOwner } from '@/lib/apply-account-link';
 import { emailSchema, phoneSchema, shortText, answersMap, normalizePhone } from '@/lib/validation';
+import { structuredConsentWrites, getConsentIp } from '@/lib/apply-consent';
 
 const ID_RE = /^[a-z0-9_-]{8,40}$/i;
 
@@ -61,6 +62,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       referredBy: true,
       consentEmail: true,
       consentSms: true,
+      // PHASE B: returned so the form rehydrates the submit gate from the
+      // structured signal (with consentEmail as the in-flight backfill fallback).
+      agreedToMembershipTerms: true,
       answers: { select: { questionKey: true, answer: true } },
     },
   });
@@ -116,7 +120,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const existing = await db.application.findUnique({
     where: { id },
-    select: { id: true, status: true },
+    // PHASE B: prior consent timestamps drive stamp-once — the original
+    // acceptance time must survive the final-submit re-PATCH.
+    select: { id: true, status: true, termsAcceptedAt: true, emailOptInAt: true, smsOptInAt: true },
   });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   // Once an application leaves PENDING, the draft endpoint is closed.
@@ -133,6 +139,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (fields.referredBy !== undefined) updateData.referredBy = fields.referredBy;
   if (fields.consentEmail !== undefined) updateData.consentEmail = fields.consentEmail;
   if (fields.consentSms !== undefined) updateData.consentSms = fields.consentSms;
+
+  // PHASE B dual-write: derive the structured consent columns from the same
+  // booleans written above. Legacy consentEmail/consentSms writes are unchanged.
+  // This single site covers both the front-gate consent PATCH and the
+  // final-submit PATCH (both land here). IP/UA captured at the agreement write.
+  Object.assign(
+    updateData,
+    structuredConsentWrites({
+      consentEmail: fields.consentEmail,
+      consentSms: fields.consentSms,
+      now: new Date(),
+      ip: getConsentIp(req),
+      userAgent: req.headers.get('user-agent'),
+      existing,
+    }),
+  );
 
   const application = await db.application.update({
     where: { id },

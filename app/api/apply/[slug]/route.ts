@@ -6,6 +6,7 @@ import { tagApplication } from '@/lib/ai/tag-application';
 import { attachEventRsvpAfterApply } from '@/lib/apply-event-rsvp';
 import { resolveMember } from '@/lib/member-identity';
 import { emitEvent } from '@/lib/emit-event';
+import { structuredConsentWrites, getConsentIp } from '@/lib/apply-consent';
 
 export async function POST(
   req: NextRequest,
@@ -89,6 +90,15 @@ export async function POST(
         referredBy: data.referredBy,
         consentEmail: data.consentEmail ?? false,
         consentSms: data.consentSms ?? false,
+        // PHASE B dual-write: structured consent derived from the same booleans;
+        // single-shot create (no prior row) so timestamps stamp on true.
+        ...structuredConsentWrites({
+          consentEmail: data.consentEmail ?? false,
+          consentSms: data.consentSms ?? false,
+          now: new Date(),
+          ip: getConsentIp(req),
+          userAgent: req.headers.get('user-agent'),
+        }),
         status: 'HOLD',
         duplicateFlag: true,
         aiTags: [],
@@ -119,6 +129,15 @@ export async function POST(
         referredBy: data.referredBy,
         consentEmail: data.consentEmail ?? false,
         consentSms: data.consentSms ?? false,
+        // PHASE B dual-write: structured consent derived from the same booleans;
+        // single-shot create (no prior row) so timestamps stamp on true.
+        ...structuredConsentWrites({
+          consentEmail: data.consentEmail ?? false,
+          consentSms: data.consentSms ?? false,
+          now: new Date(),
+          ip: getConsentIp(req),
+          userAgent: req.headers.get('user-agent'),
+        }),
         status: 'PENDING',
         aiTags: [],
       },
