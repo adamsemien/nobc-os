@@ -385,6 +385,16 @@ model Application {
   referredBy   String?
   consentEmail Boolean           @default(false)
   consentSms   Boolean           @default(false)
+  // --- Phase A: structured consent + lifecycle (additive; legacy consentEmail/consentSms above are unchanged) ---
+  agreedToMembershipTerms Boolean   @default(false)
+  termsAcceptedAt         DateTime?
+  termsVersion            String?
+  emailOptIn              Boolean   @default(false)
+  emailOptInAt            DateTime?
+  smsOptInAt              DateTime?
+  consentIp               String?
+  consentUserAgent        String?
+  archivedAt              DateTime?
   status       ApplicationStatus @default(PENDING)
   reviewedAt  DateTime?
   reviewedBy  String?
