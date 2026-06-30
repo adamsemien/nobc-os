@@ -135,6 +135,21 @@ export default async function ApplicantStatus() {
     }
   }
 
+  return <ApplicantStatusView app={app} />;
+}
+
+/**
+ * Presentational applicant-status card. Pure — no auth, no DB read, no
+ * claim/member resolution — so a caller that already knows the applicant's
+ * `{ status, aiScore }` (e.g. the /apply front-door router, which computes it via
+ * its own pure reads) can render this view WITHOUT triggering the self-contained
+ * wrapper's member-claim fallback (`getMemberPortalContext`, which writes).
+ */
+export function ApplicantStatusView({
+  app,
+}: {
+  app: { status: string; aiScore: number | null } | null;
+}) {
   const view = selectView(app);
 
   return (
