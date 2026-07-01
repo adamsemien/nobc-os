@@ -74,6 +74,50 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ blocked: true, cached: true });
   }
 
+  // ── Atomic once-only guard ────────────────────────────────────────────
+  // Concurrent submits for the same draft (two tabs, a network retry, a replayed or
+  // account-relinked cookie) would each pass the idempotency guard above while aiScore
+  // is still null and then score INDEPENDENTLY - two billed Sonnet calls each, a
+  // duplicated Door 1 (and PURPLE) email, duplicate audit rows. Serialize per-draft on
+  // a Postgres transaction-scoped advisory lock: a second submit blocks until the
+  // first COMMITS (durably writing aiScore below), then re-reads it non-null and
+  // returns the cached reveal - never billing or emailing twice. The xact lock
+  // releases automatically when the transaction ends INCLUDING on error, so a scoring
+  // failure never locks a draft out (a retry re-enters with aiScore still null). No
+  // schema change: the existing aiScore column is the durable "already scored" signal.
+  // scoreApplication / lib/scoring.ts are unchanged - the lock is taken AROUND the
+  // call, here in the route. The whole scoring + email critical section runs inside;
+  // Door 1 + confirmation email (after the lock) is winner-only because a loser
+  // returns cached from within the lock and never reaches it.
+  const outcome = await db.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+
+  // Re-read under the lock. If a concurrent submit already scored (or was decided),
+  // return its persisted reveal and do NO scoring / billing / email on this request.
+  const locked = await tx.application.findUnique({
+    where: { id },
+    select: {
+      aiScore: true,
+      status: true,
+      archetype: true,
+      archetypeScores: true,
+      aiTags: true,
+      personalizedCopy: true,
+    },
+  });
+  if (locked && locked.aiScore !== null) {
+    return NextResponse.json({
+      cached: true,
+      archetype: locked.archetype ?? '',
+      archetypeScores: (locked.archetypeScores ?? {}) as Record<string, number>,
+      tags: locked.aiTags,
+      personalizedCopy: locked.personalizedCopy ?? '',
+    });
+  }
+  if (locked && locked.status === 'REJECTED') {
+    return NextResponse.json({ blocked: true, cached: true });
+  }
+
   // ── 1. Duplicate check ────────────────────────────────────────────────
   const isDuplicate = await checkDuplicate(
     application.workspaceId,
@@ -234,6 +278,14 @@ Output rules (follow exactly):
       personalizedCopy,
     },
   });
+
+  return { result, personalizedCopy };
+  }, { timeout: 60_000, maxWait: 20_000 });
+
+  // A loser (or a duplicate / blocked terminal path) already returned its NextResponse
+  // from inside the lock; re-emit it and skip the winner-only Door 1 + email below.
+  if (outcome instanceof NextResponse) return outcome;
+  const { result, personalizedCopy } = outcome;
 
   // Durable off-platform backup of the completed application — the company's most
   // critical data asset. Runs OUT OF BAND via after() so it never affects this
