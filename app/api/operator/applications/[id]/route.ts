@@ -103,7 +103,9 @@ export async function GET(
       createdAt: app.createdAt.toISOString(),
       reviewedAt: app.reviewedAt?.toISOString() ?? null,
       rejectionReason: app.rejectionReason ?? null,
-      consentEmail: app.consentEmail,
+      // Phase C: read the email opt-in from `emailOptIn` (the member apply flow
+      // stopped writing legacy `consentEmail`); transport key stays `consentEmail`.
+      consentEmail: app.emailOptIn,
       consentSms: app.consentSms,
       referrers: referrerLines(app.referredBy, app.answers),
       substantiveAnswers,
