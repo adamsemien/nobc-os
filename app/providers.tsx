@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { MemberApiError } from "@/lib/member-client";
+import SessionExpiryWarning from "@/components/auth/SessionExpiryWarning";
 
 // Dev-only, lazily loaded so the devtools never reach the production bundle:
 // `process.env.NODE_ENV` is statically inlined at build time, so in production this
@@ -48,6 +49,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={client}>
+      <SessionExpiryWarning />
       {children}
       {ReactQueryDevtools && (
         <Suspense fallback={null}>
