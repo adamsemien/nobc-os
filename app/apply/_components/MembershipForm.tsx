@@ -1643,6 +1643,24 @@ export default function MembershipForm() {
                 <span>{disclosures.smsOptIn}</span>
               </label>
 
+              {/* F4: plain-language irreversibility notice, added alongside the
+                  consent language (consent text / checkboxes / wiring untouched). */}
+              <p
+                style={{
+                  fontFamily: bodyFont,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: theme.muted,
+                  borderTop: `1px solid ${theme.border}`,
+                  paddingTop: 20,
+                  marginTop: 12,
+                  marginBottom: 0,
+                }}
+              >
+                Once you submit, your application is final - you won&apos;t be able to change your
+                answers. Take a moment to make sure it reads the way you want.
+              </p>
+
               {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
               {navBlock(handleSubmit, 'submit my application', !data.agreedToTerms)}
             </div>
