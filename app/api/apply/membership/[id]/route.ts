@@ -33,6 +33,9 @@ const PatchSchema = z.object({
   referredBy: shortText(200).optional().nullable(),
   consentEmail: z.boolean().optional(),
   consentSms: z.boolean().optional(),
+  // PHASE C: the three House Rules checkboxes write these independent signals.
+  agreedToMembershipTerms: z.boolean().optional(),
+  emailOptIn: z.boolean().optional(),
   answers: answersMap.optional(),
 });
 
@@ -149,6 +152,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     structuredConsentWrites({
       consentEmail: fields.consentEmail,
       consentSms: fields.consentSms,
+      agreedToMembershipTerms: fields.agreedToMembershipTerms,
+      emailOptIn: fields.emailOptIn,
       now: new Date(),
       ip: getConsentIp(req),
       userAgent: req.headers.get('user-agent'),

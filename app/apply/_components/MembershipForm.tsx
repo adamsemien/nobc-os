@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName } from '@/config/archetypes';
+import { CONSENT_DISCLOSURES, TERMS_VERSION } from '@/lib/apply-consent';
 import dynamic from 'next/dynamic';
 import { Mic } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -47,6 +48,7 @@ interface FormData {
   foodAccessibility: string;
   photoUrls: string[];
   agreedToTerms: boolean;
+  consentEmail: boolean;
   consentSms: boolean;
 }
 
@@ -125,7 +127,7 @@ function QrReveal({ code }: { code: string }) {
 const EMPTY_FORM: FormData = {
   fullName: '', email: '', phone: '',
   foodAccessibility: '',
-  photoUrls: [], agreedToTerms: false, consentSms: false,
+  photoUrls: [], agreedToTerms: false, consentEmail: false, consentSms: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -815,7 +817,10 @@ export default function MembershipForm() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          consentEmail: true, consentSms: data.consentSms,
+          // PHASE C: three independent House Rules consents. No legacy `consentEmail`.
+          agreedToMembershipTerms: data.agreedToTerms,
+          emailOptIn: data.consentEmail,
+          consentSms: data.consentSms,
           answers: { 'photos.urls': JSON.stringify(uploadedUrls), 'photos.foodAccessibility': data.foodAccessibility },
         }),
       });
@@ -1459,16 +1464,84 @@ export default function MembershipForm() {
           );
         })()}
 
-        {/* SCREEN 7: Legal */}
-        {step === LEGAL_STEP && (
-          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
-            <span style={chapterLabelStyle}>THE FINE PRINT</span>
-            <h1 style={sectionHeadingStyle}>Almost There</h1>
+        {/* SCREEN 7: House Rules — membership terms + the two optional opt-ins as
+            three independent checkboxes, right before submit. Labels are rendered
+            verbatim from CONSENT_DISCLOSURES so what the applicant reads is exactly
+            what termsVersion pins on the row. The required terms box gates submit;
+            email + SMS are optional and never bundled (TCPA). */}
+        {step === LEGAL_STEP && (() => {
+          const disclosures = CONSENT_DISCLOSURES[TERMS_VERSION];
+          const consentRowStyle: React.CSSProperties = {
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+            cursor: 'pointer',
+            fontFamily: bodyFont,
+            fontSize: 14,
+            lineHeight: 1.55,
+            color: theme.text,
+            marginBottom: 18,
+          };
+          const checkboxStyle: React.CSSProperties = {
+            marginTop: 2,
+            width: 18,
+            height: 18,
+            flexShrink: 0,
+            accentColor: theme.accent,
+            cursor: 'pointer',
+          };
+          const linkStyle: React.CSSProperties = {
+            color: theme.accent,
+            textDecoration: 'underline',
+            textUnderlineOffset: 2,
+          };
+          return (
+            <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
+              <span style={chapterLabelStyle}>HOUSE RULES</span>
+              <h1 style={sectionHeadingStyle}>A few house rules</h1>
 
-            {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-            {navBlock(handleSubmit, 'submit my application', !data.agreedToTerms)}
-          </div>
-        )}
+              <p style={{ ...helpStyle, marginBottom: 28 }}>
+                No Bad Company is a private club, so membership comes with a short set of house rules.
+                The short version: we decide who joins at our discretion, you must be 18 or older, we
+                protect your information and never sell it, and our events may be photographed. The
+                full detail lives in our{' '}
+                <Link href="/terms" style={linkStyle}>membership terms</Link> and{' '}
+                <Link href="/privacy" style={linkStyle}>privacy policy</Link>.
+              </p>
+
+              <label style={consentRowStyle}>
+                <input
+                  type="checkbox"
+                  checked={data.agreedToTerms}
+                  onChange={e => setData(prev => ({ ...prev, agreedToTerms: e.target.checked }))}
+                  style={checkboxStyle}
+                />
+                <span>{disclosures.membershipTerms}</span>
+              </label>
+              <label style={consentRowStyle}>
+                <input
+                  type="checkbox"
+                  checked={data.consentEmail}
+                  onChange={e => setData(prev => ({ ...prev, consentEmail: e.target.checked }))}
+                  style={checkboxStyle}
+                />
+                <span>{disclosures.emailOptIn}</span>
+              </label>
+              <label style={{ ...consentRowStyle, marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={data.consentSms}
+                  onChange={e => setData(prev => ({ ...prev, consentSms: e.target.checked }))}
+                  style={checkboxStyle}
+                />
+                <span>{disclosures.smsOptIn}</span>
+              </label>
+
+              {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
+              {navBlock(handleSubmit, 'submit my application', !data.agreedToTerms)}
+            </div>
+          );
+        })()}
 
         {/* SCREEN 8: Reveal */}
         {step === REVEAL_STEP && submitResult && Object.keys(submitResult.archetypeScores ?? {}).length > 0 && (
