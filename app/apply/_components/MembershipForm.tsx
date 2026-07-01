@@ -1169,20 +1169,25 @@ export default function MembershipForm() {
     );
   }
 
-  /** Validate a page's required fields and gather the answers it owns. */
-  function pageIsComplete(page: Question[]): boolean {
+  /** Labels of the required fields still empty on a page. Single source of truth
+   *  for the required-field rule — it drives BOTH F2's specific validation message
+   *  and submitPage's advance gate, so the two can never diverge. The rule is
+   *  unchanged: a required simple field or required group sub-field must be
+   *  non-empty after trim (allowNone questions accept "none" elsewhere). */
+  function missingRequiredLabels(page: Question[]): string[] {
+    const missing: string[] = [];
     for (const q of page) {
       if (q.type === 'group') {
         for (const sub of q.fields ?? []) {
-          if (sub.required && !(answers[answerKey(q, sub)] ?? '').trim()) return false;
+          if (sub.required && !(answers[answerKey(q, sub)] ?? '').trim()) {
+            missing.push(sub.label ?? q.label);
+          }
         }
       } else if (q.required) {
-        const v = (answers[answerKey(q)] ?? '').trim();
-        // allowNone questions accept "none"; required still means non-empty.
-        if (!v) return false;
+        if (!(answers[answerKey(q)] ?? '').trim()) missing.push(q.label);
       }
     }
-    return true;
+    return missing;
   }
 
   function answersForPage(page: Question[]): Record<string, string> {
@@ -1195,9 +1200,16 @@ export default function MembershipForm() {
 
   function submitPage(pageIndex: number) {
     const page = PAGES[pageIndex];
-    if (!isDemo && !pageIsComplete(page)) {
-      setError('Please answer the required questions on this page.');
-      return;
+    if (!isDemo) {
+      const missing = missingRequiredLabels(page);
+      if (missing.length > 0) {
+        // F2: name the specific missing fields instead of a generic banner.
+        const shown = missing.slice(0, 3);
+        const extra = missing.length - shown.length;
+        const list = shown.join(', ') + (extra > 0 ? `, and ${extra} more` : '');
+        setError(`Please answer: ${list}.`);
+        return;
+      }
     }
     setError('');
     patchAndAdvance(answersForPage(page), pageIndex + 1);
