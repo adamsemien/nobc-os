@@ -1,0 +1,64 @@
+# Stage 17 — Access Gate Engine v3 (M1: headless engine core)
+
+> Replaces the three hardcoded access forks (open Access / paid ticket / apply) with one engine: a Gate is a boolean expression tree of tiered-verification conditions, evaluated fail-closed, with persistent proofs and a growth graph write path.
+
+## Status
+
+| Field | Value |
+|---|---|
+| **State** | 🔴 Blocked |
+| **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestone 1 of 6) |
+| **Last updated** | 2026-07-01 |
+| **Owner** | Adam |
+| **Blocked on** | Adam's Phase A approval: the build plan + `prisma/sql/gate-engine-m1.sql` + confirmation of the Phase B target database (proposed: dev branch `ep-sweet-term`). Also: the v3 spec file (`NoBadOS__spec__access-gate-engine-and-growth-platform-v3__2026-06-26.md`) is NOT in the repo — searched exhaustively 2026-07-01; the mission brief's restatement is the operative requirements doc until it lands. |
+| **Next** | On approval: apply the additive migration to the confirmed dev branch via `db execute`, then execute Phase B tasks 0–8 in `docs/superpowers/plans/2026-07-01-gate-engine-m1.md` (TDD, commit per task, branch `feat/gate-engine-m1`, no merge). |
+
+## Scope
+
+M1 only: the headless engine core. Five additive tables (Gate, GateNode, GateProof, GrowthEdge, GateSession), the recursive evaluator (pure core + effectful orchestrator), the condition type contract + open registry, the five M1 verifiers (PAY, ANSWER_QUESTIONS, REFERRED_BY_MEMBER, ATTENDED_PRIOR, HOLD_MEMBERSHIP), proof persistence with §16.4 carry-forward, and the REFERRAL GrowthEdge write path. Proven by tests on real seeded rows. Responsibility ends where rendering begins: no UI, no guest render, no Builder, no `/e/` changes, no backfill of existing events.
+
+## Files in play
+
+```
+prisma/schema.prisma                          ← 5 additive models + 8 enums (end of file)
+prisma/sql/gate-engine-m1.sql                 ← reviewed additive migration (NOT yet applied)
+docs/superpowers/plans/2026-07-01-gate-engine-m1.md  ← the Phase B build contract
+lib/gate-engine/                              ← (Phase B) engine core: types, registry, validate,
+                                                 evaluate, orchestrate, proofs, growth, authoring,
+                                                 conditions/{pay,answer-questions,referred-by-member,
+                                                 attended-prior,hold-membership}
+tests/unit/gate-engine/                       ← (Phase B) truth tables + acceptance.db.test.ts
+scripts/seed-gate-m1.ts                       ← (Phase B) deterministic acceptance seed
+```
+
+## Inputs
+
+- Gate definitions authored via `createGate()` (tests/authoring helper in M1; Builder UI is M3)
+- Member submissions to `verifyCondition()` (payment intent ids, application ids, referral facts)
+- Existing rows the verifiers read: `Member.referredByMemberId`, `Member.approved`/`status`, `RSVP.checkedIn`, Stripe payment intent state via `lib/stripe.ts` (read-only)
+- `scoreApplication()` from `lib/scoring.ts` (wrapped, never edited)
+
+## Outputs
+
+- `GateDecision` (Open / not-Open, fail-closed) from `evaluateGate()`
+- `GateProof` rows — one live proof per (nodeId, memberId), honest tier + mechanism, carry-forward lineage
+- `GrowthEdge` REFERRAL rows (workspace-scoped)
+- `GateSession.lastDecision` snapshots
+- Downstream: M2 guest render and M3 Builder consume this engine's API surface
+
+## Rules — DO NOT VIOLATE
+
+1. **Fail-closed everywhere.** Any verifier error, malformed node, unregistered type, or ambiguous state evaluates NOT Open. Never throw on the grant path; log with context.
+2. **No condition type is usable until its server-side verifier exists and is tested.** The registry invariant test enforces this.
+3. **Proof honesty:** tier + mechanism are stamped from contract constants, never from verifier return values. An attestation is never stored as first-party truth.
+4. **Locked §16 decisions:** depth ceiling = flat + depth-2; carry-forward windows = attended-prior never expires, membership always, payment per-event never carries, answers 12 months from original verification (window never refreshes on carry). Argue changes in a report; never override mid-run.
+5. **Frozen zones read-only:** `lib/scoring.ts`, `MembershipForm.tsx`, `EventAccessFlow.tsx`, v1 engine (`lib/event-access*.ts`, `deriveFlow`, `buildSteps`), `config/archetypes.ts`, every Stripe payment route. The PAY verifier reads intent state only.
+6. **This migration is applied to the confirmed dev/scratch branch only** (`db execute`, never `db push`); production application is Adam's, in the Neon console, at M4 cutover earliest.
+7. M1 is headless — any string the engine can emit (guestPrompt, log/DTO copy) still honors brand law: "Access" not "RSVP", "No Bad Company" never "NBC", spaced hyphens, no raw enum values.
+
+## What this stage does NOT own
+
+- **04-access** owns the live v1 access flow (`lib/event-access*.ts`, EventAccessFlow) — untouched until M4 backfill/cutover
+- **05-payments** owns charge/capture/refund routes — PAY only reads intent state
+- **01-apply / 02-approval** own the application form + scoring pipeline — ANSWER_QUESTIONS wraps `scoreApplication()`
+- **M2+ milestones** own guest render, Builder split-view, backfill/cutover, Cmd+K/agent surfaces, and all v3.1 condition types
