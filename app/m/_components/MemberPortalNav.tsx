@@ -7,7 +7,7 @@ import ZoneSignOut from '@/components/auth/ZoneSignOut';
 const NAV_LINKS = [
   { href: '/m', label: 'Home' },
   { href: '/m/events', label: 'Events' },
-  { href: '/m/rsvps', label: 'RSVPs' },
+  { href: '/m/rsvps', label: 'Access' },
   { href: '/m/profile', label: 'Profile' },
   { href: '/m/help', label: 'Help' },
 ];

@@ -219,7 +219,7 @@ export default async function MemberHomePage() {
             className="text-[0.65rem] uppercase tracking-[0.2em]"
             style={{ color: 'var(--events-fg-quiet)' }}
           >
-            Your RSVPs
+            Your Access
           </p>
           <Link
             href="/m/rsvps"
