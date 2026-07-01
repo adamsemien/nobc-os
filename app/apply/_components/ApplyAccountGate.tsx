@@ -4,6 +4,7 @@ import { useState, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { SignUp, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
+import { Mic } from 'lucide-react';
 
 const displayFont = "'PP Editorial New', Georgia, serif";
 const bodyFont = "'Neue Haas Grotesk Display Pro', 'Helvetica Neue', Arial, sans-serif";
@@ -98,6 +99,39 @@ export default function ApplyAccountGate() {
     color: 'var(--text-secondary)',
     margin: '0 0 18px 0',
   };
+  // "Before you start" reuses the hero "Membership" eyebrow's typography, but muted
+  // (text-secondary) so it reads as a quiet sub-label instead of a second brand-red
+  // eyebrow competing with the hero.
+  const eyebrowMutedStyle: CSSProperties = {
+    display: 'block',
+    fontFamily: bodyFont,
+    fontSize: 11,
+    fontWeight: 500,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: 'var(--text-secondary)',
+    margin: '0 0 12px 0',
+  };
+  const tipListStyle: CSSProperties = {
+    listStyle: 'none',
+    padding: 0,
+    margin: '0 0 28px 0',
+  };
+  const tipStyle: CSSProperties = {
+    display: 'flex',
+    gap: 10,
+    fontFamily: bodyFont,
+    fontSize: 15,
+    lineHeight: 1.6,
+    color: 'var(--text-secondary)',
+    margin: '0 0 12px 0',
+  };
+  const dashStyle: CSSProperties = { flexShrink: 0, color: 'var(--text-tertiary)' };
+  // Only the lead phrase is emphasized, and only by weight - 500 is the emphasis
+  // weight used elsewhere in this file (eyebrow, CTA, sign-in link).
+  const leadStyle: CSSProperties = { fontWeight: 500 };
+  // Sized to the 15px tip line-height so the mic sits with the text, not as a badge.
+  const micIconStyle: CSSProperties = { verticalAlign: '-0.15em', marginRight: 6 };
   const beginDisabled = !verifiedEmail || submitting;
 
   return (
@@ -113,17 +147,31 @@ export default function ApplyAccountGate() {
           Membership is by application, and by invitation. The room is small on purpose - built from
           people worth spending an evening with, chosen one at a time.
         </p>
-        <p style={sellStyle}>
-          Set aside about 30 minutes. This is a real application - most questions ask you to write a
-          few sentences, not tick a box.
-        </p>
-        <p style={sellStyle}>
-          Use a computer rather than a phone if you can, and answer out loud where it helps - the best
-          answers sound like you, talking.
-        </p>
-        <p style={{ ...sellStyle, marginBottom: 28 }}>
-          Create an account first so your progress saves and you can pick up from any device.
-        </p>
+        <span style={eyebrowMutedStyle}>Before you start</span>
+        <ul style={tipListStyle}>
+          <li style={tipStyle}>
+            <span aria-hidden="true" style={dashStyle}>-</span>
+            <span>
+              <strong style={leadStyle}>Set aside about 30 minutes.</strong> This is a real
+              application - most questions ask you to write a few sentences, not tick a box.
+            </span>
+          </li>
+          <li style={tipStyle}>
+            <span aria-hidden="true" style={dashStyle}>-</span>
+            <span>
+              <Mic size={15} strokeWidth={1.75} aria-hidden="true" style={micIconStyle} />
+              <strong style={leadStyle}>Use your voice.</strong> Tap the mic and just talk - the
+              application was built for it. Don&apos;t overthink your answers.
+            </span>
+          </li>
+          <li style={tipStyle}>
+            <span aria-hidden="true" style={dashStyle}>-</span>
+            <span>
+              <strong style={leadStyle}>Create an account first</strong> so your progress saves and
+              you can pick up from any device.
+            </span>
+          </li>
+        </ul>
 
         {/* Signed-out only: a quiet way back for someone who already applied. */}
         {isLoaded && !isSignedIn && (
