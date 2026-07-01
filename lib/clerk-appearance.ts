@@ -1,7 +1,8 @@
 /** Clerk appearance config — NoBC editorial-cream treatment.
- *  Direction: editorial, minimal, cream canvas (#F5EFE8), red (#B22E21) as the only
- *  pop, square-ish 3px corners, no drop shadows, tight typography. Body font is the
- *  app's Neue Haas Grotesk Display Pro stack (loaded via @font-face in globals.css).
+ *  Direction: editorial, minimal, cream canvas (#F9F6F1, matches the app day --bg),
+ *  red (#B22E21) as the only pop, square 0 corners, flat (borderless, no drop shadow),
+ *  warm cream field borders, tight typography. Body font is the app's Neue Haas Grotesk
+ *  Display Pro stack (loaded via @font-face in globals.css).
  *
  *  NOTE on literals: Clerk components render outside the app's Tailwind CSS-var theme,
  *  so the palette is passed as literal NoBC hex here (variables + arbitrary-value
@@ -22,8 +23,8 @@ const TEXT_SECONDARY = 'rgba(28,28,28,0.55)';
 export const clerkAppearance = {
   variables: {
     colorPrimary: '#B22E21',
-    colorBackground: '#F5EFE8',
-    colorInputBackground: '#FFFFFF',
+    colorBackground: '#F9F6F1',
+    colorInputBackground: '#FCFAF6',
     colorText: '#1C1C1C',
     colorTextSecondary: 'rgba(28,28,28,0.55)',
     colorNeutral: '#2A1F1A',
@@ -31,19 +32,24 @@ export const clerkAppearance = {
     colorDanger: '#B22E21',
     fontFamily: BODY_FONT,
     fontFamilyButtons: BODY_FONT,
-    borderRadius: '3px',
+    borderRadius: '0px',
     fontSize: '14px',
   },
   elements: {
-    rootBox: 'bg-[#F5EFE8]',
-    card: 'bg-[#F5EFE8] shadow-none border border-black/[0.06] rounded-[3px]',
+    rootBox: 'bg-[#F9F6F1] shadow-none border-0',
+    // Clerk nests rootBox > cardBox > card. The DEFAULT drop shadow + outer border
+    // live on `cardBox` (the container), NOT the inner `card` — so both must be
+    // flattened or the widget keeps its raised outline. Inputs/social buttons keep
+    // their own warm borders below; only this card container goes borderless.
+    cardBox: 'bg-[#F9F6F1] shadow-none border-0 rounded-none',
+    card: 'bg-[#F9F6F1] shadow-none border-0 rounded-none',
     headerTitle: 'font-light tracking-tight',
     headerSubtitle: 'opacity-50 text-sm',
-    socialButtonsBlockButton: 'rounded-[3px] border-black/[0.12]',
-    formButtonPrimary: 'rounded-[3px] font-medium tracking-wide',
-    formFieldInput: 'rounded-[3px] border-black/[0.12]',
-    footer: 'bg-[#F5EFE8]',
-    footerActionText: 'text-[#1C1C1C] opacity-50',
+    socialButtonsBlockButton: 'rounded-none border-[#E8E0D5]',
+    formButtonPrimary: 'rounded-none font-medium tracking-wide',
+    formFieldInput: 'rounded-none border-[#E8E0D5]',
+    footer: 'bg-[#F9F6F1]',
+    footerActionText: 'text-[#A8978A]',
     footerActionLink: 'text-[#B22E21]',
     // Preserved app-wide surfaces (style objects) — avoid regressing the header menu.
     formFieldLabel: {
