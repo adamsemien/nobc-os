@@ -36,7 +36,12 @@ export const clerkAppearance = {
     fontSize: '14px',
   },
   elements: {
-    rootBox: 'bg-[#F9F6F1]',
+    rootBox: 'bg-[#F9F6F1] shadow-none border-0',
+    // Clerk nests rootBox > cardBox > card. The DEFAULT drop shadow + outer border
+    // live on `cardBox` (the container), NOT the inner `card` — so both must be
+    // flattened or the widget keeps its raised outline. Inputs/social buttons keep
+    // their own warm borders below; only this card container goes borderless.
+    cardBox: 'bg-[#F9F6F1] shadow-none border-0 rounded-none',
     card: 'bg-[#F9F6F1] shadow-none border-0 rounded-none',
     headerTitle: 'font-light tracking-tight',
     headerSubtitle: 'opacity-50 text-sm',
