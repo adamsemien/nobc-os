@@ -1162,7 +1162,7 @@ export default function MembershipForm() {
           <div className="apply-group-grid" style={{ marginTop: 12 }}>
             {(q.fields ?? []).map(sub => (
               <div key={sub.id}>
-                {sub.label && <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>{sub.label}</label>}
+                {sub.label && <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>{sub.label}{sub.required && <span style={{ color: theme.accent }}> *</span>}</label>}
                 {renderSubInput(q, sub)}
               </div>
             ))}
@@ -1173,7 +1173,7 @@ export default function MembershipForm() {
     const key = answerKey(q);
     return (
       <div key={q.id} style={fieldGroup}>
-        <label style={labelStyle}>{q.label}</label>
+        <label style={labelStyle}>{q.label}{q.required && <span style={{ color: theme.accent }}> *</span>}</label>
         {q.help && <p style={helpStyle}>{q.help}</p>}
         {renderSimpleInput(q, key, hintKey === key)}
       </div>
