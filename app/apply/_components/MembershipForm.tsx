@@ -1018,6 +1018,7 @@ export default function MembershipForm() {
       return (
         <div style={{ position: 'relative' }}>
           <textarea
+            id={key}
             style={{ ...getTextareaStyle(key), paddingRight: speechSupported ? 30 : undefined }}
             ref={el => { if (el) autoResizeTextarea(el); }}
             onInput={e => autoResizeTextarea(e.currentTarget)}
@@ -1080,6 +1081,7 @@ export default function MembershipForm() {
     if (q.type === 'select') {
       return (
         <select
+          id={key}
           style={{ ...getInputStyle(key), colorScheme: isNight ? 'dark' : 'light', appearance: 'none' }}
           onFocus={() => setFocusedField(key)}
           onBlur={() => setFocusedField(null)}
@@ -1103,6 +1105,7 @@ export default function MembershipForm() {
       : 'text';
     return (
       <input
+        id={key}
         style={inputType === 'date' || inputType === 'time'
           ? { ...getInputStyle(key), colorScheme: isNight ? 'dark' : 'light' }
           : getInputStyle(key)}
@@ -1128,6 +1131,7 @@ export default function MembershipForm() {
       : 'text';
     return (
       <input
+        id={key}
         style={inputType === 'date' || inputType === 'time'
           ? { ...getInputStyle(key), colorScheme: isNight ? 'dark' : 'light' }
           : getInputStyle(key)}
@@ -1169,22 +1173,25 @@ export default function MembershipForm() {
     );
   }
 
-  /** Labels of the required fields still empty on a page. Single source of truth
-   *  for the required-field rule — it drives BOTH F2's specific validation message
-   *  and submitPage's advance gate, so the two can never diverge. The rule is
-   *  unchanged: a required simple field or required group sub-field must be
-   *  non-empty after trim (allowNone questions accept "none" elsewhere). */
-  function missingRequiredLabels(page: Question[]): string[] {
-    const missing: string[] = [];
+  /** The required fields still empty on a page, as {key, label}. Single source of
+   *  truth for the required-field rule — it drives F2's specific validation
+   *  message, F3's focus target (first key), AND submitPage's advance gate, so
+   *  they can never diverge. The rule is unchanged: a required simple field or
+   *  required group sub-field must be non-empty after trim (allowNone questions
+   *  accept "none" elsewhere). */
+  function missingRequiredFields(page: Question[]): { key: string; label: string }[] {
+    const missing: { key: string; label: string }[] = [];
     for (const q of page) {
       if (q.type === 'group') {
         for (const sub of q.fields ?? []) {
-          if (sub.required && !(answers[answerKey(q, sub)] ?? '').trim()) {
-            missing.push(sub.label ?? q.label);
+          const k = answerKey(q, sub);
+          if (sub.required && !(answers[k] ?? '').trim()) {
+            missing.push({ key: k, label: sub.label ?? q.label });
           }
         }
       } else if (q.required) {
-        if (!(answers[answerKey(q)] ?? '').trim()) missing.push(q.label);
+        const k = answerKey(q);
+        if (!(answers[k] ?? '').trim()) missing.push({ key: k, label: q.label });
       }
     }
     return missing;
@@ -1198,16 +1205,31 @@ export default function MembershipForm() {
     return out;
   }
 
+  // F3: send the eye (and keyboard focus) to a field by its answer-key id.
+  // preventScroll avoids fighting the smooth scrollIntoView. Independent of the
+  // F1 autosave effect — this only reads the DOM and moves focus; it never
+  // mutates `answers`, so an autosave firing mid-correction can't disrupt it.
+  function focusField(key: string) {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById(key);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    (el as HTMLElement).focus({ preventScroll: true });
+  }
+
   function submitPage(pageIndex: number) {
     const page = PAGES[pageIndex];
     if (!isDemo) {
-      const missing = missingRequiredLabels(page);
+      const missing = missingRequiredFields(page);
       if (missing.length > 0) {
         // F2: name the specific missing fields instead of a generic banner.
-        const shown = missing.slice(0, 3);
-        const extra = missing.length - shown.length;
+        const labels = missing.map(f => f.label);
+        const shown = labels.slice(0, 3);
+        const extra = labels.length - shown.length;
         const list = shown.join(', ') + (extra > 0 ? `, and ${extra} more` : '');
         setError(`Please answer: ${list}.`);
+        // F3: focus + scroll to the first missing field, not just a banner.
+        focusField(missing[0].key);
         return;
       }
     }
