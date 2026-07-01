@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { isStorageConfigured, uploadObject } from '@/lib/dam/storage';
 import { applicationPhotoKey } from '@/lib/apply-photo';
 import { isAllowedImageBytes, type SniffedImageType } from '@/lib/image-magic-bytes';
+import sharp from 'sharp';
 
 // Membership-application photos are PII-adjacent, so they land in PRIVATE R2
 // (not public Vercel Blob) and are read back only through the role-gated
@@ -49,9 +50,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
   }
 
+  // Strip EXIF/GPS + bake orientation before storage. Application photos are
+  // PII-adjacent and camera EXIF commonly carries GPS location; rotate() honors
+  // the EXIF orientation flag, then sharp re-encodes WITHOUT metadata (its
+  // default) in the same format, so the stored object is orientation-correct and
+  // metadata-free. Mirrors lib/dam/image.ts. On a decode failure (rare — magic
+  // bytes already validated) reject so we never fall back to storing raw EXIF.
+  let processed: Buffer;
+  try {
+    processed = await sharp(buf, { failOn: 'none' }).rotate().toBuffer();
+  } catch (e) {
+    console.warn('[apply/upload] image processing failed', {
+      declaredType: file.type,
+      err: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.json({ error: 'Could not process image' }, { status: 400 });
+  }
+
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
   const key = applicationPhotoKey(workspace.id, ext);
-  await uploadObject(key, buf, file.type);
+  await uploadObject(key, processed, file.type);
 
   return NextResponse.json({ key });
 }
