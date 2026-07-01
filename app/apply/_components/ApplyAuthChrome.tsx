@@ -18,7 +18,11 @@ export default function ApplyAuthChrome() {
   if (!isLoaded || !isSignedIn) return null;
 
   return (
-    <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 50 }}>
+    // Bottom-right, above app chrome (z:100). Pinned to the BOTTOM because
+    // MembershipForm's opaque sticky <nav> owns the top strip (top:0, h:56, z:50)
+    // and paints over a top-anchored button on the form route; the bottom-right
+    // corner is clear on every apply surface (door, form, thanks).
+    <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 100 }}>
       <UserButton />
     </div>
   );
