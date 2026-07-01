@@ -506,7 +506,14 @@ export default function MembershipForm() {
 
   useEffect(() => {
     const id = searchParams.get('id');
-    if (!id || isDemo || isDev) return;
+    if (!id || isDemo) return;
+    // The URL id is the source of truth for applicationId: adopt it up front,
+    // independent of the GET rehydrate below. If the rehydrate fails (a 403 draft
+    // this browser can't write, a 404, or a network error) the form still knows its
+    // draft id, so the save paths PATCH the existing row instead of POST-creating a
+    // duplicate. A genuinely unwritable draft still degrades to create-fresh via
+    // patchAndAdvance's existing PATCH-403 handling. Runs in dev too (no isDev gate).
+    setApplicationId(id);
     (async () => {
       try {
         const res = await fetch(`/api/apply/membership/${id}`);
