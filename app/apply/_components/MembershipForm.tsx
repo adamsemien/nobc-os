@@ -384,6 +384,8 @@ export default function MembershipForm() {
   const seenSections = useRef<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
+  // Synchronous double-tap guard for the House Rules submit button (see guardedSubmit).
+  const submittingRef = useRef(false);
 
   const theme = isNight ? THEME.night : THEME.day;
 
@@ -908,6 +910,26 @@ export default function MembershipForm() {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  // Synchronous double-tap guard for the submit button. isLoading (set inside the
+  // frozen handleSubmit) already disables the button, shows an in-flight label, and
+  // re-enables on failure via its finally - but isLoading is React state and flushes
+  // a render later, so it can't block a second invocation fired in the same tick.
+  // This ref does, synchronously. It matters because submit has billed, irreversible
+  // side effects (two Sonnet calls + a welcome email; the server's aiScore idempotency
+  // check can be raced by two near-simultaneous POSTs). Wraps handleSubmit at the call
+  // site; handleSubmit is unchanged. handleSubmit catches its own errors, so the await
+  // resolves either way and finally clears the ref (a successful submit unmounts this
+  // page, making the reset a harmless no-op).
+  async function guardedSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await handleSubmit();
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -1669,7 +1691,7 @@ export default function MembershipForm() {
               </p>
 
               {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-              {navBlock(handleSubmit, 'submit my application', !data.agreedToTerms)}
+              {navBlock(guardedSubmit, 'submit my application', !data.agreedToTerms)}
             </div>
           );
         })()}
