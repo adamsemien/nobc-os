@@ -27,14 +27,7 @@ const doorCss = `
   gap: 24px;
 }
 .apply-door-read { min-width: 0; }
-.apply-door-frame {
-  border: 1px solid var(--border);
-  border-radius: 0;
-  padding: 20px;
-  box-sizing: border-box;
-  display: flex;
-  justify-content: center;
-}
+.apply-door-act { display: flex; justify-content: center; }
 .apply-door-marker { margin-top: 40px; margin-bottom: 0; }
 .apply-door-rule {
   height: 1px;
@@ -51,7 +44,6 @@ const doorCss = `
     padding-top: clamp(64px, 12vh, 160px);
   }
   .apply-door-marker { display: none; }
-  .apply-door-frame { padding: 32px; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .apply-door-chevron { animation: apply-door-bob 2s ease-in-out infinite; }
@@ -185,8 +177,18 @@ export default function ApplyAccountGate() {
   // Only the lead phrase is emphasized, and only by weight - 500 is the emphasis
   // weight used elsewhere in this file (eyebrow, CTA, sign-in link).
   const leadStyle: CSSProperties = { fontWeight: 500 };
-  // Sized to the 15px tip line-height so the mic sits with the text, not as a badge.
+  // Confirm-view mic keeps the original treatment so the signed-in view stays
+  // byte-identical.
   const micIconStyle: CSSProperties = { verticalAlign: '-0.15em', marginRight: 6 };
+  // Door mic is inlined and baseline-aligned so it reads as part of the sentence,
+  // not orphaned above it - Tailwind preflight sets svg { display: block }, so the
+  // inline-block override is load-bearing here.
+  const doorMicStyle: CSSProperties = {
+    display: 'inline-block',
+    verticalAlign: '-0.15em',
+    marginRight: 6,
+    color: 'var(--text-tertiary)',
+  };
   // "To begin" marker eyebrow — same token/treatment as the hero "Membership"
   // eyebrow (red, 11px, 500, uppercase, 0.12em), reused as the action marker.
   const markerEyebrowStyle: CSSProperties = {
@@ -210,8 +212,9 @@ export default function ApplyAccountGate() {
   const beginDisabled = !verifiedEmail || submitting;
 
   // The editorial sell copy — one source of truth, reused by both the signed-out
-  // door (left read column) and the signed-in confirm view. Copy is verbatim.
-  const copyBlock = (
+  // door (near-black body + inline mic) and the signed-in confirm view (original
+  // muted body + original mic, kept byte-identical). Copy is verbatim.
+  const renderCopy = (bodyColor: string, micStyle: CSSProperties, micSize: number) => (
     <>
       <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 500, color: 'var(--primary)', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
         Membership
@@ -219,28 +222,28 @@ export default function ApplyAccountGate() {
       <h1 style={{ fontFamily: displayFont, fontSize: 'clamp(34px, 5vw, 52px)', fontStyle: 'italic', lineHeight: 1.1, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>
         Apply to No Bad Company
       </h1>
-      <p style={sellStyle}>
+      <p style={{ ...sellStyle, color: bodyColor }}>
         Membership is by application, and by invitation. The room is small on purpose - built from
         people worth spending an evening with, chosen one at a time.
       </p>
       <span style={eyebrowMutedStyle}>Before you start</span>
       <ul style={tipListStyle}>
-        <li style={tipStyle}>
+        <li style={{ ...tipStyle, color: bodyColor }}>
           <span aria-hidden="true" style={dashStyle}>-</span>
           <span>
             <strong style={leadStyle}>Set aside about 30 minutes.</strong> This is a real
             application - most questions ask you to write a few sentences, not tick a box.
           </span>
         </li>
-        <li style={tipStyle}>
+        <li style={{ ...tipStyle, color: bodyColor }}>
           <span aria-hidden="true" style={dashStyle}>-</span>
           <span>
-            <Mic size={15} strokeWidth={1.75} aria-hidden="true" style={micIconStyle} />
+            <Mic size={micSize} strokeWidth={1.75} aria-hidden="true" style={micStyle} />
             <strong style={leadStyle}>Use your voice.</strong> Tap the mic and just talk - the
             application was built for it. Don&apos;t overthink your answers.
           </span>
         </li>
-        <li style={tipStyle}>
+        <li style={{ ...tipStyle, color: bodyColor }}>
           <span aria-hidden="true" style={dashStyle}>-</span>
           <span>
             <strong style={leadStyle}>Create an account first</strong> so your progress saves and
@@ -261,7 +264,7 @@ export default function ApplyAccountGate() {
         <style>{doorCss}</style>
         <div className="apply-door">
           <div className="apply-door-read">
-            {copyBlock}
+            {renderCopy('var(--text-primary)', doorMicStyle, 16)}
 
             {/* A quiet way back for someone who already applied. */}
             <p style={{ fontFamily: bodyFont, fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 32px 0' }}>
@@ -282,12 +285,11 @@ export default function ApplyAccountGate() {
           </div>
 
           {/* The Clerk card's own Terms/Privacy checkbox is the ONLY agreement on
-              the door — no gate. Composed around only (sized/placed/framed), never
-              restructured or re-themed. */}
+              the door - no gate. The card stands on its own (no wrapping frame);
+              the column only sizes, places, and centers it - never restructured or
+              re-themed. */}
           <div className="apply-door-act">
-            <div className="apply-door-frame">
-              <SignUp routing="hash" signInUrl="/sign-in" fallbackRedirectUrl="/apply" />
-            </div>
+            <SignUp routing="hash" signInUrl="/sign-in" fallbackRedirectUrl="/apply" />
           </div>
         </div>
       </div>
@@ -299,7 +301,7 @@ export default function ApplyAccountGate() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: 'clamp(48px, 8vw, 96px) 24px' }}>
       <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
-        {copyBlock}
+        {renderCopy('var(--text-secondary)', micIconStyle, 15)}
 
         {isLoaded && isSignedIn && (
           <div>
