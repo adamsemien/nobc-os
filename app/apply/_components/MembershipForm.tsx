@@ -170,6 +170,26 @@ const PAGES = buildPages();
 
 /** localStorage key for the logged-out draft-resume feature. */
 const DRAFT_KEY = 'nobc-apply-draft';
+
+// Debounce for save-as-you-type: 2s after the last keystroke. Long enough that a
+// burst of typing collapses into ONE PATCH (not one per keystroke), short enough
+// that at most ~2s of edits are ever at risk — and the beforeunload guard covers
+// even that window.
+const AUTOSAVE_DEBOUNCE_MS = 2000;
+
+/**
+ * The single PATCH-answers call shared by save-on-advance (patchAndAdvance) and
+ * autosave, so both persist through the exact same path/endpoint/body — autosave
+ * is NOT a parallel save path. Returns the raw Response; callers own status
+ * handling.
+ */
+function patchDraftAnswers(id: string, answers: Record<string, string>): Promise<Response> {
+  return fetch(`/api/apply/membership/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
+  });
+}
 const QUESTION_STEPS = PAGES.length;
 const LEGAL_STEP = QUESTION_STEPS;
 const REVEAL_STEP = QUESTION_STEPS + 1;
@@ -340,6 +360,10 @@ export default function MembershipForm() {
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [draftSaved, setDraftSaved] = useState(false);
+  // Autosave (F1): debounced save-as-you-type status + a JSON snapshot of the
+  // last successfully autosaved answers, used to detect unsaved changes.
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const lastSavedAnswersRef = useRef<string>('');
   const [testDataLoaded, setTestDataLoaded] = useState(false);
   const [devHovered, setDevHovered] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
@@ -652,6 +676,50 @@ export default function MembershipForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
+  // Autosave (F1): debounced save-as-you-type through the SAME path as
+  // save-on-advance (patchDraftAnswers). Closes the mid-page data-loss gap —
+  // previously the current page's answers only reached the server on advance.
+  // Requires an existing draft (applicationId — set from ?id= for the
+  // account-first flow); skips demo/dev and non-question steps.
+  useEffect(() => {
+    if (isDemo || isDev) return;
+    if (!applicationId) return;
+    if (step >= QUESTION_STEPS) return;
+    if (Object.keys(answers).length === 0) return;
+    const serialized = JSON.stringify(answers);
+    if (serialized === lastSavedAnswersRef.current) return;
+    const t = setTimeout(async () => {
+      setAutosaveState('saving');
+      try {
+        const res = await patchDraftAnswers(applicationId, answers);
+        if (res.ok) {
+          lastSavedAnswersRef.current = serialized;
+          setAutosaveState('saved');
+        } else {
+          setAutosaveState('idle');
+        }
+      } catch {
+        setAutosaveState('idle');
+      }
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, applicationId, step]);
+
+  // beforeunload guard (F1): warn on tab close / navigation when the current page
+  // has answer edits newer than the last successful autosave.
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (isDemo || isDev || !applicationId || step >= QUESTION_STEPS) return;
+      if (Object.keys(answers).length === 0) return;
+      if (JSON.stringify(answers) === lastSavedAnswersRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [answers, applicationId, step, isDemo, isDev]);
+
   // Clear the local draft once a submission has succeeded. Watching submitResult
   // keeps the submission handler itself byte-for-byte untouched.
   useEffect(() => {
@@ -736,11 +804,7 @@ export default function MembershipForm() {
     let id = applicationId;
     try {
       if (id) {
-        const res = await fetch(`/api/apply/membership/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers }),
-        });
+        const res = await patchDraftAnswers(id, answers);
         if (res.status === 403) {
           // This draft can't be saved from this browser — its access cookie is
           // missing or expired. Abandon the stale id and start a fresh draft
@@ -892,6 +956,14 @@ export default function MembershipForm() {
             {draftSaved ? 'saved.' : 'save draft'}
           </button>
         </div>
+        {autosaveState !== 'idle' && (
+          <div
+            aria-live="polite"
+            style={{ textAlign: 'center', marginBottom: 12, fontFamily: bodyFont, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: theme.muted, opacity: 0.6 }}
+          >
+            {autosaveState === 'saving' ? 'Saving...' : 'Saved'}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           {step > 0 ? (
             <button onClick={() => { setIsTransitioning(true); setTransitionDirection('backward'); setTimeout(() => { setStep(s => Math.max(0, s - 1)); setIsTransitioning(false); window.scrollTo({ top: 0, behavior: 'instant' }); }, 400); }}
