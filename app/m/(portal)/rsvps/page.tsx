@@ -53,7 +53,7 @@ export default async function RsvpsPage() {
           fontStyle: 'italic',
         }}
       >
-        My RSVPs
+        My Access
       </h1>
       <RsvpList rsvps={serialized} />
     </div>

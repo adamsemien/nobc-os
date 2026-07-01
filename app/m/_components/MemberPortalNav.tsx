@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import ZoneSignOut from '@/components/auth/ZoneSignOut';
 
 const NAV_LINKS = [
   { href: '/m', label: 'Home' },
   { href: '/m/events', label: 'Events' },
-  { href: '/m/rsvps', label: 'RSVPs' },
+  { href: '/m/rsvps', label: 'Access' },
   { href: '/m/profile', label: 'Profile' },
   { href: '/m/help', label: 'Help' },
 ];
@@ -66,6 +67,20 @@ export default function MemberPortalNav({ firstName: _firstName }: MemberPortalN
                 {link.label}
               </Link>
             ))}
+            <ZoneSignOut
+              redirectUrl="/signed-out"
+              ariaLabel="Sign out"
+              className="text-[0.6rem] uppercase tracking-[0.2em] transition-colors"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                color: 'var(--events-fg-soft)',
+              }}
+            >
+              Sign out
+            </ZoneSignOut>
           </div>
         </div>
       </nav>
@@ -93,6 +108,14 @@ export default function MemberPortalNav({ firstName: _firstName }: MemberPortalN
             {link.label}
           </Link>
         ))}
+        <ZoneSignOut
+          redirectUrl="/signed-out"
+          ariaLabel="Sign out"
+          className="flex flex-1 flex-col items-center justify-center py-3 text-[0.65rem] uppercase tracking-[0.15em] whitespace-nowrap transition-colors"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--events-fg-soft)' }}
+        >
+          Sign out
+        </ZoneSignOut>
       </nav>
     </>
   );

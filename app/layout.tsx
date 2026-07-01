@@ -100,7 +100,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider appearance={clerkAppearance} localization={clerkLocalization}>
+    <ClerkProvider afterSignOutUrl="/signed-out" appearance={clerkAppearance} localization={clerkLocalization}>
       <html lang="en" data-theme="nobc" suppressHydrationWarning>
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} ${dmSans.variable} ${dmMono.variable} ${plusJakarta.variable} ${fraunces.variable} ${dmSerifDisplay.variable} ${spaceGrotesk.variable} ${syne.variable} ${instrumentSerif.variable} font-sans antialiased`}

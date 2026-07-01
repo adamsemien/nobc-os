@@ -90,32 +90,42 @@ export async function POST(req: NextRequest) {
   const workspace = await resolveDefaultApplyWorkspace();
   if (!workspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 500 });
 
-  // Idempotency: a network timeout before the client receives the new `id` (and
-  // appends `?id=` to the URL) makes the user retry screen 0 — without this guard
-  // that retry mints a second Application for the same person. If an in-progress
-  // (PENDING) application already exists for (workspaceId, email), reuse it so the
-  // draft converges to a single row. APPROVED/REJECTED rows are NOT reused — a
-  // genuine re-application after a decision should create a fresh row.
-  const existingPending = await db.application.findFirst({
-    where: {
-      workspaceId: workspace.id,
-      email: { equals: email, mode: 'insensitive' },
-      status: 'PENDING',
-    },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true },
-  });
-  if (existingPending) {
-    // Persist any answers carried in this retry, then return the existing draft.
-    if (Object.keys(answers).length > 0) {
-      await Promise.all(
-        Object.entries(answers).map(([questionKey, answer]) =>
-          upsertAnswer(existingPending.id, questionKey, String(answer ?? '')),
-        ),
-      );
+  // The ONLY email we trust for reusing (and re-issuing the draft-access cookie for)
+  // a pre-existing row is the signed-in caller's VERIFIED Clerk email. The body email
+  // is attacker-controlled: matching a stranger's PENDING draft on it and returning
+  // that draft's cookie was an IDOR - anyone could POST {email:"victim@..."} and
+  // receive read/write access to the victim's draft + answers. Resolved once here and
+  // reused as the create email below.
+  const verifiedEmail = userId ? await getVerifiedClerkEmail(userId) : null;
+
+  // Idempotency (ownership-gated): a network timeout before the client receives the
+  // new `id` makes a signed-in applicant retry screen 0 - reuse their in-progress
+  // PENDING row so the draft converges to one, matched on their VERIFIED email only.
+  // Anonymous or non-matching callers never reuse here; they fall through to create a
+  // fresh row (the P2002 recovery below still collapses a genuine same-owner race).
+  // APPROVED/REJECTED rows are NOT reused - a re-application after a decision is fresh.
+  if (userId && verifiedEmail) {
+    const existingPending = await db.application.findFirst({
+      where: {
+        workspaceId: workspace.id,
+        email: { equals: verifiedEmail, mode: 'insensitive' },
+        status: 'PENDING',
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (existingPending) {
+      // Persist any answers carried in this retry, then return the existing draft.
+      if (Object.keys(answers).length > 0) {
+        await Promise.all(
+          Object.entries(answers).map(([questionKey, answer]) =>
+            upsertAnswer(existingPending.id, questionKey, String(answer ?? '')),
+          ),
+        );
+      }
+      await stampApplicationOwner(existingPending.id, userId);
+      return draftCreated(existingPending.id);
     }
-    if (userId) await stampApplicationOwner(existingPending.id, userId);
-    return draftCreated(existingPending.id);
   }
 
   // Link identity at submission: resolve (or mint) the GUEST Member now so the
@@ -132,8 +142,8 @@ export async function POST(req: NextRequest) {
   // truth — override any email in the request body server-side. Falls back to the
   // validated body email only when unauthenticated or the Clerk email is
   // unverified/unavailable. Scoped to this create (the sole body-email write site);
-  // the existingPending reuse + P2002 raced-recovery paths inherit the row's email.
-  const createEmail = userId ? ((await getVerifiedClerkEmail(userId)) ?? email) : email;
+  // The reuse + P2002 recovery paths are gated on this same verified email, never body.
+  const createEmail = verifiedEmail ?? email;
 
   let application: { id: string };
   try {
@@ -158,9 +168,19 @@ export async function POST(req: NextRequest) {
     // races past the findFirst above surfaces as P2002. Recover by re-reading the
     // row the other request created rather than 500-ing the applicant. Works
     // correctly whether or not the index is live yet.
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+    // Recover the row the concurrent create won - but only re-issue its draft cookie
+    // to a VERIFIED owner (same IDOR guard as the idempotency branch: never hand back
+    // a pre-existing row's id/cookie on an unverified body email). Match on the trusted
+    // verified email. An anonymous P2002 collision means a PENDING row already exists
+    // but ownership is unproven, so fall through to the 500 below rather than leak it.
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      e.code === 'P2002' &&
+      userId &&
+      verifiedEmail
+    ) {
       const raced = await db.application.findFirst({
-        where: { workspaceId: workspace.id, email: { equals: email, mode: 'insensitive' } },
+        where: { workspaceId: workspace.id, email: { equals: verifiedEmail, mode: 'insensitive' } },
         orderBy: { createdAt: 'asc' },
         select: { id: true },
       });
@@ -172,7 +192,7 @@ export async function POST(req: NextRequest) {
             ),
           );
         }
-        if (userId) await stampApplicationOwner(raced.id, userId);
+        await stampApplicationOwner(raced.id, userId);
         return draftCreated(raced.id);
       }
     }

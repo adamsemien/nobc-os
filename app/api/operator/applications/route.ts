@@ -60,7 +60,10 @@ export async function GET(req: NextRequest) {
     phone: app.phone,
     submittedAt: app.createdAt.toISOString(),
     status: app.status,
-    consentEmail: app.consentEmail,
+    // Phase C: the email opt-in now lives on `emailOptIn` (the member apply flow
+    // stopped writing legacy `consentEmail`); read it so the queue reflects the
+    // real opt-in. Transport key stays `consentEmail` (display unchanged).
+    consentEmail: app.emailOptIn,
     consentSms: app.consentSms,
     firstAnswerPreview: firstAnswerPreview(app.answers),
     referrerCount: referrerCount(app.referredBy, app.answers),

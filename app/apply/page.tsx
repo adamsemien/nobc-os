@@ -6,6 +6,8 @@ import MembershipForm from './_components/MembershipForm';
 import ApplyAccountGate from './_components/ApplyAccountGate';
 import { LegalFooter } from '@/app/_components/LegalFooter';
 import { resolvePendingApplicationForAccount } from '@/lib/apply-account-link';
+import { ApplicantStatusView } from '@/app/m/_components/ApplicantStatus';
+import { db } from '@/lib/db';
 
 export const metadata: Metadata = {
   title: 'apply - no bad company',
@@ -35,16 +37,60 @@ export default async function ApplyPage({
     );
   }
 
-  // No draft id: a signed-in applicant with an in-progress draft resumes it
-  // (cross-device safe — the PR1 resolver matches by clerkUserId, or by verified
-  // email then claims it). Everyone else gets the account + consent gate. The
-  // anonymous *start* is intentionally unreachable now: an account comes first.
+  // No draft id: route the signed-in caller by application state. Every branch
+  // READS state only — no NEW DB write. (The PR1 resolver below may stamp
+  // clerkUserId on its email-claim slow path; that pre-existing write is the
+  // cross-device resume link and is intentionally kept. The member-detection read
+  // is pure — no claim/stamp — and a presentational ApplicantStatusView is
+  // rendered with router-computed props, so this path never triggers
+  // ApplicantStatus's self-contained member-claim fallback.)
   const { userId } = await auth();
   if (userId) {
+    // (c)/(d) — an in-progress (draft) or submitted PENDING application.
     const existing = await resolvePendingApplicationForAccount(userId);
-    if (existing) redirect(`/apply?id=${existing.id}`);
+    if (existing) {
+      const row = await db.application.findUnique({
+        where: { id: existing.id },
+        select: { status: true, aiScore: true },
+      });
+      // (c) Draft, not yet submitted (aiScore unset) — resume the form.
+      if (row?.aiScore === null) redirect(`/apply?id=${existing.id}`);
+      // (d) Submitted (aiScore set at scoring) — "Application received." No form,
+      // no reapply.
+      return (
+        <Suspense fallback={<div style={{ background: '#f9f7f2', minHeight: '100vh' }} />}>
+          <ApplicantStatusView app={row} />
+          <LegalFooter />
+        </Suspense>
+      );
+    }
+
+    // No PENDING application. One pure read by clerkUserId resolves the rest:
+    //  (e) APPROVED member → the member home.
+    //  decided (REJECTED / WAITLISTED / HOLD) → graceful "thank you", never the
+    //      door — an invitation-only club must not invite a declined applicant to
+    //      reapply.
+    //  none → fall through to the account + consent gate (b).
+    // The legacy fully-anonymous-approved row (clerkUserId never stamped) is an
+    // accepted known gap that self-heals on /m; we do NOT add a write to close it.
+    const prior = await db.application.findFirst({
+      where: { clerkUserId: userId },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true, aiScore: true },
+    });
+    if (prior?.status === 'APPROVED') redirect('/m');
+    if (prior) {
+      return (
+        <Suspense fallback={<div style={{ background: '#f9f7f2', minHeight: '100vh' }} />}>
+          <ApplicantStatusView app={prior} />
+          <LegalFooter />
+        </Suspense>
+      );
+    }
   }
 
+  // (a) signed-out, or (b) signed-in with no application — the account + consent
+  // gate (the door). The anonymous *start* is gated behind an account first.
   return (
     <Suspense fallback={<div style={{ background: '#f9f7f2', minHeight: '100vh' }} />}>
       <ApplyAccountGate />

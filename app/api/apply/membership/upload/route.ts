@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { isStorageConfigured, uploadObject } from '@/lib/dam/storage';
 import { applicationPhotoKey } from '@/lib/apply-photo';
 import { isAllowedImageBytes, type SniffedImageType } from '@/lib/image-magic-bytes';
+import sharp from 'sharp';
+import { publicRateLimit } from '@/lib/public-rate-limit';
 
 // Membership-application photos are PII-adjacent, so they land in PRIVATE R2
 // (not public Vercel Blob) and are read back only through the role-gated
@@ -18,6 +20,17 @@ const ALLOWED = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
 const ALLOWED_BYTES = new Set<SniffedImageType>(['jpeg', 'png', 'webp']);
 
 export async function POST(req: NextRequest) {
+  // This endpoint is intentionally unauthenticated (public /apply), and each call
+  // decodes up to 10MB through sharp — cap per-IP floods before that work. Bucket
+  // is generous: a real applicant uploads a handful of photos, plus retries.
+  const rateCheck = publicRateLimit(req, { bucket: 'apply-upload', max: 40 });
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many uploads. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfterSecs) } },
+    );
+  }
+
   const form = await req.formData().catch(() => null);
   const file = form?.get('file');
   if (!file || !(file instanceof File)) {
@@ -49,9 +62,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
   }
 
+  // Strip EXIF/GPS + bake orientation before storage. Application photos are
+  // PII-adjacent and camera EXIF commonly carries GPS location; rotate() honors
+  // the EXIF orientation flag, then sharp re-encodes WITHOUT metadata (its
+  // default) in the same format, so the stored object is orientation-correct and
+  // metadata-free. Mirrors lib/dam/image.ts. On a decode failure (rare — magic
+  // bytes already validated) reject so we never fall back to storing raw EXIF.
+  let processed: Buffer;
+  try {
+    processed = await sharp(buf, { failOn: 'none' }).rotate().toBuffer();
+  } catch (e) {
+    console.warn('[apply/upload] image processing failed', {
+      declaredType: file.type,
+      err: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.json({ error: 'Could not process image' }, { status: 400 });
+  }
+
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
   const key = applicationPhotoKey(workspace.id, ext);
-  await uploadObject(key, buf, file.type);
+  await uploadObject(key, processed, file.type);
 
   return NextResponse.json({ key });
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName } from '@/config/archetypes';
+import { CONSENT_DISCLOSURES, TERMS_VERSION } from '@/lib/apply-consent';
 import dynamic from 'next/dynamic';
 import { Mic } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -47,6 +48,7 @@ interface FormData {
   foodAccessibility: string;
   photoUrls: string[];
   agreedToTerms: boolean;
+  consentEmail: boolean;
   consentSms: boolean;
 }
 
@@ -125,7 +127,7 @@ function QrReveal({ code }: { code: string }) {
 const EMPTY_FORM: FormData = {
   fullName: '', email: '', phone: '',
   foodAccessibility: '',
-  photoUrls: [], agreedToTerms: false, consentSms: false,
+  photoUrls: [], agreedToTerms: false, consentEmail: false, consentSms: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -168,6 +170,26 @@ const PAGES = buildPages();
 
 /** localStorage key for the logged-out draft-resume feature. */
 const DRAFT_KEY = 'nobc-apply-draft';
+
+// Debounce for save-as-you-type: 2s after the last keystroke. Long enough that a
+// burst of typing collapses into ONE PATCH (not one per keystroke), short enough
+// that at most ~2s of edits are ever at risk — and the beforeunload guard covers
+// even that window.
+const AUTOSAVE_DEBOUNCE_MS = 2000;
+
+/**
+ * The single PATCH-answers call shared by save-on-advance (patchAndAdvance) and
+ * autosave, so both persist through the exact same path/endpoint/body — autosave
+ * is NOT a parallel save path. Returns the raw Response; callers own status
+ * handling.
+ */
+function patchDraftAnswers(id: string, answers: Record<string, string>): Promise<Response> {
+  return fetch(`/api/apply/membership/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
+  });
+}
 const QUESTION_STEPS = PAGES.length;
 const LEGAL_STEP = QUESTION_STEPS;
 const REVEAL_STEP = QUESTION_STEPS + 1;
@@ -338,6 +360,10 @@ export default function MembershipForm() {
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [draftSaved, setDraftSaved] = useState(false);
+  // Autosave (F1): debounced save-as-you-type status + a JSON snapshot of the
+  // last successfully autosaved answers, used to detect unsaved changes.
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const lastSavedAnswersRef = useRef<string>('');
   const [testDataLoaded, setTestDataLoaded] = useState(false);
   const [devHovered, setDevHovered] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
@@ -358,6 +384,8 @@ export default function MembershipForm() {
   const seenSections = useRef<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
+  // Synchronous double-tap guard for the House Rules submit button (see guardedSubmit).
+  const submittingRef = useRef(false);
 
   const theme = isNight ? THEME.night : THEME.day;
 
@@ -480,7 +508,14 @@ export default function MembershipForm() {
 
   useEffect(() => {
     const id = searchParams.get('id');
-    if (!id || isDemo || isDev) return;
+    if (!id || isDemo) return;
+    // The URL id is the source of truth for applicationId: adopt it up front,
+    // independent of the GET rehydrate below. If the rehydrate fails (a 403 draft
+    // this browser can't write, a 404, or a network error) the form still knows its
+    // draft id, so the save paths PATCH the existing row instead of POST-creating a
+    // duplicate. A genuinely unwritable draft still degrades to create-fresh via
+    // patchAndAdvance's existing PATCH-403 handling. Runs in dev too (no isDev gate).
+    setApplicationId(id);
     (async () => {
       try {
         const res = await fetch(`/api/apply/membership/${id}`);
@@ -496,9 +531,13 @@ export default function MembershipForm() {
           phone: application.phone ?? '',
           // Consent is captured at the front gate now; rehydrate it from the stored
           // application so the unchanged handleSubmit agreedToTerms gate passes on
-          // resume without the removed LEGAL_STEP checkboxes. consentEmail is the
-          // persisted "agreed to terms" signal; consentSms is the optional opt-in.
-          agreedToTerms: !!application.consentEmail,
+          // resume without the removed LEGAL_STEP checkboxes. PHASE B: the gate now
+          // reads the structured `agreedToMembershipTerms` signal. `consentEmail` is
+          // kept as a BACKFILL fallback so drafts created before Phase B — which have
+          // agreedToMembershipTerms=false but may have consentEmail=true — still pass
+          // the gate on resume; the final-submit PATCH then persists
+          // agreedToMembershipTerms=true server-side. consentSms is the optional opt-in.
+          agreedToTerms: !!application.agreedToMembershipTerms || !!application.consentEmail,
           consentSms: !!application.consentSms,
         }));
         setStep(stepFromAnswers(ans));
@@ -646,6 +685,50 @@ export default function MembershipForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
+  // Autosave (F1): debounced save-as-you-type through the SAME path as
+  // save-on-advance (patchDraftAnswers). Closes the mid-page data-loss gap —
+  // previously the current page's answers only reached the server on advance.
+  // Requires an existing draft (applicationId — set from ?id= for the
+  // account-first flow); skips demo/dev and non-question steps.
+  useEffect(() => {
+    if (isDemo || isDev) return;
+    if (!applicationId) return;
+    if (step >= QUESTION_STEPS) return;
+    if (Object.keys(answers).length === 0) return;
+    const serialized = JSON.stringify(answers);
+    if (serialized === lastSavedAnswersRef.current) return;
+    const t = setTimeout(async () => {
+      setAutosaveState('saving');
+      try {
+        const res = await patchDraftAnswers(applicationId, answers);
+        if (res.ok) {
+          lastSavedAnswersRef.current = serialized;
+          setAutosaveState('saved');
+        } else {
+          setAutosaveState('idle');
+        }
+      } catch {
+        setAutosaveState('idle');
+      }
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, applicationId, step]);
+
+  // beforeunload guard (F1): warn on tab close / navigation when the current page
+  // has answer edits newer than the last successful autosave.
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (isDemo || isDev || !applicationId || step >= QUESTION_STEPS) return;
+      if (Object.keys(answers).length === 0) return;
+      if (JSON.stringify(answers) === lastSavedAnswersRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [answers, applicationId, step, isDemo, isDev]);
+
   // Clear the local draft once a submission has succeeded. Watching submitResult
   // keeps the submission handler itself byte-for-byte untouched.
   useEffect(() => {
@@ -730,11 +813,7 @@ export default function MembershipForm() {
     let id = applicationId;
     try {
       if (id) {
-        const res = await fetch(`/api/apply/membership/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers }),
-        });
+        const res = await patchDraftAnswers(id, answers);
         if (res.status === 403) {
           // This draft can't be saved from this browser — its access cookie is
           // missing or expired. Abandon the stale id and start a fresh draft
@@ -811,7 +890,10 @@ export default function MembershipForm() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          consentEmail: true, consentSms: data.consentSms,
+          // PHASE C: three independent House Rules consents. No legacy `consentEmail`.
+          agreedToMembershipTerms: data.agreedToTerms,
+          emailOptIn: data.consentEmail,
+          consentSms: data.consentSms,
           answers: { 'photos.urls': JSON.stringify(uploadedUrls), 'photos.foodAccessibility': data.foodAccessibility },
         }),
       });
@@ -828,6 +910,26 @@ export default function MembershipForm() {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  // Synchronous double-tap guard for the submit button. isLoading (set inside the
+  // frozen handleSubmit) already disables the button, shows an in-flight label, and
+  // re-enables on failure via its finally - but isLoading is React state and flushes
+  // a render later, so it can't block a second invocation fired in the same tick.
+  // This ref does, synchronously. It matters because submit has billed, irreversible
+  // side effects (two Sonnet calls + a welcome email; the server's aiScore idempotency
+  // check can be raced by two near-simultaneous POSTs). Wraps handleSubmit at the call
+  // site; handleSubmit is unchanged. handleSubmit catches its own errors, so the await
+  // resolves either way and finally clears the ref (a successful submit unmounts this
+  // page, making the reset a harmless no-op).
+  async function guardedSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await handleSubmit();
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -883,6 +985,14 @@ export default function MembershipForm() {
             {draftSaved ? 'saved.' : 'save draft'}
           </button>
         </div>
+        {autosaveState !== 'idle' && (
+          <div
+            aria-live="polite"
+            style={{ textAlign: 'center', marginBottom: 12, fontFamily: bodyFont, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: theme.muted, opacity: 0.6 }}
+          >
+            {autosaveState === 'saving' ? 'Saving...' : 'Saved'}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           {step > 0 ? (
             <button onClick={() => { setIsTransitioning(true); setTransitionDirection('backward'); setTimeout(() => { setStep(s => Math.max(0, s - 1)); setIsTransitioning(false); window.scrollTo({ top: 0, behavior: 'instant' }); }, 400); }}
@@ -937,6 +1047,7 @@ export default function MembershipForm() {
       return (
         <div style={{ position: 'relative' }}>
           <textarea
+            id={key}
             style={{ ...getTextareaStyle(key), paddingRight: speechSupported ? 30 : undefined }}
             ref={el => { if (el) autoResizeTextarea(el); }}
             onInput={e => autoResizeTextarea(e.currentTarget)}
@@ -999,6 +1110,7 @@ export default function MembershipForm() {
     if (q.type === 'select') {
       return (
         <select
+          id={key}
           style={{ ...getInputStyle(key), colorScheme: isNight ? 'dark' : 'light', appearance: 'none' }}
           onFocus={() => setFocusedField(key)}
           onBlur={() => setFocusedField(null)}
@@ -1022,6 +1134,7 @@ export default function MembershipForm() {
       : 'text';
     return (
       <input
+        id={key}
         style={inputType === 'date' || inputType === 'time'
           ? { ...getInputStyle(key), colorScheme: isNight ? 'dark' : 'light' }
           : getInputStyle(key)}
@@ -1047,6 +1160,7 @@ export default function MembershipForm() {
       : 'text';
     return (
       <input
+        id={key}
         style={inputType === 'date' || inputType === 'time'
           ? { ...getInputStyle(key), colorScheme: isNight ? 'dark' : 'light' }
           : getInputStyle(key)}
@@ -1070,7 +1184,7 @@ export default function MembershipForm() {
           <div className="apply-group-grid" style={{ marginTop: 12 }}>
             {(q.fields ?? []).map(sub => (
               <div key={sub.id}>
-                {sub.label && <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>{sub.label}</label>}
+                {sub.label && <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>{sub.label}{sub.required && <span style={{ color: theme.accent }}> *</span>}</label>}
                 {renderSubInput(q, sub)}
               </div>
             ))}
@@ -1081,27 +1195,35 @@ export default function MembershipForm() {
     const key = answerKey(q);
     return (
       <div key={q.id} style={fieldGroup}>
-        <label style={labelStyle}>{q.label}</label>
+        <label style={labelStyle}>{q.label}{q.required && <span style={{ color: theme.accent }}> *</span>}</label>
         {q.help && <p style={helpStyle}>{q.help}</p>}
         {renderSimpleInput(q, key, hintKey === key)}
       </div>
     );
   }
 
-  /** Validate a page's required fields and gather the answers it owns. */
-  function pageIsComplete(page: Question[]): boolean {
+  /** The required fields still empty on a page, as {key, label}. Single source of
+   *  truth for the required-field rule — it drives F2's specific validation
+   *  message, F3's focus target (first key), AND submitPage's advance gate, so
+   *  they can never diverge. The rule is unchanged: a required simple field or
+   *  required group sub-field must be non-empty after trim (allowNone questions
+   *  accept "none" elsewhere). */
+  function missingRequiredFields(page: Question[]): { key: string; label: string }[] {
+    const missing: { key: string; label: string }[] = [];
     for (const q of page) {
       if (q.type === 'group') {
         for (const sub of q.fields ?? []) {
-          if (sub.required && !(answers[answerKey(q, sub)] ?? '').trim()) return false;
+          const k = answerKey(q, sub);
+          if (sub.required && !(answers[k] ?? '').trim()) {
+            missing.push({ key: k, label: sub.label ?? q.label });
+          }
         }
       } else if (q.required) {
-        const v = (answers[answerKey(q)] ?? '').trim();
-        // allowNone questions accept "none"; required still means non-empty.
-        if (!v) return false;
+        const k = answerKey(q);
+        if (!(answers[k] ?? '').trim()) missing.push({ key: k, label: q.label });
       }
     }
-    return true;
+    return missing;
   }
 
   function answersForPage(page: Question[]): Record<string, string> {
@@ -1112,11 +1234,33 @@ export default function MembershipForm() {
     return out;
   }
 
+  // F3: send the eye (and keyboard focus) to a field by its answer-key id.
+  // preventScroll avoids fighting the smooth scrollIntoView. Independent of the
+  // F1 autosave effect — this only reads the DOM and moves focus; it never
+  // mutates `answers`, so an autosave firing mid-correction can't disrupt it.
+  function focusField(key: string) {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById(key);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    (el as HTMLElement).focus({ preventScroll: true });
+  }
+
   function submitPage(pageIndex: number) {
     const page = PAGES[pageIndex];
-    if (!isDemo && !pageIsComplete(page)) {
-      setError('Please answer the required questions on this page.');
-      return;
+    if (!isDemo) {
+      const missing = missingRequiredFields(page);
+      if (missing.length > 0) {
+        // F2: name the specific missing fields instead of a generic banner.
+        const labels = missing.map(f => f.label);
+        const shown = labels.slice(0, 3);
+        const extra = labels.length - shown.length;
+        const list = shown.join(', ') + (extra > 0 ? `, and ${extra} more` : '');
+        setError(`Please answer: ${list}.`);
+        // F3: focus + scroll to the first missing field, not just a banner.
+        focusField(missing[0].key);
+        return;
+      }
     }
     setError('');
     patchAndAdvance(answersForPage(page), pageIndex + 1);
@@ -1455,16 +1599,102 @@ export default function MembershipForm() {
           );
         })()}
 
-        {/* SCREEN 7: Legal */}
-        {step === LEGAL_STEP && (
-          <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
-            <span style={chapterLabelStyle}>THE FINE PRINT</span>
-            <h1 style={sectionHeadingStyle}>Almost There</h1>
+        {/* SCREEN 7: House Rules — membership terms + the two optional opt-ins as
+            three independent checkboxes, right before submit. Labels are rendered
+            verbatim from CONSENT_DISCLOSURES so what the applicant reads is exactly
+            what termsVersion pins on the row. The required terms box gates submit;
+            email + SMS are optional and never bundled (TCPA). */}
+        {step === LEGAL_STEP && (() => {
+          const disclosures = CONSENT_DISCLOSURES[TERMS_VERSION];
+          const consentRowStyle: React.CSSProperties = {
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+            cursor: 'pointer',
+            fontFamily: bodyFont,
+            fontSize: 14,
+            lineHeight: 1.55,
+            color: theme.text,
+            marginBottom: 18,
+          };
+          const checkboxStyle: React.CSSProperties = {
+            marginTop: 2,
+            width: 18,
+            height: 18,
+            flexShrink: 0,
+            accentColor: theme.accent,
+            cursor: 'pointer',
+          };
+          const linkStyle: React.CSSProperties = {
+            color: theme.accent,
+            textDecoration: 'underline',
+            textUnderlineOffset: 2,
+          };
+          return (
+            <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
+              <span style={chapterLabelStyle}>HOUSE RULES</span>
+              <h1 style={sectionHeadingStyle}>A few house rules</h1>
 
-            {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-            {navBlock(handleSubmit, 'submit my application', !data.agreedToTerms)}
-          </div>
-        )}
+              <p style={{ ...helpStyle, marginBottom: 28 }}>
+                No Bad Company is a private club, so membership comes with a short set of house rules.
+                The short version: we decide who joins at our discretion, you must be 18 or older, we
+                protect your information and never sell it, and our events may be photographed. The
+                full detail lives in our{' '}
+                <Link href="/terms" style={linkStyle}>membership terms</Link> and{' '}
+                <Link href="/privacy" style={linkStyle}>privacy policy</Link>.
+              </p>
+
+              <label style={consentRowStyle}>
+                <input
+                  type="checkbox"
+                  checked={data.agreedToTerms}
+                  onChange={e => setData(prev => ({ ...prev, agreedToTerms: e.target.checked }))}
+                  style={checkboxStyle}
+                />
+                <span>{disclosures.membershipTerms}</span>
+              </label>
+              <label style={consentRowStyle}>
+                <input
+                  type="checkbox"
+                  checked={data.consentEmail}
+                  onChange={e => setData(prev => ({ ...prev, consentEmail: e.target.checked }))}
+                  style={checkboxStyle}
+                />
+                <span>{disclosures.emailOptIn}</span>
+              </label>
+              <label style={{ ...consentRowStyle, marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={data.consentSms}
+                  onChange={e => setData(prev => ({ ...prev, consentSms: e.target.checked }))}
+                  style={checkboxStyle}
+                />
+                <span>{disclosures.smsOptIn}</span>
+              </label>
+
+              {/* F4: plain-language irreversibility notice, added alongside the
+                  consent language (consent text / checkboxes / wiring untouched). */}
+              <p
+                style={{
+                  fontFamily: bodyFont,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: theme.muted,
+                  borderTop: `1px solid ${theme.border}`,
+                  paddingTop: 20,
+                  marginTop: 12,
+                  marginBottom: 0,
+                }}
+              >
+                Once you submit, your application is final - you won&apos;t be able to change your
+                answers. Take a moment to make sure it reads the way you want.
+              </p>
+
+              {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
+              {navBlock(guardedSubmit, 'submit my application', !data.agreedToTerms)}
+            </div>
+          );
+        })()}
 
         {/* SCREEN 8: Reveal */}
         {step === REVEAL_STEP && submitResult && Object.keys(submitResult.archetypeScores ?? {}).length > 0 && (
