@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — M1 code-complete on `feat/gate-engine-m1`, all 6 acceptance criteria green on ep-sweet-term, UNMERGED by design (Adam's gate) |
-| **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestone 1 of 6) |
+| **State** | 🟡 In progress — M1 (engine core) + M2 (guest render) code-complete; M1 on `feat/gate-engine-m1`, M2 stacked on `feat/gate-engine-m2`; all acceptance green on ep-sweet-term; UNMERGED by design (Adam's gate) |
+| **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestones 1–2 of 6 built) |
 | **Last updated** | 2026-07-01 |
 | **Owner** | Adam |
-| **Blocked on** | Adam's review of the Phase B build (branch `feat/gate-engine-m1`; nothing merges or deploys without his gate). Secondary: the v3 spec file is still not in the repo — Adam will reconcile it later; flag any §11.1 conflict then. |
-| **Next** | Adam reviews the Phase B report + branch. On sign-off: plan M2 (guest render) against this engine's API surface. When the spec file lands in the repo root, diff the shipped data model against §11.1 and flag conflicts. |
+| **Blocked on** | Adam's review of the M1 + M2 branches (nothing merges or deploys without his gate). Secondary: the v3 spec file is still not in the repo — reconcile + flag conflicts when it lands. |
+| **Next** | Adam reviews M2 rendered design (screenshots delivered) + both branches. Then M3 (Builder) or M4 items per Adam's call — in-page PAY flow, application bridge, `/e/` session minting, and rate limiting are the documented M4 deferrals in `docs/superpowers/plans/2026-07-01-gate-engine-m2.md`. |
 
 ## Scope
 

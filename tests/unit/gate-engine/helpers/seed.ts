@@ -24,8 +24,11 @@ export type AcceptanceWorld = {
   pastEventId: string;
 };
 
-export async function cleanupAcceptanceWorld(db: PrismaClient): Promise<void> {
-  const ws = await db.workspace.findUnique({ where: { slug: ACCEPTANCE_SLUG } });
+export async function cleanupAcceptanceWorld(
+  db: PrismaClient,
+  slug: string = ACCEPTANCE_SLUG
+): Promise<void> {
+  const ws = await db.workspace.findUnique({ where: { slug } });
   if (!ws) return;
   const scope = { workspaceId: ws.id };
   await db.growthEdge.deleteMany({ where: scope });
@@ -76,14 +79,20 @@ export async function makeEvent(
   return event.id;
 }
 
-export async function seedAcceptanceWorld(db: PrismaClient): Promise<AcceptanceWorld> {
-  await cleanupAcceptanceWorld(db);
+/** Each suite passes its own slug so parallel test files never collide on
+ *  the workspace-level uniques (slug, clerkOrgId). Member uniques are
+ *  workspace-scoped and need no suffix. */
+export async function seedAcceptanceWorld(
+  db: PrismaClient,
+  slug: string = ACCEPTANCE_SLUG
+): Promise<AcceptanceWorld> {
+  await cleanupAcceptanceWorld(db, slug);
 
   const workspace = await db.workspace.create({
     data: {
-      clerkOrgId: "org_gate_m1_acceptance",
-      name: "Gate M1 Acceptance",
-      slug: ACCEPTANCE_SLUG,
+      clerkOrgId: `org_${slug.replace(/-/g, "_")}`,
+      name: `Gate acceptance (${slug})`,
+      slug,
     },
   });
 

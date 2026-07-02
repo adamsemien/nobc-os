@@ -12,14 +12,19 @@ import { createGateEngine, type GateEngine } from "./orchestrate";
 
 export { createDefaultConditionDefs } from "./conditions/defaults";
 
+let _registry: ReturnType<typeof createConditionRegistry> | null = null;
 let _engine: GateEngine | null = null;
+
+export function getDefaultRegistry() {
+  if (!_registry) {
+    _registry = createConditionRegistry(createDefaultConditionDefs());
+  }
+  return _registry;
+}
 
 export function getGateEngine(): GateEngine {
   if (!_engine) {
-    _engine = createGateEngine({
-      db,
-      registry: createConditionRegistry(createDefaultConditionDefs()),
-    });
+    _engine = createGateEngine({ db, registry: getDefaultRegistry() });
   }
   return _engine;
 }
@@ -40,6 +45,14 @@ export {
   writeNodeProof,
 } from "./proofs";
 export { recordGrowthEdge } from "./growth";
+export { projectGuestView } from "./guest-view";
+export type { GuestGateView, GuestSectionView, GuestStepState, GuestStepView } from "./guest-view";
+export {
+  guestViewForSession,
+  identifyGuestSession,
+  loadGuestGateContext,
+} from "./guest-session";
+export type { GuestGateContext } from "./guest-session";
 export { createPayCondition } from "./conditions/pay";
 export type { PayConfig, StripeIntentReader, StripeIntentSnapshot, IntentOwnershipCheck } from "./conditions/pay";
 export { createAnswerQuestionsCondition } from "./conditions/answer-questions";
