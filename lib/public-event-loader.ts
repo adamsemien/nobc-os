@@ -105,12 +105,18 @@ export async function assemblePublicEventDTO(
     })),
   );
 
-  const [workflow, capacityUsedCount] = await Promise.all([
+  const [workflow, capacityUsedCount, gateRow] = await Promise.all([
     db.eventWorkflow.findUnique({
       where: { eventId: event.id },
       select: { paths: true },
     }),
     getCapacityUsedRsvpCount(event.id, workspaceId),
+    // Stage 17 (M4): an Access Gate on the event switches the public door to
+    // the gate walkthrough. Workspace-scoped like every other read here.
+    db.gate.findFirst({
+      where: { workspaceId, resourceType: 'EVENT', resourceId: event.id },
+      select: { id: true },
+    }),
   ]);
 
   const workflowPaths = parseWorkflowPaths(workflow?.paths);
@@ -156,6 +162,7 @@ export async function assemblePublicEventDTO(
     workflowPaths,
     // Per-event styling overrides; null/invalid falls back to brand defaults.
     pageStyle: parsePageStyle(event.pageStyle),
+    gated: gateRow != null,
   };
 
   return dto;

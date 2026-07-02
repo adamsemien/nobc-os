@@ -304,12 +304,18 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
 
   const resolved = event.resolved;
   const isClosed = resolved.kind === 'closed';
-  const ctaLabel = isClosed ? 'Closed' : formatGateCTA(resolved);
+  // Stage 17 (M4): an Access Gate on the event owns the public door - it
+  // REPLACES the v1 access policy for every pre-engagement state (idle,
+  // closed, full), because the gate's conditions are now the door decision.
+  // The CTA posts to the mint route (no JS needed) and the v1 access flow is
+  // never mounted. Only the public /e loader sets `gated` - /m is unchanged.
+  const isGated = event.gated === true;
+  const ctaLabel = isGated ? 'Unlock Access' : isClosed ? 'Closed' : formatGateCTA(resolved);
   const showCapacityMeter =
     !hideHeader &&
     event.showCapacity && event.capacity != null && rsvpState === 'idle' && !isClosed;
   // The only state with an actionable button — drives the mobile sticky CTA.
-  const isCtaState = rsvpState === 'idle' && !isClosed && !isFull;
+  const isCtaState = rsvpState === 'idle' && (isGated || (!isClosed && !isFull));
 
   return (
     <>
@@ -317,7 +323,7 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
       {!hideHeader ? (
         <>
           <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            {accessTypeLabel(event.resolved)}
+            {isGated ? 'Event Access' : accessTypeLabel(event.resolved)}
           </p>
 
           {showCapacityMeter ? (
@@ -367,6 +373,18 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
             We&rsquo;ll let you know the moment a spot opens.
           </p>
         </div>
+      ) : isGated ? (
+        <form method="post" action={`/e/${event.slug}/access`} className="space-y-3">
+          <button
+            type="submit"
+            className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
+          >
+            {ctaLabel}
+          </button>
+          <p className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            A few steps unlock your access
+          </p>
+        </form>
       ) : resolved.kind === 'closed' ? (
         (() => {
           const c = warmClosedCopy(resolved);
@@ -429,17 +447,28 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
           className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--apply-rule)] bg-events-paper-card/95 px-5 py-4 backdrop-blur lg:hidden"
           style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
-          <button
-            type="button"
-            onClick={() => setFlowOpen(true)}
-            className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
-          >
-            {ctaLabel}
-          </button>
+          {isGated ? (
+            <form method="post" action={`/e/${event.slug}/access`}>
+              <button
+                type="submit"
+                className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
+              >
+                {ctaLabel}
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setFlowOpen(true)}
+              className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
+            >
+              {ctaLabel}
+            </button>
+          )}
         </div>
       ) : null}
 
-      {mounted
+      {mounted && !isGated
         ? createPortal(
             <EventAccessFlow
               event={event}

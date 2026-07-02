@@ -12,15 +12,21 @@
  *    unavailable - never as open, never as a stack trace.
  */
 import type { ConditionRegistry } from "./registry";
+import { CONDITION_ANSWER_QUESTIONS } from "./types";
 import type { GateEvaluation, GateTreeNode, ProofIndex } from "./types";
 
 export type GuestStepState = "complete" | "needed" | "in_review";
+
+/** Guest-actionable step kinds (M4). A designed union, never a registry key -
+ *  the no-raw-enums guarantee holds. "apply" offers the application bridge. */
+export type GuestStepAction = "apply" | null;
 
 export type GuestStepView = {
   nodeId: string;
   prompt: string;
   state: GuestStepState;
   required: boolean;
+  action: GuestStepAction;
 };
 
 export type GuestSectionView = {
@@ -97,8 +103,12 @@ export function projectGuestView(args: {
       : proof?.status === "PENDING_REVIEW"
         ? "in_review"
         : "needed";
+    const action: GuestStepAction =
+      node.conditionType === CONDITION_ANSWER_QUESTIONS && state === "needed"
+        ? "apply"
+        : null;
 
-    return { nodeId: node.id, prompt, state, required: node.required };
+    return { nodeId: node.id, prompt, state, required: node.required, action };
   };
 
   const sections: GuestSectionView[] = [];

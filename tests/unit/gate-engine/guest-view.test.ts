@@ -206,6 +206,38 @@ describe("projectGuestView", () => {
     ).toEqual({ available: false });
   });
 
+  it("M4: only ANSWER_QUESTIONS steps still needing action carry the apply action", () => {
+    const realRegistry = createConditionRegistry(createDefaultConditionDefs());
+    const tree = grp("root", "ALL", [
+      cond("ans", "ANSWER_QUESTIONS"),
+      cond("att", "ATTENDED_PRIOR"),
+    ]);
+
+    const needed = projectGuestView({
+      tree,
+      evaluation: null,
+      proofs: new Map(),
+      registry: realRegistry,
+      needsIdentity: false,
+    });
+    if (!needed.available) throw new Error("expected available");
+    const neededSteps = needed.sections.flatMap((s) => s.steps);
+    expect(neededSteps.find((s) => s.nodeId === "ans")?.action).toBe("apply");
+    expect(neededSteps.find((s) => s.nodeId === "att")?.action).toBeNull();
+
+    const done = projectGuestView({
+      tree,
+      evaluation: evaluation({ ans: true, att: false, root: false }, false),
+      proofs: new Map(),
+      registry: realRegistry,
+      needsIdentity: false,
+    });
+    if (!done.available) throw new Error("expected available");
+    expect(
+      done.sections.flatMap((s) => s.steps).find((s) => s.nodeId === "ans")?.action
+    ).toBeNull();
+  });
+
   it("brand-law sweep: every string from the five real condition types is clean", () => {
     const realRegistry = createConditionRegistry(createDefaultConditionDefs());
     const tree = grp("root", "ALL", [

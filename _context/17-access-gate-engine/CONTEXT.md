@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — M1 (engine core) + M2 (guest render) + M3 (Builder) code-complete on stacked branches `feat/gate-engine-m1/-m2/-m3`; M4 (bridge + minting + rate limits) in progress on `feat/gate-engine-m4`; all acceptance green on ep-sweet-term; UNMERGED by design (Adam's gate) |
-| **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestones 1–3 of 6 built) |
+| **State** | 🟡 In progress — M1 (engine core) + M2 (guest render) + M3 (Builder) + M4 GO items (application bridge, `/e/` minting, rate limits) code-complete on stacked branches `feat/gate-engine-m1/-m2/-m3/-m4`; in-page PAY flow is PLAN-ONLY (`docs/superpowers/plans/2026-07-02-gate-engine-m4-pay-plan.md`); all acceptance green on ep-sweet-term; UNMERGED by design (Adam's gate) |
+| **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestones 1–4 of 6 built; PAY flow awaiting Adam's plan review) |
 | **Last updated** | 2026-07-02 |
 | **Owner** | Adam |
-| **Blocked on** | Adam's review of the branch stack (nothing merges or deploys without his gate). The in-page PAY flow is PLAN-ONLY by Adam's directive — no Stripe integration code until he greenlights the plan doc. Secondary: the v3 spec file is still not in the repo — reconcile + flag conflicts when it lands. |
-| **Next** | Finish M4 GO items (application bridge, `/e/` session minting, per-token rate limiting) on `feat/gate-engine-m4`, deliver the PAY-flow plan doc, then Adam reviews the stack + the PAY plan. |
+| **Blocked on** | Adam's review of the four-branch stack + the PAY-flow plan (incl. the authorize-vs-capture decision in that doc). Nothing merges or deploys without his gate. Secondary: the v3 spec file is still not in the repo — reconcile + flag conflicts when it lands. |
+| **Next** | Adam reviews the stack, the M3/M4 rendered captures (delivered), and the PAY plan's Option A/B money-semantics decision. On PAY greenlight: build the plan as written (test-mode keys, own commits). Remaining v3 milestones after that: backfill/cutover of existing events + v3.1 condition types. |
 
 ## Scope
 

@@ -66,6 +66,11 @@ export type EventDetailDTO = {
   isOperator: boolean;
   workflowPaths?: WorkflowPath[];
   pageStyle: PageStyle;
+  /** True when an Access Gate governs this event's public door (Stage 17,
+   *  M4). Set ONLY by the public /e loader - the member surface never sets
+   *  it, so /m behavior is unchanged. Gated events route the CTA to the gate
+   *  walkthrough instead of the v1 access flow. */
+  gated?: boolean;
 };
 
 type PreviewViewer = 'guest' | 'member';

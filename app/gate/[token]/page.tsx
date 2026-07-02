@@ -15,6 +15,7 @@ import {
 } from "@/lib/gate-engine/guest-session";
 import type { GuestSectionView, GuestStepView } from "@/lib/gate-engine/guest-view";
 import { IdentifyForm } from "./_components/IdentifyForm";
+import { StepActions } from "./_components/StepActions";
 
 export const metadata: Metadata = {
   title: "Event Access - No Bad Company",
@@ -22,36 +23,59 @@ export const metadata: Metadata = {
 
 const editorial = { fontFamily: "'PP Editorial New', Georgia, serif" };
 
-function StepRow({ step }: { step: GuestStepView }) {
+function StepRow({
+  step,
+  token,
+  identified,
+}: {
+  step: GuestStepView;
+  token: string;
+  identified: boolean;
+}) {
   return (
-    <li className="flex items-start gap-3 border-b border-border px-5 py-4 last:border-b-0">
-      <span
-        aria-hidden
-        className={
-          step.state === "complete"
-            ? "mt-1 inline-block h-3 w-3 shrink-0 rounded-full bg-primary"
+    <li className="border-b border-border px-5 py-4 last:border-b-0">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className={
+            step.state === "complete"
+              ? "mt-1 inline-block h-3 w-3 shrink-0 rounded-full bg-primary"
+              : step.state === "in_review"
+                ? "mt-1 inline-block h-3 w-3 shrink-0 rounded-full bg-warning"
+                : "mt-1 inline-block h-3 w-3 shrink-0 rounded-full border border-border-strong bg-transparent"
+          }
+        />
+        <span className="flex-1 text-sm leading-relaxed text-text-primary">
+          {step.prompt}
+        </span>
+        <span className="shrink-0 text-xs uppercase tracking-wide text-text-tertiary">
+          {step.state === "complete"
+            ? "Done"
             : step.state === "in_review"
-              ? "mt-1 inline-block h-3 w-3 shrink-0 rounded-full bg-warning"
-              : "mt-1 inline-block h-3 w-3 shrink-0 rounded-full border border-border-strong bg-transparent"
-        }
-      />
-      <span className="flex-1 text-sm leading-relaxed text-text-primary">
-        {step.prompt}
-      </span>
-      <span className="shrink-0 text-xs uppercase tracking-wide text-text-tertiary">
-        {step.state === "complete"
-          ? "Done"
-          : step.state === "in_review"
-            ? "In review"
-            : step.required
-              ? "Required"
-              : "To do"}
-      </span>
+              ? "In review"
+              : step.required
+                ? "Required"
+                : "To do"}
+        </span>
+      </div>
+      {identified && step.action === "apply" ? (
+        <div className="pl-6">
+          <StepActions token={token} nodeId={step.nodeId} />
+        </div>
+      ) : null}
     </li>
   );
 }
 
-function Section({ section }: { section: GuestSectionView }) {
+function Section({
+  section,
+  token,
+  identified,
+}: {
+  section: GuestSectionView;
+  token: string;
+  identified: boolean;
+}) {
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-card">
       <header className="flex items-baseline justify-between border-b border-border bg-raised px-5 py-3">
@@ -64,7 +88,7 @@ function Section({ section }: { section: GuestSectionView }) {
       </header>
       <ul>
         {section.steps.map((step) => (
-          <StepRow key={step.nodeId} step={step} />
+          <StepRow key={step.nodeId} step={step} token={token} identified={identified} />
         ))}
       </ul>
     </section>
@@ -133,7 +157,12 @@ export default async function GuestGatePage({
 
         <div className="flex flex-col gap-4">
           {view.sections.map((section, i) => (
-            <Section key={i} section={section} />
+            <Section
+              key={i}
+              section={section}
+              token={token}
+              identified={!view.needsIdentity}
+            />
           ))}
         </div>
       </div>
