@@ -64,7 +64,18 @@ export async function mirrorApplicationPhotosToDam(opts: {
 
     // Only keys under this workspace's `applications/` prefix are mirrored -
     // the answer value is applicant-controlled, so validate every key (IDOR).
-    const keys = parseKeys(opts.photoUrlsAnswer)
+    // A drop here means a stored photo will never render or mirror, so it must
+    // be LOUD: silence is what hid the 2026-07-02 wrong-tenant key bug.
+    const allKeys = parseKeys(opts.photoUrlsAnswer);
+    const dropped = allKeys.filter((k) => !isWorkspacePhotoKey(k, workspaceId));
+    if (dropped.length > 0) {
+      console.warn('[apply/photo-mirror] dropped key(s) outside this workspace prefix', {
+        applicationId,
+        expectedWorkspaceId: workspaceId,
+        dropped: dropped.map((k) => ({ key: k, keyWorkspaceId: k.split('/')[1] ?? null })),
+      });
+    }
+    const keys = allKeys
       .filter((k) => isWorkspacePhotoKey(k, workspaceId))
       .slice(0, MAX_MIRRORED_PHOTOS);
     const previousKeys = parseKeys(opts.previousPhotoUrlsAnswer ?? '').filter((k) =>
