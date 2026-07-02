@@ -548,10 +548,13 @@ function ChipCard({
 export function BuilderShell({
   initialState,
   previewUrl,
+  composedSummary = null,
 }: {
   initialState: BuilderState;
   previewUrl: string;
+  composedSummary?: string[] | null;
 }) {
+  const [showComposed, setShowComposed] = useState(Boolean(composedSummary?.length));
   const [state, setState] = useState(initialState);
   const [draft, setDraft] = useState<AccessDraft>(() =>
     initialState.gate ? draftFromTree(initialState.gate.tree) : { kind: "open", rootChips: [], groups: [] },
@@ -672,6 +675,30 @@ export function BuilderShell({
               </span>
             </div>
           </header>
+
+          {showComposed && composedSummary ? (
+            <div className="rounded-sm border border-primary bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-xs font-medium uppercase tracking-widest text-primary">
+                  Composed for your review
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowComposed(false)}
+                  className="text-xs text-text-tertiary underline underline-offset-2"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <ul className="mt-2 flex flex-col gap-1">
+                {composedSummary.map((line, i) => (
+                  <li key={i} className="text-xs leading-relaxed text-text-secondary">
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {notice ? (
             <p className="rounded-sm border border-border bg-raised px-3 py-2 text-xs text-text-secondary">
