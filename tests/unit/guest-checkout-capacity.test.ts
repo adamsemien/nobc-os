@@ -12,6 +12,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * minted (so it doesn't dangle as a 7-day hold) and returns 409. The existing
  * idempotency key on paymentIntents.create is preserved.
  *
+ * Amounts: the buyer covers the Stripe fee (lib/ticketing/buyer-fee.ts), so
+ * the $50.00 gate price below charges 5180 cents ($50.00 + $1.80 fee).
+ *
  * Only the DB, stripe, access helpers, rate limit, and loader are mocked.
  */
 
@@ -97,7 +100,7 @@ beforeEach(() => {
   m.findOrCreateGuestMember.mockResolvedValue({ id: 'g1', email: 'g@x.com' });
   m.hasCapacity.mockResolvedValue(true);
   m.rsvpFindFirst.mockResolvedValue(null); // no existing RSVP → else branch
-  m.piCreate.mockResolvedValue({ id: 'pi_1', client_secret: 'cs_1', amount: 5000, status: 'requires_payment_method' });
+  m.piCreate.mockResolvedValue({ id: 'pi_1', client_secret: 'cs_1', amount: 5180, status: 'requires_payment_method' });
   m.piCancel.mockResolvedValue({});
   m.auditCreate.mockResolvedValue({});
   // $transaction runs the callback against the tx client by default.
@@ -113,7 +116,7 @@ describe('public guest checkout: serializable capacity re-check on first-time RS
     // 2nd arg carries the idempotency key scoped to (workspace, event, member,
     // amount, capture_method) — amount+mode in the key so a price/mode change
     // mints a fresh PI instead of reusing the stale one.
-    expect(m.piCreate.mock.calls[0][1]).toMatchObject({ idempotencyKey: 'pi-w1-ev1-g1-5000-automatic' });
+    expect(m.piCreate.mock.calls[0][1]).toMatchObject({ idempotencyKey: 'pi-w1-ev1-g1-5180-automatic' });
   });
 
   it('seat available: re-counts taken seats and creates the RSVP on the SAME transaction', async () => {
@@ -121,7 +124,7 @@ describe('public guest checkout: serializable capacity re-check on first-time RS
     const res = await post();
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ clientSecret: 'cs_1', rsvpId: 'r-new', amountCents: 5000 });
+    expect(body).toMatchObject({ clientSecret: 'cs_1', rsvpId: 'r-new', amountCents: 5180 });
 
     expect(m.transaction).toHaveBeenCalledOnce();
     expect(m.transaction.mock.calls[0][1]).toMatchObject({ isolationLevel: 'Serializable' });

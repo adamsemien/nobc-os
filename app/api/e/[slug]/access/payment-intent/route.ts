@@ -29,6 +29,7 @@ import {
 } from '@/lib/event-access-submit';
 import { resolvePublishedEventBySlug } from '@/lib/public-event-loader';
 import { publicRateLimit } from '@/lib/public-rate-limit';
+import { grossUpForBuyer } from '@/lib/ticketing/buyer-fee';
 
 const BodySchema = z.object({
   guestEmail: z.string().email().optional(),
@@ -113,6 +114,11 @@ export async function POST(
     return NextResponse.json({ error: 'This path is free — use submit endpoint.' }, { status: 400 });
   }
 
+  // Buyer covers the Stripe processing fee; NoBC nets the full ticket price.
+  // amountCents stays the ticket price for the free-path gate above; the
+  // charge, the RSVP row, and the response all carry the grossed-up total.
+  const { chargedCents, feeCents } = grossUpForBuyer(amountCents);
+
   // Resolve the member who will own the RSVP + receive Stripe receipt.
   let rsvpMember: { id: string; email: string };
   if (resolved.kind === 'guest') {
@@ -145,7 +151,7 @@ export async function POST(
       return NextResponse.json({
         clientSecret: pi.client_secret,
         rsvpId: existing.id,
-        amountCents: pi.amount ?? amountCents,
+        amountCents: pi.amount ?? chargedCents,
       });
     }
     if (pi.status !== 'canceled' && pi.status !== 'succeeded') {
@@ -167,16 +173,18 @@ export async function POST(
   // and ignores the new params, charging the stale amount or wrong hold type.
   // Mirrors the member route (app/api/m/events/[slug]/access/payment-intent).
   const captureMethod = event.approvalRequired ? 'manual' : 'automatic';
-  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}-${amountCents}-${captureMethod}`;
+  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}-${chargedCents}-${captureMethod}`;
   const pi = await stripe.paymentIntents.create(
     {
-      amount: amountCents,
+      amount: chargedCents,
       currency: 'usd',
       capture_method: captureMethod,
       description: event.title,
       receipt_email: rsvpMember.email,
       automatic_payment_methods: { enabled: true },
-      metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug },
+      // feeCents records the buyer-covered service fee so the Stripe record
+      // shows the ticket/fee split (amount - feeCents = ticket price).
+      metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug, feeCents: String(feeCents) },
     },
     { idempotencyKey },
   );
@@ -188,7 +196,7 @@ export async function POST(
       data: {
         stripePaymentIntentId: pi.id,
         paymentStatus: 'PENDING',
-        amountCents,
+        amountCents: chargedCents,
         ticketStatus: 'held',
         tierId: resolvedTierId ?? null,
         customAnswers: body.customAnswers ?? undefined,
@@ -223,7 +231,7 @@ export async function POST(
               ticketStatus: 'held',
               stripePaymentIntentId: pi.id,
               paymentStatus: 'PENDING',
-              amountCents,
+              amountCents: chargedCents,
               tierId: resolvedTierId ?? null,
               customAnswers: body.customAnswers ?? undefined,
               guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
@@ -261,6 +269,6 @@ export async function POST(
   return NextResponse.json({
     clientSecret: pi.client_secret,
     rsvpId,
-    amountCents,
+    amountCents: chargedCents,
   });
 }
