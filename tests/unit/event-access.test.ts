@@ -167,10 +167,10 @@ describe('formatGateCTA (LOCKED member-facing copy)', () => {
   it('approval flow -> "Apply to Attend"', () => {
     expect(formatGateCTA(resolved('guest', [gate('application')]))).toBe('Apply to Attend');
   });
-  it('ticket flow -> "Get Ticket — $X" with trimmed whole-dollar amounts', () => {
-    expect(formatGateCTA(resolved('member', [gate('ticket')], 5000))).toBe('Get Ticket — $50');
-    expect(formatGateCTA(resolved('member', [gate('ticket')], 4999))).toBe('Get Ticket — $49.99');
-    expect(formatGateCTA(resolved('member', [gate('ticket')], 1050))).toBe('Get Ticket — $10.50');
+  it('ticket flow -> "Get Ticket - $X" with trimmed whole-dollar amounts', () => {
+    expect(formatGateCTA(resolved('member', [gate('ticket')], 5000))).toBe('Get Ticket - $50');
+    expect(formatGateCTA(resolved('member', [gate('ticket')], 4999))).toBe('Get Ticket - $49.99');
+    expect(formatGateCTA(resolved('member', [gate('ticket')], 1050))).toBe('Get Ticket - $10.50');
   });
   it('pay-AFTER-approval shows "Apply to Attend" (pay is out of the in-session flow)', () => {
     // application (fields+approval) then ticket -> flow ['fields','approval','pay'];
