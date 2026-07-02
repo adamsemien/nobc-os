@@ -63,9 +63,38 @@ export async function assemblePublicEventDTO(
   // Step 1: resolve workspace from slug.
   const resolved = await resolvePublishedEventBySlug(slug);
   if (!resolved) return null;
-  const { workspaceId } = resolved;
 
-  // Step 2: all queries scoped to workspaceId.
+  // Step 2: the shared assembly, scoped to the server-derived workspaceId.
+  return assembleAnonEventDTO(resolved.workspaceId, slug);
+}
+
+/**
+ * Draft preview entry (Event Builder Rebuild, Phase B). The builder's WYSIWYG
+ * pane and the token-gated /e/preview route resolve by (workspaceId, eventId)
+ * — already authenticated by a signed preview token or an operator session —
+ * then run the EXACT same assembly the live page runs. One code path, so the
+ * preview and the published render can never drift (acceptance 2 by
+ * construction). Status is deliberately not filtered here: previewing DRAFT
+ * is the point. Callers own authorization.
+ */
+export async function assembleDraftPreviewDTO(
+  workspaceId: string,
+  eventId: string,
+): Promise<(EventDetailDTO & { workspaceId: string }) | null> {
+  const evt = await db.event.findFirst({
+    where: { id: eventId, workspaceId },
+    select: { slug: true },
+  });
+  if (!evt) return null;
+  return assembleAnonEventDTO(workspaceId, evt.slug);
+}
+
+/** THE anon assembly - everything below runs identically for the live
+ *  published page and the draft preview. Do not fork this. */
+async function assembleAnonEventDTO(
+  workspaceId: string,
+  slug: string,
+): Promise<(EventDetailDTO & { workspaceId: string }) | null> {
   const event = await getEventBySlug(workspaceId, slug);
   if (!event) return null;
 

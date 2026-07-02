@@ -16,12 +16,12 @@
  *  (console + alert) but must not turn a succeeded payment into a guest-
  *  facing error.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { alert } from "@/lib/alerting";
 import type { GuestGateContext } from "@/lib/gate-engine/guest-session";
 import { isProofLive } from "@/lib/gate-engine/proofs";
-import { CONDITION_PAY } from "@/lib/gate-engine/types";
+import { CONDITION_COLLECT_INFO, CONDITION_PAY } from "@/lib/gate-engine/types";
 import {
   ensureOpenAdmission,
   recordPaidAdmission,
@@ -75,6 +75,77 @@ async function recordForPayNode(
   });
 }
 
+const collectPayloadShape = z.object({
+  answers: z.record(
+    z.string(),
+    z.union([z.string(), z.boolean(), z.number(), z.null()]),
+  ),
+  questions: z
+    .array(z.object({ id: z.string(), label: z.string() }))
+    .optional(),
+});
+
+/** Copy live COLLECT_INFO proof answers onto the member's RSVP row, keyed by
+ *  question label so the operator attendee surfaces render them as-is. */
+async function persistCollectedAnswers(
+  db: PrismaClient,
+  args: {
+    workspaceId: string;
+    eventId: string;
+    gateId: string;
+    memberId: string;
+  },
+): Promise<void> {
+  const nodes = await db.gateNode.findMany({
+    where: {
+      gateId: args.gateId,
+      workspaceId: args.workspaceId,
+      kind: "CONDITION",
+      conditionType: CONDITION_COLLECT_INFO,
+    },
+    select: { id: true },
+  });
+  if (nodes.length === 0) return;
+
+  const merged: Record<string, string | boolean | number | null> = {};
+  for (const node of nodes) {
+    const proof = await db.gateProof.findFirst({
+      where: { nodeId: node.id, memberId: args.memberId },
+      select: { status: true, expiresAt: true, payload: true },
+    });
+    if (!proof || !isProofLive(proof, new Date())) continue;
+    const payload = collectPayloadShape.safeParse(proof.payload);
+    if (!payload.success) continue;
+    const labelById = new Map(
+      (payload.data.questions ?? []).map((q) => [q.id, q.label]),
+    );
+    for (const [id, value] of Object.entries(payload.data.answers)) {
+      merged[labelById.get(id) ?? id] = value;
+    }
+  }
+  if (Object.keys(merged).length === 0) return;
+
+  const rsvp = await db.rSVP.findFirst({
+    where: {
+      workspaceId: args.workspaceId,
+      eventId: args.eventId,
+      memberId: args.memberId,
+    },
+    select: { id: true, customAnswers: true },
+  });
+  if (!rsvp) return;
+  const existing =
+    rsvp.customAnswers && typeof rsvp.customAnswers === "object"
+      ? (rsvp.customAnswers as Record<string, unknown>)
+      : {};
+  await db.rSVP.update({
+    where: { id: rsvp.id },
+    data: {
+      customAnswers: { ...existing, ...merged } as Prisma.InputJsonValue,
+    },
+  });
+}
+
 export async function bridgeGateAdmission(
   db: PrismaClient,
   args: {
@@ -122,6 +193,14 @@ export async function bridgeGateAdmission(
       await ensureOpenAdmission(db, {
         workspaceId,
         eventId,
+        memberId: member.id,
+      });
+      // Collected registration answers must land where the operator looks
+      // (RSVP.customAnswers), never satisfy-and-vanish in a proof payload.
+      await persistCollectedAnswers(db, {
+        workspaceId,
+        eventId,
+        gateId: gate.id,
         memberId: member.id,
       });
     }

@@ -25,6 +25,9 @@ export const CONDITION_ANSWER_QUESTIONS = "ANSWER_QUESTIONS";
 export const CONDITION_REFERRED_BY_MEMBER = "REFERRED_BY_MEMBER";
 export const CONDITION_ATTENDED_PRIOR = "ATTENDED_PRIOR";
 export const CONDITION_HOLD_MEMBERSHIP = "HOLD_MEMBERSHIP";
+// Phase B (Event Builder Rebuild): collect-only registration fields - the
+// honest home for questions with no scoring (FIRST_PARTY / INTERNAL_RECORD).
+export const CONDITION_COLLECT_INFO = "COLLECT_INFO";
 
 // ─── Carry-forward policy (Adam's §16.4 defaults) ───────────────────────────
 // NEVER  - proof never carries across gates (PAY: payment is per-event).

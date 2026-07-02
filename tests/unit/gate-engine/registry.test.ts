@@ -56,13 +56,23 @@ const EXPECTED: Record<
     passive: true,
     exampleConfig: {},
   },
+  // Phase B (Event Builder Rebuild): collect-only registration fields.
+  COLLECT_INFO: {
+    tier: "FIRST_PARTY",
+    mechanism: "INTERNAL_RECORD",
+    carry: { kind: "NEVER" },
+    passive: false,
+    exampleConfig: {
+      questions: [{ id: "q1", label: "Anything we should know?" }],
+    },
+  },
 };
 
 describe("default condition registry", () => {
   const defs = createDefaultConditionDefs() as unknown as ConditionTypeDef<unknown>[];
   const registry = createConditionRegistry(defs);
 
-  it("registers exactly the five M1 condition types", () => {
+  it("registers exactly the five M1 types plus Phase B COLLECT_INFO", () => {
     expect(registry.types().sort()).toEqual(Object.keys(EXPECTED).sort());
   });
 

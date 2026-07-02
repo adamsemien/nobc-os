@@ -14,6 +14,7 @@ import {
   loadGuestGateContext,
 } from "@/lib/gate-engine/guest-session";
 import type { GuestSectionView, GuestStepView } from "@/lib/gate-engine/guest-view";
+import { AnswerStep } from "./_components/AnswerStep";
 import { IdentifyForm } from "./_components/IdentifyForm";
 import { PayStep } from "./_components/PayStep";
 import { StepActions } from "./_components/StepActions";
@@ -67,6 +68,11 @@ function StepRow({
       {identified && step.action === "pay" ? (
         <div className="pl-6">
           <PayStep token={token} nodeId={step.nodeId} prompt={step.prompt} />
+        </div>
+      ) : null}
+      {identified && step.action === "answer" && step.fields?.length ? (
+        <div className="pl-6">
+          <AnswerStep token={token} nodeId={step.nodeId} fields={step.fields} />
         </div>
       ) : null}
     </li>

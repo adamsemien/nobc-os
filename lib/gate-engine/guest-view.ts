@@ -12,15 +12,30 @@
  *    unavailable - never as open, never as a stack trace.
  */
 import type { ConditionRegistry } from "./registry";
-import { CONDITION_ANSWER_QUESTIONS, CONDITION_PAY } from "./types";
+import {
+  CONDITION_ANSWER_QUESTIONS,
+  CONDITION_COLLECT_INFO,
+  CONDITION_PAY,
+} from "./types";
 import type { GateEvaluation, GateTreeNode, ProofIndex } from "./types";
 
 export type GuestStepState = "complete" | "needed" | "in_review";
 
 /** Guest-actionable step kinds (M4). A designed union, never a registry key -
  *  the no-raw-enums guarantee holds. "apply" offers the application bridge;
- *  "pay" offers the in-page Payment Element (M4-PAY, greenlit). */
-export type GuestStepAction = "apply" | "pay" | null;
+ *  "pay" offers the in-page Payment Element (M4-PAY, greenlit); "answer"
+ *  offers the collect-only registration fields (Phase B). */
+export type GuestStepAction = "apply" | "pay" | "answer" | null;
+
+/** Guest-safe field projection for "answer" steps - operator config shaped
+ *  for rendering, nothing more. */
+export type GuestFieldView = {
+  id: string;
+  label: string;
+  type: "text" | "textarea" | "select" | "checkbox";
+  required: boolean;
+  options?: string[];
+};
 
 export type GuestStepView = {
   nodeId: string;
@@ -28,6 +43,8 @@ export type GuestStepView = {
   state: GuestStepState;
   required: boolean;
   action: GuestStepAction;
+  /** Present only for "answer" steps. */
+  fields?: GuestFieldView[];
 };
 
 export type GuestSectionView = {
@@ -90,9 +107,13 @@ export function projectGuestView(args: {
     if (!def) return null; // unregistered - the gate is unprojectable
 
     let prompt = FALLBACK_PROMPT;
+    let parsedConfig: unknown = null;
     try {
       const parsed = def.configSchema.safeParse(node.config ?? {});
-      if (parsed.success) prompt = def.guestPrompt(parsed.data);
+      if (parsed.success) {
+        parsedConfig = parsed.data;
+        prompt = def.guestPrompt(parsed.data);
+      }
     } catch {
       prompt = FALLBACK_PROMPT;
     }
@@ -111,9 +132,36 @@ export function projectGuestView(args: {
           ? "apply"
           : node.conditionType === CONDITION_PAY
             ? "pay"
-            : null;
+            : node.conditionType === CONDITION_COLLECT_INFO
+              ? "answer"
+              : null;
 
-    return { nodeId: node.id, prompt, state, required: node.required, action };
+    const step: GuestStepView = {
+      nodeId: node.id,
+      prompt,
+      state,
+      required: node.required,
+      action,
+    };
+    if (action === "answer" && parsedConfig) {
+      const config = parsedConfig as {
+        questions: {
+          id: string;
+          label: string;
+          type: "text" | "textarea" | "select" | "checkbox";
+          required: boolean;
+          options?: string[];
+        }[];
+      };
+      step.fields = config.questions.map((q) => ({
+        id: q.id,
+        label: q.label,
+        type: q.type,
+        required: q.required,
+        options: q.options,
+      }));
+    }
+    return step;
   };
 
   const sections: GuestSectionView[] = [];

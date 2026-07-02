@@ -20,8 +20,40 @@ import { CONDITION_PAY } from "../types";
 const payConfigSchema = z.object({
   priceCents: z.number().int().min(0),
   currency: z.string().min(3).max(3).default("usd"),
+  /** Optional guest-facing label ("Early Bird", "GA", "Door"). */
+  label: z.string().min(1).max(80).optional(),
+  /** Availability window (ISO datetimes). Outside it the node is not offered
+   *  - enforced at the offer/mint layer, never inside the evaluator. */
+  availableFrom: z.string().datetime().optional(),
+  availableUntil: z.string().datetime().optional(),
+  /** Cap on successful purchases against THIS node (Early Bird runs out). */
+  maxQuantity: z.number().int().min(1).optional(),
 });
 export type PayConfig = z.infer<typeof payConfigSchema>;
+
+export type PayAvailability =
+  | { available: true }
+  | { available: false; reason: "not_yet" | "closed" | "sold_out" };
+
+/** Offer-layer availability for a PAY node. Pure - callers supply the sold
+ *  count (successful proofs/orders against the node) and the clock. Used by
+ *  the guest-view offer filter and the mint route's server-side enforcement;
+ *  the M1 verifier is deliberately not involved. */
+export function payNodeAvailability(
+  config: Pick<PayConfig, "availableFrom" | "availableUntil" | "maxQuantity">,
+  state: { now: Date; soldCount: number },
+): PayAvailability {
+  if (config.availableFrom && new Date(config.availableFrom).getTime() > state.now.getTime()) {
+    return { available: false, reason: "not_yet" };
+  }
+  if (config.availableUntil && new Date(config.availableUntil).getTime() <= state.now.getTime()) {
+    return { available: false, reason: "closed" };
+  }
+  if (config.maxQuantity !== undefined && state.soldCount >= config.maxQuantity) {
+    return { available: false, reason: "sold_out" };
+  }
+  return { available: true };
+}
 
 const paySubmissionSchema = z.object({
   paymentIntentId: z.string().min(1),
@@ -104,7 +136,9 @@ export function createPayCondition(ports?: {
     proofMechanism: "STRIPE_PAYMENT",
     configSchema: payConfigSchema,
     guestPrompt: (config) =>
-      `Get Ticket - ${formatPrice(config.priceCents, config.currency)}`,
+      config.label
+        ? `${config.label} - ${formatPrice(config.priceCents, config.currency)}`
+        : `Get Ticket - ${formatPrice(config.priceCents, config.currency)}`,
     isPassive: false,
     carryForward: { kind: "NEVER" },
     async verify({ config, submission, member, workspaceId }) {
