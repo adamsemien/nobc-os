@@ -27,14 +27,15 @@ export type FieldType =
   | 'select'
   | 'url'
   | 'number'
-  | 'group';
+  | 'group'
+  | 'photo';
 
 export interface SubField {
   id: string;
   /** Optional visible label for the sub-field. */
   label?: string;
-  /** Sub-fields are never themselves groups. */
-  type: Exclude<FieldType, 'group'>;
+  /** Sub-fields are never themselves groups or photo pickers. */
+  type: Exclude<FieldType, 'group' | 'photo'>;
   required?: boolean;
   system?: boolean;
   placeholder?: string;
@@ -160,6 +161,19 @@ export const QUESTIONS: Question[] = [
       { id: 'instagram', label: 'Instagram', type: 'url', required: false },
       { id: 'other', label: 'Other', type: 'url', required: false },
     ],
+  },
+  // A `photo` question writes no answer key of its own: the form's picker holds
+  // the files and the submit pipeline persists the uploaded R2 keys as the
+  // existing `photos.urls` answer (see MembershipForm handleSubmit). Placed as
+  // the close of the identity block - the natural end of "tell us who you are".
+  {
+    id: 'photos',
+    section: 'who-you-are',
+    label: 'Photos of you',
+    type: 'photo',
+    required: true,
+    help:
+      'Share 1 to 5 recent photos that feel like you - at least one clear shot of your face, so we can put a face to the name at the door.',
   },
   {
     id: 'whatYouDo',

@@ -132,7 +132,7 @@ const EMPTY_FORM: FormData = {
 
 // ---------------------------------------------------------------------------
 // Chapter pagination - the questions module is the single source of truth for
-// CONTENT; this map is the single source of truth for LAYOUT. The 39 questions
+// CONTENT; this map is the single source of truth for LAYOUT. The 40 questions
 // are grouped into 6 chapter-pages. Nothing is cut, renamed, or duplicated -
 // every id below resolves to a question in the module. Each page belongs to
 // exactly one section, so the three section interstitials still fire only at
@@ -141,8 +141,9 @@ const EMPTY_FORM: FormData = {
 
 const CHAPTER_PAGE_IDS: string[][] = [
   // Section 01 - Who You Are (pages follow module order; personality-test
-  // questions kept together on Page 2)
-  ['firstName', 'lastName', 'email', 'cell', 'homeAddress', 'cities', 'birthInfo', 'gender', 'dietary', 'links'],
+  // questions kept together on Page 2). Photos close the identity page - the
+  // natural end of "tell us who you are", per Adam's placement call.
+  ['firstName', 'lastName', 'email', 'cell', 'homeAddress', 'cities', 'birthInfo', 'gender', 'dietary', 'links', 'photos'],
   ['whatYouDo', 'creativePursuits', 'referrals', 'enneagram', 'otherTests'],
   // Section 02 - How You Move Through the World
   ['lastConvinced', 'obsessedWith', 'recommendForPay', 'comeToYouFor', 'loyalBrands', 'expertIn'],
@@ -194,6 +195,16 @@ const QUESTION_STEPS = PAGES.length;
 const LEGAL_STEP = QUESTION_STEPS;
 const REVEAL_STEP = QUESTION_STEPS + 1;
 
+// Photo picker limits - mirror the server caps in /api/apply/membership/upload
+// (10MB, image-only). The picked File objects live in component state and are
+// uploaded by the existing handleSubmit loop; nothing here touches that path.
+const MAX_APPLY_PHOTOS = 5;
+const APPLY_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+const APPLY_PHOTO_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+/** Page hosting the `photo` question - guardedSubmit's re-route target. */
+const PHOTO_PAGE_INDEX = PAGES.findIndex(page => page.some(q => q.type === 'photo'));
+const PHOTO_REQUIRED = PAGES.some(page => page.some(q => q.type === 'photo' && q.required));
+
 const SECTION_BY_ID = Object.fromEntries(SECTIONS.map(s => [s.id, s] as const));
 
 /** Answer key for a simple field or a group sub-field. */
@@ -207,7 +218,9 @@ function keysForPage(page: Question[]): string[] {
   for (const q of page) {
     if (q.type === 'group') {
       for (const sub of q.fields ?? []) keys.push(answerKey(q, sub));
-    } else {
+    } else if (q.type !== 'photo') {
+      // `photo` questions hold File objects in component state, not answers -
+      // the submit pipeline persists them under the fixed `photos.urls` key.
       keys.push(answerKey(q));
     }
   }
@@ -358,6 +371,9 @@ export default function MembershipForm() {
   const [showFrogger, setShowFrogger] = useState(false);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  // Picker-local validation message (wrong type / too large / over the cap) -
+  // separate from the page-level `error` so it renders beside the previews.
+  const [photoError, setPhotoError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [draftSaved, setDraftSaved] = useState(false);
   // Autosave (F1): debounced save-as-you-type status + a JSON snapshot of the
@@ -559,9 +575,51 @@ export default function MembershipForm() {
     };
   }, [showResumeBanner]);
 
+  // Revoke preview object URLs on unmount only. Removal revokes its own URL at
+  // the call site (removePhoto); revoking on every array change would kill URLs
+  // that survive into the next array when a photo is added or removed.
+  const photoPreviewUrlsRef = useRef<string[]>([]);
+  photoPreviewUrlsRef.current = photoPreviewUrls;
   useEffect(() => {
-    return () => { photoPreviewUrls.forEach(u => URL.revokeObjectURL(u)); };
-  }, [photoPreviewUrls]);
+    return () => { photoPreviewUrlsRef.current.forEach(u => URL.revokeObjectURL(u)); };
+  }, []);
+
+  /** Validate + accept newly picked files, capped at MAX_APPLY_PHOTOS. */
+  function addPhotoFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const accepted: File[] = [];
+    const urls: string[] = [];
+    let problem = '';
+    for (const file of Array.from(list)) {
+      if (photoFiles.length + accepted.length >= MAX_APPLY_PHOTOS) {
+        problem = `You can share up to ${MAX_APPLY_PHOTOS} photos.`;
+        break;
+      }
+      if (!APPLY_PHOTO_TYPES.has(file.type)) {
+        problem = `"${file.name}" isn't a JPG, PNG, or WebP - please pick a different photo.`;
+        continue;
+      }
+      if (file.size > APPLY_PHOTO_MAX_BYTES) {
+        problem = `"${file.name}" is over 10MB - please pick a smaller version.`;
+        continue;
+      }
+      accepted.push(file);
+      urls.push(URL.createObjectURL(file));
+    }
+    if (accepted.length > 0) {
+      setPhotoFiles(prev => [...prev, ...accepted]);
+      setPhotoPreviewUrls(prev => [...prev, ...urls]);
+    }
+    setPhotoError(problem);
+  }
+
+  function removePhoto(index: number) {
+    const url = photoPreviewUrls[index];
+    if (url) URL.revokeObjectURL(url);
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index));
+    setPhotoError('');
+  }
 
   // Section interstitial: the first time a section's first page is reached,
   // show a full-screen card before the form. CSS handles the motion; we just
@@ -752,6 +810,7 @@ export default function MembershipForm() {
   const fillSample = useCallback(() => {
     const filled: Record<string, string> = {};
     for (const q of QUESTIONS) {
+      if (q.type === 'photo') continue; // files, not text answers - nothing to fill
       if (q.type === 'group') {
         for (const sub of q.fields ?? []) filled[answerKey(q, sub)] = sampleValue(q, sub);
       } else {
@@ -924,6 +983,15 @@ export default function MembershipForm() {
   // resolves either way and finally clears the ref (a successful submit unmounts this
   // page, making the reset a harmless no-op).
   async function guardedSubmit() {
+    // Photo backstop: a resumed draft can land directly on House Rules with the
+    // picker empty (File objects never survive a reload). Send the applicant
+    // back to the photo page instead of submitting a photo-less application.
+    // Demo mode keeps its no-validation walkthrough. handleSubmit is unchanged.
+    if (!isDemo && PHOTO_REQUIRED && photoFiles.length === 0) {
+      setError('Please add at least one photo to finish your application.');
+      advance(PHOTO_PAGE_INDEX);
+      return;
+    }
     if (submittingRef.current) return;
     submittingRef.current = true;
     try {
@@ -1042,6 +1110,99 @@ export default function MembershipForm() {
 
   function renderSimpleInput(q: Question, key: string, showHint = false) {
     const value = answers[key] ?? '';
+    if (q.type === 'photo') {
+      const atCapacity = photoFiles.length >= MAX_APPLY_PHOTOS;
+      return (
+        <div>
+          {photoPreviewUrls.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
+              {photoPreviewUrls.map((url, i) => (
+                <div key={url} style={{ position: 'relative', width: 96, height: 96 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview, not a remote asset */}
+                  <img
+                    src={url}
+                    alt={`Your photo ${i + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(i)}
+                    aria-label={`Remove photo ${i + 1}`}
+                    style={{
+                      position: 'absolute',
+                      top: -10,
+                      right: -10,
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: theme.text,
+                      color: theme.bg,
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 15,
+                      lineHeight: 1,
+                      fontFamily: bodyFont,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <input
+            id={`${key}-input`}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            style={{ display: 'none' }}
+            onChange={e => { addPhotoFiles(e.target.files); e.currentTarget.value = ''; }}
+          />
+          <button
+            type="button"
+            id={key}
+            onClick={() => document.getElementById(`${key}-input`)?.click()}
+            disabled={atCapacity}
+            onFocus={() => setFocusedField(key)}
+            onBlur={() => setFocusedField(null)}
+            style={{
+              background: 'transparent',
+              color: atCapacity ? theme.muted : theme.text,
+              border: `1.5px solid ${focusedField === key ? theme.accent : theme.border}`,
+              borderRadius: 0,
+              padding: '0 24px',
+              minHeight: 48,
+              fontSize: 13,
+              fontFamily: bodyFont,
+              fontWeight: 500,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: atCapacity ? 'not-allowed' : 'pointer',
+              transition: 'border-color 200ms ease, color 200ms ease',
+            }}
+          >
+            {atCapacity ? 'photo limit reached' : photoFiles.length > 0 ? '+ add another photo' : '+ add photos'}
+          </button>
+          <p style={{ fontFamily: bodyFont, fontSize: 12, color: theme.muted, margin: '10px 0 0 0', letterSpacing: '0.04em' }}>
+            {photoFiles.length} of {MAX_APPLY_PHOTOS} added
+          </p>
+          {photoError && (
+            <p role="alert" style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, margin: '10px 0 0 0' }}>
+              {photoError}
+            </p>
+          )}
+        </div>
+      );
+    }
     if (q.type === 'textarea') {
       const recording = recordingKey === key;
       return (
@@ -1217,6 +1378,11 @@ export default function MembershipForm() {
           if (sub.required && !(answers[k] ?? '').trim()) {
             missing.push({ key: k, label: sub.label ?? q.label });
           }
+        }
+      } else if (q.type === 'photo') {
+        // Photos are Files in state, not answers - required means at least one.
+        if (q.required && photoFiles.length === 0) {
+          missing.push({ key: q.id, label: q.label });
         }
       } else if (q.required) {
         const k = answerKey(q);

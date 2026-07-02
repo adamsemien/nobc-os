@@ -134,6 +134,24 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[\r\n"\\]/g, '_').slice(0, 200);
 }
 
+/**
+ * Fetch a private R2 object into memory. Returns null when storage is
+ * unconfigured, the key is empty, or the object is missing. Only for
+ * bounded-size objects (application photos are capped at 10MB at upload).
+ */
+export async function getObjectBuffer(key: string): Promise<Buffer | null> {
+  const client = s3Client();
+  const b = bucket();
+  if (!client || !b || !key.trim()) return null;
+  try {
+    const res = await client.send(new GetObjectCommand({ Bucket: b, Key: key.trim() }));
+    const bytes = await res.Body?.transformToByteArray();
+    return bytes ? Buffer.from(bytes) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Delete a private R2 object (permanent-delete path). No-op when unconfigured/empty. */
 export async function deleteObject(key: string): Promise<void> {
   const client = s3Client();

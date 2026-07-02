@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { mirrorApplicationPhotosToDam } from '@/lib/apply-photo-mirror';
 import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
 import { isApplicationAccountOwner } from '@/lib/apply-account-link';
@@ -125,7 +126,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     where: { id },
     // PHASE B: prior consent timestamps drive stamp-once — the original
     // acceptance time must survive the final-submit re-PATCH.
-    select: { id: true, status: true, termsAcceptedAt: true, emailOptInAt: true, smsOptInAt: true },
+    // workspaceId + fullName feed the post-response DAM photo mirror below.
+    select: {
+      id: true,
+      status: true,
+      termsAcceptedAt: true,
+      emailOptInAt: true,
+      smsOptInAt: true,
+      workspaceId: true,
+      fullName: true,
+    },
   });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   // Once an application leaves PENDING, the draft endpoint is closed.
@@ -166,6 +176,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data: updateData,
   });
 
+  // DAM photo mirror: capture the prior photos.urls value BEFORE the upsert
+  // loop overwrites it, so a retried submit can retire the assets it replaced.
+  const incomingPhotoUrls =
+    typeof answers['photos.urls'] === 'string' ? answers['photos.urls'] : undefined;
+  let previousPhotoUrls: string | null = null;
+  if (incomingPhotoUrls !== undefined) {
+    const prev = await db.applicationAnswer.findFirst({
+      where: { applicationId: id, questionKey: 'photos.urls' },
+      select: { answer: true },
+    });
+    previousPhotoUrls = prev?.answer ?? null;
+  }
+
   for (const [questionKey, answer] of Object.entries(answers)) {
     const existingAnswer = await db.applicationAnswer.findFirst({
       where: { applicationId: id, questionKey },
@@ -176,6 +199,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else {
       await db.applicationAnswer.create({ data: { applicationId: id, questionKey, answer: value } });
     }
+  }
+
+  if (incomingPhotoUrls !== undefined) {
+    // Mirror the applicant's photos into the DAM after the response is sent.
+    // Best-effort and fully isolated (the mirror logs + swallows every error),
+    // so it can never fail or slow this PATCH — never break /apply.
+    after(() =>
+      mirrorApplicationPhotosToDam({
+        applicationId: id,
+        workspaceId: existing.workspaceId,
+        applicantName: existing.fullName,
+        photoUrlsAnswer: incomingPhotoUrls,
+        previousPhotoUrlsAnswer: previousPhotoUrls,
+      }),
+    );
   }
 
   return NextResponse.json({ id: application.id });
