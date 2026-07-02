@@ -28,6 +28,124 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
 const GENERIC_ERROR = "Something went wrong. Try again in a moment.";
 
+type LineItems = {
+  subtotalCents: number;
+  serviceFeeCents: number;
+  discountCents: number;
+  totalCents: number;
+};
+
+function formatCents(cents: number): string {
+  const dollars = (cents / 100).toFixed(2).replace(/\.00$/, "");
+  return `$${dollars}`;
+}
+
+/** Ticket / Service fee / Total - full price upfront, never a silently
+ *  inflated single number (Decision 3 transparency law). */
+function LineItemRows({ items }: { items: LineItems }) {
+  return (
+    <div className="mb-3 flex flex-col gap-1 border-b border-border pb-3 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="text-text-secondary">Ticket</span>
+        <span className="text-text-primary">{formatCents(items.subtotalCents)}</span>
+      </div>
+      {items.serviceFeeCents > 0 ? (
+        <div className="flex items-center justify-between">
+          <span className="text-text-secondary">Service fee</span>
+          <span className="text-text-primary">{formatCents(items.serviceFeeCents)}</span>
+        </div>
+      ) : null}
+      <div className="flex items-center justify-between font-medium">
+        <span className="text-text-primary">Total</span>
+        <span className="text-text-primary">{formatCents(items.totalCents)}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Quiet comp-code entry: collapsed to a text link, expands to one field.
+ *  Redemption is fully server-side - success refreshes into the opened
+ *  state, failure shows one generic line. */
+function CompCodeEntry({
+  token,
+  nodeId,
+  onNotice,
+}: {
+  token: string;
+  nodeId: string;
+  onNotice: (message: string) => void;
+}) {
+  const router = useRouter();
+  const [openEntry, setOpenEntry] = useState(false);
+  const [code, setCode] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
+
+  async function redeem() {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setRedeeming(true);
+    onNotice("");
+    try {
+      const res = await fetch(`/api/gate/${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "redeem_comp", nodeId, code: trimmed }),
+      });
+      const body = (await res.json()) as {
+        available?: boolean;
+        open?: boolean;
+        notice?: string;
+        sections?: { steps: { nodeId: string; state: string }[] }[];
+      };
+      if (!res.ok || !body.available) {
+        onNotice(GENERIC_ERROR);
+        return;
+      }
+      if (body.notice) {
+        onNotice(body.notice);
+        return;
+      }
+      router.refresh();
+    } catch {
+      onNotice(GENERIC_ERROR);
+    } finally {
+      setRedeeming(false);
+    }
+  }
+
+  if (!openEntry) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpenEntry(true)}
+        className="mt-2 self-start text-xs text-text-secondary underline underline-offset-2 transition-opacity hover:opacity-80"
+      >
+        Have a code?
+      </button>
+    );
+  }
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <input
+        type="text"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        placeholder="Access code"
+        className="w-40 rounded-sm border border-border bg-raised px-2 py-1.5 text-xs text-text-primary outline-none focus:border-primary"
+        maxLength={80}
+      />
+      <button
+        type="button"
+        onClick={redeem}
+        disabled={redeeming || code.trim().length === 0}
+        className="rounded-sm border border-border px-3 py-1.5 text-xs font-medium text-text-primary transition-opacity hover:opacity-80 disabled:opacity-50"
+      >
+        {redeeming ? "One moment…" : "Apply"}
+      </button>
+    </div>
+  );
+}
+
 function tokenAppearance(): Appearance {
   const styles = getComputedStyle(document.documentElement);
   const read = (name: string) => styles.getPropertyValue(name).trim();
@@ -122,6 +240,7 @@ export function PayStep({
 }) {
   const router = useRouter();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [lineItems, setLineItems] = useState<LineItems | null>(null);
   const [appearance, setAppearance] = useState<Appearance | null>(null);
   const [starting, setStarting] = useState(false);
   const [notice, setNotice] = useState("");
@@ -137,6 +256,7 @@ export function PayStep({
       });
       const body = (await res.json()) as {
         clientSecret?: string;
+        lineItems?: LineItems;
         alreadyPaid?: boolean;
         error?: string;
       };
@@ -149,6 +269,7 @@ export function PayStep({
         return;
       }
       setAppearance(tokenAppearance());
+      setLineItems(body.lineItems ?? null);
       setClientSecret(body.clientSecret);
     } catch {
       setNotice(GENERIC_ERROR);
@@ -161,6 +282,7 @@ export function PayStep({
     <div className="mt-2">
       {clientSecret ? (
         <div className="rounded-sm border border-border bg-raised p-4">
+          {lineItems ? <LineItemRows items={lineItems} /> : null}
           <Elements
             stripe={stripePromise}
             options={{ clientSecret, appearance: appearance ?? undefined }}
@@ -169,14 +291,17 @@ export function PayStep({
           </Elements>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={start}
-          disabled={starting}
-          className="inline-flex items-center rounded-sm bg-primary px-3 py-1.5 text-xs font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {starting ? "One moment…" : prompt}
-        </button>
+        <div className="flex flex-col">
+          <button
+            type="button"
+            onClick={start}
+            disabled={starting}
+            className="inline-flex items-center self-start rounded-sm bg-primary px-3 py-1.5 text-xs font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {starting ? "One moment…" : prompt}
+          </button>
+          <CompCodeEntry token={token} nodeId={nodeId} onNotice={setNotice} />
+        </div>
       )}
       {notice ? (
         <p className="mt-2 text-xs leading-snug text-text-secondary">{notice}</p>

@@ -36,7 +36,13 @@ export async function cleanupAcceptanceWorld(
   await db.gateSession.deleteMany({ where: scope });
   await db.gateNode.deleteMany({ where: scope });
   await db.gate.deleteMany({ where: scope });
+  // Commerce rows (Phase A bridge) - FK order: redemption -> ticket -> rsvp
+  // -> order -> promo (Ticket references RSVP; RSVP references Order).
+  await db.promoRedemption.deleteMany({ where: scope });
+  await db.ticket.deleteMany({ where: scope });
   await db.rSVP.deleteMany({ where: scope });
+  await db.order.deleteMany({ where: scope });
+  await db.promoCode.deleteMany({ where: scope });
   await db.application.deleteMany({ where: scope });
   await db.event.deleteMany({ where: scope });
   await db.member.deleteMany({ where: scope });

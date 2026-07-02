@@ -10,6 +10,14 @@
  *          { action: "check_application", nodeId }  the M4 bridge: the server
  *          finds the identified member's OWN application (never a
  *          client-supplied id) and runs the ANSWER_QUESTIONS verifier on it.
+ *          { action: "redeem_comp", nodeId, code }  Phase A: a 100%-off
+ *          PromoCode satisfies the PAY node with an honest COMP_CODE proof -
+ *          zero Stripe contact, real Order + Ticket + door-list RSVP.
+ *
+ *  After every evaluated POST, the commerce bridge records money +
+ *  attendance (Order/Ticket on satisfied PAY, confirmed RSVP on Open) - see
+ *  lib/commerce/gate-bridge.ts. GET runs the same bridge when the gate is
+ *  already open, so a crash between charge and record self-heals on reload.
  *
  *  Fail-closed: unknown/expired tokens are 404; malformed bodies are 400
  *  with a generic guest-safe message; verifier internals never leak. Both
@@ -18,6 +26,8 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { bridgeGateAdmission } from "@/lib/commerce/gate-bridge";
+import { checkCompCode, redeemCompCode } from "@/lib/commerce/promo-codes";
 import { db } from "@/lib/db";
 import { getDefaultRegistry, getGateEngine } from "@/lib/gate-engine";
 import { findApplicationForMember } from "@/lib/gate-engine/application-bridge";
@@ -26,7 +36,9 @@ import {
   identifyGuestSession,
   loadGuestGateContext,
 } from "@/lib/gate-engine/guest-session";
-import { CONDITION_ANSWER_QUESTIONS } from "@/lib/gate-engine/types";
+import type { GuestGateContext } from "@/lib/gate-engine/guest-session";
+import type { GuestGateView } from "@/lib/gate-engine/guest-view";
+import { CONDITION_ANSWER_QUESTIONS, CONDITION_PAY } from "@/lib/gate-engine/types";
 import { clientIpFrom, createRateLimiter } from "@/lib/rate-limit";
 
 const UNAVAILABLE_BODY = { available: false as const };
@@ -58,10 +70,28 @@ const postSchema = z.discriminatedUnion("action", [
     action: z.literal("check_application"),
     nodeId: z.string().min(1).max(64),
   }),
+  z.object({
+    action: z.literal("redeem_comp"),
+    nodeId: z.string().min(1).max(64),
+    code: z.string().min(1).max(80),
+  }),
 ]);
 
 function deps() {
   return { db, engine: getGateEngine(), registry: getDefaultRegistry() };
+}
+
+/** Money + attendance after an evaluation. Never affects the guest response. */
+async function bridge(
+  context: GuestGateContext,
+  view: GuestGateView,
+  submittedNodeId?: string,
+): Promise<void> {
+  await bridgeGateAdmission(db, {
+    context,
+    open: view.available ? view.open : false,
+    submittedNodeId,
+  });
 }
 
 export async function GET(
@@ -79,6 +109,7 @@ export async function GET(
   }
   try {
     const view = await guestViewForSession(deps(), context);
+    if (view.available && view.open) await bridge(context, view);
     return NextResponse.json(view, { status: view.available ? 200 : 404 });
   } catch (err) {
     console.error("[gate-guest-api] GET failed", {
@@ -117,6 +148,8 @@ export async function POST(
       });
       if (!context) return NextResponse.json(UNAVAILABLE_BODY, { status: 404 });
       const view = await guestViewForSession(deps(), context);
+      // A returning member can open on carry-forward alone at identify time.
+      await bridge(context, view);
       return NextResponse.json(view, { status: view.available ? 200 : 404 });
     }
 
@@ -173,13 +206,19 @@ export async function POST(
       const view = await guestViewForSession(deps(), context, {
         submissions: { [node.id]: { applicationId } },
       });
+      await bridge(context, view);
       return NextResponse.json(view, { status: view.available ? 200 : 404 });
+    }
+
+    if (parsed.action === "redeem_comp") {
+      return redeemCompForSession(context, parsed.nodeId, parsed.code);
     }
 
     // action === "submit"
     const view = await guestViewForSession(deps(), context, {
       submissions: { [parsed.nodeId]: parsed.submission },
     });
+    await bridge(context, view, parsed.nodeId);
     return NextResponse.json(view, { status: view.available ? 200 : 404 });
   } catch (err) {
     console.error("[gate-guest-api] POST failed", {
@@ -189,4 +228,79 @@ export async function POST(
     });
     return NextResponse.json(UNAVAILABLE_BODY, { status: 500 });
   }
+}
+
+// One generic message for every comp failure - reasons never leak to guests.
+const COMP_DECLINED = "That code did not work. Check it and try again.";
+
+/** Phase A comp redemption: validate the code server-side, write the money +
+ *  attendance records and the honest COMP_CODE proof, then re-evaluate. The
+ *  fresh evaluation reads the SATISFIED proof (established truth) and the
+ *  gate opens without any Stripe contact. */
+async function redeemCompForSession(
+  context: GuestGateContext,
+  nodeId: string,
+  code: string,
+) {
+  const { session, gate } = context;
+  if (!session.memberId) {
+    return NextResponse.json(
+      { available: false, error: "Tell us who you are first." },
+      { status: 409 }
+    );
+  }
+  const declined = async () => {
+    const view = await guestViewForSession(deps(), context);
+    return NextResponse.json(
+      view.available ? { ...view, notice: COMP_DECLINED } : view,
+      { status: view.available ? 200 : 404 }
+    );
+  };
+
+  if (gate.resourceType !== "EVENT") return declined();
+
+  const node = await db.gateNode.findFirst({
+    where: {
+      id: nodeId,
+      gateId: session.gateId,
+      workspaceId: session.workspaceId,
+      conditionType: CONDITION_PAY,
+    },
+    select: { id: true, config: true },
+  });
+  const member = await db.member.findFirst({
+    where: { id: session.memberId, workspaceId: session.workspaceId },
+    select: { id: true, email: true, firstName: true, lastName: true },
+  });
+  if (!node || !member) return declined();
+
+  const def = getDefaultRegistry().get(CONDITION_PAY);
+  const parsedConfig = def?.configSchema.safeParse(node.config ?? {});
+  const priceCents =
+    parsedConfig?.success &&
+    typeof (parsedConfig.data as { priceCents?: unknown }).priceCents === "number"
+      ? ((parsedConfig.data as { priceCents: number }).priceCents)
+      : 0;
+  if (priceCents <= 0) return declined();
+
+  const check = await checkCompCode(db, {
+    workspaceId: session.workspaceId,
+    eventId: gate.resourceId,
+    memberId: member.id,
+    code,
+  });
+  if (!check.ok) return declined();
+
+  await redeemCompCode(db, {
+    workspaceId: session.workspaceId,
+    eventId: gate.resourceId,
+    member,
+    promo: check.promo,
+    payNodeId: node.id,
+    subtotalCents: priceCents,
+  });
+
+  const view = await guestViewForSession(deps(), context);
+  await bridge(context, view);
+  return NextResponse.json(view, { status: view.available ? 200 : 404 });
 }

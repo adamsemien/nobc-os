@@ -1895,6 +1895,9 @@ enum ProofMechanism {
   INTERNAL_RECORD
   STRIPE_PAYMENT
   AI_SCORING
+  /// Operator-authorized comp - a 100%-off PromoCode satisfied the PAY step.
+  /// No Stripe contact; the proof payload carries the promo code + order ids.
+  COMP_CODE
 }
 
 /// Proof lifecycle. Only SATISFIED (and unexpired) counts toward Open.

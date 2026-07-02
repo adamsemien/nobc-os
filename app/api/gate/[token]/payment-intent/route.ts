@@ -21,6 +21,7 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { applyServiceFee, feePolicyFromEvent } from "@/lib/commerce/service-fee";
 import { db } from "@/lib/db";
 import { getDefaultRegistry } from "@/lib/gate-engine";
 import { isProofLive } from "@/lib/gate-engine/proofs";
@@ -78,7 +79,7 @@ export async function POST(
   if (!context) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const { session } = context;
+  const { session, gate } = context;
   if (!session.memberId) {
     return NextResponse.json(
       { error: "Tell us who you are first." },
@@ -118,6 +119,28 @@ export async function POST(
     return NextResponse.json({ alreadyPaid: true });
   }
 
+  // Service fee (Decision 3): the event's fee policy shapes what the buyer is
+  // charged. Default absorb = the flat ticket price. The line items go back to
+  // the client so the pay step never shows a silently inflated single price.
+  let lineItems = applyServiceFee(price.data.priceCents, {
+    mode: "absorb",
+    percentBps: null,
+    flatCents: null,
+  });
+  if (gate.resourceType === "EVENT") {
+    const event = await db.event.findFirst({
+      where: { id: gate.resourceId, workspaceId: session.workspaceId },
+      select: {
+        serviceFeeMode: true,
+        serviceFeePercentBps: true,
+        serviceFeeFlatCents: true,
+      },
+    });
+    if (event) {
+      lineItems = applyServiceFee(price.data.priceCents, feePolicyFromEvent(event));
+    }
+  }
+
   if (liveChargesBlocked()) {
     console.error(
       "[gate-pay] refusing to mint: live Stripe key without GATE_PAY_LIVE_CHARGES=1",
@@ -132,7 +155,7 @@ export async function POST(
   try {
     const intent = await stripe.paymentIntents.create(
       {
-        amount: price.data.priceCents,
+        amount: lineItems.totalCents,
         currency: price.data.currency,
         automatic_payment_methods: { enabled: true },
         metadata: {
@@ -142,11 +165,16 @@ export async function POST(
           nodeId: node.id,
           memberId: session.memberId,
           gateSessionId: session.id,
+          // Ticket/fee split for the Stripe record (total - fee = ticket).
+          subtotalCents: String(lineItems.subtotalCents),
+          serviceFeeCents: String(lineItems.serviceFeeCents),
         },
       },
-      { idempotencyKey: `gate-pay:${session.id}:${node.id}:${price.data.priceCents}` }
+      // Total in the key: a price OR fee-policy change mints a fresh intent
+      // instead of Stripe returning the stale-amount original.
+      { idempotencyKey: `gate-pay:${session.id}:${node.id}:${lineItems.totalCents}` }
     );
-    return NextResponse.json({ clientSecret: intent.client_secret });
+    return NextResponse.json({ clientSecret: intent.client_secret, lineItems });
   } catch (err) {
     console.error("[gate-pay] intent mint failed", {
       nodeId: node.id,

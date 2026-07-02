@@ -66,10 +66,14 @@ export async function cleanupWorld(
   await db.workspace.delete({ where: { id: ws.id } });
 }
 
-/** Seed the NBS-shape replica world. Returns ids the baseline test pins. */
+/** Seed the NBS-shape replica world. Returns ids the baseline test pins.
+ *  Event slugs are only unique per workspace but the PUBLIC resolver matches
+ *  by slug across workspaces - every world MUST use a distinct event slug or
+ *  a parallel world's twin can shadow this one. */
 export async function seedNbsWorld(
   db: PrismaClient,
   slug: string = NBS_WORLD_SLUG,
+  eventSlug: string = NBS_REPLICA_EVENT_SLUG,
 ): Promise<NbsWorld> {
   await cleanupWorld(db, slug);
 
@@ -84,7 +88,7 @@ export async function seedNbsWorld(
   const event = await db.event.create({
     data: {
       workspaceId: workspace.id,
-      slug: NBS_REPLICA_EVENT_SLUG,
+      slug: eventSlug,
       title: "No Bad Saturday (baseline replica)",
       description: "Baseline replica of the live event shape. Dev data only.",
       startAt: new Date("2026-07-12T02:00:00.000Z"),

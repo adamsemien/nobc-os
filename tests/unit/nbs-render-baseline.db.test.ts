@@ -12,7 +12,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import {
-  NBS_REPLICA_EVENT_SLUG,
   cleanupWorld,
   seedNbsWorld,
   type NbsWorld,
@@ -35,7 +34,7 @@ describeDb("NBS public render baseline on real rows", () => {
     }
     const adapter = new PrismaNeon({ connectionString: url });
     db = new PrismaClient({ adapter });
-    world = await seedNbsWorld(db, SLUG);
+    world = await seedNbsWorld(db, SLUG, `${SLUG}-event`);
   }, T);
 
   afterAll(async () => {
@@ -51,7 +50,7 @@ describeDb("NBS public render baseline on real rows", () => {
       const { resolvePublishedEventBySlug } = await import(
         "@/lib/public-event-loader"
       );
-      const ref = await resolvePublishedEventBySlug(NBS_REPLICA_EVENT_SLUG);
+      const ref = await resolvePublishedEventBySlug(world.eventSlug);
       expect(ref).toEqual({
         workspaceId: world.workspace.id,
         eventId: world.eventId,
@@ -66,7 +65,7 @@ describeDb("NBS public render baseline on real rows", () => {
       const { assemblePublicEventDTO } = await import(
         "@/lib/public-event-loader"
       );
-      const dto = await assemblePublicEventDTO(NBS_REPLICA_EVENT_SLUG);
+      const dto = await assemblePublicEventDTO(world.eventSlug);
       expect(dto).not.toBeNull();
       if (!dto) throw new Error("unreachable");
 
@@ -98,7 +97,7 @@ describeDb("NBS public render baseline on real rows", () => {
         data: { status: "DRAFT" },
       });
       try {
-        const ref = await resolvePublishedEventBySlug(NBS_REPLICA_EVENT_SLUG);
+        const ref = await resolvePublishedEventBySlug(world.eventSlug);
         expect(ref).toBeNull();
       } finally {
         await db.event.update({
