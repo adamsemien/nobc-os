@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🔴 Blocked |
+| **State** | 🟡 In progress — M1 code-complete on `feat/gate-engine-m1`, all 6 acceptance criteria green on ep-sweet-term, UNMERGED by design (Adam's gate) |
 | **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestone 1 of 6) |
 | **Last updated** | 2026-07-01 |
 | **Owner** | Adam |
-| **Blocked on** | Adam's Phase A approval: the build plan + `prisma/sql/gate-engine-m1.sql` + confirmation of the Phase B target database (proposed: dev branch `ep-sweet-term`). Also: the v3 spec file (`NoBadOS__spec__access-gate-engine-and-growth-platform-v3__2026-06-26.md`) is NOT in the repo — searched exhaustively 2026-07-01; the mission brief's restatement is the operative requirements doc until it lands. |
-| **Next** | On approval: apply the additive migration to the confirmed dev branch via `db execute`, then execute Phase B tasks 0–8 in `docs/superpowers/plans/2026-07-01-gate-engine-m1.md` (TDD, commit per task, branch `feat/gate-engine-m1`, no merge). |
+| **Blocked on** | Adam's review of the Phase B build (branch `feat/gate-engine-m1`; nothing merges or deploys without his gate). Secondary: the v3 spec file is still not in the repo — Adam will reconcile it later; flag any §11.1 conflict then. |
+| **Next** | Adam reviews the Phase B report + branch. On sign-off: plan M2 (guest render) against this engine's API surface. When the spec file lands in the repo root, diff the shipped data model against §11.1 and flag conflicts. |
 
 ## Scope
 

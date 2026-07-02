@@ -39,8 +39,16 @@
 | D14 | REFERRED_BY_MEMBER carry-forward = ALWAYS (not in §16.4) | It is a permanent internal record (`Member.referredByMemberId`); re-deriving is free and the fact never becomes false. |
 | D15 | ATTENDED_PRIOR reads RSVP rows (`checkedIn = true`), not the denormalized `Member.totalEventsAttended` | Source-of-truth over counter; the counter can drift. |
 | D16 | Carry-forward matches on conditionType only (not config hash) in M1 | No M1 condition has config-divergent reuse semantics yet; config-hash matching is additive when a real case appears. Documented limitation. |
+| D17 | Strict structural fail-closed: ANY structural violation anywhere in the tree (depth breach, empty/rule-less group, unregistered type, condition at root or with children) closes the WHOLE gate, even when a valid OR branch is satisfied | A partially malformed tree is ambiguity about operator intent; ambiguity is never Open. |
+| D18 | REFERRED_BY_MEMBER is passive (the brief tagged only ATTENDED_PRIOR passive) | It is a zero-member-action first-party lookup; auto-satisfying it on landing improves the flow and can never over-grant (the record is either true or absent). |
+| D19 | HOLD_MEMBERSHIP config is `{}` - no tier list | The live schema has no member-to-MembershipTier linkage column to check against; a tier config would be unverifiable theater. Additive later. |
+| D20 | Established-truth guard: a node with a live SATISFIED proof is not re-run on re-submission (non-LIVE types) | Paid is paid - a junk resubmission must never downgrade a real payment proof; "we never re-verify what we already know." LIVE types always re-run. |
+| D21 | Carry-forward mints only when the node has NO proof row at all | A fresher local REJECTED / PENDING_REVIEW / expired row must not be overwritten by older remote history. |
+| D22 | Passive verifiers do not re-run over a standing REJECTED / PENDING_REVIEW row | Human-relevant states (a pending review, an explicit rejection) are not silently flipped by a landing; a new submission or operator action changes them. |
 
-**Argued, not overridden (Adam to rule):** §16.4 "membership always" carries a revoked-member risk - a member approved once, later revoked or red-listed, still holds a live HOLD_MEMBERSHIP proof. Recommendation: change HOLD_MEMBERSHIP to always-live-re-verify (it is one indexed lookup, effectively free, and revocation-safe). Implemented as LOCKED (carries always) until Adam unlocks.
+**§16.4 HOLD_MEMBERSHIP - UNLOCKED by Adam 2026-07-01** (was "argued, not overridden" in Phase A): implemented as LIVE re-verify - the condition is re-verified from current member state on every evaluation, never carried, and a verifier error on a LIVE node evaluates unproven even when an older satisfied row exists. Acceptance test 6d proves a red-listed member stops passing immediately.
+
+**Ops note (Phase B, autonomous, documented):** the dev branch `ep-sweet-term` had drifted behind `schema.prisma` (missing `Member.claimedAt`, `Event.pageStyle`, `SponsorBrandProfile.contactEmail`, and the `ApplicationBackup` / `StripeEvent` / `InstagramStory` / `InstagramStoryBatch` tables - all already-merged main features). The generated client therefore could not write Member rows on dev. Reconciled with a `migrate diff --from-config-datasource` script, stripped of the two known false-drift `DROP INDEX` lines (DAM GIN + HNSW), verified zero destructive statements, applied to ep-sweet-term ONLY; both DAM indexes verified present afterward. Production untouched.
 
 ---
 
