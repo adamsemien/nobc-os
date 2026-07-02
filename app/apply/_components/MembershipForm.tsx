@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName } from '@/config/archetypes';
 import { CONSENT_DISCLOSURES, TERMS_VERSION } from '@/lib/apply-consent';
 import dynamic from 'next/dynamic';
@@ -353,10 +354,48 @@ function shouldPlayOpeningPull(): boolean {
   return true;
 }
 
+/**
+ * Fence for the `?dev=true` / `?demo=true` URL params (2026-07-02). Previously
+ * both worked for ANY production visitor - and isDemo skips required-field
+ * validation, a public backdoor into submitting empty applications. The flags
+ * now activate only in local development or for a signed-in member of the
+ * workspace's Clerk organization (`useAuth().orgId` - the same Clerk-org
+ * membership floor the operator role model rests on; applicants sign up as
+ * personal accounts and never carry an org). For everyone else the params are
+ * silently inert: no error, no message, the form behaves as normal. Local
+ * development behavior is unchanged (isDev stays on without any param, exactly
+ * as before). The fence only guards where the flags get SET - everything
+ * downstream of isDev/isDemo is untouched.
+ *
+ * NOTE: tests/unit/apply-dev-param-fence.test.ts byte-asserts and evaluates
+ * this exact function source - keep the two in lockstep.
+ */
+function resolveApplyDevFlags(
+  nodeEnv: string | undefined,
+  isWorkspaceOperator: boolean,
+  devParam: string | null,
+  demoParam: string | null,
+): { isDev: boolean; isDemo: boolean } {
+  const isLocalDev = nodeEnv === 'development';
+  const paramsAllowed = isLocalDev || isWorkspaceOperator;
+  return {
+    isDev: isLocalDev || (paramsAllowed && devParam === 'true'),
+    isDemo: paramsAllowed && demoParam === 'true',
+  };
+}
+
 export default function MembershipForm() {
   const searchParams = useSearchParams();
-  const isDev = process.env.NODE_ENV === 'development' || searchParams.get('dev') === 'true';
-  const isDemo = searchParams.get('demo') === 'true';
+  // Operator signal: an active Clerk-organization membership. Applicants are
+  // personal Clerk accounts (no org), so orgId is null for them and the fence
+  // stays closed; operators carry the workspace org. See resolveApplyDevFlags.
+  const { orgId } = useAuth();
+  const { isDev, isDemo } = resolveApplyDevFlags(
+    process.env.NODE_ENV,
+    !!orgId,
+    searchParams.get('dev'),
+    searchParams.get('demo'),
+  );
 
   const [isNight, setIsNight] = useState(false);
   const [step, setStep] = useState(0);
