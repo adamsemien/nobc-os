@@ -15,6 +15,7 @@ import {
   hasCapacity,
 } from '@/lib/event-access-submit';
 import { selectTierPriceCents } from '@/lib/ticketing/pricing';
+import { grossUpForBuyer } from '@/lib/ticketing/buyer-fee';
 import { alert } from '@/lib/alerting';
 
 const BodySchema = z.object({
@@ -183,6 +184,11 @@ async function handlePost(
     return NextResponse.json({ error: 'This path is free — use submit endpoint.' }, { status: 400 });
   }
 
+  // Buyer covers the Stripe processing fee; NoBC nets the full ticket price.
+  // amountCents stays the ticket price for the free-path gate above; the
+  // charge, the RSVP row, and the response all carry the grossed-up total.
+  const { chargedCents, feeCents } = grossUpForBuyer(amountCents);
+
   let rsvpMember: { id: string; email: string };
   if (resolved.kind === 'guest') {
     if (!body.guestEmail || !body.guestName) {
@@ -211,7 +217,7 @@ async function handlePost(
       return NextResponse.json({
         clientSecret: pi.client_secret,
         rsvpId: existingRsvp.id,
-        amountCents: pi.amount ?? amountCents,
+        amountCents: pi.amount ?? chargedCents,
       });
     }
     if (pi.status !== 'canceled' && pi.status !== 'succeeded') {
@@ -238,12 +244,12 @@ async function handlePost(
   // Without amount+mode in the key, Stripe returns the original PI and ignores
   // the new params, charging the stale amount or minting the wrong hold type.
   const captureMethod = event.approvalRequired ? 'manual' : 'automatic';
-  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}-${amountCents}-${captureMethod}`;
+  const idempotencyKey = `pi-${workspaceId}-${evt.id}-${rsvpMember.id}-${chargedCents}-${captureMethod}`;
   let pi: Awaited<ReturnType<typeof stripe.paymentIntents.create>>;
   try {
     pi = await stripe.paymentIntents.create(
       {
-        amount: amountCents,
+        amount: chargedCents,
         currency: 'usd',
         // approvalRequired -> 'manual' (authorize-and-hold, captured on operator
         // approval); ticketed no-approval -> 'automatic' (immediate capture,
@@ -252,7 +258,9 @@ async function handlePost(
         description: event.title,
         receipt_email: rsvpMember.email,
         automatic_payment_methods: { enabled: true },
-        metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug },
+        // feeCents records the buyer-covered service fee so the Stripe record
+        // shows the ticket/fee split (amount - feeCents = ticket price).
+        metadata: { workspaceId, eventId: evt.id, memberId: rsvpMember.id, slug, feeCents: String(feeCents) },
       },
       { idempotencyKey },
     );
@@ -264,7 +272,7 @@ async function handlePost(
       context: {
         eventId: evt.id,
         slug,
-        amountCents,
+        amountCents: chargedCents,
         viewer: String(viewer),
         errorClass: err instanceof Error ? err.constructor.name : 'unknown',
         errorMessage: err instanceof Error ? err.message : String(err),
@@ -283,7 +291,7 @@ async function handlePost(
       data: {
         stripePaymentIntentId: pi.id,
         paymentStatus: 'PENDING',
-        amountCents,
+        amountCents: chargedCents,
         ticketStatus: 'held',
         tierId: resolvedTierId ?? null,
         customAnswers: body.customAnswers ?? undefined,
@@ -314,7 +322,7 @@ async function handlePost(
             ticketStatus: 'held',
             stripePaymentIntentId: pi.id,
             paymentStatus: 'PENDING',
-            amountCents,
+            amountCents: chargedCents,
             tierId: resolvedTierId ?? null,
             customAnswers: body.customAnswers ?? undefined,
             guestEmail: resolved.kind === 'guest' ? body.guestEmail : null,
@@ -361,6 +369,6 @@ async function handlePost(
   return NextResponse.json({
     clientSecret: pi.client_secret,
     rsvpId,
-    amountCents,
+    amountCents: chargedCents,
   });
 }

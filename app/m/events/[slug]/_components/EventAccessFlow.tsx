@@ -14,6 +14,7 @@ import QRCode from 'qrcode';
 import { Loader2, CalendarPlus } from 'lucide-react';
 import type { EventDetailDTO, CustomQuestionDTO, TicketTierDTO } from './EventDetail';
 import { formatGateCTA } from '@/lib/event-access';
+import { splitChargedCents } from '@/lib/ticketing/buyer-fee';
 
 type Props = {
   event: EventDetailDTO;
@@ -790,6 +791,7 @@ function PayForm({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [hasExpress, setHasExpress] = useState(false);
+  const { baseCents, feeCents } = splitChargedCents(amountCents);
 
   async function confirm() {
     if (!stripe || !elements) return false;
@@ -848,11 +850,29 @@ function PayForm({
 
       <PaymentElement />
 
-      <div className="flex items-center justify-between border-t border-[var(--apply-rule)] pt-3 text-sm font-[family-name:var(--font-dm-sans)]">
-        <span className="text-[var(--apply-muted)]">Total</span>
-        <span className="font-medium text-[var(--apply-ink)]">
-          {formatPrice(amountCents)}
-        </span>
+      {/* Line items, never a silently inflated single price: the charged total
+          is the ticket price grossed up so the buyer covers the Stripe fee
+          (lib/ticketing/buyer-fee.ts), and the split is derived exactly from
+          the one amount this step already receives. */}
+      <div className="space-y-1.5 border-t border-[var(--apply-rule)] pt-3 text-sm font-[family-name:var(--font-dm-sans)]">
+        {feeCents > 0 ? (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-[var(--apply-muted)]">Ticket</span>
+              <span className="text-[var(--apply-ink)]">{formatPrice(baseCents)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[var(--apply-muted)]">Service fee</span>
+              <span className="text-[var(--apply-ink)]">{formatPrice(feeCents)}</span>
+            </div>
+          </>
+        ) : null}
+        <div className="flex items-center justify-between">
+          <span className="text-[var(--apply-muted)]">Total</span>
+          <span className="font-medium text-[var(--apply-ink)]">
+            {formatPrice(amountCents)}
+          </span>
+        </div>
       </div>
 
       {err ? <ErrorText msg={err} /> : null}
