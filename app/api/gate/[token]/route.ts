@@ -26,8 +26,9 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { sendTicketConfirmation } from "@/lib/commerce/confirmation";
 import { bridgeGateAdmission } from "@/lib/commerce/gate-bridge";
-import { CompExhaustedError } from "@/lib/commerce/orders";
+import { CapacityFullError, CompExhaustedError } from "@/lib/commerce/orders";
 import { checkCompCode, redeemCompCode } from "@/lib/commerce/promo-codes";
 import { db } from "@/lib/db";
 import { getDefaultRegistry, getGateEngine } from "@/lib/gate-engine";
@@ -61,6 +62,11 @@ const postSchema = z.discriminatedUnion("action", [
     action: z.literal("identify"),
     email: z.string().email().max(320),
     name: z.string().min(1).max(200),
+    // Phase F (ADD 1): consent capture - three separate signals, never
+    // bundled, never pre-checked. All optional: checking nothing still buys.
+    phone: z.string().min(3).max(40).optional(),
+    emailOptIn: z.boolean().optional(),
+    smsOptIn: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("submit"),
@@ -148,6 +154,11 @@ export async function POST(
         name: parsed.name,
       });
       if (!context) return NextResponse.json(UNAVAILABLE_BODY, { status: 404 });
+      await recordCheckoutConsent(context, {
+        phone: parsed.phone,
+        emailOptIn: parsed.emailOptIn,
+        smsOptIn: parsed.smsOptIn,
+      });
       const view = await guestViewForSession(deps(), context);
       // A returning member can open on carry-forward alone at identify time.
       await bridge(context, view);
@@ -231,6 +242,42 @@ export async function POST(
   }
 }
 
+/** Phase F (ADD 1) - consent capture on the person record. Affirmative-only:
+ *  a checked box sets the opt-in true with a timestamp; an unchecked box
+ *  never un-sets an earlier consent (absence is not revocation). Phone is
+ *  stored only when provided and never overwrites an existing number with
+ *  nothing. Never blocks the walkthrough - a failed write logs and moves on;
+ *  consent gates marketing contact, never the ticket. */
+async function recordCheckoutConsent(
+  context: GuestGateContext,
+  input: { phone?: string; emailOptIn?: boolean; smsOptIn?: boolean },
+): Promise<void> {
+  const { session } = context;
+  if (!session.memberId) return;
+  if (!input.phone && !input.emailOptIn && !input.smsOptIn) return;
+  const now = new Date();
+  try {
+    await db.member.updateMany({
+      where: { id: session.memberId, workspaceId: session.workspaceId },
+      data: {
+        ...(input.phone ? { phone: input.phone } : {}),
+        ...(input.emailOptIn === true
+          ? { marketingEmailOptIn: true, marketingEmailOptInAt: now }
+          : {}),
+        ...(input.smsOptIn === true
+          ? { marketingSmsOptIn: true, marketingSmsOptInAt: now }
+          : {}),
+      },
+    });
+  } catch (err) {
+    console.error("[gate-guest-api] consent capture failed", {
+      workspaceId: session.workspaceId,
+      memberId: session.memberId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 // One generic message for every comp failure - reasons never leak to guests.
 const COMP_DECLINED = "That code did not work. Check it and try again.";
 
@@ -293,7 +340,7 @@ async function redeemCompForSession(
   if (!check.ok) return declined();
 
   try {
-    await redeemCompCode(db, {
+    const redemption = await redeemCompCode(db, {
       workspaceId: session.workspaceId,
       eventId: gate.resourceId,
       member,
@@ -301,7 +348,28 @@ async function redeemCompForSession(
       payNodeId: node.id,
       subtotalCents: priceCents,
     });
+    // Phase F (ADD 2): comp orders confirm by email too - no Stripe event
+    // exists for them, so this is the only send.
+    if (!redemption.alreadyRecorded && redemption.rsvpId) {
+      await sendTicketConfirmation(db, {
+        workspaceId: session.workspaceId,
+        eventId: gate.resourceId,
+        memberId: member.id,
+        rsvpId: redemption.rsvpId,
+      });
+    }
   } catch (err) {
+    if (err instanceof CapacityFullError) {
+      // Phase F (ADD 3): the cap was reached inside the admission
+      // transaction - honest sold-out copy, nothing written.
+      const view = await guestViewForSession(deps(), context);
+      return NextResponse.json(
+        view.available
+          ? { ...view, notice: "Every seat for this evening is spoken for." }
+          : view,
+        { status: view.available ? 200 : 404 }
+      );
+    }
     // The race-safe claim lost (code exhausted between check and commit) or
     // the write failed - either way the guest gets the one generic decline.
     if (!(err instanceof CompExhaustedError)) {

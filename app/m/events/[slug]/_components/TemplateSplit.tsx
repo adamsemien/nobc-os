@@ -76,7 +76,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
         <div className="ev-stagger flex flex-1 flex-col px-6 pb-28 pt-8 text-left sm:px-12 sm:pt-12 lg:pb-14">
           {/* category tag */}
           <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-            {accessTypeLabel(event.resolved)}
+            {event.gated ? 'Event Access' : accessTypeLabel(event.resolved)}
           </p>
 
           {/* title */}

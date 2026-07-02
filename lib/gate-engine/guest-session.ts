@@ -11,10 +11,16 @@
  *  allow member swapping mid-traversal).
  */
 import type { Gate, GateSession, PrismaClient } from "@prisma/client";
+import { payNodeAvailability } from "./conditions/pay";
 import type { GateEngine } from "./orchestrate";
 import type { ConditionRegistry } from "./registry";
 import { loadProofIndex } from "./proofs";
-import { projectGuestView, type GuestGateView } from "./guest-view";
+import {
+  projectGuestView,
+  type GuestGateView,
+  type PayUnavailableReason,
+} from "./guest-view";
+import { CONDITION_PAY } from "./types";
 import type { GateTreeNode, ProofIndex } from "./types";
 
 export type GuestGateContext = {
@@ -103,6 +109,39 @@ export async function guestViewForSession(
   }
   const tree = byId.get(roots[0].id) ?? null;
 
+  // Phase F (ADD 4): compute the offer-layer availability for PAY nodes that
+  // declare a window or a quantity cap. Sold counts are live SATISFIED
+  // proofs on the node (paid + comp alike). Constraint-free nodes skip the
+  // count entirely.
+  const payAvailability = new Map<string, PayUnavailableReason>();
+  const now = new Date();
+  for (const row of rows) {
+    if (row.kind !== "CONDITION" || row.conditionType !== CONDITION_PAY) continue;
+    const def = registry.get(CONDITION_PAY);
+    const parsed = def?.configSchema.safeParse(row.config ?? {});
+    if (!parsed?.success) continue;
+    const config = parsed.data as {
+      availableFrom?: string;
+      availableUntil?: string;
+      maxQuantity?: number;
+    };
+    if (!config.availableFrom && !config.availableUntil && config.maxQuantity === undefined) {
+      continue;
+    }
+    const soldCount =
+      config.maxQuantity !== undefined
+        ? await db.gateProof.count({
+            where: {
+              nodeId: row.id,
+              status: "SATISFIED",
+              OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+            },
+          })
+        : 0;
+    const availability = payNodeAvailability(config, { now, soldCount });
+    if (!availability.available) payAvailability.set(row.id, availability.reason);
+  }
+
   if (!session.memberId) {
     return projectGuestView({
       tree,
@@ -110,6 +149,7 @@ export async function guestViewForSession(
       proofs: new Map(),
       registry,
       needsIdentity: true,
+      payAvailability,
     });
   }
 
@@ -135,5 +175,6 @@ export async function guestViewForSession(
     proofs,
     registry,
     needsIdentity: false,
+    payAvailability,
   });
 }

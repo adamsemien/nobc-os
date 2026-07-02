@@ -36,7 +36,11 @@ function buyerName(member: AdmissionMember): string {
 
 type Tx = Prisma.TransactionClient;
 
-/** Upsert the attendance record the door list reads. */
+/** Upsert the attendance record the door list reads. Capacity is enforced
+ *  HERE, inside the caller's transaction (Phase F, ADD 3): a NEW seat is
+ *  only created while the confirmed/held count is under the cap - two racing
+ *  buyers of the last seat cannot both land, because the count and the
+ *  create commit atomically. Updating an existing row never adds a seat. */
 async function upsertConfirmedRsvp(
   tx: Tx,
   args: {
@@ -47,6 +51,7 @@ async function upsertConfirmedRsvp(
     stripePaymentIntentId: string | null;
     paymentStatus: string;
     amountCents: number;
+    capacity: number | null;
   },
 ): Promise<string> {
   const existing = await tx.rSVP.findFirst({
@@ -69,6 +74,16 @@ async function upsertConfirmedRsvp(
   if (existing) {
     await tx.rSVP.update({ where: { id: existing.id }, data });
     return existing.id;
+  }
+  if (args.capacity !== null) {
+    const taken = await tx.rSVP.count({
+      where: {
+        workspaceId: args.workspaceId,
+        eventId: args.eventId,
+        ticketStatus: { in: ["confirmed", "held"] },
+      },
+    });
+    if (taken >= args.capacity) throw new CapacityFullError();
   }
   const created = await tx.rSVP.create({
     data: {
@@ -129,6 +144,7 @@ export async function recordPaidAdmission(
     0,
     args.amountReceivedCents - args.subtotalCents,
   );
+  const capacity = await eventCapacity(db, args.workspaceId, args.eventId);
 
   return db.$transaction(async (tx) => {
     const order = await tx.order.create({
@@ -155,6 +171,7 @@ export async function recordPaidAdmission(
       stripePaymentIntentId: args.paymentIntentId,
       paymentStatus: "CAPTURED",
       amountCents: args.amountReceivedCents,
+      capacity,
     });
     const ticket = await tx.ticket.create({
       data: {
@@ -187,6 +204,28 @@ export class CompExhaustedError extends Error {
     super("comp_code_exhausted");
     this.name = "CompExhaustedError";
   }
+}
+
+/** Phase F (ADD 3): the event is at capacity - no seat, no Order. Thrown
+ *  inside the admission transaction so every partial write rolls back. */
+export class CapacityFullError extends Error {
+  constructor() {
+    super("event_at_capacity");
+    this.name = "CapacityFullError";
+  }
+}
+
+/** The event's cap, read where the admission writes happen. */
+async function eventCapacity(
+  db: PrismaClient | Tx,
+  workspaceId: string,
+  eventId: string,
+): Promise<number | null> {
+  const event = await db.event.findFirst({
+    where: { id: eventId, workspaceId },
+    select: { capacity: true },
+  });
+  return event?.capacity ?? null;
 }
 
 export async function recordCompAdmission(
@@ -227,6 +266,8 @@ export async function recordCompAdmission(
       alreadyRecorded: true,
     };
   }
+
+  const capacity = await eventCapacity(db, args.workspaceId, args.eventId);
 
   return db.$transaction(async (tx) => {
     // Race-safe claim FIRST (Warden, Phase C): the increment only lands while
@@ -276,6 +317,7 @@ export async function recordCompAdmission(
       stripePaymentIntentId: null,
       paymentStatus: "COMP",
       amountCents: 0,
+      capacity,
     });
     const ticket = await tx.ticket.create({
       data: {
@@ -322,14 +364,27 @@ export async function ensureOpenAdmission(
     }
     return;
   }
-  await db.rSVP.create({
-    data: {
-      workspaceId: args.workspaceId,
-      eventId: args.eventId,
-      memberId: args.memberId,
-      status: "CONFIRMED",
-      ticketStatus: "confirmed",
-      origin: "gate",
-    },
+  const capacity = await eventCapacity(db, args.workspaceId, args.eventId);
+  await db.$transaction(async (tx) => {
+    if (capacity !== null) {
+      const taken = await tx.rSVP.count({
+        where: {
+          workspaceId: args.workspaceId,
+          eventId: args.eventId,
+          ticketStatus: { in: ["confirmed", "held"] },
+        },
+      });
+      if (taken >= capacity) throw new CapacityFullError();
+    }
+    await tx.rSVP.create({
+      data: {
+        workspaceId: args.workspaceId,
+        eventId: args.eventId,
+        memberId: args.memberId,
+        status: "CONFIRMED",
+        ticketStatus: "confirmed",
+        origin: "gate",
+      },
+    });
   });
 }

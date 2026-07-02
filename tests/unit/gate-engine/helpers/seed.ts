@@ -44,6 +44,8 @@ export async function cleanupAcceptanceWorld(
   await db.order.deleteMany({ where: scope });
   await db.promoCode.deleteMany({ where: scope });
   await db.application.deleteMany({ where: scope });
+  // The commerce bridge + refund machine audit their writes (Phase A/C).
+  await db.auditEvent.deleteMany({ where: scope });
   await db.event.deleteMany({ where: scope });
   await db.member.deleteMany({ where: scope });
   await db.workspace.delete({ where: { id: ws.id } });

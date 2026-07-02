@@ -22,7 +22,9 @@ import { alert } from "@/lib/alerting";
 import type { GuestGateContext } from "@/lib/gate-engine/guest-session";
 import { isProofLive } from "@/lib/gate-engine/proofs";
 import { CONDITION_COLLECT_INFO, CONDITION_PAY } from "@/lib/gate-engine/types";
+import { sendTicketConfirmation } from "./confirmation";
 import {
+  CapacityFullError,
   ensureOpenAdmission,
   recordPaidAdmission,
   type AdmissionMember,
@@ -61,18 +63,70 @@ async function recordForPayNode(
   if (!payload.success) return;
   const price = priceShape.safeParse(args.node.config ?? {});
 
-  await recordPaidAdmission(db, {
-    workspaceId: args.workspaceId,
-    eventId: args.eventId,
-    member: args.member,
-    paymentIntentId: payload.data.paymentIntentId,
-    subtotalCents: price.success
-      ? Math.min(price.data.priceCents, payload.data.amountReceived)
-      : payload.data.amountReceived,
-    amountReceivedCents: payload.data.amountReceived,
-    currency: payload.data.currency,
-    gateSessionId: args.gateSessionId,
-  });
+  try {
+    const admission = await recordPaidAdmission(db, {
+      workspaceId: args.workspaceId,
+      eventId: args.eventId,
+      member: args.member,
+      paymentIntentId: payload.data.paymentIntentId,
+      subtotalCents: price.success
+        ? Math.min(price.data.priceCents, payload.data.amountReceived)
+        : payload.data.amountReceived,
+      amountReceivedCents: payload.data.amountReceived,
+      currency: payload.data.currency,
+      gateSessionId: args.gateSessionId,
+    });
+    // Phase F (ADD 2): confirmation on the FIRST record only - the webhook
+    // provably never emails gate purchases (row absent or already CAPTURED
+    // when it fires), so this direct send cannot double.
+    if (!admission.alreadyRecorded && admission.rsvpId) {
+      await sendTicketConfirmation(db, {
+        workspaceId: args.workspaceId,
+        eventId: args.eventId,
+        memberId: args.member.id,
+        rsvpId: admission.rsvpId,
+      });
+    }
+  } catch (err) {
+    if (err instanceof CapacityFullError) {
+      // Phase F (ADD 3): the last seat went to a racing buyer AFTER this
+      // charge succeeded. No Order was written (the transaction rolled
+      // back); return the money immediately and expire the proof so the
+      // gate cannot open on a refunded charge.
+      const { stripe } = await import("@/lib/stripe");
+      await stripe.refunds
+        .create(
+          { payment_intent: payload.data.paymentIntentId },
+          { idempotencyKey: `capfull-${payload.data.paymentIntentId}` },
+        )
+        .catch((refundErr) => {
+          console.error("[gate-bridge] capacity-race auto-refund failed", {
+            paymentIntentId: payload.data.paymentIntentId,
+            error:
+              refundErr instanceof Error ? refundErr.message : String(refundErr),
+          });
+        });
+      await db.gateProof.updateMany({
+        where: {
+          nodeId: args.node.id,
+          memberId: args.member.id,
+          status: "SATISFIED",
+        },
+        data: { expiresAt: new Date() },
+      });
+      void alert({
+        severity: "warn",
+        event: "gate.capacity_race_refunded",
+        workspaceId: args.workspaceId,
+        context: {
+          eventId: args.eventId,
+          paymentIntentId: payload.data.paymentIntentId,
+        },
+      });
+      return;
+    }
+    throw err;
+  }
 }
 
 const collectPayloadShape = z.object({
@@ -190,11 +244,20 @@ export async function bridgeGateAdmission(
     }
 
     if (args.open) {
-      await ensureOpenAdmission(db, {
-        workspaceId,
-        eventId,
-        memberId: member.id,
-      });
+      try {
+        await ensureOpenAdmission(db, {
+          workspaceId,
+          eventId,
+          memberId: member.id,
+        });
+      } catch (err) {
+        if (err instanceof CapacityFullError) {
+          // A free-path open at capacity: no seat to give. Expected at cap -
+          // the page renders sold out; nothing to unwind.
+          return;
+        }
+        throw err;
+      }
       // Collected registration answers must land where the operator looks
       // (RSVP.customAnswers), never satisfy-and-vanish in a proof payload.
       await persistCollectedAnswers(db, {

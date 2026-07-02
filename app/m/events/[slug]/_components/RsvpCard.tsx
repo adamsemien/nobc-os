@@ -315,7 +315,8 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
     !hideHeader &&
     event.showCapacity && event.capacity != null && rsvpState === 'idle' && !isClosed;
   // The only state with an actionable button — drives the mobile sticky CTA.
-  const isCtaState = rsvpState === 'idle' && (isGated || (!isClosed && !isFull));
+  // Phase F: a full event has no CTA on the gated door either.
+  const isCtaState = rsvpState === 'idle' && !isFull && (isGated || !isClosed);
 
   return (
     <>
@@ -371,6 +372,18 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
           <p className="mt-2 text-[15px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
             {waitlistPosition ? `You're #${waitlistPosition}. ` : ''}
             We&rsquo;ll let you know the moment a spot opens.
+          </p>
+        </div>
+      ) : isGated && isFull ? (
+        // Phase F (ADD 3): sold out is sold out on the gated door too -
+        // editorial copy, no dead button. The mint route + admission
+        // transaction enforce the same cap server-side.
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            Sold out
+          </p>
+          <p className="mt-2 text-[18px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+            Every seat for this evening is spoken for.
           </p>
         </div>
       ) : isGated ? (

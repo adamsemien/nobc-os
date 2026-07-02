@@ -47,17 +47,21 @@ function StepRow({
                 : "mt-1 inline-block h-3 w-3 shrink-0 rounded-full border border-border-strong bg-transparent"
           }
         />
-        <span className="flex-1 text-sm leading-relaxed text-text-primary">
+        <span
+          className={`flex-1 text-sm leading-relaxed ${step.offered ? "text-text-primary" : "text-text-tertiary"}`}
+        >
           {step.prompt}
         </span>
         <span className="shrink-0 text-xs uppercase tracking-wide text-text-tertiary">
           {step.state === "complete"
             ? "Done"
-            : step.state === "in_review"
-              ? "In review"
-              : step.required
-                ? "Required"
-                : "To do"}
+            : !step.offered
+              ? (step.unofferedCopy ?? "Sales closed")
+              : step.state === "in_review"
+                ? "In review"
+                : step.required
+                  ? "Required"
+                  : "To do"}
         </span>
       </div>
       {identified && step.action === "apply" ? (
@@ -88,6 +92,16 @@ function Section({
   token: string;
   identified: boolean;
 }) {
+  // Phase F (ADD 4): when every path through this section is a PAY step
+  // whose sales have ended, the section renders one designed line - no dead
+  // buttons, no per-row noise.
+  // Only PAY steps can be unoffered, so every-step-unoffered means every
+  // alternative here was a ticket whose window closed or cap filled.
+  const allSalesClosed =
+    !section.satisfied &&
+    section.steps.length > 0 &&
+    section.steps.every((s) => !s.offered);
+
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-card">
       <header className="flex items-baseline justify-between border-b border-border bg-raised px-5 py-3">
@@ -98,11 +112,17 @@ function Section({
           <span className="text-xs text-text-tertiary">Done</span>
         ) : null}
       </header>
-      <ul>
-        {section.steps.map((step) => (
-          <StepRow key={step.nodeId} step={step} token={token} identified={identified} />
-        ))}
-      </ul>
+      {allSalesClosed ? (
+        <p className="px-5 py-6 text-sm italic leading-relaxed text-text-secondary" style={editorial}>
+          Ticket sales have closed for this evening.
+        </p>
+      ) : (
+        <ul>
+          {section.steps.map((step) => (
+            <StepRow key={step.nodeId} step={step} token={token} identified={identified} />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

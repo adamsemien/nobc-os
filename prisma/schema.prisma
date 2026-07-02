@@ -224,6 +224,15 @@ model Member {
   firstName         String
   lastName          String
   phone             String?
+  /// Checkout consent capture (Event Builder Rebuild, Phase F - ADD 1).
+  /// Three separate signals, never bundled, never pre-checked; affirmative
+  /// consent only ever sets them true (+ timestamp). Mirrors the apply
+  /// flow's structured consent model on Application. Gates marketing
+  /// contact, never the ticket.
+  marketingEmailOptIn   Boolean   @default(false)
+  marketingEmailOptInAt DateTime?
+  marketingSmsOptIn     Boolean   @default(false)
+  marketingSmsOptInAt   DateTime?
   status            MemberStatus @default(PENDING)
   tags              String[]
   /// Multi-valued CRM roles. Orthogonal to `status` (the membership lifecycle) —

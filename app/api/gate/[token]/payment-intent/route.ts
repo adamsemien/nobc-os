@@ -24,6 +24,7 @@ import { z } from "zod";
 import { applyServiceFee, feePolicyFromEvent } from "@/lib/commerce/service-fee";
 import { db } from "@/lib/db";
 import { getDefaultRegistry } from "@/lib/gate-engine";
+import { payNodeAvailability } from "@/lib/gate-engine/conditions/pay";
 import { isProofLive } from "@/lib/gate-engine/proofs";
 import { loadGuestGateContext } from "@/lib/gate-engine/guest-session";
 import { CONDITION_PAY } from "@/lib/gate-engine/types";
@@ -119,6 +120,33 @@ export async function POST(
     return NextResponse.json({ alreadyPaid: true });
   }
 
+  // Phase F (ADD 4): availability is enforced HERE, server-side, at the
+  // offer layer - never inside the evaluator. Outside its window or at its
+  // per-node cap, the node mints nothing.
+  const now = new Date();
+  const soldCount = await db.gateProof.count({
+    where: {
+      nodeId: node.id,
+      status: "SATISFIED",
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+  });
+  const availability = payNodeAvailability(
+    parsedConfig!.success ? (parsedConfig!.data as Parameters<typeof payNodeAvailability>[0]) : {},
+    { now, soldCount },
+  );
+  if (!availability.available) {
+    return NextResponse.json(
+      {
+        error:
+          availability.reason === "not_yet"
+            ? "This ticket is not on sale yet."
+            : "Sales for this ticket have closed.",
+      },
+      { status: 409 }
+    );
+  }
+
   // Service fee (Decision 3): the event's fee policy shapes what the buyer is
   // charged. Default absorb = the flat ticket price. The line items go back to
   // the client so the pay step never shows a silently inflated single price.
@@ -134,9 +162,27 @@ export async function POST(
         serviceFeeMode: true,
         serviceFeePercentBps: true,
         serviceFeeFlatCents: true,
+        capacity: true,
       },
     });
     if (event) {
+      // Phase F (ADD 3): sold out is enforced before any intent exists -
+      // the buyer at cap sees the sold-out state, never a charge.
+      if (event.capacity !== null) {
+        const taken = await db.rSVP.count({
+          where: {
+            workspaceId: session.workspaceId,
+            eventId: gate.resourceId,
+            ticketStatus: { in: ["confirmed", "held"] },
+          },
+        });
+        if (taken >= event.capacity) {
+          return NextResponse.json(
+            { error: "Every seat for this evening is spoken for." },
+            { status: 409 }
+          );
+        }
+      }
       lineItems = applyServiceFee(price.data.priceCents, feePolicyFromEvent(event));
     }
   }

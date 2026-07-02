@@ -28,7 +28,7 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
 
         <div className="ev-stagger">
           <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-            {accessTypeLabel(event.resolved)}
+            {event.gated ? 'Event Access' : accessTypeLabel(event.resolved)}
           </p>
 
           <h1

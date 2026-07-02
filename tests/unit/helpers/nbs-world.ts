@@ -61,6 +61,9 @@ export async function cleanupWorld(
   await db.promoCode.deleteMany({ where: scope });
   await db.eventWorkflow.deleteMany({ where: scope });
   await db.application.deleteMany({ where: scope });
+  // The action layer + refund machine audit their writes - clear the trail
+  // before the workspace row or its FK blocks the delete.
+  await db.auditEvent.deleteMany({ where: scope });
   await db.event.deleteMany({ where: scope });
   await db.member.deleteMany({ where: scope });
   await db.workspace.delete({ where: { id: ws.id } });

@@ -45,7 +45,16 @@ export type GuestStepView = {
   action: GuestStepAction;
   /** Present only for "answer" steps. */
   fields?: GuestFieldView[];
+  /** Phase F (ADD 4): false when a PAY node is outside its sales window or
+   *  at its quantity cap - the step renders as designed copy, never a dead
+   *  button. Enforcement also lives server-side in the mint route. */
+  offered: boolean;
+  /** Guest-safe copy for an unoffered step. */
+  unofferedCopy?: string;
 };
+
+/** Why a PAY node is not offered (server-derived, never guest input). */
+export type PayUnavailableReason = "not_yet" | "closed" | "sold_out";
 
 export type GuestSectionView = {
   headline: string;
@@ -92,8 +101,11 @@ export function projectGuestView(args: {
   proofs: ProofIndex;
   registry: ConditionRegistry;
   needsIdentity: boolean;
+  /** Unavailable PAY nodes only (Phase F, ADD 4). */
+  payAvailability?: Map<string, PayUnavailableReason>;
 }): GuestGateView {
   const { tree, evaluation, proofs, registry, needsIdentity } = args;
+  const payAvailability = args.payAvailability ?? new Map<string, PayUnavailableReason>();
 
   if (!tree || tree.kind !== "GROUP") return UNAVAILABLE;
   if (evaluation?.structuralViolation) return UNAVAILABLE;
@@ -136,12 +148,23 @@ export function projectGuestView(args: {
               ? "answer"
               : null;
 
+    const unavailable =
+      node.conditionType === CONDITION_PAY && state === "needed"
+        ? payAvailability.get(node.id)
+        : undefined;
     const step: GuestStepView = {
       nodeId: node.id,
       prompt,
       state,
       required: node.required,
-      action,
+      action: unavailable ? null : action,
+      offered: !unavailable,
+      ...(unavailable
+        ? {
+            unofferedCopy:
+              unavailable === "not_yet" ? "Not on sale yet" : "Sales closed",
+          }
+        : {}),
     };
     if (action === "answer" && parsedConfig) {
       const config = parsedConfig as {
