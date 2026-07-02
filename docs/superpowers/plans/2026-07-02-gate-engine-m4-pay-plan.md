@@ -1,10 +1,30 @@
-# Access Gate Engine v3 - In-page PAY flow: PLAN ONLY
+# Access Gate Engine v3 - In-page PAY flow
 
-> **Status: NOT BUILT.** Per Adam's split-authority directive (2026-07-02), no Stripe
-> integration code exists for the gate PAY flow. This document is the design for his
-> review. Nothing below ships until he explicitly greenlights it. If a demo of the
-> shape is ever built first, it runs against test-mode keys only, on its own commit,
-> fully revertible without touching the rest of M4.
+> **Status: GREENLIT AND BUILT (2026-07-02).** Adam resolved Decision 1 as
+> **auto-capture** (Option B - an authorization hold can lapse unclaimed ~7 days;
+> auto-capture removes that failure mode and refunds stay equally easy), so the
+> Option A verifier extension below was never needed - the M1 verifier is untouched.
+> Built on `feat/gate-engine-m4-pay` (stacked on `feat/gate-engine-m4`), own clean
+> commit, revertible independent of the rest of M4.
+>
+> **Safety rail as built:** the mint route refuses to create intents on a non-test
+> Stripe key unless `GATE_PAY_LIVE_CHARGES=1` is explicitly set (PAY-D3). Merging
+> this branch enables zero live-charge capability - flipping that env var is a
+> separate deliberate step Adam takes.
+>
+> **Open questions resolved under standing authority (see deviation table in the
+> M4-PAY report):**
+> - **Tier support (PAY-D4):** flat `priceCents` per PAY node stands. Tiered doors
+>   are composed, not configured: multiple PAY nodes under an ANY_N group, one per
+>   tier - visible in the Builder like every other rule, no hidden pricing logic.
+> - **Refund-revokes-proof (PAY-D5):** NOT built in this milestone, deliberately.
+>   The only correct wiring points (the ADMIN refund route or a Stripe webhook
+>   route) are frozen money routes - touching them needs Adam's explicit gate. The
+>   blast radius of the gap is one event (PAY proofs carry NEVER) and the operator
+>   who issued the refund is looking right at it. Recommended follow-up: pair proof
+>   revocation with the operator proof-visibility surface, under its own gate.
+>
+> The original plan follows, kept for the record; deltas from as-built are noted above.
 
 ## What exists today (context)
 

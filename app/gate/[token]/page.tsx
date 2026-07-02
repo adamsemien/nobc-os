@@ -15,6 +15,7 @@ import {
 } from "@/lib/gate-engine/guest-session";
 import type { GuestSectionView, GuestStepView } from "@/lib/gate-engine/guest-view";
 import { IdentifyForm } from "./_components/IdentifyForm";
+import { PayStep } from "./_components/PayStep";
 import { StepActions } from "./_components/StepActions";
 
 export const metadata: Metadata = {
@@ -61,6 +62,11 @@ function StepRow({
       {identified && step.action === "apply" ? (
         <div className="pl-6">
           <StepActions token={token} nodeId={step.nodeId} />
+        </div>
+      ) : null}
+      {identified && step.action === "pay" ? (
+        <div className="pl-6">
+          <PayStep token={token} nodeId={step.nodeId} prompt={step.prompt} />
         </div>
       ) : null}
     </li>

@@ -12,14 +12,15 @@
  *    unavailable - never as open, never as a stack trace.
  */
 import type { ConditionRegistry } from "./registry";
-import { CONDITION_ANSWER_QUESTIONS } from "./types";
+import { CONDITION_ANSWER_QUESTIONS, CONDITION_PAY } from "./types";
 import type { GateEvaluation, GateTreeNode, ProofIndex } from "./types";
 
 export type GuestStepState = "complete" | "needed" | "in_review";
 
 /** Guest-actionable step kinds (M4). A designed union, never a registry key -
- *  the no-raw-enums guarantee holds. "apply" offers the application bridge. */
-export type GuestStepAction = "apply" | null;
+ *  the no-raw-enums guarantee holds. "apply" offers the application bridge;
+ *  "pay" offers the in-page Payment Element (M4-PAY, greenlit). */
+export type GuestStepAction = "apply" | "pay" | null;
 
 export type GuestStepView = {
   nodeId: string;
@@ -104,9 +105,13 @@ export function projectGuestView(args: {
         ? "in_review"
         : "needed";
     const action: GuestStepAction =
-      node.conditionType === CONDITION_ANSWER_QUESTIONS && state === "needed"
-        ? "apply"
-        : null;
+      state !== "needed"
+        ? null
+        : node.conditionType === CONDITION_ANSWER_QUESTIONS
+          ? "apply"
+          : node.conditionType === CONDITION_PAY
+            ? "pay"
+            : null;
 
     return { nodeId: node.id, prompt, state, required: node.required, action };
   };

@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — M1 (engine core) + M2 (guest render) + M3 (Builder) + M4 GO items (application bridge, `/e/` minting, rate limits) code-complete on stacked branches `feat/gate-engine-m1/-m2/-m3/-m4`; in-page PAY flow is PLAN-ONLY (`docs/superpowers/plans/2026-07-02-gate-engine-m4-pay-plan.md`); all acceptance green on ep-sweet-term; UNMERGED by design (Adam's gate) |
-| **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestones 1–4 of 6 built; PAY flow awaiting Adam's plan review) |
+| **State** | 🟡 In progress — M1 (engine core) + M2 (guest render) + M3 (Builder) + M4 (bridge, `/e/` minting, rate limits) + M4-PAY (in-page Stripe pay flow, auto-capture, greenlit 2026-07-02) code-complete on stacked branches `feat/gate-engine-m1/-m2/-m3/-m4/-m4-pay`; all acceptance green on ep-sweet-term incl. a live test-mode end-to-end payment; UNMERGED by design (Adam's gate) |
+| **V1 item** | None — post-July-11 platform work (v3 roadmap: engine, guest render, Builder, cutover surfaces + pay all built) |
 | **Last updated** | 2026-07-02 |
 | **Owner** | Adam |
-| **Blocked on** | Adam's review of the four-branch stack + the PAY-flow plan (incl. the authorize-vs-capture decision in that doc). Nothing merges or deploys without his gate. Secondary: the v3 spec file is still not in the repo — reconcile + flag conflicts when it lands. |
-| **Next** | Adam reviews the stack, the M3/M4 rendered captures (delivered), and the PAY plan's Option A/B money-semantics decision. On PAY greenlight: build the plan as written (test-mode keys, own commits). Remaining v3 milestones after that: backfill/cutover of existing events + v3.1 condition types. |
+| **Blocked on** | Adam's review of the five-branch stack. Live charges stay OFF even after merge until Adam sets `GATE_PAY_LIVE_CHARGES=1` on a live key (the mint route's safety rail). Secondary: the v3 spec file is still not in the repo — reconcile + flag conflicts when it lands. |
+| **Next** | Adam reviews the stack + the PAY rendered capture. Documented follow-ups needing their own gates: refund-revokes-proof (touches frozen money routes, PAY-D5), Builder-UX notice that a gate fully replaces v1 access settings (Decision 3), operator proof/session visibility. Remaining v3 milestones: backfill/cutover of existing events + v3.1 condition types. |
 
 ## Scope
 
