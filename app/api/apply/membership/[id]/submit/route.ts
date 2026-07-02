@@ -90,7 +90,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Door 1 + confirmation email (after the lock) is winner-only because a loser
   // returns cached from within the lock and never reaches it.
   const outcome = await db.$transaction(async (tx) => {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+  // $executeRaw, NOT $queryRaw: pg_advisory_xact_lock() returns Postgres `void`,
+  // which Prisma 7's $queryRaw cannot deserialize (P2010 "Failed to deserialize
+  // column of type 'void'" - this 500'd every prod submission, 2026-07-02).
+  // $executeRaw runs the statement and discards the result; the lock semantics
+  // are identical (verified: lock held inside the tx, released at COMMIT/ROLLBACK).
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
 
   // Re-read under the lock. If a concurrent submit already scored (or was decided),
   // return its persisted reveal and do NO scoring / billing / email on this request.
