@@ -104,6 +104,7 @@ export async function redeemCompCode(
     eventId: args.eventId,
     member: args.member,
     promoCodeId: args.promo.id,
+    promoMaxUses: args.promo.maxUses,
     subtotalCents: args.subtotalCents,
   });
 

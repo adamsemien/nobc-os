@@ -48,7 +48,13 @@ export function RsvpList({ eventId, initialRsvps }: { eventId: string; initialRs
     setRefunding(rsvpId);
     setError(null);
     try {
-      const res = await fetch(`/api/operator/rsvps/${rsvpId}/refund`, { method: 'POST' });
+      // Phase C: one refund machine - the ADMIN route with cumulative
+      // idempotency + refund-revokes-proof (the old per-RSVP route is gone).
+      const res = await fetch('/api/stripe/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rsvpId }),
+      });
       const data = (await res.json()) as { ok?: boolean; error?: string; refundAmountCents?: number };
       if (!res.ok) throw new Error(data.error ?? 'Refund failed');
       setRsvps(prev =>

@@ -53,11 +53,25 @@ export async function getPublishedEventsWithConfirmedCounts(workspaceId: string)
   }));
 }
 
-export async function getEventBySlug(workspaceId: string, slug: string) {
-  return db.event.findUnique({
+/** Load one event for a detail surface.
+ *
+ *  DRAFT guard (Event Builder Rebuild, Phase C - audit item h): by default a
+ *  DRAFT event resolves to null, so a plain signed-in member can no longer
+ *  browse unpublished events at /m/events/[slug]. The two legitimate draft
+ *  readers opt in explicitly: the public loader's preview entry (authorized
+ *  by a signed preview token or a STAFF+ session) and any operator surface
+ *  that has already role-checked.
+ */
+export async function getEventBySlug(
+  workspaceId: string,
+  slug: string,
+  opts?: { includeDraft?: boolean },
+) {
+  const event = await db.event.findUnique({
     where: { workspaceId_slug: { workspaceId, slug } },
     select: {
       ...listSelect,
+      status: true,
       pageStyle: true,
       plusOnesAllowed: true,
       customQuestions: {
@@ -92,6 +106,9 @@ export async function getEventBySlug(workspaceId: string, slug: string) {
       _count: { select: { rsvps: true } },
     },
   });
+  if (!event) return null;
+  if (event.status === 'DRAFT' && !opts?.includeDraft) return null;
+  return event;
 }
 
 export async function getConfirmedRsvpCount(eventId: string): Promise<number> {

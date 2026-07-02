@@ -95,7 +95,10 @@ async function assembleAnonEventDTO(
   workspaceId: string,
   slug: string,
 ): Promise<(EventDetailDTO & { workspaceId: string }) | null> {
-  const event = await getEventBySlug(workspaceId, slug);
+  // includeDraft is safe here: the live entry already enforced PUBLISHED via
+  // resolvePublishedEventBySlug, and the preview entry is authorized by a
+  // signed token or a STAFF+ session before it ever reaches this assembly.
+  const event = await getEventBySlug(workspaceId, slug, { includeDraft: true });
   if (!event) return null;
 
   const heroImageUrl = getEventHeroDisplayUrl(event.heroImageAssetId ?? null);

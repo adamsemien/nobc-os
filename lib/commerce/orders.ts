@@ -182,6 +182,13 @@ export async function recordPaidAdmission(
  *  contact anywhere: a zero-total Order carries the promo linkage, the
  *  Ticket is a real zero-amount admission, and the RSVP uses the house
  *  'COMP' payment status the operator surfaces already understand. */
+export class CompExhaustedError extends Error {
+  constructor() {
+    super("comp_code_exhausted");
+    this.name = "CompExhaustedError";
+  }
+}
+
 export async function recordCompAdmission(
   db: PrismaClient,
   args: {
@@ -189,6 +196,8 @@ export async function recordCompAdmission(
     eventId: string;
     member: AdmissionMember;
     promoCodeId: string;
+    /** The code's cap, for the race-safe claim below. Null = uncapped. */
+    promoMaxUses: number | null;
     subtotalCents: number;
   },
 ): Promise<AdmissionResult> {
@@ -220,6 +229,21 @@ export async function recordCompAdmission(
   }
 
   return db.$transaction(async (tx) => {
+    // Race-safe claim FIRST (Warden, Phase C): the increment only lands while
+    // usedCount is still under the cap, so two concurrent redemptions of the
+    // last use cannot both succeed - the loser rolls the whole admission back.
+    const claimed = await tx.promoCode.updateMany({
+      where: {
+        id: args.promoCodeId,
+        workspaceId: args.workspaceId,
+        ...(args.promoMaxUses !== null
+          ? { usedCount: { lt: args.promoMaxUses } }
+          : {}),
+      },
+      data: { usedCount: { increment: 1 } },
+    });
+    if (claimed.count === 0) throw new CompExhaustedError();
+
     const order = await tx.order.create({
       data: {
         workspaceId: args.workspaceId,
@@ -243,10 +267,6 @@ export async function recordCompAdmission(
         orderId: order.id,
         amountSavedCents: args.subtotalCents,
       },
-    });
-    await tx.promoCode.update({
-      where: { id: args.promoCodeId },
-      data: { usedCount: { increment: 1 } },
     });
     const rsvpId = await upsertConfirmedRsvp(tx, {
       workspaceId: args.workspaceId,

@@ -27,6 +27,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { bridgeGateAdmission } from "@/lib/commerce/gate-bridge";
+import { CompExhaustedError } from "@/lib/commerce/orders";
 import { checkCompCode, redeemCompCode } from "@/lib/commerce/promo-codes";
 import { db } from "@/lib/db";
 import { getDefaultRegistry, getGateEngine } from "@/lib/gate-engine";
@@ -291,14 +292,27 @@ async function redeemCompForSession(
   });
   if (!check.ok) return declined();
 
-  await redeemCompCode(db, {
-    workspaceId: session.workspaceId,
-    eventId: gate.resourceId,
-    member,
-    promo: check.promo,
-    payNodeId: node.id,
-    subtotalCents: priceCents,
-  });
+  try {
+    await redeemCompCode(db, {
+      workspaceId: session.workspaceId,
+      eventId: gate.resourceId,
+      member,
+      promo: check.promo,
+      payNodeId: node.id,
+      subtotalCents: priceCents,
+    });
+  } catch (err) {
+    // The race-safe claim lost (code exhausted between check and commit) or
+    // the write failed - either way the guest gets the one generic decline.
+    if (!(err instanceof CompExhaustedError)) {
+      console.error("[gate-guest-api] comp redemption failed", {
+        workspaceId: session.workspaceId,
+        eventId: gate.resourceId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return declined();
+  }
 
   const view = await guestViewForSession(deps(), context);
   await bridge(context, view);
