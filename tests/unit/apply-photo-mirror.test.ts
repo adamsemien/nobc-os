@@ -117,7 +117,8 @@ describe('mirrorApplicationPhotosToDam', () => {
     expect(m.assetCreate.mock.calls[0][0].data.folderId).toBe('folder_new');
   });
 
-  it('ignores keys outside this workspace prefix, http URLs, and traversal', async () => {
+  it('ignores keys outside this workspace prefix, http URLs, and traversal — loudly', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await mirrorApplicationPhotosToDam(
       baseOpts([
         `applications/ws_OTHER/1-x.jpg`,
@@ -128,6 +129,29 @@ describe('mirrorApplicationPhotosToDam', () => {
     );
     expect(m.assetCreate).not.toHaveBeenCalled();
     expect(m.uploadObject).not.toHaveBeenCalled();
+    // The drop must be logged with the key + expected vs actual workspace id -
+    // a silent drop is what hid the 2026-07-02 wrong-tenant key bug.
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringContaining('[apply/photo-mirror] dropped key'),
+      expect.objectContaining({
+        applicationId: APP,
+        expectedWorkspaceId: WS,
+        dropped: expect.arrayContaining([
+          expect.objectContaining({
+            key: 'applications/ws_OTHER/1-x.jpg',
+            keyWorkspaceId: 'ws_OTHER',
+          }),
+        ]),
+      }),
+    );
+    consoleWarn.mockRestore();
+  });
+
+  it('does not warn when every key belongs to this workspace', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await mirrorApplicationPhotosToDam(baseOpts([KEY(1)]));
+    expect(consoleWarn).not.toHaveBeenCalled();
+    consoleWarn.mockRestore();
   });
 
   it('caps mirroring at 5 photos', async () => {

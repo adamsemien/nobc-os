@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { resolveDefaultApplyWorkspace } from '@/lib/apply-workspace';
 import { isStorageConfigured, uploadObject } from '@/lib/dam/storage';
 import { applicationPhotoKey } from '@/lib/apply-photo';
 import { isAllowedImageBytes, type SniffedImageType } from '@/lib/image-magic-bytes';
@@ -46,8 +46,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Uploads unavailable' }, { status: 503 });
   }
 
-  // Unauthenticated public apply → tenant zero (mirror /api/apply/membership POST).
-  const workspace = await db.workspace.findFirst({ select: { id: true } });
+  // Unauthenticated public apply → the SAME resolver the create route uses
+  // (APPLY_DEFAULT_WORKSPACE_ID, else oldest workspace). A bare findFirst() here
+  // once minted keys under a different workspace than the application row, so
+  // every downstream IDOR guard (photo proxy, DAM mirror) correctly refused
+  // them and no photo ever rendered (P0, 2026-07-02).
+  const workspace = await resolveDefaultApplyWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: 'Workspace not found' }, { status: 500 });
   }
