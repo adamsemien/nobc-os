@@ -10,8 +10,8 @@
 | **V1 item** | None — post-July-11 platform work (v3 roadmap: engine, guest render, Builder, cutover surfaces + pay all built) |
 | **Last updated** | 2026-07-02 |
 | **Owner** | Adam |
-| **Blocked on** | Adam's review of the five-branch stack. Live charges stay OFF even after merge until Adam sets `GATE_PAY_LIVE_CHARGES=1` on a live key (the mint route's safety rail). Secondary: the v3 spec file is still not in the repo — reconcile + flag conflicts when it lands. |
-| **Next** | Adam reviews the stack + the PAY rendered capture. Documented follow-ups needing their own gates: refund-revokes-proof (touches frozen money routes, PAY-D5), Builder-UX notice that a gate fully replaces v1 access settings (Decision 3), operator proof/session visibility. Remaining v3 milestones: backfill/cutover of existing events + v3.1 condition types. |
+| **Blocked on** | Adam's approval of the Event Builder Rebuild phase plan (`docs/superpowers/plans/2026-07-02-event-builder-rebuild.md`, branch `feat/event-builder-rebuild` cut from m4-pay 79d483c). Live charges stay OFF until Adam sets `GATE_PAY_LIVE_CHARGES=1` on a live key. Secondary: the v3 spec file is still not committed to the repo (lives untracked at the main checkout root). |
+| **Next** | 2026-07-02 — Apex directive: Event Builder Rebuild (v3 cutover) phase plan written and AWAITING APPROVAL. Phases: 0 baseline harness, A commerce spine (Order/Ticket/PromoCode/service fee), B builder surface + actions layer + true anon draft preview, C refunds complete + orphan demolition, D cutover package (NBS converter + checklist, no cutover), E AI composition through the same actions. The M4 follow-ups (refund-revokes-proof, gate-replaces-door notice) are folded into Phases C and B respectively. On approval: build Phase 0 first (NBS render baseline pinned before any change). |
 
 ## Scope
 
