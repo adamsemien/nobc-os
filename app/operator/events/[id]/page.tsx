@@ -8,6 +8,7 @@ import { EventApplicationsTab } from './_components/EventApplicationsTab';
 import { EventCheckinTab } from './_components/EventCheckinTab';
 import { EventSettingsTab } from './_components/EventSettingsTab';
 import { QuestionsTab } from './_components/QuestionsTab';
+import { GateBuilderTab } from './_components/GateBuilderTab';
 import { CopyInviteLinkButton } from './_components/CopyInviteLinkButton';
 import { EventActionBar } from './_components/EventActionBar';
 import { LiveRsvpFeed } from './_components/LiveRsvpFeed';
@@ -264,6 +265,7 @@ export default async function OperatorEventDetailPage({
         {tab === 'questions' && (
           <QuestionsTab eventId={id} questions={event.customQuestions} />
         )}
+        {tab === 'gate' && <GateBuilderTab eventId={id} />}
         {tab === 'settings' && <EventSettingsTab event={event} />}
       </div>
     </div>

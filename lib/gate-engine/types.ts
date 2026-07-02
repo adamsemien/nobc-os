@@ -162,9 +162,14 @@ export type GateDecision = {
   verifierErrors: { nodeId: string; code: "VERIFIER_ERROR" | "INVALID_CONFIG" | "UNREGISTERED_CONDITION" }[];
 };
 
-// ─── Authoring spec (input to validate + createGate) ─────────────────────────
+// ─── Authoring spec (input to validate + createGate / updateGate) ────────────
+// `id` is the round-trip identity for updateGate's id-stable diff (M3): a spec
+// node carrying the id of an existing node of the same kind (and, for
+// conditions, the same conditionType) is updated in place so its proofs
+// survive the edit. Validation ignores it; createGate ignores it.
 export type GateConditionSpec = {
   kind: "CONDITION";
+  id?: string;
   conditionType: string;
   config: unknown;
   required?: boolean;
@@ -173,6 +178,7 @@ export type GateConditionSpec = {
 
 export type GateGroupSpec = {
   kind: "GROUP";
+  id?: string;
   rule: "ALL" | "ANY_N" | "WEIGHTED";
   requiredCount?: number;
   weightThreshold?: number;

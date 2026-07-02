@@ -11,6 +11,7 @@ const TABS = [
   // Questions tab hidden from operator nav (V1.5) — gates cover the use case for now.
   // QuestionsTab.tsx stays on disk; page.tsx still renders it for ?tab=questions.
   // { key: 'questions', label: 'Questions' },
+  { key: 'gate', label: 'Access Gate' },
   { key: 'settings', label: 'Settings' },
 ];
 

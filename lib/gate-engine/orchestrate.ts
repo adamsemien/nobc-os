@@ -18,6 +18,15 @@
  *  and a junk re-submission can never downgrade a real payment).
  */
 import type { GateNode, GateResourceType, Member, PrismaClient } from "@prisma/client";
+import {
+  buildTree,
+  deleteGate as deleteGateImpl,
+  GateAuthoringError,
+  getGateForResource as getGateForResourceImpl,
+  toTreeNode,
+  updateGate as updateGateImpl,
+  type LoadedGate,
+} from "./authoring";
 import { evaluateTree } from "./evaluate";
 import { recordGrowthEdge } from "./growth";
 import type { ConditionRegistry } from "./registry";
@@ -31,20 +40,12 @@ import {
 import type {
   GateDecision,
   GateNodeSpec,
-  GateTreeNode,
   ProofSnapshot,
   VerifyOutcome,
 } from "./types";
 import { validateGateSpec } from "./validate";
 
-export class GateAuthoringError extends Error {
-  readonly errors: string[];
-  constructor(errors: string[]) {
-    super(`Gate spec failed validation: ${errors.join(" | ")}`);
-    this.name = "GateAuthoringError";
-    this.errors = errors;
-  }
-}
+export { GateAuthoringError } from "./authoring";
 
 export type EvaluateGateArgs = {
   workspaceId: string;
@@ -70,6 +71,18 @@ export type GateEngine = {
     memberId?: string;
   }): Promise<{ sessionId: string; token: string }>;
   evaluateGate(args: EvaluateGateArgs): Promise<GateDecision>;
+  // M3 authoring surface (Builder)
+  getGateForResource(args: {
+    workspaceId: string;
+    resource: { type: GateResourceType; id: string };
+  }): Promise<LoadedGate | null>;
+  updateGate(args: {
+    workspaceId: string;
+    gateId: string;
+    name?: string | null;
+    spec: GateNodeSpec;
+  }): Promise<{ rootNodeId: string }>;
+  deleteGate(args: { workspaceId: string; gateId: string }): Promise<boolean>;
 };
 
 export function createGateEngine(deps: {
@@ -379,32 +392,12 @@ export function createGateEngine(deps: {
     return decision;
   }
 
-  return { createGate, createSession, evaluateGate };
-}
-
-function toTreeNode(row: GateNode): GateTreeNode {
   return {
-    id: row.id,
-    kind: row.kind,
-    required: row.required,
-    weight: row.weight,
-    rule: row.rule,
-    requiredCount: row.requiredCount,
-    weightThreshold: row.weightThreshold,
-    children: [],
-    conditionType: row.conditionType,
-    config: row.config,
+    createGate,
+    createSession,
+    evaluateGate,
+    getGateForResource: (a) => getGateForResourceImpl(db, a),
+    updateGate: (a) => updateGateImpl(db, registry, a),
+    deleteGate: (a) => deleteGateImpl(db, a),
   };
-}
-
-function buildTree(rows: GateNode[], rootId: string): GateTreeNode | null {
-  const byId = new Map<string, GateTreeNode>();
-  for (const row of rows) byId.set(row.id, toTreeNode(row));
-  for (const row of rows) {
-    if (row.parentId === null) continue;
-    const parent = byId.get(row.parentId);
-    const child = byId.get(row.id);
-    if (parent && child) parent.children.push(child);
-  }
-  return byId.get(rootId) ?? null;
 }

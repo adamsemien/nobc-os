@@ -32,6 +32,8 @@ export function getGateEngine(): GateEngine {
 export { createConditionRegistry, ConditionRegistry } from "./registry";
 export { createGateEngine, GateAuthoringError } from "./orchestrate";
 export type { GateEngine, EvaluateGateArgs } from "./orchestrate";
+export { buildTree, deleteGate, getGateForResource, specToPreviewTree, toTreeNode, updateGate } from "./authoring";
+export type { LoadedGate } from "./authoring";
 export { evaluateTree } from "./evaluate";
 export type { EvaluateOptions } from "./evaluate";
 export { validateGateSpec, MAX_CONDITION_DEPTH, MAX_GROUP_DEPTH } from "./validate";

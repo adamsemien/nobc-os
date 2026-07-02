@@ -6,12 +6,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — M1 (engine core) + M2 (guest render) code-complete; M1 on `feat/gate-engine-m1`, M2 stacked on `feat/gate-engine-m2`; all acceptance green on ep-sweet-term; UNMERGED by design (Adam's gate) |
-| **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestones 1–2 of 6 built) |
-| **Last updated** | 2026-07-01 |
+| **State** | 🟡 In progress — M1 (engine core) + M2 (guest render) + M3 (Builder) code-complete on stacked branches `feat/gate-engine-m1/-m2/-m3`; M4 (bridge + minting + rate limits) in progress on `feat/gate-engine-m4`; all acceptance green on ep-sweet-term; UNMERGED by design (Adam's gate) |
+| **V1 item** | None — post-July-11 platform work (v3 roadmap, Milestones 1–3 of 6 built) |
+| **Last updated** | 2026-07-02 |
 | **Owner** | Adam |
-| **Blocked on** | Adam's review of the M1 + M2 branches (nothing merges or deploys without his gate). Secondary: the v3 spec file is still not in the repo — reconcile + flag conflicts when it lands. |
-| **Next** | Adam reviews M2 rendered design (screenshots delivered) + both branches. Then M3 (Builder) or M4 items per Adam's call — in-page PAY flow, application bridge, `/e/` session minting, and rate limiting are the documented M4 deferrals in `docs/superpowers/plans/2026-07-01-gate-engine-m2.md`. |
+| **Blocked on** | Adam's review of the branch stack (nothing merges or deploys without his gate). The in-page PAY flow is PLAN-ONLY by Adam's directive — no Stripe integration code until he greenlights the plan doc. Secondary: the v3 spec file is still not in the repo — reconcile + flag conflicts when it lands. |
+| **Next** | Finish M4 GO items (application bridge, `/e/` session minting, per-token rate limiting) on `feat/gate-engine-m4`, deliver the PAY-flow plan doc, then Adam reviews the stack + the PAY plan. |
 
 ## Scope
 
@@ -23,12 +23,17 @@ M1 only: the headless engine core. Five additive tables (Gate, GateNode, GatePro
 prisma/schema.prisma                          ← 5 additive models + 8 enums (end of file)
 prisma/sql/gate-engine-m1.sql                 ← reviewed additive migration (NOT yet applied)
 docs/superpowers/plans/2026-07-01-gate-engine-m1.md  ← the Phase B build contract
-lib/gate-engine/                              ← (Phase B) engine core: types, registry, validate,
-                                                 evaluate, orchestrate, proofs, growth, authoring,
+lib/gate-engine/                              ← engine core: types, registry, validate, evaluate,
+                                                 orchestrate, proofs, growth, authoring (M3 read/
+                                                 update/delete), guest-view + guest-session (M2),
                                                  conditions/{pay,answer-questions,referred-by-member,
                                                  attended-prior,hold-membership}
-tests/unit/gate-engine/                       ← (Phase B) truth tables + acceptance.db.test.ts
-scripts/seed-gate-m1.ts                       ← (Phase B) deterministic acceptance seed
+app/gate/[token]/ + app/api/gate/[token]/     ← (M2) public guest walkthrough + token API
+app/api/operator/events/[id]/gate/…           ← (M3) operator gate CRUD + preview + sessions
+app/operator/events/[id]/_components/GateBuilderTab.tsx ← (M3) Builder split-view (Access Gate tab)
+tests/unit/gate-engine/                       ← truth tables + acceptance/guest-flow/authoring DB suites
+scripts/seed-gate-m1.ts                       ← deterministic acceptance seed
+docs/superpowers/plans/2026-07-0*-gate-engine-m*.md ← per-milestone build contracts + deviations
 ```
 
 ## Inputs
