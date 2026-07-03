@@ -126,12 +126,18 @@ export function discountForPromo(
 /** Validate a partial-discount code against one PAY price (D6). Comp-class
  *  codes report "comp_code" so the caller routes them through the existing
  *  zero-Stripe machinery - never a second zero-charge path. A discount that
- *  zeroes or inverts the price is refused, not clamped (D6-2). Fail-closed. */
+ *  zeroes or inverts the price is refused, not clamped (D6-2). Fail-closed.
+ *
+ *  Scope (Loose Ends L7): a code redeems here when it is scoped to THIS
+ *  event, or to the series this event belongs to. `seriesId` is the event's
+ *  own series, read server-side by the caller - never client input. On a
+ *  code-string collision the event-scoped code wins. */
 export async function checkDiscountCode(
   db: PrismaClient,
   args: {
     workspaceId: string;
     eventId: string;
+    seriesId: string | null;
     memberId: string;
     code: string;
     baseCents: number;
@@ -144,17 +150,21 @@ export async function checkDiscountCode(
     return { ok: false, reason: "not_found" };
   }
 
-  const promo = await db.promoCode.findFirst({
+  const candidates = await db.promoCode.findMany({
     where: {
       workspaceId: args.workspaceId,
-      eventId: args.eventId,
       code: { equals: code, mode: "insensitive" },
+      OR: [
+        { eventId: args.eventId },
+        ...(args.seriesId ? [{ seriesId: args.seriesId }] : []),
+      ],
     },
   });
+  const promo =
+    candidates.find((p) => p.eventId === args.eventId) ?? candidates[0] ?? null;
   if (!promo) return { ok: false, reason: "not_found" };
   // A PAY node has no tier - tier-scoped codes do not redeem at a gate
-  // (D6-7). Series codes have no eventId, so the query above never finds
-  // them here.
+  // (D6-7), whether event- or series-scoped.
   if (promo.tierId !== null) return { ok: false, reason: "out_of_scope" };
   if (isCompCode(promo)) return { ok: false, reason: "comp_code" };
 

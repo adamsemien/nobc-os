@@ -10,6 +10,7 @@ import { createAnswerQuestionsCondition } from "./answer-questions";
 import { createAttendedPriorCondition } from "./attended-prior";
 import { createCollectInfoCondition } from "./collect-info";
 import { createHoldMembershipCondition } from "./hold-membership";
+import { createOpenCondition } from "./open";
 import { createPayCondition } from "./pay";
 import { createReferredByMemberCondition } from "./referred-by-member";
 
@@ -21,5 +22,6 @@ export function createDefaultConditionDefs(): ConditionTypeDef<unknown>[] {
     createAttendedPriorCondition(),
     createHoldMembershipCondition(),
     createCollectInfoCondition(),
+    createOpenCondition(),
   ] as unknown as ConditionTypeDef<unknown>[];
 }

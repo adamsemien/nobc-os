@@ -24,6 +24,7 @@ import {
   resolveAccessForViewer,
   buildSteps,
 } from './event-access';
+import { CONDITION_OPEN } from '@/lib/gate-engine/types';
 import type { EventDetailDTO } from '@/app/m/events/[slug]/_components/EventDetail';
 import type { WorkflowPath } from '@/lib/workflows/types';
 import { parsePageStyle } from '@/lib/page-style';
@@ -147,9 +148,23 @@ async function assembleAnonEventDTO(
     // the gate walkthrough. Workspace-scoped like every other read here.
     db.gate.findFirst({
       where: { workspaceId, resourceType: 'EVENT', resourceId: event.id },
-      select: { id: true },
+      select: {
+        id: true,
+        nodes: {
+          where: { kind: 'CONDITION' },
+          select: { conditionType: true },
+        },
+      },
     }),
   ]);
+
+  // Loose Ends L1/L3: the canonical open gate (at least one condition, all
+  // OPEN) renders the open door - CTA "Register" per copy law. Fail-closed:
+  // a gate with no condition nodes is NOT open.
+  const gateOpen =
+    gateRow != null &&
+    gateRow.nodes.length > 0 &&
+    gateRow.nodes.every((n) => n.conditionType === CONDITION_OPEN);
 
   const workflowPaths = parseWorkflowPaths(workflow?.paths);
 
@@ -195,6 +210,7 @@ async function assembleAnonEventDTO(
     // Per-event styling overrides; null/invalid falls back to brand defaults.
     pageStyle: parsePageStyle(event.pageStyle),
     gated: gateRow != null,
+    gateOpen,
   };
 
   return dto;

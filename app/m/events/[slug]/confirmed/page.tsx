@@ -92,7 +92,6 @@ export default async function EventConfirmedPage({
     color: QR_RENDER_COLORS,
   });
 
-  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/m/events/${event.slug}`;
   const applyHref = getApplyHref();
 
   // TODO(wallet): the Apple/Google wallet CTAs below post to /api/wallet/* which

@@ -28,6 +28,33 @@ export const CONDITION_HOLD_MEMBERSHIP = "HOLD_MEMBERSHIP";
 // Phase B (Event Builder Rebuild): collect-only registration fields - the
 // honest home for questions with no scoring (FIRST_PARTY / INTERNAL_RECORD).
 export const CONDITION_COLLECT_INFO = "COLLECT_INFO";
+// Loose Ends L1: the open door. Passive, always satisfied - the canonical
+// default gate for a fresh draft, because the evaluator (correctly)
+// fail-closes an empty group and an honest "anyone can get in" needs a
+// verifier that says so.
+export const CONDITION_OPEN = "OPEN";
+
+/** The canonical open-door gate: GROUP(ALL) with one OPEN condition. Fresh
+ *  object per call - authoring layers must never share a mutable spec. */
+export function openGateSpec(): GateNodeSpec {
+  return {
+    kind: "GROUP",
+    rule: "ALL",
+    children: [{ kind: "CONDITION", conditionType: CONDITION_OPEN, config: {} }],
+  };
+}
+
+/** True when a spec is the open door: a group with at least one condition,
+ *  all of them OPEN. Fail-closed on the childless case. */
+export function isOpenSpec(spec: GateNodeSpec | null): boolean {
+  if (!spec || spec.kind !== "GROUP") return false;
+  return (
+    spec.children.length > 0 &&
+    spec.children.every(
+      (c) => c.kind === "CONDITION" && c.conditionType === CONDITION_OPEN,
+    )
+  );
+}
 
 // ─── Carry-forward policy (Adam's §16.4 defaults) ───────────────────────────
 // NEVER  - proof never carries across gates (PAY: payment is per-event).

@@ -311,7 +311,15 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
   // The CTA posts to the mint route (no JS needed) and the v1 access flow is
   // never mounted. Only the public /e loader sets `gated` - /m is unchanged.
   const isGated = event.gated === true;
-  const ctaLabel = isGated ? 'Unlock Access' : isClosed ? 'Closed' : formatGateCTA(resolved);
+  // Loose Ends L3: the open door says "Register" (copy law for open events);
+  // a gate with real requirements says "Unlock Access". Same walkthrough.
+  const ctaLabel = isGated
+    ? event.gateOpen === true
+      ? 'Register'
+      : 'Unlock Access'
+    : isClosed
+      ? 'Closed'
+      : formatGateCTA(resolved);
   const showCapacityMeter =
     !hideHeader &&
     event.showCapacity && event.capacity != null && rsvpState === 'idle' && !isClosed;

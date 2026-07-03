@@ -66,13 +66,21 @@ const EXPECTED: Record<
       questions: [{ id: "q1", label: "Anything we should know?" }],
     },
   },
+  // Loose Ends L1: the open door - the default gate on a fresh draft.
+  OPEN: {
+    tier: "FIRST_PARTY",
+    mechanism: "INTERNAL_RECORD",
+    carry: { kind: "LIVE" },
+    passive: true,
+    exampleConfig: {},
+  },
 };
 
 describe("default condition registry", () => {
   const defs = createDefaultConditionDefs() as unknown as ConditionTypeDef<unknown>[];
   const registry = createConditionRegistry(defs);
 
-  it("registers exactly the five M1 types plus Phase B COLLECT_INFO", () => {
+  it("registers exactly the five M1 types plus Phase B COLLECT_INFO and L1 OPEN", () => {
     expect(registry.types().sort()).toEqual(Object.keys(EXPECTED).sort());
   });
 

@@ -45,6 +45,9 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   // the member page is auth-gated, so this never alters the member surface.
   const isActiveEvent = event.eventId === ACTIVE_EVENT_ID;
   const showFork = isActiveEvent && event.viewer === 'anon';
+  // Per-event hero fit (Loose Ends L6). The active-event hack stays ORed in
+  // until cutover step 10 retires it in favor of the setting.
+  const heroContain = event.pageStyle.heroFit === 'contain' || isActiveEvent;
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--ev-ground)] text-[var(--ev-ink)] lg:h-dvh lg:flex-row lg:overflow-hidden">
@@ -61,7 +64,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           <img
             src={event.heroImageUrl}
             alt=""
-            className={`h-[40vh] w-full sm:h-[44vh] lg:h-dvh lg:max-h-dvh ${isActiveEvent ? 'object-contain object-center' : 'object-cover'}`}
+            className={`h-[40vh] w-full sm:h-[44vh] lg:h-dvh lg:max-h-dvh ${heroContain ? 'object-contain object-center' : 'object-cover'}`}
           />
         ) : (
           <EventHeroFallback className="h-[40vh] w-full sm:h-[44vh] lg:h-full" />
@@ -99,7 +102,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           {showCapacity ? (
             <p className="mb-7 inline-flex w-fit items-center gap-2 text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--ev-accent)]" aria-hidden />
-              Limited to {event.capacity} spots
+              Limited to {event.capacity} spot{event.capacity === 1 ? '' : 's'}
             </p>
           ) : null}
 

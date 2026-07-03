@@ -58,7 +58,11 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
         {event.heroImageUrl ? (
           <div className="mx-auto mb-10 aspect-video w-full max-w-md overflow-hidden rounded-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={event.heroImageUrl} alt="" className="h-full w-full object-cover" />
+            <img
+              src={event.heroImageUrl}
+              alt=""
+              className={`h-full w-full ${event.pageStyle.heroFit === 'contain' ? 'object-contain object-center' : 'object-cover'}`}
+            />
           </div>
         ) : null}
 

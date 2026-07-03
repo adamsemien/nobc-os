@@ -64,5 +64,6 @@ export type { ReferredByMemberConfig, ReferrerExistsCheck } from "./conditions/r
 export { createAttendedPriorCondition } from "./conditions/attended-prior";
 export type { AttendedPriorConfig, CheckInCounter } from "./conditions/attended-prior";
 export { createHoldMembershipCondition } from "./conditions/hold-membership";
+export { createOpenCondition } from "./conditions/open";
 export type { HoldMembershipConfig } from "./conditions/hold-membership";
 export * from "./types";

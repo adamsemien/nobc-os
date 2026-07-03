@@ -192,6 +192,101 @@ describeDb("Phase B builder actions on real rows", () => {
   );
 
   it(
+    "loose ends L1: a fresh draft mints the open gate - anon preview shows the open door and anyone gets in",
+    async () => {
+      const created = await actions.createEventDraft({ title: "Open Door Default" });
+      expect(created.ok).toBe(true);
+      if (!created.ok) throw new Error("unreachable");
+
+      // The default gate is the canonical open spec: one OPEN condition.
+      const gate = await db.gate.findFirst({
+        where: {
+          workspaceId: workspace.id,
+          resourceType: "EVENT",
+          resourceId: created.eventId,
+        },
+        select: { id: true, nodes: { select: { kind: true, conditionType: true } } },
+      });
+      expect(gate).not.toBeNull();
+      const conditions = gate!.nodes.filter((n) => n.kind === "CONDITION");
+      expect(conditions).toEqual([{ kind: "CONDITION", conditionType: "OPEN" }]);
+
+      // Acceptance 3's letter: the builder never WRITES the legacy shape.
+      // Event.eventAccess carries a members-only column default the builder
+      // must not touch - the fresh draft's value equals a raw row's default,
+      // and the gated render below never reads it.
+      const bare = await db.event.create({
+        data: {
+          workspaceId: workspace.id,
+          title: "No Gate",
+          slug: "loose-ends-no-gate",
+          status: "DRAFT",
+          startAt: new Date("2026-08-01T20:00:00Z"),
+        },
+        select: { id: true, eventAccess: true },
+      });
+      const legacy = await legacySnapshot(created.eventId);
+      expect(legacy.event?.eventAccess).toEqual(bare.eventAccess);
+
+      // The anon preview renders the OPEN state, not the members-only card:
+      // the gate owns the door (gated) and it is the open door (gateOpen ->
+      // the CTA reads "Register").
+      const { assembleDraftPreviewDTO } = await import("@/lib/public-event-loader");
+      const dto = await assembleDraftPreviewDTO(workspace.id, created.eventId);
+      expect(dto).toMatchObject({ viewer: "anon", gated: true, gateOpen: true });
+
+      // Counterfactual (the old mismatch, pinned): an event with no gate is
+      // neither gated nor open-gated - its door still falls to the legacy
+      // members-only default.
+      const bareDto = await assembleDraftPreviewDTO(workspace.id, bare.id);
+      expect(bareDto).toMatchObject({ gated: false, gateOpen: false });
+
+      // And anyone actually gets in: an anonymous guest identifies on the
+      // walkthrough and the bridge hands them a confirmed seat.
+      const engine = (await import("@/lib/gate-engine")).getGateEngine();
+      const publicRoute = (await import("@/app/api/gate/[token]/route")) as unknown as {
+        POST: (req: Request, ctx: { params: Promise<{ token: string }> }) => Promise<Response>;
+      };
+      const session = await engine.createSession({
+        workspaceId: workspace.id,
+        gateId: gate!.id,
+      });
+      const identify = await publicRoute.POST(
+        new Request(`http://localhost/api/gate/${session.token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-forwarded-for": "10.77.0.1" },
+          body: JSON.stringify({
+            action: "identify",
+            email: "open-door-guest@example.com",
+            name: "Open Door Guest",
+          }),
+        }),
+        { params: Promise.resolve({ token: session.token }) },
+      );
+      expect(identify.status).toBe(200);
+
+      const guest = await db.member.findFirst({
+        where: { workspaceId: workspace.id, email: "open-door-guest@example.com" },
+        select: { id: true },
+      });
+      expect(guest).not.toBeNull();
+      const decision = await engine.evaluateGate({
+        workspaceId: workspace.id,
+        gateId: gate!.id,
+        memberId: guest!.id,
+        sessionId: session.sessionId,
+      });
+      expect(decision.open).toBe(true);
+      const seat = await db.rSVP.findFirst({
+        where: { workspaceId: workspace.id, eventId: created.eventId, memberId: guest!.id },
+        select: { ticketStatus: true },
+      });
+      expect(seat?.ticketStatus).toBe("confirmed");
+    },
+    T,
+  );
+
+  it(
     "comp codes: create is idempotent-guarded and deactivate closes the window",
     async () => {
       const created = await actions.createEventDraft({ title: "Comp Codes" });

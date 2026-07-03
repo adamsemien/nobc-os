@@ -42,7 +42,7 @@ export function TemplateEditorial({ event }: { event: EventDetailDTO }) {
           <img
             src={event.heroImageUrl}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute inset-0 h-full w-full ${event.pageStyle.heroFit === 'contain' ? 'object-contain object-center' : 'object-cover'}`}
           />
         ) : (
           <EventHeroFallback className="absolute inset-0 h-full w-full" />

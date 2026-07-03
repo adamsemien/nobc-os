@@ -173,6 +173,9 @@ export async function POST(
     percentBps: null,
     flatCents: null,
   };
+  // The event's own series, for series-scoped code lookup (Loose Ends L7).
+  // Server-derived only - never client input.
+  let eventSeriesId: string | null = null;
   if (gate.resourceType === "EVENT") {
     const event = await db.event.findFirst({
       where: { id: gate.resourceId, workspaceId: session.workspaceId },
@@ -181,6 +184,7 @@ export async function POST(
         serviceFeePercentBps: true,
         serviceFeeFlatCents: true,
         capacity: true,
+        seriesId: true,
       },
     });
     if (event) {
@@ -202,6 +206,7 @@ export async function POST(
         }
       }
       feePolicy = feePolicyFromEvent(event);
+      eventSeriesId = event.seriesId;
     }
   }
 
@@ -217,6 +222,7 @@ export async function POST(
     const check = await checkDiscountCode(db, {
       workspaceId: session.workspaceId,
       eventId: gate.resourceId,
+      seriesId: eventSeriesId,
       memberId: session.memberId,
       code: body.promoCode,
       baseCents: price.data.priceCents,

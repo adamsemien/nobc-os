@@ -16,7 +16,11 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { HeroImageUpload } from "../../_components/HeroImageUpload";
-import type { GateNodeSpec } from "@/lib/gate-engine/types";
+import {
+  CONDITION_OPEN,
+  openGateSpec,
+  type GateNodeSpec,
+} from "@/lib/gate-engine/types";
 import {
   createCompCode,
   createDiscountCode,
@@ -167,11 +171,20 @@ function draftFromTree(tree: unknown): AccessDraft {
       });
     }
   }
+  // Loose Ends L1: the default open gate (every condition OPEN) IS the open
+  // state - the rail reads and writes it as kind "open", never as chips.
+  const allChips = [...rootChips, ...groups.flatMap((g) => g.chips)];
+  if (
+    allChips.length > 0 &&
+    allChips.every((c) => c.conditionType === CONDITION_OPEN)
+  ) {
+    return { kind: "open", rootChips: [], groups: [] };
+  }
   return { kind: "gated", rootChips, groups };
 }
 
-function draftToSpec(draft: AccessDraft): GateNodeSpec | null {
-  if (draft.kind === "open") return null;
+function draftToSpec(draft: AccessDraft): GateNodeSpec {
+  if (draft.kind === "open") return openGateSpec();
   const children: GateNodeSpec[] = [
     ...draft.rootChips.map(
       (c): GateNodeSpec => ({
@@ -195,7 +208,8 @@ function draftToSpec(draft: AccessDraft): GateNodeSpec | null {
         }),
       ),
   ];
-  if (children.length === 0) return null;
+  // A gated draft with every chip removed is the open door.
+  if (children.length === 0) return openGateSpec();
   return { kind: "GROUP", rule: "ALL", children };
 }
 
@@ -777,6 +791,20 @@ export function BuilderShell({
                 onChange={(key) => saveDetails({ heroImageAssetId: key || null })}
               />
             </Row>
+            {event.heroImageAssetId ? (
+              <Row label="Cover fit">
+                <select
+                  defaultValue={event.heroFit}
+                  onChange={(e) =>
+                    saveDetails({ heroFit: e.target.value as "cover" | "contain" })
+                  }
+                  className={fieldClass}
+                >
+                  <option value="cover">Fill the frame</option>
+                  <option value="contain">Show the whole image</option>
+                </select>
+              </Row>
+            ) : null}
           </section>
 
           {/* Access - the gate is the door. */}

@@ -26,7 +26,7 @@ import { getMemberWorkspaceId } from "@/lib/auth";
 import { getEffectiveRole, roleAtLeast } from "@/lib/operator-role";
 import { getGateEngine } from "@/lib/gate-engine";
 import { GateAuthoringError } from "@/lib/gate-engine/authoring";
-import type { GateNodeSpec } from "@/lib/gate-engine/types";
+import { openGateSpec, type GateNodeSpec } from "@/lib/gate-engine/types";
 import { validateGateSpec } from "@/lib/gate-engine/validate";
 import { getDefaultRegistry } from "@/lib/gate-engine";
 import { mintPreviewToken } from "@/lib/preview-token";
@@ -125,6 +125,30 @@ export async function createEventDraft(
     },
     select: { id: true, slug: true },
   });
+
+  // Loose Ends L1 (Adam's decision: default gate on create): every fresh
+  // draft mints the canonical open gate, so the rail sentence and the anon
+  // render agree from the first second and the legacy access fallback never
+  // decides a rebuild draft's door. Gate mint failing means the draft must
+  // not exist - a gateless rebuild draft is exactly the seam this closes.
+  try {
+    await getGateEngine().createGate({
+      workspaceId: gate.op.workspaceId,
+      resource: { type: "EVENT", id: event.id },
+      spec: openGateSpec(),
+    });
+  } catch (err) {
+    console.error("[builder-actions] default open gate mint failed", {
+      eventId: event.id,
+      workspaceId: gate.op.workspaceId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    await db.event
+      .delete({ where: { id: event.id } })
+      .catch(() => undefined);
+    return { ok: false, error: "Something went wrong creating the draft." };
+  }
+
   await db.auditEvent.create({
     data: {
       workspaceId: gate.op.workspaceId,
@@ -154,6 +178,9 @@ const detailsSchema = z.object({
   /** Page theme (Phase 2) - merged into Event.pageStyle.theme; the palette
    *  register the guest page renders in. Orthogonal to template. */
   pageTheme: z.enum(["paper", "night"]).optional(),
+  /** Hero fit (Loose Ends L6) - merged into Event.pageStyle.heroFit. Cover
+   *  fills the frame (default); contain shows the whole poster. */
+  heroFit: z.enum(["cover", "contain"]).optional(),
 });
 
 export async function updateEventDetails(
@@ -168,10 +195,10 @@ export async function updateEventDetails(
   if (!parsed.success) return { ok: false, error: "That could not be read." };
   const d = parsed.data;
 
-  // Theme rides Event.pageStyle (jsonb) - merge, never clobber the other
-  // page-style knobs the operator may have set on the member editor.
+  // Theme + hero fit ride Event.pageStyle (jsonb) - merge, never clobber the
+  // other page-style knobs the operator may have set on the member editor.
   let pageStyleWrite: Prisma.InputJsonValue | undefined;
-  if (d.pageTheme !== undefined) {
+  if (d.pageTheme !== undefined || d.heroFit !== undefined) {
     const current = await db.event.findFirst({
       where: { id: event.id },
       select: { pageStyle: true },
@@ -180,7 +207,11 @@ export async function updateEventDetails(
       current?.pageStyle && typeof current.pageStyle === "object"
         ? (current.pageStyle as Record<string, unknown>)
         : {};
-    pageStyleWrite = { ...existing, theme: d.pageTheme } as Prisma.InputJsonValue;
+    pageStyleWrite = {
+      ...existing,
+      ...(d.pageTheme !== undefined ? { theme: d.pageTheme } : {}),
+      ...(d.heroFit !== undefined ? { heroFit: d.heroFit } : {}),
+    } as Prisma.InputJsonValue;
   }
 
   await db.event.update({
@@ -519,6 +550,7 @@ export type BuilderState = {
     showCapacity: boolean;
     template: string;
     pageTheme: "paper" | "night";
+    heroFit: "cover" | "contain";
     heroImageAssetId: string | null;
     serviceFeeMode: string;
     serviceFeePercentBps: number | null;
@@ -635,6 +667,12 @@ export async function getBuilderState(
           (event.pageStyle as { theme?: unknown }).theme === "night"
             ? "night"
             : "paper",
+        heroFit:
+          event.pageStyle &&
+          typeof event.pageStyle === "object" &&
+          (event.pageStyle as { heroFit?: unknown }).heroFit === "contain"
+            ? "contain"
+            : "cover",
         heroImageAssetId: event.heroImageAssetId ?? null,
         serviceFeeMode: event.serviceFeeMode,
         serviceFeePercentBps: event.serviceFeePercentBps,

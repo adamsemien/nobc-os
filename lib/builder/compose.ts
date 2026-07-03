@@ -15,7 +15,11 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { JUDGMENT_MODEL } from "@/lib/ai/runtime-models";
-import type { GateNodeSpec } from "@/lib/gate-engine/types";
+import {
+  isOpenSpec,
+  openGateSpec,
+  type GateNodeSpec,
+} from "@/lib/gate-engine/types";
 import {
   createCompCode,
   createEventDraft,
@@ -125,7 +129,7 @@ function requirementToSpec(req: z.infer<typeof requirementSchema>): GateNodeSpec
   }
 }
 
-export function planToGateSpec(plan: CompositionPlan): GateNodeSpec | null {
+export function planToGateSpec(plan: CompositionPlan): GateNodeSpec {
   const children: GateNodeSpec[] = plan.requiredAll
     .map(requirementToSpec)
     .filter((s): s is GateNodeSpec => s !== null);
@@ -141,7 +145,9 @@ export function planToGateSpec(plan: CompositionPlan): GateNodeSpec | null {
       children: alternatives,
     });
   }
-  if (children.length === 0) return null; // Open - anyone can get in
+  // Loose Ends L1: "open" is a real gate now (the canonical OPEN spec), never
+  // a null that would delete the draft's default gate.
+  if (children.length === 0) return openGateSpec();
   return { kind: "GROUP", rule: "ALL", children };
 }
 
@@ -205,7 +211,7 @@ export async function composeEventFromPrompt(
 
   const summary = [
     `Draft "${plan.title}" is ready - review it in the preview.`,
-    spec === null
+    isOpenSpec(spec)
       ? "Access: Open - anyone can get in."
       : "Access composed from your sentence - check the chips.",
     ...(plan.serviceFeeMode === "pass_stripe_only"

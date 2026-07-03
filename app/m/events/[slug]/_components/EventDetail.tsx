@@ -71,6 +71,10 @@ export type EventDetailDTO = {
    *  it, so /m behavior is unchanged. Gated events route the CTA to the gate
    *  walkthrough instead of the v1 access flow. */
   gated?: boolean;
+  /** True when the governing gate is the open door (every condition OPEN -
+   *  Loose Ends L1/L3). The CTA reads "Register" per copy law; the flow is
+   *  the same gate walkthrough. Set ONLY by the public /e loader. */
+  gateOpen?: boolean;
 };
 
 type PreviewViewer = 'guest' | 'member';

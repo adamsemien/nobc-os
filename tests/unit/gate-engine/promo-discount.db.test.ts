@@ -607,11 +607,226 @@ describeDb("D6 promo discounts (mint + verify + record on real rows)", () => {
       const again = await checkDiscountCode(db, {
         workspaceId: world.workspace.id,
         eventId,
+        seriesId: null,
         memberId: world.staleApplicant.id,
         code: "ONEEACH",
         baseCents: 2500,
       });
       expect(again).toEqual({ ok: false, reason: "exhausted" });
+    },
+    T
+  );
+
+  // ── Loose Ends L7: series-scoped codes at gates ────────────────────────────
+
+  type SeriesWorld = {
+    seriesId: string;
+    otherSeriesId: string;
+    inSeriesEventId: string;
+    inSeriesGateId: string;
+    inSeriesNodeId: string;
+    strayEventId: string;
+    strayGateId: string;
+    strayNodeId: string;
+  };
+  let seriesWorld: SeriesWorld | null = null;
+
+  async function seedSeries(): Promise<SeriesWorld> {
+    if (seriesWorld) return seriesWorld;
+    const mkSeries = (name: string) =>
+      db.eventSeries.create({
+        data: {
+          workspaceId: world.workspace.id,
+          name,
+          recurrenceRule: "FREQ=WEEKLY",
+          startsAt: new Date("2026-08-01T20:00:00Z"),
+        },
+        select: { id: true },
+      });
+    const series = await mkSeries("Promo Series");
+    const otherSeries = await mkSeries("Other Series");
+    const inSeriesEventId = await makeEvent(db, world.workspace.id, "gate-promo-series-event");
+    const strayEventId = await makeEvent(db, world.workspace.id, "gate-promo-series-stray");
+    await db.event.update({ where: { id: inSeriesEventId }, data: { seriesId: series.id } });
+    await db.event.update({ where: { id: strayEventId }, data: { seriesId: otherSeries.id } });
+
+    const mkGate = async (eid: string) => {
+      const created = await engine.createGate({
+        workspaceId: world.workspace.id,
+        resource: { type: "EVENT", id: eid },
+        spec: {
+          kind: "GROUP",
+          rule: "ALL",
+          children: [{ kind: "CONDITION", conditionType: "PAY", config: { priceCents: 2500 } }],
+        },
+      });
+      const node = await db.gateNode.findFirst({
+        where: { gateId: created.gateId, conditionType: "PAY" },
+        select: { id: true },
+      });
+      return { gateId: created.gateId, nodeId: node!.id };
+    };
+    const inGate = await mkGate(inSeriesEventId);
+    const strayGate = await mkGate(strayEventId);
+    seriesWorld = {
+      seriesId: series.id,
+      otherSeriesId: otherSeries.id,
+      inSeriesEventId,
+      inSeriesGateId: inGate.gateId,
+      inSeriesNodeId: inGate.nodeId,
+      strayEventId,
+      strayGateId: strayGate.gateId,
+      strayNodeId: strayGate.nodeId,
+    };
+    return seriesWorld;
+  }
+
+  async function sessionOn(gid: string, email: string, ip: string) {
+    const session = await engine.createSession({ workspaceId: world.workspace.id, gateId: gid });
+    const res = await publicRoute.POST(
+      post(session.token, "", { action: "identify", email, name: "Series guest" }, ip),
+      tokenCtx(session.token)
+    );
+    expect(res.status).toBe(200);
+    return session;
+  }
+
+  it(
+    "L7: a series-scoped code redeems on an event in the series - stamped like any discount",
+    async () => {
+      const sw = await seedSeries();
+      const promo = await db.promoCode.create({
+        data: {
+          workspaceId: world.workspace.id,
+          seriesId: sw.seriesId,
+          code: "SEASON20",
+          discountType: "percent",
+          discountValue: 20,
+        },
+      });
+      const session = await sessionOn(sw.inSeriesGateId, world.applicant.email, "10.9.0.1");
+      const res = await intentRoute.POST(
+        post(session.token, "/payment-intent", { nodeId: sw.inSeriesNodeId, promoCode: "season20" }, "10.9.0.1"),
+        tokenCtx(session.token)
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { lineItems?: Record<string, number> };
+      expect(body.lineItems).toEqual({
+        subtotalCents: 2500,
+        discountCents: 500,
+        serviceFeeCents: 0,
+        totalCents: 2000,
+      });
+      const call = lastCreate();
+      expect(call.params.metadata).toMatchObject({
+        nodeId: sw.inSeriesNodeId,
+        promoCodeId: promo.id,
+        baseCents: "2500",
+        discountCents: "500",
+        discountedCents: "2000",
+      });
+    },
+    T
+  );
+
+  it(
+    "L7: scope refusal - a series code never redeems outside its series, nor on a series-less event",
+    async () => {
+      const sw = await seedSeries();
+      // Route level: the stray event lives in a DIFFERENT series.
+      const session = await sessionOn(sw.strayGateId, world.paidOnlyGuest.email, "10.9.0.2");
+      const res = await intentRoute.POST(
+        post(session.token, "/payment-intent", { nodeId: sw.strayNodeId, promoCode: "SEASON20" }, "10.9.0.2"),
+        tokenCtx(session.token)
+      );
+      expect(res.status).toBe(409);
+
+      // Direct check: an event with no series at all never matches a series code.
+      const { checkDiscountCode } = await import("@/lib/commerce/promo-codes");
+      const check = await checkDiscountCode(db, {
+        workspaceId: world.workspace.id,
+        eventId: otherEventId,
+        seriesId: null,
+        memberId: world.paidOnlyGuest.id,
+        code: "SEASON20",
+        baseCents: 2500,
+      });
+      expect(check).toEqual({ ok: false, reason: "not_found" });
+    },
+    T
+  );
+
+  it(
+    "L7: on a code-string collision the event-scoped code wins",
+    async () => {
+      const sw = await seedSeries();
+      await db.promoCode.create({
+        data: {
+          workspaceId: world.workspace.id,
+          seriesId: sw.seriesId,
+          code: "CLASH",
+          discountType: "percent",
+          discountValue: 20,
+        },
+      });
+      await db.promoCode.create({
+        data: {
+          workspaceId: world.workspace.id,
+          eventId: sw.inSeriesEventId,
+          code: "CLASH",
+          discountType: "percent",
+          discountValue: 10,
+        },
+      });
+      const session = await sessionOn(sw.inSeriesGateId, world.attendee.email, "10.9.0.3");
+      const res = await intentRoute.POST(
+        post(session.token, "/payment-intent", { nodeId: sw.inSeriesNodeId, promoCode: "CLASH" }, "10.9.0.3"),
+        tokenCtx(session.token)
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { lineItems?: Record<string, number> };
+      expect(body.lineItems?.discountCents).toBe(250); // 10%, the event's own code
+    },
+    T
+  );
+
+  it(
+    "L7: the last use of a series code races - exactly one lands",
+    async () => {
+      const sw = await seedSeries();
+      const { recordPaidAdmission, PromoExhaustedError } = await import("@/lib/commerce/orders");
+      const promo = await db.promoCode.create({
+        data: {
+          workspaceId: world.workspace.id,
+          seriesId: sw.seriesId,
+          code: "SERIESLAST",
+          discountType: "percent",
+          discountValue: 50,
+          maxUses: 1,
+        },
+      });
+      const admit = (member: typeof world.referrer, intent: string) =>
+        recordPaidAdmission(db, {
+          workspaceId: world.workspace.id,
+          eventId: sw.inSeriesEventId,
+          member,
+          paymentIntentId: intent,
+          subtotalCents: 2500,
+          amountReceivedCents: 1250,
+          currency: "usd",
+          gateSessionId: null,
+          promo: { promoCodeId: promo.id, discountCents: 1250 },
+        });
+      const results = await Promise.allSettled([
+        admit(world.referrer, "pi_series_race_a"),
+        admit(world.attendee, "pi_series_race_b"),
+      ]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const lost = results.filter((r) => r.status === "rejected");
+      expect(lost).toHaveLength(1);
+      expect((lost[0] as PromiseRejectedResult).reason).toBeInstanceOf(PromoExhaustedError);
+      const after = await db.promoCode.findUnique({ where: { id: promo.id } });
+      expect(after?.usedCount).toBe(1);
     },
     T
   );
