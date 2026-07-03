@@ -47,9 +47,13 @@
    Rose Noir 4F284B, Soft Lavender B57EDC.
    ------------------------------------------------------------ */
 [data-event-theme='night'] {
-  /* ground */
-  --ev-ground: #2c1332;
-  --ev-ground-raised: #2d1c42;
+  /* ground - the room goes a half-step darker than Moonlit Plum and the
+     card lifts a half-step past Violet Night, so the access card reads as a
+     raised velvet surface (1.32:1 separation) instead of relying on its
+     hairline. Card-borne lavender text stays AA (4.55:1). Chloe holds the
+     veto - reverting this commit restores the flat 2C1332/2D1C42 pair. */
+  --ev-ground: #220e26;
+  --ev-ground-raised: #38254b;
   /* depth */
   --ev-depth: #2b063d;
   --ev-on-depth: #f2eae3;
@@ -72,7 +76,7 @@
   --apply-ink: #f2eae3;
   --apply-muted: #b5a0b5;
   --apply-rule: #4f284b;
-  --apply-cream: #2d1c42;
+  --apply-cream: #38254b;
 
   color-scheme: dark;
 }
