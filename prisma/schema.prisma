@@ -83,6 +83,10 @@ model Workspace {
   growthEdges  GrowthEdge[]
   gateSessions GateSession[]
 
+  // Attendee messaging layer (Stage 18)
+  blasts             Blast[]
+  suppressedContacts SuppressedContact[]
+
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
   // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
@@ -594,6 +598,7 @@ model Event {
   accessTokens    AccessToken[]
   promoCodes      PromoCode[]
   ticketHolds     TicketHold[]
+  blasts          Blast[]
   workflow        EventWorkflow?
   smsConversations SmsConversation[]
 
@@ -2064,4 +2069,100 @@ model GateSession {
 
   @@index([workspaceId])
   @@index([gateId, memberId])
+}
+
+// ─── Attendee messaging layer (Stage 18) ─────────────────────────────────────
+// One-off operator blasts (email or SMS) to ONE event's confirmed attendees.
+// CHANNEL axis only: consent lives on Member.marketing*OptIn with the latest
+// Application as documented fallback; redListed/RedList (ACCESS axis) is
+// deliberately never consulted. Not a marketing automation platform - no
+// schedules, no segments, no templates editor.
+
+enum BlastChannel {
+  EMAIL
+  SMS
+}
+
+enum BlastStatus {
+  DRAFT
+  SENDING
+  SENT
+  FAILED
+}
+
+enum BlastRecipientStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED_NO_CONSENT
+  SKIPPED_SUPPRESSED
+  SKIPPED_NO_DESTINATION
+}
+
+/// One operator-composed message to one event's confirmed attendees.
+/// clientToken makes double-submit idempotent: the compose surface mints one
+/// token per draft, and the unique below collapses concurrent sends of the
+/// same draft into one row.
+model Blast {
+  id              String       @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id])
+  eventId         String
+  event           Event        @relation(fields: [eventId], references: [id])
+  channel         BlastChannel
+  status          BlastStatus  @default(DRAFT)
+  subject         String?
+  body            String       @db.Text
+  createdByUserId String
+  clientToken     String
+  recipientCount  Int          @default(0)
+  sentCount       Int          @default(0)
+  failedCount     Int          @default(0)
+  skippedCount    Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  sentAt          DateTime?
+
+  recipients BlastRecipient[]
+
+  @@unique([workspaceId, clientToken])
+  @@index([workspaceId, eventId, createdAt])
+}
+
+/// Per-recipient outcome log. rsvpId/memberId are plain references (no FK):
+/// these rows are the delivery record and must survive RSVP/member cleanup.
+model BlastRecipient {
+  id          String               @id @default(cuid())
+  workspaceId String
+  blastId     String
+  blast       Blast                @relation(fields: [blastId], references: [id], onDelete: Cascade)
+  rsvpId      String
+  memberId    String?
+  destination String
+  status      BlastRecipientStatus
+  /// Which signal authorized the send: profile | application. Null on skips.
+  consentSource String?
+  error       String?
+  providerId  String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([workspaceId, blastId])
+  @@index([blastId, status])
+}
+
+/// Minimal per-workspace suppression list (hard bounces, opt-outs, carrier
+/// STOPs). Consulted by every blast; deliberately NOT a per-member channel
+/// subscription axis - v1 is a destination blocklist and nothing more.
+model SuppressedContact {
+  id          String       @id @default(cuid())
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+  channel     BlastChannel
+  destination String
+  reason      String?
+  createdAt   DateTime     @default(now())
+
+  @@unique([workspaceId, channel, destination])
+  @@index([workspaceId])
 }

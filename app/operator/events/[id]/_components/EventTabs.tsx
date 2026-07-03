@@ -12,6 +12,7 @@ const TABS = [
   // QuestionsTab.tsx stays on disk; page.tsx still renders it for ?tab=questions.
   // { key: 'questions', label: 'Questions' },
   { key: 'gate', label: 'Access Gate' },
+  { key: 'messages', label: 'Messages' },
   { key: 'settings', label: 'Settings' },
 ];
 

@@ -217,7 +217,7 @@ No Runtype in either half. See `_context/14-house-phone`. Runtype is still on th
 ## Absolute Rules (apply to every stage)
 
 ### Twilio — House Phone SMS only
-Twilio is approved for the House Phone SMS feature only (`lib/twilio.ts` + `/api/sms/reply`). Do not add Twilio to any other feature without explicit approval.
+Twilio is approved for the House Phone SMS feature (`lib/twilio.ts` + `/api/sms/reply`) and - per Adam's 2026-07-02 directive (Phase 4C) - the attendee blast layer (Stage 18), which sends from `MARKETING_TWILIO_PHONE_NUMBER` only via `sendMarketingSms` in `lib/twilio.ts`. The conversational `TWILIO_PHONE_NUMBER` stays House Phone's. Do not add Twilio to any other feature without explicit approval.
 
 ### Workspace scoping is the security boundary
 Every read and every write is workspace-scoped. `workspaceId` is on every user-data table, indexed, and checked on every query. No exceptions.
@@ -293,6 +293,8 @@ Define success criteria before coding, then loop until verified. Here, "verified
 | 13 | `_context/13-dev-tooling/` | ✅ Shipped (internal) — DevToolbar now also openable from Settings → Developer (PR #33) | — |
 | 14 | `_context/14-house-phone/` | 🟡 In progress (inbox UI + analytics shipped; awaiting `TWILIO_*` + Railway deploy; Railway service = standalone Node.js, NOT Runtype) | House Phone SMS inbox + Intelligence tab (post-V1) |
 | 15 | `_context/15-media-dam/` | 🟡 In progress (Phases 1, 2a, 2b, HEIC, seed, ShareLink schema all merged; Phase 4 PR #39 open / not merged; Phase 3 deferred; Phases 5–6 not started) | Digital Asset Manager (post-V1) |
+| 17 | `_context/17-access-gate-engine/` | 🟡 Built on `feat/event-builder-rebuild` (M1-M4 + PAY + builder rebuild + D6 + Night + loose ends), unmerged by design — Adam's review gates the cutover | Access Gate Engine v3 (post-July-11) |
+| 18 | `_context/18-attendee-messaging/` | 🟡 Built on `feat/event-builder-rebuild` (blast layer: email + SMS, dry-run-first), unmerged; SMS needs `MARKETING_TWILIO_PHONE_NUMBER` | Attendee messaging (post-V1) |
 
 > **#18 (Stage 09 — AI chat panel):** direct Vercel AI SDK + MCP tool registry (`lib/mcp/`). Runtype orchestration deferred to V1.5.
 
@@ -314,6 +316,7 @@ Define success criteria before coding, then loop until verified. Here, "verified
 - `SVIX_API_KEY` — outbound operator webhooks (#20). `getSvix()` returns null until set.
 - `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` — House Phone outbound reply sends from nobc-os (`POST /api/sms/reply`). See the Twilio override note in Absolute Rules.
 - `HOUSE_PHONE_WORKSPACE_ID` — the workspace that owns the House Phone SMS inbox. Used to scope conversations where there is no Clerk session (the Railway inbound service; reserved for any nobc-os SMS path that lacks a session).
+- `MARKETING_TWILIO_PHONE_NUMBER` — the attendee blast layer's send-from number (Stage 18). Unset → the SMS blast surface renders disabled with honest copy (fail-soft); email blasts are unaffected. Never the House Phone number.
 
 **Optional:**
 
