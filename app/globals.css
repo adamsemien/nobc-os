@@ -652,10 +652,13 @@
 }
 
 /* Cheap insurance against a leaky child scrolling the whole page sideways on
-   mobile. (MOBILE-IPHONE-AUDIT-2026-06-22, #9.) */
+   mobile. (MOBILE-IPHONE-AUDIT-2026-06-22, #9.) `clip`, NOT `hidden`: hidden
+   makes body a scroll container (overflow-y computes to auto), which silently
+   disables position: sticky under it - the operator rail's pinned Settings
+   was the visible casualty. clip clips without creating a scroll container. */
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {

@@ -80,10 +80,34 @@ const instrumentSerif = Instrument_Serif({
   style: ["normal", "italic"],
 });
 
+// Base for resolving relative OG/twitter image paths to the absolute URLs
+// link unfurlers require. Same fallback as app/e/[slug]/page.tsx and
+// lib/email-templates.ts.
+const SITE_BASE_URL = (
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://app.thenobadcompany.com"
+).replace(/\/+$/, "");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_BASE_URL),
   title: "NoBC OS",
   description: "No Bad Company member platform",
   manifest: "/manifest.json",
+  // Site-wide share-card defaults so any URL unfurls as No Bad Company.
+  // Pages with their own openGraph (/apply, /e/[slug]) override wholesale.
+  // og-default.png is a functional placeholder pending final art from Chloe.
+  openGraph: {
+    siteName: "No Bad Company",
+    title: "No Bad Company",
+    description: "No Bad Company member platform",
+    type: "website",
+    images: [{ url: "/og-default.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "No Bad Company",
+    description: "No Bad Company member platform",
+    images: ["/og-default.png"],
+  },
 };
 
 // viewport-fit=cover lets env(safe-area-inset-*) engage so fixed/sticky bars can

@@ -56,7 +56,11 @@ export async function generateMetadata({
       rawDescription.length > 200
         ? `${rawDescription.slice(0, 197).trimEnd()}...`
         : rawDescription;
-    const image = toAbsoluteImageUrl(getEventHeroDisplayUrl(event.heroImageAssetId));
+    // No-hero events fall back to the site default card instead of an
+    // imageless unfurl (this openGraph object replaces the root's wholesale).
+    const image =
+      toAbsoluteImageUrl(getEventHeroDisplayUrl(event.heroImageAssetId)) ??
+      `${SITE_BASE_URL}/og-default.png`;
 
     return {
       title,
