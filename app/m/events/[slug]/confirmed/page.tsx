@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import QRCode from 'qrcode';
 import { db } from '@/lib/db';
+import { QR_RENDER_COLORS } from '@/lib/page-style';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { MemberShellNav, MemberShellFooter } from '../../_components/MemberShell';
 import ShareButton from './_components/ShareButton';
@@ -88,7 +89,7 @@ export default async function EventConfirmedPage({
   const qrDataUrl = await QRCode.toDataURL(qrValue, {
     width: 240,
     margin: 2,
-    color: { dark: '#1a1a1a', light: '#F9F7F2' },
+    color: QR_RENDER_COLORS,
   });
 
   const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/m/events/${event.slug}`;
@@ -106,7 +107,7 @@ export default async function EventConfirmedPage({
 
   return (
     <div
-      style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--events-ref-cream, #F9F7F2)' }}
+      style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--ev-ground, #F9F7F2)' }}
     >
       <MemberShellNav applyHref={applyHref} theme="cream" />
 
@@ -132,7 +133,7 @@ export default async function EventConfirmedPage({
               fontWeight: 500,
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
-              color: 'var(--events-ref-accent, #B22E21)',
+              color: 'var(--ev-accent, #B22E21)',
               marginBottom: '12px',
             }}
           >
@@ -145,7 +146,7 @@ export default async function EventConfirmedPage({
               fontSize: 'clamp(2rem, 6vw, 2.75rem)',
               fontWeight: 400,
               lineHeight: 1.1,
-              color: 'var(--events-ref-ink, #1a1a1a)',
+              color: 'var(--ev-ink, #1a1a1a)',
               margin: 0,
             }}
           >
@@ -157,8 +158,8 @@ export default async function EventConfirmedPage({
         <div
           style={{
             width: '100%',
-            borderTop: '1px solid var(--events-ref-rule, #E0DDD5)',
-            borderBottom: '1px solid var(--events-ref-rule, #E0DDD5)',
+            borderTop: '1px solid var(--ev-rule, #E0DDD5)',
+            borderBottom: '1px solid var(--ev-rule, #E0DDD5)',
             padding: '20px 0',
             display: 'flex',
             flexDirection: 'column',
@@ -179,9 +180,9 @@ export default async function EventConfirmedPage({
         {/* QR code */}
         <div
           style={{
-            background: '#F9F7F2',
+            background: 'var(--ev-ground-raised, #F9F7F2)',
             borderRadius: '10px',
-            border: '1px solid var(--events-ref-rule, #E0DDD5)',
+            border: '1px solid var(--ev-rule, #E0DDD5)',
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',
@@ -197,7 +198,7 @@ export default async function EventConfirmedPage({
               fontWeight: 500,
               letterSpacing: '0.16em',
               textTransform: 'uppercase',
-              color: 'var(--events-ref-muted, #888)',
+              color: 'var(--ev-muted, #888)',
               margin: 0,
             }}
           >
@@ -215,7 +216,7 @@ export default async function EventConfirmedPage({
             style={{
               fontSize: '0.65rem',
               fontFamily: 'var(--font-dm-sans, DM Sans, sans-serif)',
-              color: 'var(--events-ref-muted, #888)',
+              color: 'var(--ev-muted, #888)',
               margin: 0,
               letterSpacing: '0.02em',
             }}
@@ -243,6 +244,8 @@ export default async function EventConfirmedPage({
               gap: '8px',
               width: '100%',
               padding: '14px 20px',
+              // Apple Wallet badge: Apple's brand guidelines fix the black
+              // button - third-party brand color, exempt from tokens.
               background: '#000',
               color: '#fff',
               borderRadius: '6px',
@@ -265,6 +268,8 @@ export default async function EventConfirmedPage({
               gap: '8px',
               width: '100%',
               padding: '14px 20px',
+              // Google Wallet badge: Google's brand blue - third-party brand
+              // color, exempt from tokens (logo fills below likewise).
               background: '#1a73e8',
               color: '#fff',
               borderRadius: '6px',
@@ -311,7 +316,7 @@ function DetailRow({
           fontWeight: 500,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: 'var(--events-ref-muted, #888)',
+          color: 'var(--ev-muted, #888)',
           flexShrink: 0,
         }}
       >
@@ -325,7 +330,7 @@ function DetailRow({
           style={{
             fontFamily: 'var(--font-dm-sans, DM Sans, sans-serif)',
             fontSize: '0.9rem',
-            color: 'var(--events-ref-accent, #B22E21)',
+            color: 'var(--ev-accent, #B22E21)',
             textDecoration: 'underline',
             textAlign: 'right',
           }}
@@ -337,7 +342,7 @@ function DetailRow({
           style={{
             fontFamily: 'var(--font-dm-sans, DM Sans, sans-serif)',
             fontSize: '0.9rem',
-            color: 'var(--events-ref-ink, #1a1a1a)',
+            color: 'var(--ev-ink, #1a1a1a)',
             textAlign: 'right',
           }}
         >
@@ -350,7 +355,7 @@ function DetailRow({
 
 function FallbackPage({ slug, applyHref, reason }: { slug: string; applyHref: string; reason: string }) {
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--events-ref-cream, #F9F7F2)' }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--ev-ground, #F9F7F2)' }}>
       <MemberShellNav applyHref={applyHref} theme="cream" />
       <main
         style={{
@@ -371,7 +376,7 @@ function FallbackPage({ slug, applyHref, reason }: { slug: string; applyHref: st
             fontStyle: 'italic',
             fontSize: '2rem',
             fontWeight: 400,
-            color: 'var(--events-ref-ink, #1a1a1a)',
+            color: 'var(--ev-ink, #1a1a1a)',
           }}
         >
           {reason === 'notfound' ? "We couldn't find your registration." : 'Something went wrong.'}
@@ -380,7 +385,7 @@ function FallbackPage({ slug, applyHref, reason }: { slug: string; applyHref: st
           style={{
             fontFamily: 'var(--font-dm-sans, DM Sans, sans-serif)',
             fontSize: '0.9rem',
-            color: 'var(--events-ref-muted, #888)',
+            color: 'var(--ev-muted, #888)',
             maxWidth: '320px',
           }}
         >
@@ -397,7 +402,7 @@ function FallbackPage({ slug, applyHref, reason }: { slug: string; applyHref: st
             fontWeight: 500,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: 'var(--events-ref-accent, #B22E21)',
+            color: 'var(--ev-accent, #B22E21)',
             textDecoration: 'none',
           }}
         >

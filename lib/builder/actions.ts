@@ -18,7 +18,7 @@
  *  Each action returns { ok: true, ... } | { ok: false, error } - guest-safe
  *  strings, brand law throughout.
  */
-import { OperatorRole, type ServiceFeeMode } from "@prisma/client";
+import { OperatorRole, type Prisma, type ServiceFeeMode } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
@@ -151,6 +151,9 @@ const detailsSchema = z.object({
   showCapacity: z.boolean().optional(),
   template: z.enum(["split", "editorial", "minimal"]).optional(),
   heroImageAssetId: z.string().max(500).nullable().optional(),
+  /** Page theme (Phase 2) - merged into Event.pageStyle.theme; the palette
+   *  register the guest page renders in. Orthogonal to template. */
+  pageTheme: z.enum(["paper", "night"]).optional(),
 });
 
 export async function updateEventDetails(
@@ -164,6 +167,21 @@ export async function updateEventDetails(
   const parsed = detailsSchema.safeParse(patch);
   if (!parsed.success) return { ok: false, error: "That could not be read." };
   const d = parsed.data;
+
+  // Theme rides Event.pageStyle (jsonb) - merge, never clobber the other
+  // page-style knobs the operator may have set on the member editor.
+  let pageStyleWrite: Prisma.InputJsonValue | undefined;
+  if (d.pageTheme !== undefined) {
+    const current = await db.event.findFirst({
+      where: { id: event.id },
+      select: { pageStyle: true },
+    });
+    const existing =
+      current?.pageStyle && typeof current.pageStyle === "object"
+        ? (current.pageStyle as Record<string, unknown>)
+        : {};
+    pageStyleWrite = { ...existing, theme: d.pageTheme } as Prisma.InputJsonValue;
+  }
 
   await db.event.update({
     where: { id: event.id },
@@ -182,6 +200,7 @@ export async function updateEventDetails(
       ...(d.heroImageAssetId !== undefined
         ? { heroImageAssetId: d.heroImageAssetId }
         : {}),
+      ...(pageStyleWrite !== undefined ? { pageStyle: pageStyleWrite } : {}),
     },
   });
   return { ok: true };
@@ -499,6 +518,7 @@ export type BuilderState = {
     capacity: number | null;
     showCapacity: boolean;
     template: string;
+    pageTheme: "paper" | "night";
     heroImageAssetId: string | null;
     serviceFeeMode: string;
     serviceFeePercentBps: number | null;
@@ -544,6 +564,7 @@ export async function getBuilderState(
       capacity: true,
       showCapacity: true,
       template: true,
+      pageStyle: true,
       heroImageAssetId: true,
       serviceFeeMode: true,
       serviceFeePercentBps: true,
@@ -608,6 +629,12 @@ export async function getBuilderState(
         capacity: event.capacity,
         showCapacity: event.showCapacity,
         template: event.template ?? "split",
+        pageTheme:
+          event.pageStyle &&
+          typeof event.pageStyle === "object" &&
+          (event.pageStyle as { theme?: unknown }).theme === "night"
+            ? "night"
+            : "paper",
         heroImageAssetId: event.heroImageAssetId ?? null,
         serviceFeeMode: event.serviceFeeMode,
         serviceFeePercentBps: event.serviceFeePercentBps,

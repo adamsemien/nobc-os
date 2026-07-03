@@ -60,7 +60,7 @@ export default async function DraftPreviewPage({
   if (!dto) notFound();
 
   return (
-    <PublicEventShell>
+    <PublicEventShell theme={dto.pageStyle.theme}>
       <EventDetail event={dto} />
     </PublicEventShell>
   );

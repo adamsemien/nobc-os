@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import QRCode from 'qrcode';
 import { resolvePublishedEventBySlug } from '@/lib/public-event-loader';
+import { QR_RENDER_COLORS } from '@/lib/page-style';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -82,7 +83,7 @@ export default async function PublicConfirmedPage({ params, searchParams }: Prop
     qrSvg = await QRCode.toString(qrValue, {
       type: 'svg',
       margin: 1,
-      color: { dark: '#1C1008', light: '#F5EDE0' },
+      color: QR_RENDER_COLORS,
     });
   }
 
@@ -98,59 +99,59 @@ export default async function PublicConfirmedPage({ params, searchParams }: Prop
   });
 
   return (
-    <div className="flex min-h-screen flex-col bg-events-paper text-[var(--apply-ink)]">
+    <div className="flex min-h-screen flex-col bg-[var(--ev-ground)] text-[var(--ev-ink)]">
       {/* Plain wordmark header */}
       <header className="mx-auto w-full max-w-xl px-6 pt-10 text-center">
         <Link
           href="/"
-          className="text-[10px] uppercase tracking-[0.3em] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]"
+          className="text-[10px] uppercase tracking-[0.3em] text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]"
         >
-          <span className="text-[var(--nobc-red)]">NO BAD </span>
+          <span className="text-[var(--ev-accent)]">NO BAD </span>
           <span>COMPANY</span>
         </Link>
       </header>
 
       <main className="mx-auto w-full max-w-xl flex-1 px-6 pb-20 pt-10 text-center">
-        <div className="my-10 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
+        <div className="my-10 h-px w-full bg-[var(--ev-rule)]" aria-hidden />
 
         {/* ── CONFIRMED ── */}
         {ticketStatus === 'confirmed' && (
           <div className="space-y-8">
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]">
                 You&apos;re on the list
               </p>
-              <h1 className="mt-4 text-[clamp(2rem,5vw,3rem)] font-normal leading-[1.1] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+              <h1 className="mt-4 text-[clamp(2rem,5vw,3rem)] font-normal leading-[1.1] text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]">
                 {event.title}
               </h1>
               <div className="mt-4 space-y-1">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                   {formattedDate} · {formattedTime}
                 </p>
                 {event.location ? (
-                  <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                     {event.location}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <div className="my-8 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
+            <div className="my-8 h-px w-full bg-[var(--ev-rule)]" aria-hidden />
 
             {/* QR code */}
             {qrSvg ? (
               <div className="flex flex-col items-center gap-4">
                 <div
-                  className="text-[var(--apply-ink)] [&_svg]:h-auto [&_svg]:max-w-[200px]"
+                  className="text-[var(--ev-ink)] [&_svg]:h-auto [&_svg]:max-w-[200px]"
                   dangerouslySetInnerHTML={{ __html: qrSvg }}
                 />
-                <p className="text-[11px] uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                   Show at the door
                 </p>
               </div>
             ) : null}
 
-            <p className="text-[14px] leading-[1.8] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            <p className="text-[14px] leading-[1.8] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
               We&apos;ll see you there, {displayName.split(' ')[0]}.
             </p>
           </div>
@@ -160,42 +161,42 @@ export default async function PublicConfirmedPage({ params, searchParams }: Prop
         {(ticketStatus === 'pending_approval' || ticketStatus === 'held') && (
           <div className="space-y-6">
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]">
                 Application received
               </p>
-              <h1 className="mt-4 text-[clamp(2rem,5vw,3rem)] font-normal leading-[1.1] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+              <h1 className="mt-4 text-[clamp(2rem,5vw,3rem)] font-normal leading-[1.1] text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]">
                 {event.title}
               </h1>
               <div className="mt-4 space-y-1">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                   {formattedDate} · {formattedTime}
                 </p>
                 {event.location ? (
-                  <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                     {event.location}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <div className="my-8 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
+            <div className="my-8 h-px w-full bg-[var(--ev-rule)]" aria-hidden />
 
-            <p className="text-[16px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+            <p className="text-[16px] leading-[1.8] text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
               You&apos;ve applied to attend. We&apos;ll be in touch.
             </p>
 
             {/* R9 — required line for TICKETED + approvalRequired (held) */}
             {ticketStatus === 'held' && (
-              <p className="text-[13px] leading-[1.7] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+              <p className="text-[13px] leading-[1.7] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                 Your card is authorized and will be captured once your application is approved.
               </p>
             )}
 
-            <p className="text-[13px] leading-[1.7] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            <p className="text-[13px] leading-[1.7] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
               Questions? Reach us at{' '}
               <a
                 href="mailto:team@thenobadcompany.com"
-                className="underline underline-offset-4 transition-colors hover:text-[var(--nobc-red)]"
+                className="underline underline-offset-4 transition-colors hover:text-[var(--ev-accent)]"
               >
                 team@thenobadcompany.com
               </a>
@@ -207,41 +208,41 @@ export default async function PublicConfirmedPage({ params, searchParams }: Prop
         {ticketStatus === 'waitlisted' && (
           <div className="space-y-6">
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]">
                 You&apos;re on the waitlist
               </p>
-              <h1 className="mt-4 text-[clamp(2rem,5vw,3rem)] font-normal leading-[1.1] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+              <h1 className="mt-4 text-[clamp(2rem,5vw,3rem)] font-normal leading-[1.1] text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]">
                 {event.title}
               </h1>
               <div className="mt-4 space-y-1">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                   {formattedDate} · {formattedTime}
                 </p>
                 {event.location ? (
-                  <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                     {event.location}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <div className="my-8 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
+            <div className="my-8 h-px w-full bg-[var(--ev-rule)]" aria-hidden />
 
             {waitlistPosition != null ? (
-              <p className="text-[16px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+              <p className="text-[16px] leading-[1.8] text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
                 You&apos;re #{waitlistPosition} on the waitlist.
               </p>
             ) : (
-              <p className="text-[16px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+              <p className="text-[16px] leading-[1.8] text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
                 You&apos;re on the waitlist.
               </p>
             )}
 
-            <p className="text-[13px] leading-[1.7] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            <p className="text-[13px] leading-[1.7] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
               We&apos;ll reach out if a spot opens up. Questions?{' '}
               <a
                 href="mailto:team@thenobadcompany.com"
-                className="underline underline-offset-4 transition-colors hover:text-[var(--nobc-red)]"
+                className="underline underline-offset-4 transition-colors hover:text-[var(--ev-accent)]"
               >
                 team@thenobadcompany.com
               </a>
@@ -249,16 +250,16 @@ export default async function PublicConfirmedPage({ params, searchParams }: Prop
           </div>
         )}
 
-        <div className="mt-16 h-px w-full bg-[var(--apply-rule)]" aria-hidden />
+        <div className="mt-16 h-px w-full bg-[var(--ev-rule)]" aria-hidden />
 
         <footer className="mt-6">
-          <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
-            <span className="text-[var(--nobc-red)]">NO BAD </span>
+          <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
+            <span className="text-[var(--ev-accent)]">NO BAD </span>
             <span>COMPANY</span>
           </p>
           <a
             href="mailto:team@thenobadcompany.com"
-            className="mt-3 inline-block text-[13px] text-[var(--apply-muted)] underline-offset-4 transition-colors hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
+            className="mt-3 inline-block text-[13px] text-[var(--ev-muted)] underline-offset-4 transition-colors hover:text-[var(--ev-accent)] hover:underline font-[family-name:var(--font-dm-sans)]"
           >
             team@thenobadcompany.com
           </a>

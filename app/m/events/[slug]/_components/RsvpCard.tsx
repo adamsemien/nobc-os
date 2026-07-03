@@ -13,6 +13,7 @@ import { EventAccessFlow } from './EventAccessFlow';
 import { useMemberApplyHref } from '../../_components/MemberShell';
 import { warmClosedCopy } from './event-format';
 import { formatGateCTA, accessTypeLabel } from '@/lib/event-access';
+import { QR_RENDER_COLORS } from '@/lib/page-style';
 
 function QrDisplay({ code }: { code: string }) {
   const [svg, setSvg] = useState<string | null>(null);
@@ -23,7 +24,7 @@ function QrDisplay({ code }: { code: string }) {
       type: 'svg',
       width: 200,
       margin: 1,
-      color: { dark: '#1C1008', light: '#FFFFFF' },
+      color: QR_RENDER_COLORS,
     })
       .then((s) => {
         if (!cancelled) setSvg(s);
@@ -35,11 +36,11 @@ function QrDisplay({ code }: { code: string }) {
   }, [code]);
 
   if (!svg) {
-    return <div className="h-[200px] w-[200px] animate-pulse rounded-sm bg-events-paper" />;
+    return <div className="h-[200px] w-[200px] animate-pulse rounded-sm bg-[var(--ev-ground)]" />;
   }
   return (
     <div
-      className="text-[var(--apply-ink)] [&_svg]:h-auto [&_svg]:max-w-[200px]"
+      className="text-[var(--ev-ink)] [&_svg]:h-auto [&_svg]:max-w-[200px]"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
@@ -120,16 +121,16 @@ function PlusOneSection({
 
   if (mode === 'done' && addedGuest) {
     return (
-      <div className="mt-6 border-t border-[var(--apply-rule)] pt-6">
+      <div className="mt-6 border-t border-[var(--ev-rule)] pt-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
               Guest
             </p>
-            <p className="mt-1 text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+            <p className="mt-1 text-sm text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
               {addedGuest.guestName}
             </p>
-            <p className="truncate text-xs text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            <p className="truncate text-xs text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
               {addedGuest.guestEmail}
             </p>
           </div>
@@ -138,7 +139,7 @@ function PlusOneSection({
               type="button"
               onClick={handleRemove}
               disabled={loading}
-              className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest text-[var(--apply-muted)] hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+              className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest text-[var(--ev-muted)] hover:text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]"
             >
               <X className="h-3 w-3" />
               Remove
@@ -151,15 +152,15 @@ function PlusOneSection({
 
   if (mode === 'form') {
     return (
-      <div className="mt-6 border-t border-[var(--apply-rule)] pt-6">
-        <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      <div className="mt-6 border-t border-[var(--ev-rule)] pt-6">
+        <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
           Bring a guest
         </p>
         <form onSubmit={handleAddGuest} className="mt-4 space-y-3">
           <div>
             <label
               htmlFor="guest-name"
-              className="mb-1 block text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]"
+              className="mb-1 block text-sm text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]"
             >
               Guest name
             </label>
@@ -169,13 +170,13 @@ function PlusOneSection({
               required
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
-              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full border-0 border-b border-[var(--ev-rule)] bg-transparent py-2 text-sm text-[var(--ev-ink)] focus:border-[var(--ev-accent)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             />
           </div>
           <div>
             <label
               htmlFor="guest-email"
-              className="mb-1 block text-sm text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]"
+              className="mb-1 block text-sm text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]"
             >
               Guest email
             </label>
@@ -185,11 +186,11 @@ function PlusOneSection({
               required
               value={guestEmail}
               onChange={(e) => setGuestEmail(e.target.value)}
-              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-sm text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full border-0 border-b border-[var(--ev-rule)] bg-transparent py-2 text-sm text-[var(--ev-ink)] focus:border-[var(--ev-accent)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             />
           </div>
           {error ? (
-            <p role="alert" className="text-sm text-[var(--nobc-red)]">
+            <p role="alert" className="text-sm text-[var(--ev-accent)]">
               {error}
             </p>
           ) : null}
@@ -197,14 +198,14 @@ function PlusOneSection({
             <button
               type="button"
               onClick={() => setMode('collapsed')}
-              className="text-[11px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:underline font-[family-name:var(--font-dm-sans)]"
+              className="text-[11px] uppercase tracking-widest text-[var(--ev-muted)] underline-offset-4 hover:underline font-[family-name:var(--font-dm-sans)]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="rounded-sm border border-[var(--apply-rule)] px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:bg-[var(--nobc-red)] hover:text-[var(--nobc-on-red)] disabled:opacity-50 font-[family-name:var(--font-dm-sans)]"
+              className="rounded-sm border border-[var(--ev-rule)] px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest text-[var(--ev-ink)] transition-colors hover:border-[var(--ev-accent)] hover:bg-[var(--ev-accent)] hover:text-[var(--ev-on-accent)] disabled:opacity-50 font-[family-name:var(--font-dm-sans)]"
             >
               {loading ? 'Adding…' : 'Add guest'}
             </button>
@@ -215,11 +216,11 @@ function PlusOneSection({
   }
 
   return (
-    <div className="mt-6 border-t border-[var(--apply-rule)] pt-6">
+    <div className="mt-6 border-t border-[var(--ev-rule)] pt-6">
       <button
         type="button"
         onClick={() => setMode('form')}
-        className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
+        className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-[var(--ev-muted)] underline-offset-4 hover:text-[var(--ev-accent)] hover:underline font-[family-name:var(--font-dm-sans)]"
       >
         <UserPlus className="h-3.5 w-3.5" aria-hidden />
         Bring a guest
@@ -234,13 +235,13 @@ function CapacityMeter({ used, capacity }: { used: number; capacity: number }) {
   const pct = Math.min(100, Math.max(0, Math.round((used / capacity) * 100)));
   return (
     <div className="mt-4">
-      <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--apply-rule)]">
+      <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--ev-rule)]">
         <div
-          className="h-full rounded-full bg-[var(--nobc-red)] transition-[width] duration-500"
+          className="h-full rounded-full bg-[var(--ev-accent)] transition-[width] duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="mt-2 text-[11px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      <p className="mt-2 text-[11px] uppercase tracking-widest text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
         {remaining > 0
           ? `${remaining} spot${remaining === 1 ? '' : 's'} remaining`
           : 'At capacity'}
@@ -299,7 +300,7 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
 
   const cardWrapper =
     variant === 'card'
-      ? 'rounded-md border border-[var(--apply-rule)] bg-events-paper-card p-6 shadow-[0_2px_12px_rgba(28,16,8,0.05)]'
+      ? 'rounded-md border border-[var(--ev-rule)] bg-[var(--ev-ground-raised)] p-6 shadow-[0_2px_12px_rgba(28,16,8,0.05)]'
       : 'p-0';
 
   const resolved = event.resolved;
@@ -323,7 +324,7 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
     <div className={`ev-access-card ${cardWrapper}${mobileSticky && isCtaState ? ' max-lg:hidden' : ''}`}>
       {!hideHeader ? (
         <>
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
             {isGated ? 'Event Access' : accessTypeLabel(event.resolved)}
           </p>
 
@@ -331,22 +332,22 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
             <CapacityMeter used={event.capacityUsedCount} capacity={event.capacity!} />
           ) : null}
 
-          <div className="my-5 h-px w-full bg-[var(--apply-rule)]" />
+          <div className="my-5 h-px w-full bg-[var(--ev-rule)]" />
         </>
       ) : null}
 
       {rsvpState === 'confirmed' ? (
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]">
             You&rsquo;re on the list
           </p>
-          <p className="mt-1.5 text-[22px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <p className="mt-1.5 text-[22px] leading-snug text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]">
             We&rsquo;ll see you there.
           </p>
           {qrCode ? (
             <div className="mt-5 flex flex-col items-start gap-2">
               <QrDisplay code={qrCode} />
-              <p className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                 Show this at the door
               </p>
             </div>
@@ -357,19 +358,19 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
         </div>
       ) : rsvpState === 'pending_approval' ? (
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]">
             Request received
           </p>
-          <p className="mt-2 text-[15px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+          <p className="mt-2 text-[15px] leading-relaxed text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
             Your request is in — we&rsquo;ll be in touch shortly.
           </p>
         </div>
       ) : rsvpState === 'waitlisted' ? (
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
             On the waitlist
           </p>
-          <p className="mt-2 text-[15px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+          <p className="mt-2 text-[15px] leading-relaxed text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
             {waitlistPosition ? `You're #${waitlistPosition}. ` : ''}
             We&rsquo;ll let you know the moment a spot opens.
           </p>
@@ -379,10 +380,10 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
         // editorial copy, no dead button. The mint route + admission
         // transaction enforce the same cap server-side.
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
             Sold out
           </p>
-          <p className="mt-2 text-[18px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <p className="mt-2 text-[18px] leading-snug text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]">
             Every seat for this evening is spoken for.
           </p>
         </div>
@@ -390,11 +391,11 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
         <form method="post" action={`/e/${event.slug}/access`} className="space-y-3">
           <button
             type="submit"
-            className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
+            className="w-full rounded-md bg-[var(--ev-accent)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--ev-on-accent)] transition-all hover:bg-[var(--ev-accent-hover)] hover:shadow-[0_4px_18px_var(--ev-cta-glow)] font-[family-name:var(--font-dm-sans)]"
           >
             {ctaLabel}
           </button>
-          <p className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[10px] uppercase tracking-widest text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
             A few steps unlock your access
           </p>
         </form>
@@ -403,22 +404,22 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
           const c = warmClosedCopy(resolved);
           return (
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                 {c.eyebrow}
               </p>
-              <p className="mt-2 text-[18px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+              <p className="mt-2 text-[18px] leading-snug text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]">
                 {c.body}
               </p>
               {c.showApply ? (
                 <div className="mt-5">
                   {c.invite ? (
-                    <p className="text-[13px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                    <p className="text-[13px] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                       {c.invite}
                     </p>
                   ) : null}
                   <Link
                     href={applyHref}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[var(--apply-rule)] px-5 py-2.5 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--apply-ink)] transition-colors hover:border-[var(--nobc-red)] hover:bg-[var(--nobc-red)] hover:text-[var(--nobc-on-red)] font-[family-name:var(--font-dm-sans)]"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[var(--ev-rule)] px-5 py-2.5 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--ev-ink)] transition-colors hover:border-[var(--ev-accent)] hover:bg-[var(--ev-accent)] hover:text-[var(--ev-on-accent)] font-[family-name:var(--font-dm-sans)]"
                   >
                     Apply to attend →
                   </Link>
@@ -429,10 +430,10 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
         })()
       ) : isFull ? (
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
             At capacity
           </p>
-          <p className="mt-2 text-[18px] leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+          <p className="mt-2 text-[18px] leading-snug text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]">
             This gathering is full.
           </p>
         </div>
@@ -441,12 +442,12 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
           <button
             type="button"
             onClick={() => setFlowOpen(true)}
-            className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
+            className="w-full rounded-md bg-[var(--ev-accent)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--ev-on-accent)] transition-all hover:bg-[var(--ev-accent-hover)] hover:shadow-[0_4px_18px_var(--ev-cta-glow)] font-[family-name:var(--font-dm-sans)]"
           >
             {ctaLabel}
           </button>
           {resolved.kind === 'guest' && event.viewer !== 'guest' ? (
-            <p className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            <p className="text-[10px] uppercase tracking-widest text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
               No member account required
             </p>
           ) : null}
@@ -457,14 +458,14 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
 
       {mobileSticky && isCtaState ? (
         <div
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--apply-rule)] bg-events-paper-card/95 px-5 py-4 backdrop-blur lg:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--ev-rule)] bg-[var(--ev-ground-raised)]/95 px-5 py-4 backdrop-blur lg:hidden"
           style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
           {isGated ? (
             <form method="post" action={`/e/${event.slug}/access`}>
               <button
                 type="submit"
-                className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
+                className="w-full rounded-md bg-[var(--ev-accent)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--ev-on-accent)] transition-all hover:bg-[var(--ev-accent-hover)] hover:shadow-[0_4px_18px_var(--ev-cta-glow)] font-[family-name:var(--font-dm-sans)]"
               >
                 {ctaLabel}
               </button>
@@ -473,7 +474,7 @@ export function RsvpCard({ event, variant = 'card', hideHeader = false, mobileSt
             <button
               type="button"
               onClick={() => setFlowOpen(true)}
-              className="w-full rounded-md bg-[var(--nobc-red)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-on-red)] transition-all hover:bg-[var(--nobc-red-hover)] hover:shadow-[0_4px_18px_rgba(178,46,33,0.28)] font-[family-name:var(--font-dm-sans)]"
+              className="w-full rounded-md bg-[var(--ev-accent)] px-5 py-4 text-center text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--ev-on-accent)] transition-all hover:bg-[var(--ev-accent-hover)] hover:shadow-[0_4px_18px_var(--ev-cta-glow)] font-[family-name:var(--font-dm-sans)]"
             >
               {ctaLabel}
             </button>

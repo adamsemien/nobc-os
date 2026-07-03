@@ -18,6 +18,7 @@ export function EventPageStyleWrapper({
   return (
     <div
       className="event-page-root"
+      data-event-theme={style.theme}
       data-hero-text={style.heroTextMode}
       data-hero-title={style.heroTitleColor}
       data-hero-title-accent={style.heroTitleAccent ? 'on' : 'off'}

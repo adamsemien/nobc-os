@@ -564,6 +564,7 @@ export function BuilderShell({
   const [previewVersion, setPreviewVersion] = useState(0);
   const [saving, startSaving] = useTransition();
   const [notice, setNotice] = useState("");
+  const [savedFlash, setSavedFlash] = useState(false);
   const [newCode, setNewCode] = useState("");
   const emptyDiscount = {
     code: "",
@@ -590,7 +591,13 @@ export function BuilderShell({
       setNotice("");
       startSaving(async () => {
         const res = await fn();
-        if (!res.ok) setNotice(res.error ?? "Something went wrong.");
+        if (!res.ok) {
+          setNotice(res.error ?? "Something went wrong.");
+        } else {
+          // Quiet saved flash - success must read differently from failure.
+          setSavedFlash(true);
+          window.setTimeout(() => setSavedFlash(false), 1800);
+        }
         await refresh();
       });
     },
@@ -681,8 +688,12 @@ export function BuilderShell({
               >
                 {published ? "Unpublish" : "Publish"}
               </button>
-              <span className="text-xs text-text-tertiary">
-                {published ? `Live at /e/${event.slug}` : "Draft - only you can see it"}
+              <span className="text-xs text-text-tertiary" aria-live="polite">
+                {savedFlash
+                  ? "Saved"
+                  : published
+                    ? `Live at /e/${event.slug}`
+                    : "Draft - only you can see it"}
               </span>
             </div>
           </header>
@@ -712,7 +723,10 @@ export function BuilderShell({
           ) : null}
 
           {notice ? (
-            <p className="rounded-sm border border-border bg-raised px-3 py-2 text-xs text-text-secondary">
+            <p
+              role="alert"
+              className="rounded-sm border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger)]"
+            >
               {notice}
             </p>
           ) : null}
@@ -1256,6 +1270,18 @@ export function BuilderShell({
                   <option value="split">Split</option>
                   <option value="editorial">Editorial</option>
                   <option value="minimal">Minimal</option>
+                </select>
+              </Row>
+              <Row label="Page theme">
+                <select
+                  defaultValue={event.pageTheme}
+                  onChange={(e) =>
+                    saveDetails({ pageTheme: e.target.value as "paper" | "night" })
+                  }
+                  className={fieldClass}
+                >
+                  <option value="paper">Paper - warm cream, daylight</option>
+                  <option value="night">Night - purple velvet, evening</option>
                 </select>
               </Row>
             </div>

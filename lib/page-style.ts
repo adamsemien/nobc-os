@@ -14,8 +14,14 @@ export type HeroTitleColor = 'light' | 'dark' | 'red';
 export type HeroHeight = 'compact' | 'standard' | 'tall';
 export type CardShadow = 'flat' | 'raised' | 'lifted';
 export type FooterScale = 'sm' | 'md' | 'lg';
+export type EventTheme = 'paper' | 'night';
 
 export const PageStyleSchema = z.object({
+  // Page theme — the palette register the whole page renders in. 'paper'
+  // (default) is the warm cream editorial look and renders exactly as before;
+  // 'night' is the purple-velvet dark register. A theme is a token file:
+  // app/event-themes.css defines both, components never carry theme color.
+  theme: z.enum(['paper', 'night']).default('paper'),
   // Hero legibility scrims — black-opacity only. Bounds guarantee readable text
   // on a worst-case photo without a heavy black-box feel. The top scrim covers
   // the nav/logo zone; the bottom covers the title/date.
@@ -59,3 +65,11 @@ export function parsePageStyle(raw: unknown): PageStyle {
 export function heroHeightVh(h: HeroHeight): number {
   return h === 'compact' ? 44 : h === 'tall' ? 72 : 58;
 }
+
+/**
+ * QR render colors — the canvas API cannot read CSS custom properties, so
+ * the scan code's ink/paper pair lives here as the single source. Kept
+ * dark-on-light in BOTH page themes: scanners want maximum contrast, and a
+ * light tile on the night page reads as a deliberate ticket artifact.
+ */
+export const QR_RENDER_COLORS = { dark: '#1C1008', light: '#FFFFFF' } as const;

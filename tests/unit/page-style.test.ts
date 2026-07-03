@@ -11,6 +11,9 @@ describe('PAGE_STYLE_DEFAULTS', () => {
     // visual regression unless intentional — update the templates' var() fallbacks
     // in lockstep.
     expect(PAGE_STYLE_DEFAULTS).toEqual({
+      // Phase 2: 'paper' is the theme default and renders exactly the prior
+      // look - the no-regression contract extends to the theme axis.
+      theme: 'paper',
       heroScrimTop: 0.55,
       heroScrimBottom: 0.65,
       heroTextMode: 'light',

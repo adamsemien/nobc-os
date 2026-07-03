@@ -95,7 +95,7 @@ export default async function PublicEventPage({
   // active event's two-choice fork lives in the access-card slot inside the
   // template (see TemplateSplit), not as a whole-page replacement.
   return (
-    <PublicEventShell>
+    <PublicEventShell theme={dto.pageStyle.theme}>
       <EventDetail event={dto} />
     </PublicEventShell>
   );
