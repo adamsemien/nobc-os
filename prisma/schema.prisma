@@ -76,6 +76,17 @@ model Workspace {
   instagramStories       InstagramStory[]
   instagramStoryBatches  InstagramStoryBatch[]
 
+  // Access Gate Engine v3 - M1 (Stage 17)
+  gates        Gate[]
+  gateNodes    GateNode[]
+  gateProofs   GateProof[]
+  growthEdges  GrowthEdge[]
+  gateSessions GateSession[]
+
+  // Attendee messaging layer (Stage 18)
+  blasts             Blast[]
+  suppressedContacts SuppressedContact[]
+
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
   // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
@@ -217,6 +228,15 @@ model Member {
   firstName         String
   lastName          String
   phone             String?
+  /// Checkout consent capture (Event Builder Rebuild, Phase F - ADD 1).
+  /// Three separate signals, never bundled, never pre-checked; affirmative
+  /// consent only ever sets them true (+ timestamp). Mirrors the apply
+  /// flow's structured consent model on Application. Gates marketing
+  /// contact, never the ticket.
+  marketingEmailOptIn   Boolean   @default(false)
+  marketingEmailOptInAt DateTime?
+  marketingSmsOptIn     Boolean   @default(false)
+  marketingSmsOptInAt   DateTime?
   status            MemberStatus @default(PENDING)
   tags              String[]
   /// Multi-valued CRM roles. Orthogonal to `status` (the membership lifecycle) —
@@ -294,6 +314,12 @@ model Member {
 
   // CRM provenance — which source systems this person came from.
   contactSources   ContactSource[]
+
+  // Access Gate Engine v3 - M1 (Stage 17)
+  gateProofs      GateProof[]
+  gateSessions    GateSession[]
+  growthEdgesFrom GrowthEdge[] @relation("GrowthEdgeFrom")
+  growthEdgesTo   GrowthEdge[] @relation("GrowthEdgeTo")
 
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
@@ -572,6 +598,7 @@ model Event {
   accessTokens    AccessToken[]
   promoCodes      PromoCode[]
   ticketHolds     TicketHold[]
+  blasts          Blast[]
   workflow        EventWorkflow?
   smsConversations SmsConversation[]
 
@@ -1834,7 +1861,308 @@ model InstagramStoryBatch {
   createdBy       String                // Clerk userId
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
-  
+
   @@index([workspaceId])
   @@index([eventId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Access Gate Engine v3 - M1 (Stage 17). Additive only. Headless engine core:
+// a Gate is a boolean expression tree of tiered-verification conditions over a
+// polymorphic resource (only EVENT is exercised in M1). Evaluation is
+// fail-closed. See docs/superpowers/plans/2026-07-01-gate-engine-m1.md.
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Node discriminator: a CONDITION leaf carries a registry conditionType +
+/// config; a GROUP combines its children via `rule`.
+enum GateNodeKind {
+  CONDITION
+  GROUP
+}
+
+/// How a GROUP node combines its children. ANY_N needs `requiredCount`
+/// satisfied children (OR = ANY_N with requiredCount 1); WEIGHTED needs the
+/// summed `weight` of satisfied children to reach `weightThreshold`.
+enum GateGroupRule {
+  ALL
+  ANY_N
+  WEIGHTED
+}
+
+/// What a gate protects. Polymorphic on (resourceType, resourceId) with no
+/// foreign key by design; new resource kinds are additive enum values.
+enum GateResourceType {
+  EVENT
+}
+
+/// Verification strength of a proof, stamped honestly per condition type - an
+/// attestation is never stored as first-party truth. M1 ships FIRST_PARTY
+/// (Tier 1: platform-verified ground truth) and AI_ATTESTED (Tier 3: model
+/// judgment). Later tiers land as additive enum values with their milestones.
+enum VerificationTier {
+  FIRST_PARTY
+  AI_ATTESTED
+}
+
+/// The mechanism that established a proof.
+enum ProofMechanism {
+  INTERNAL_RECORD
+  STRIPE_PAYMENT
+  AI_SCORING
+  /// Operator-authorized comp - a 100%-off PromoCode satisfied the PAY step.
+  /// No Stripe contact; the proof payload carries the promo code + order ids.
+  COMP_CODE
+}
+
+/// Proof lifecycle. Only SATISFIED (and unexpired) counts toward Open.
+/// PENDING_REVIEW (e.g. AI scoring returned needsHuman) and REJECTED both
+/// evaluate as not satisfied - fail-closed.
+enum GateProofStatus {
+  SATISFIED
+  REJECTED
+  PENDING_REVIEW
+}
+
+enum GrowthEdgeType {
+  REFERRAL
+}
+
+enum GateSessionStatus {
+  ACTIVE
+  SATISFIED
+  EXPIRED
+}
+
+/// One access gate per protected resource. The rule tree lives in GateNode;
+/// the root is the single node with parentId = null (engine-enforced).
+model Gate {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id])
+  resourceType GateResourceType
+  resourceId   String
+  name         String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  nodes    GateNode[]
+  sessions GateSession[]
+
+  @@unique([workspaceId, resourceType, resourceId])
+  @@index([workspaceId])
+  @@index([resourceType, resourceId])
+}
+
+/// A node in a gate's boolean expression tree. `required` blocks Open when
+/// unsatisfied regardless of the parent's rule. The depth ceiling (root GROUP
+/// plus one nested GROUP level, conditions at depth <= 2) is enforced by the
+/// engine's authoring validator, not the database. conditionType is a registry
+/// key, deliberately NOT a Postgres enum - new condition types must not
+/// require DDL, and no type is usable until its verifier exists and is tested.
+model GateNode {
+  id          String       @id @default(cuid())
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+  gateId      String
+  gate        Gate         @relation(fields: [gateId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      GateNode?    @relation("GateNodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    GateNode[]   @relation("GateNodeTree")
+
+  kind     GateNodeKind
+  position Int          @default(0)
+
+  // GROUP fields
+  rule            GateGroupRule?
+  requiredCount   Int?
+  weightThreshold Int?
+
+  // CONDITION fields
+  conditionType String?
+  config        Json?
+
+  // Child-within-parent semantics
+  required Boolean @default(false)
+  weight   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proofs GateProof[]
+
+  @@index([workspaceId])
+  @@index([gateId])
+  @@index([parentId])
+}
+
+/// A member's proof against a condition node. One LIVE proof per
+/// (nodeId, memberId) - re-verification updates the row in place, never
+/// silently upgrades tier or mechanism. conditionType is denormalized so the
+/// carry-forward query can match a member's prior proofs across gates and
+/// events; nodeId is SetNull on node deletion so proof history survives gate
+/// edits. sourceProofId records carry-forward lineage.
+model GateProof {
+  id            String           @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id])
+  nodeId        String?
+  node          GateNode?        @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  memberId      String
+  member        Member           @relation(fields: [memberId], references: [id])
+  conditionType String
+  status        GateProofStatus
+  tier          VerificationTier
+  mechanism     ProofMechanism
+  payload       Json?
+  sourceProofId String?
+  verifiedAt    DateTime         @default(now())
+  expiresAt     DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([nodeId, memberId])
+  @@index([workspaceId, memberId, conditionType])
+  @@index([memberId])
+}
+
+/// A workspace-scoped edge in the growth graph. M1 writes REFERRAL edges when
+/// REFERRED_BY_MEMBER is satisfied. One edge per (type, from, to) pair per
+/// workspace. Shaped so per-workspace network aggregation is possible later;
+/// there are NO cross-tenant reads anywhere in the engine.
+model GrowthEdge {
+  id           String            @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id])
+  type         GrowthEdgeType
+  fromMemberId String
+  fromMember   Member            @relation("GrowthEdgeFrom", fields: [fromMemberId], references: [id])
+  toMemberId   String
+  toMember     Member            @relation("GrowthEdgeTo", fields: [toMemberId], references: [id])
+  resourceType GateResourceType?
+  resourceId   String?
+  proofId      String?
+  createdAt    DateTime          @default(now())
+
+  @@unique([workspaceId, type, fromMemberId, toMemberId])
+  @@index([workspaceId, toMemberId])
+  @@index([workspaceId, fromMemberId])
+}
+
+/// A single traversal of a gate by a member or anonymous guest. Deliberately
+/// minimal in M1 (headless engine); the M2 guest render extends it additively.
+/// `token` is the anonymous resume handle; `lastDecision` snapshots the most
+/// recent evaluation result for the traversal.
+model GateSession {
+  id           String            @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id])
+  gateId       String
+  gate         Gate              @relation(fields: [gateId], references: [id], onDelete: Cascade)
+  memberId     String?
+  member       Member?           @relation(fields: [memberId], references: [id])
+  token        String            @unique @default(cuid())
+  status       GateSessionStatus @default(ACTIVE)
+  lastDecision Json?
+  expiresAt    DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([workspaceId])
+  @@index([gateId, memberId])
+}
+
+// ─── Attendee messaging layer (Stage 18) ─────────────────────────────────────
+// One-off operator blasts (email or SMS) to ONE event's confirmed attendees.
+// CHANNEL axis only: consent lives on Member.marketing*OptIn with the latest
+// Application as documented fallback; redListed/RedList (ACCESS axis) is
+// deliberately never consulted. Not a marketing automation platform - no
+// schedules, no segments, no templates editor.
+
+enum BlastChannel {
+  EMAIL
+  SMS
+}
+
+enum BlastStatus {
+  DRAFT
+  SENDING
+  SENT
+  FAILED
+}
+
+enum BlastRecipientStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED_NO_CONSENT
+  SKIPPED_SUPPRESSED
+  SKIPPED_NO_DESTINATION
+}
+
+/// One operator-composed message to one event's confirmed attendees.
+/// clientToken makes double-submit idempotent: the compose surface mints one
+/// token per draft, and the unique below collapses concurrent sends of the
+/// same draft into one row.
+model Blast {
+  id              String       @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id])
+  eventId         String
+  event           Event        @relation(fields: [eventId], references: [id])
+  channel         BlastChannel
+  status          BlastStatus  @default(DRAFT)
+  subject         String?
+  body            String       @db.Text
+  createdByUserId String
+  clientToken     String
+  recipientCount  Int          @default(0)
+  sentCount       Int          @default(0)
+  failedCount     Int          @default(0)
+  skippedCount    Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  sentAt          DateTime?
+
+  recipients BlastRecipient[]
+
+  @@unique([workspaceId, clientToken])
+  @@index([workspaceId, eventId, createdAt])
+}
+
+/// Per-recipient outcome log. rsvpId/memberId are plain references (no FK):
+/// these rows are the delivery record and must survive RSVP/member cleanup.
+model BlastRecipient {
+  id          String               @id @default(cuid())
+  workspaceId String
+  blastId     String
+  blast       Blast                @relation(fields: [blastId], references: [id], onDelete: Cascade)
+  rsvpId      String
+  memberId    String?
+  destination String
+  status      BlastRecipientStatus
+  /// Which signal authorized the send: profile | application. Null on skips.
+  consentSource String?
+  error       String?
+  providerId  String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([workspaceId, blastId])
+  @@index([blastId, status])
+}
+
+/// Minimal per-workspace suppression list (hard bounces, opt-outs, carrier
+/// STOPs). Consulted by every blast; deliberately NOT a per-member channel
+/// subscription axis - v1 is a destination blocklist and nothing more.
+model SuppressedContact {
+  id          String       @id @default(cuid())
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+  channel     BlastChannel
+  destination String
+  reason      String?
+  createdAt   DateTime     @default(now())
+
+  @@unique([workspaceId, channel, destination])
+  @@index([workspaceId])
 }

@@ -12,7 +12,7 @@ export function EventHeroFallback({ className = '' }: { className?: string }) {
       aria-hidden
       className={`relative flex items-center justify-center overflow-hidden ${className}`}
       style={{
-        backgroundColor: 'var(--apply-ink)',
+        backgroundColor: 'var(--ev-depth)',
         backgroundImage:
           'radial-gradient(135% 100% at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 55%), repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0 1px, transparent 1px 22px)',
       }}
@@ -27,13 +27,13 @@ export function EventHeroFallback({ className = '' }: { className?: string }) {
       <div className="relative flex flex-col items-center px-10 text-center">
         <span
           className="text-[clamp(2rem,4vw,3.25rem)] italic leading-[1.05] font-[family-name:var(--font-cormorant)]"
-          style={{ color: 'color-mix(in oklab, var(--events-paper) 82%, transparent)' }}
+          style={{ color: 'color-mix(in oklab, var(--ev-on-depth) 82%, transparent)' }}
         >
           No Bad Company
         </span>
         <span
           className="mt-5 h-px w-12"
-          style={{ background: 'color-mix(in oklab, var(--events-paper) 30%, transparent)' }}
+          style={{ background: 'color-mix(in oklab, var(--ev-on-depth) 30%, transparent)' }}
         />
       </div>
     </div>

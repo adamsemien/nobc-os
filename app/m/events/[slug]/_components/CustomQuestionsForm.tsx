@@ -31,18 +31,18 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      <p className="text-[11px] font-medium uppercase tracking-widest text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
         A few questions
       </p>
       {questions.map(q => (
         <div key={q.id}>
           <label
             htmlFor={`cq-${q.id}`}
-            className="mb-1 block text-sm font-normal text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]"
+            className="mb-1 block text-sm font-normal text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]"
           >
             {q.label}
             {q.required ? (
-              <span aria-hidden className="ml-1 text-[var(--nobc-red)]">
+              <span aria-hidden className="ml-1 text-[var(--ev-accent)]">
                 *
               </span>
             ) : null}
@@ -54,7 +54,7 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
               required={q.required}
               value={String(answers[q.id] ?? '')}
               onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-              className="w-full resize-none border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-base text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full resize-none border-0 border-b border-[var(--ev-rule)] bg-transparent py-2 text-base text-[var(--ev-ink)] focus:border-[var(--ev-accent)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             />
           ) : q.type === 'select' && q.options ? (
             <select
@@ -62,7 +62,7 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
               required={q.required}
               value={String(answers[q.id] ?? '')}
               onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-base text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full border-0 border-b border-[var(--ev-rule)] bg-transparent py-2 text-base text-[var(--ev-ink)] focus:border-[var(--ev-accent)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             >
               <option value="">Select…</option>
               {q.options.map(opt => (
@@ -81,9 +81,9 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
                 onChange={e =>
                   setAnswers(prev => ({ ...prev, [q.id]: e.target.checked }))
                 }
-                className="h-4 w-4 accent-[var(--nobc-red)]"
+                className="h-4 w-4 accent-[var(--ev-accent)]"
               />
-              <span className="text-sm text-[var(--apply-ink)]">{q.label}</span>
+              <span className="text-sm text-[var(--ev-ink)]">{q.label}</span>
             </label>
           ) : (
             <input
@@ -92,7 +92,7 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
               required={q.required}
               value={String(answers[q.id] ?? '')}
               onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-              className="w-full border-0 border-b border-[var(--apply-rule)] bg-transparent py-2 text-base text-[var(--apply-ink)] focus:border-[var(--nobc-red)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
+              className="w-full border-0 border-b border-[var(--ev-rule)] bg-transparent py-2 text-base text-[var(--ev-ink)] focus:border-[var(--ev-accent)] focus:outline-none font-[family-name:var(--font-dm-sans)]"
             />
           )}
         </div>
@@ -101,7 +101,7 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
         <button
           type="button"
           onClick={onBack}
-          className="text-[11px] uppercase tracking-widest text-[var(--apply-muted)] underline-offset-4 hover:underline font-[family-name:var(--font-dm-sans)]"
+          className="text-[11px] uppercase tracking-widest text-[var(--ev-muted)] underline-offset-4 hover:underline font-[family-name:var(--font-dm-sans)]"
         >
           ← Back
         </button>
@@ -109,7 +109,7 @@ export function CustomQuestionsForm({ questions, onSubmit, onBack, loading }: Pr
           type="submit"
           disabled={loading}
           aria-busy={loading}
-          className="rounded-sm bg-[var(--nobc-red)] px-6 py-3 text-[11px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-colors hover:bg-[color-mix(in_oklab,var(--nobc-red)_86%,black)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
+          className="rounded-sm bg-[var(--ev-accent)] px-6 py-3 text-[11px] font-medium uppercase tracking-widest text-[var(--ev-on-accent)] transition-colors hover:bg-[var(--ev-accent-hover)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
         >
           {loading ? 'Loading…' : 'Continue'}
         </button>

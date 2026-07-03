@@ -19,7 +19,7 @@ function renderBrandTitle(title: string) {
   if (title.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase()) {
     return (
       <>
-        <span className="text-[var(--nobc-red)]">{title.slice(0, prefix.length)}</span>
+        <span className="text-[var(--ev-brand-accent)]">{title.slice(0, prefix.length)}</span>
         {title.slice(prefix.length)}
       </>
     );
@@ -45,9 +45,12 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
   // the member page is auth-gated, so this never alters the member surface.
   const isActiveEvent = event.eventId === ACTIVE_EVENT_ID;
   const showFork = isActiveEvent && event.viewer === 'anon';
+  // Per-event hero fit (Loose Ends L6). The active-event hack stays ORed in
+  // until cutover step 10 retires it in favor of the setting.
+  const heroContain = event.pageStyle.heroFit === 'contain' || isActiveEvent;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-events-paper text-[var(--apply-ink)] lg:h-dvh lg:flex-row lg:overflow-hidden">
+    <div className="flex min-h-dvh flex-col bg-[var(--ev-ground)] text-[var(--ev-ink)] lg:h-dvh lg:flex-row lg:overflow-hidden">
       {/* Left: full-height hero — true 50/50 on desktop, ~40vh full-bleed on mobile.
           Plain paper behind the poster (any object-contain letterbox reads as
           paper, not a matte). Branded fallback panel when there's no hero image.
@@ -55,13 +58,13 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           lg:max-h-dvh) rather than lg:h-full - a percentage height can fail to
           constrain inside the flex row and let a portrait poster overflow into a
           scroll. Mobile band (h-[40vh]/sm:h-[44vh]) is unchanged. */}
-      <div className="relative w-full bg-events-paper lg:h-dvh lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
+      <div className="relative w-full bg-[var(--ev-ground)] lg:h-dvh lg:w-1/2 lg:shrink-0 lg:overflow-hidden">
         {event.heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={event.heroImageUrl}
             alt=""
-            className={`h-[40vh] w-full sm:h-[44vh] lg:h-dvh lg:max-h-dvh ${isActiveEvent ? 'object-contain object-center' : 'object-cover'}`}
+            className={`h-[40vh] w-full sm:h-[44vh] lg:h-dvh lg:max-h-dvh ${heroContain ? 'object-contain object-center' : 'object-cover'}`}
           />
         ) : (
           <EventHeroFallback className="h-[40vh] w-full sm:h-[44vh] lg:h-full" />
@@ -75,37 +78,37 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
 
         <div className="ev-stagger flex flex-1 flex-col px-6 pb-28 pt-8 text-left sm:px-12 sm:pt-12 lg:pb-14">
           {/* category tag */}
-          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-            {accessTypeLabel(event.resolved)}
+          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]">
+            {event.gated ? 'Event Access' : accessTypeLabel(event.resolved)}
           </p>
 
           {/* title */}
           <h1
-            className="mt-4 max-w-2xl font-normal leading-[1.02] text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]"
+            className="mt-4 max-w-2xl font-normal leading-[1.02] text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]"
             style={{ fontSize: 'calc(clamp(2.75rem, 5vw, 4.25rem) * var(--page-title-scale, 1))' }}
           >
             {renderBrandTitle(event.title)}
           </h1>
 
           {/* date · time · venue */}
-          <p className="mt-5 text-[13px] uppercase tracking-[0.14em] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+          <p className="mt-5 text-[13px] uppercase tracking-[0.14em] text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
             {metaLine}
           </p>
 
           {/* thin rule */}
-          <div className="my-7 h-px w-full bg-[var(--apply-rule)]" />
+          <div className="my-7 h-px w-full bg-[var(--ev-rule)]" />
 
           {/* capacity callout (distinct, not buried) */}
           {showCapacity ? (
-            <p className="mb-7 inline-flex w-fit items-center gap-2 text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--nobc-red)]" aria-hidden />
-              Limited to {event.capacity} spots
+            <p className="mb-7 inline-flex w-fit items-center gap-2 text-[12px] font-medium uppercase tracking-[0.18em] text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--ev-accent)]" aria-hidden />
+              Limited to {event.capacity} spot{event.capacity === 1 ? '' : 's'}
             </p>
           ) : null}
 
           {/* description — the guest reads what the event is before hitting the CTA */}
           {description ? (
-            <p className="max-w-2xl whitespace-pre-wrap text-[17px] leading-[1.8] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+            <p className="max-w-2xl whitespace-pre-wrap text-[17px] leading-[1.8] text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
               {description}
             </p>
           ) : null}
@@ -137,23 +140,23 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
           {/* bottom brand anchor — fills the lower panel intentionally on short-copy
               events, and reads as a closing mark on long-copy ones. */}
           <div className="mt-16">
-            <div className="h-px w-full bg-[var(--apply-rule)]" />
+            <div className="h-px w-full bg-[var(--ev-rule)]" />
             <div className="flex items-end justify-between gap-6 pt-6">
               <div>
                 <p
                   className="italic leading-none font-[family-name:var(--font-cormorant)]"
                   style={{ fontSize: 'calc(clamp(1.5rem, 2.6vw, 2.25rem) * var(--footer-scale, 1))' }}
                 >
-                  <span className="text-[var(--nobc-red)]">No Bad</span>
-                  <span className="text-[var(--apply-ink)]"> Company</span>
+                  <span className="text-[var(--ev-brand-accent)]">No Bad</span>
+                  <span className="text-[var(--ev-ink)]"> Company</span>
                 </p>
-                <p className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+                <p className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                   {event.location ? `${event.location} · Austin` : 'Austin'}
                 </p>
               </div>
               <a
                 href="mailto:team@thenobadcompany.com"
-                className="shrink-0 text-[13px] text-[var(--apply-muted)] underline-offset-4 transition-colors hover:text-[var(--nobc-red)] hover:underline font-[family-name:var(--font-dm-sans)]"
+                className="shrink-0 text-[13px] text-[var(--ev-muted)] underline-offset-4 transition-colors hover:text-[var(--ev-accent)] hover:underline font-[family-name:var(--font-dm-sans)]"
               >
                 team@thenobadcompany.com
               </a>

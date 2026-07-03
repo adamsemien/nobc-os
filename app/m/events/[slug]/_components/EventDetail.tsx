@@ -66,6 +66,15 @@ export type EventDetailDTO = {
   isOperator: boolean;
   workflowPaths?: WorkflowPath[];
   pageStyle: PageStyle;
+  /** True when an Access Gate governs this event's public door (Stage 17,
+   *  M4). Set ONLY by the public /e loader - the member surface never sets
+   *  it, so /m behavior is unchanged. Gated events route the CTA to the gate
+   *  walkthrough instead of the v1 access flow. */
+  gated?: boolean;
+  /** True when the governing gate is the open door (every condition OPEN -
+   *  Loose Ends L1/L3). The CTA reads "Register" per copy law; the flow is
+   *  the same gate walkthrough. Set ONLY by the public /e loader. */
+  gateOpen?: boolean;
 };
 
 type PreviewViewer = 'guest' | 'member';
@@ -126,7 +135,7 @@ export function EventDetail({ event }: { event: EventDetailDTO }) {
       <button
         type="button"
         onClick={() => setEditorOpen((o) => !o)}
-        className="fixed right-3 top-14 z-40 rounded-sm border border-[var(--apply-rule)] bg-events-paper-card/95 px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)] shadow-[0_1px_4px_rgba(28,16,8,0.12)] backdrop-blur transition-colors hover:text-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+        className="fixed right-3 top-14 z-40 rounded-sm border border-[var(--ev-rule)] bg-[var(--ev-ground-raised)]/95 px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--ev-ink)] shadow-[0_1px_4px_rgba(28,16,8,0.12)] backdrop-blur transition-colors hover:text-[var(--ev-accent)] font-[family-name:var(--font-dm-sans)]"
       >
         {editorOpen ? 'Close design' : 'Edit design'}
       </button>
@@ -156,11 +165,11 @@ function ViewToggle({
   onChange: (v: PreviewViewer) => void;
 }) {
   return (
-    <div className="fixed right-3 top-3 z-40 flex items-center gap-2 rounded-sm border border-[var(--apply-rule)] bg-events-paper-card/95 px-2 py-1.5 shadow-[0_1px_4px_rgba(28,16,8,0.12)] backdrop-blur">
-      <span className="pl-1 text-[9px] font-medium uppercase tracking-widest text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+    <div className="fixed right-3 top-3 z-40 flex items-center gap-2 rounded-sm border border-[var(--ev-rule)] bg-[var(--ev-ground-raised)]/95 px-2 py-1.5 shadow-[0_1px_4px_rgba(28,16,8,0.12)] backdrop-blur">
+      <span className="pl-1 text-[9px] font-medium uppercase tracking-widest text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
         Preview
       </span>
-      <div className="flex items-center rounded-sm bg-events-paper p-0.5">
+      <div className="flex items-center rounded-sm bg-[var(--ev-ground)] p-0.5">
         {(['guest', 'member'] as const).map((v) => (
           <button
             key={v}
@@ -168,8 +177,8 @@ function ViewToggle({
             onClick={() => onChange(v)}
             className={`rounded-sm px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest transition-colors font-[family-name:var(--font-dm-sans)] ${
               value === v
-                ? 'bg-[var(--nobc-red)] text-[var(--nobc-on-red)]'
-                : 'text-[var(--apply-muted)] hover:text-[var(--apply-ink)]'
+                ? 'bg-[var(--ev-accent)] text-[var(--ev-on-accent)]'
+                : 'text-[var(--ev-muted)] hover:text-[var(--ev-ink)]'
             }`}
           >
             {v === 'guest' ? 'Guest view' : 'Member view'}

@@ -40,6 +40,8 @@ Claude Code reads only that stage's `CONTEXT.md` plus the root `CLAUDE.md`. Othe
 | 13 | `13-dev-tooling/` | Internal-only: QA Missions, persona generator, seed/reset, apply-flow tester |
 | 14 | `14-house-phone/` | Shared multi-operator SMS inbox for live events (outbound replies via Twilio; inbound on Railway) |
 | 15 | `15-media-dam/` | Digital Asset Manager — R2 media library, AI tagging, share surfaces, DamPicker |
+| 17 | `17-access-gate-engine/` | Access Gate Engine v3 - M1 headless engine core (recursive evaluator, condition registry, proofs, growth graph). Post-July-11 platform work; unmerged until Adam's gate |
+| 18 | `18-attendee-messaging/` | Attendee blast layer - one-off email/SMS to one event's confirmed attendees, consent-gated + dry-run-first. Built on `feat/event-builder-rebuild`, unmerged |
 
 ## The `nobc-icm` skill
 

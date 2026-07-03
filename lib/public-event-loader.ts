@@ -24,6 +24,7 @@ import {
   resolveAccessForViewer,
   buildSteps,
 } from './event-access';
+import { CONDITION_OPEN } from '@/lib/gate-engine/types';
 import type { EventDetailDTO } from '@/app/m/events/[slug]/_components/EventDetail';
 import type { WorkflowPath } from '@/lib/workflows/types';
 import { parsePageStyle } from '@/lib/page-style';
@@ -63,10 +64,42 @@ export async function assemblePublicEventDTO(
   // Step 1: resolve workspace from slug.
   const resolved = await resolvePublishedEventBySlug(slug);
   if (!resolved) return null;
-  const { workspaceId } = resolved;
 
-  // Step 2: all queries scoped to workspaceId.
-  const event = await getEventBySlug(workspaceId, slug);
+  // Step 2: the shared assembly, scoped to the server-derived workspaceId.
+  return assembleAnonEventDTO(resolved.workspaceId, slug);
+}
+
+/**
+ * Draft preview entry (Event Builder Rebuild, Phase B). The builder's WYSIWYG
+ * pane and the token-gated /e/preview route resolve by (workspaceId, eventId)
+ * — already authenticated by a signed preview token or an operator session —
+ * then run the EXACT same assembly the live page runs. One code path, so the
+ * preview and the published render can never drift (acceptance 2 by
+ * construction). Status is deliberately not filtered here: previewing DRAFT
+ * is the point. Callers own authorization.
+ */
+export async function assembleDraftPreviewDTO(
+  workspaceId: string,
+  eventId: string,
+): Promise<(EventDetailDTO & { workspaceId: string }) | null> {
+  const evt = await db.event.findFirst({
+    where: { id: eventId, workspaceId },
+    select: { slug: true },
+  });
+  if (!evt) return null;
+  return assembleAnonEventDTO(workspaceId, evt.slug);
+}
+
+/** THE anon assembly - everything below runs identically for the live
+ *  published page and the draft preview. Do not fork this. */
+async function assembleAnonEventDTO(
+  workspaceId: string,
+  slug: string,
+): Promise<(EventDetailDTO & { workspaceId: string }) | null> {
+  // includeDraft is safe here: the live entry already enforced PUBLISHED via
+  // resolvePublishedEventBySlug, and the preview entry is authorized by a
+  // signed token or a STAFF+ session before it ever reaches this assembly.
+  const event = await getEventBySlug(workspaceId, slug, { includeDraft: true });
   if (!event) return null;
 
   const heroImageUrl = getEventHeroDisplayUrl(event.heroImageAssetId ?? null);
@@ -105,13 +138,33 @@ export async function assemblePublicEventDTO(
     })),
   );
 
-  const [workflow, capacityUsedCount] = await Promise.all([
+  const [workflow, capacityUsedCount, gateRow] = await Promise.all([
     db.eventWorkflow.findUnique({
       where: { eventId: event.id },
       select: { paths: true },
     }),
     getCapacityUsedRsvpCount(event.id, workspaceId),
+    // Stage 17 (M4): an Access Gate on the event switches the public door to
+    // the gate walkthrough. Workspace-scoped like every other read here.
+    db.gate.findFirst({
+      where: { workspaceId, resourceType: 'EVENT', resourceId: event.id },
+      select: {
+        id: true,
+        nodes: {
+          where: { kind: 'CONDITION' },
+          select: { conditionType: true },
+        },
+      },
+    }),
   ]);
+
+  // Loose Ends L1/L3: the canonical open gate (at least one condition, all
+  // OPEN) renders the open door - CTA "Register" per copy law. Fail-closed:
+  // a gate with no condition nodes is NOT open.
+  const gateOpen =
+    gateRow != null &&
+    gateRow.nodes.length > 0 &&
+    gateRow.nodes.every((n) => n.conditionType === CONDITION_OPEN);
 
   const workflowPaths = parseWorkflowPaths(workflow?.paths);
 
@@ -156,6 +209,8 @@ export async function assemblePublicEventDTO(
     workflowPaths,
     // Per-event styling overrides; null/invalid falls back to brand defaults.
     pageStyle: parsePageStyle(event.pageStyle),
+    gated: gateRow != null,
+    gateOpen,
   };
 
   return dto;

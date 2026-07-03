@@ -416,6 +416,20 @@ export async function POST(req: NextRequest) {
                   metadata: { reason: 'charge.refunded' },
                 });
               });
+              // Phase C (Decision 4b): a full refund revokes the PAY proof
+              // and closes the gate Order/Ticket. Idempotent with the admin
+              // route's fast path - whichever runs second is a no-op. Runs
+              // deferred (plain db) because the tx client cannot be captured
+              // past commit.
+              deferred.push(async () => {
+                const { revokeGateRecordsForIntent } = await import(
+                  '@/lib/commerce/refund'
+                );
+                await revokeGateRecordsForIntent(db, {
+                  workspaceId,
+                  paymentIntentId: piId,
+                });
+              });
             }
           }
           break;

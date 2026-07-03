@@ -15,10 +15,10 @@ import { useState, type ReactNode } from 'react';
  * Touches nothing in the gate engine, the builder, EventAccessFlow, or Door 1.
  */
 const buttonClass =
-  'block w-full rounded-sm bg-[var(--nobc-red)] px-6 py-4 text-center text-[13px] font-medium uppercase tracking-[0.12em] text-[var(--nobc-on-red)] transition-colors hover:bg-[var(--nobc-red-hover)] font-[family-name:var(--font-dm-sans)]';
+  'block w-full rounded-sm bg-[var(--ev-accent)] px-6 py-4 text-center text-[13px] font-medium uppercase tracking-[0.12em] text-[var(--ev-on-accent)] transition-colors hover:bg-[var(--ev-accent-hover)] font-[family-name:var(--font-dm-sans)]';
 
 const subcopyClass =
-  'text-[13px] leading-relaxed text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]';
+  'text-[13px] leading-relaxed text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]';
 
 export function DoorFork({ children, priceCents }: { children: ReactNode; priceCents: number }) {
   const [showBuy, setShowBuy] = useState(false);
@@ -32,7 +32,7 @@ export function DoorFork({ children, priceCents }: { children: ReactNode; priceC
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <p className="text-[13px] font-medium uppercase tracking-[0.24em] text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+      <p className="text-[13px] font-medium uppercase tracking-[0.24em] text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
         Choose how to join us
       </p>
 

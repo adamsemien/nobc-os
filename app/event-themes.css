@@ -1,0 +1,119 @@
+/* ============================================================
+   EVENT PAGE THEMES (Stage 17, Phase 2 - 2026-07-02)
+
+   The guest event page's palette contract. Templates and cards speak ONLY
+   these semantic tokens; a theme is one block in this file and nothing
+   else - if a new theme ever needs a component edit for color, the
+   contract is broken.
+
+   Tiers:
+     ground - the page and its raised surfaces
+     depth  - recessed panels and the hero-fallback field
+     voice  - type (ink / muted / faint), hairline rules, hover wash
+     glow   - the single bright note: CTAs, the wordmark accent, focus
+
+   'paper' (default) resolves to exactly the values the pages rendered
+   before this file existed - a null/absent theme is a pixel no-op.
+   ============================================================ */
+
+:root {
+  /* ground */
+  --ev-ground: var(--events-paper);
+  --ev-ground-raised: var(--events-paper-card);
+  /* depth - the contemplative dark field (hero fallback). Dark in BOTH
+     registers: on paper it is the brand-ink panel, on night the deepest
+     plum. --ev-on-depth is the wordmark voice on that field. */
+  --ev-depth: var(--events-ref-ink);
+  --ev-on-depth: var(--events-paper);
+  /* voice */
+  --ev-ink: var(--events-ref-ink);
+  --ev-muted: var(--events-ref-muted);
+  --ev-faint: var(--events-ref-faint);
+  --ev-rule: var(--events-ref-rule);
+  --ev-wash: color-mix(in srgb, var(--events-ref-ink) 6%, transparent);
+  /* glow */
+  --ev-accent: var(--nobc-red);
+  --ev-accent-hover: var(--nobc-red-hover);
+  --ev-on-accent: #ffffff;
+  --ev-cta-glow: rgba(178, 46, 33, 0.28);
+  /* brand - the wordmark accent ("No Bad" in the mark). A token, never a
+     literal, so a future Night brand-mark variant (Chloe's purple logo
+     suite) is an asset/token swap, not a refactor. */
+  --ev-brand-accent: var(--nobc-red);
+  /* nav CTA - the shell nav's Apply button. On paper it is the solid brand
+     button it has always been; a theme may resolve it to a ghost. */
+  --ev-nav-cta-bg: var(--nobc-red);
+  --ev-nav-cta-edge: var(--nobc-red);
+  --ev-nav-cta-ink: var(--nobc-on-red);
+  --ev-nav-cta-hover-bg: var(--nobc-red-hover);
+  --ev-nav-cta-hover-ink: var(--nobc-on-red);
+}
+
+/* ------------------------------------------------------------
+   NIGHT - purple velvet, monochromatic, quiet luxury.
+   Cream voice on plum ground; Soft Lavender is the only bright
+   note and appears exactly once per view (the CTA / the accent).
+   Raw material: Moonlit Plum 2C1332, Violet Night 2D1C42,
+   Blackcurrant 2E183B, Dark Plum 2B063D, Deep Violet 4A0E6B,
+   Rose Noir 4F284B, Soft Lavender B57EDC.
+   ------------------------------------------------------------ */
+[data-event-theme='night'] {
+  /* ground - the room goes a half-step darker than Moonlit Plum and the
+     card lifts a half-step past Violet Night, so the access card reads as a
+     raised velvet surface (1.32:1 separation) instead of relying on its
+     hairline. Card-borne lavender text stays AA (4.55:1). Chloe holds the
+     veto - reverting this commit restores the flat 2C1332/2D1C42 pair. */
+  --ev-ground: #220e26;
+  --ev-ground-raised: #38254b;
+  /* depth */
+  --ev-depth: #2b063d;
+  --ev-on-depth: #f2eae3;
+  /* voice */
+  --ev-ink: #f2eae3;
+  --ev-muted: #b5a0b5;
+  --ev-faint: #9a839d;
+  --ev-rule: #4f284b;
+  --ev-wash: color-mix(in srgb, #4a0e6b 55%, transparent);
+  /* glow */
+  --ev-accent: #b57edc;
+  --ev-accent-hover: color-mix(in oklab, #b57edc 88%, white);
+  --ev-on-accent: #2b063d;
+  --ev-cta-glow: rgba(181, 126, 220, 0.32);
+  /* brand - red dies on plum (2.65:1); the wordmark speaks lavender until
+     the real Night mark ships (future Chloe project - swap this token). */
+  --ev-brand-accent: #b57edc;
+  /* nav CTA - a cream ghost, NOT a second lavender fill: the page keeps one
+     bright note and the access card's CTA owns it. Hover joins the accent
+     system. (2-NAV decision, documented in the report.) */
+  --ev-nav-cta-bg: transparent;
+  --ev-nav-cta-edge: color-mix(in oklab, #f2eae3 55%, transparent);
+  --ev-nav-cta-ink: #f2eae3;
+  --ev-nav-cta-hover-bg: #b57edc;
+  --ev-nav-cta-hover-ink: #2b063d;
+
+  /* Frozen-zone bridge: EventAccessFlow internals are read-only and speak
+     the apply namespace. Rebinding those names INSIDE the night scope keeps
+     the frozen flow legible without touching it. New code never reads
+     these - it speaks --ev-*. */
+  --apply-ink: #f2eae3;
+  --apply-muted: #b5a0b5;
+  --apply-rule: #4f284b;
+  --apply-cream: #38254b;
+  /* 2-NAV: red does not appear anywhere on a Night guest page. The frozen
+     flow reads the brand red directly (CTA fill, step dots, focus rings,
+     error text) and 2.65:1 red-on-plum is illegible - so the brand pair
+     rebinds to the accent system inside night scope only. Known tradeoff,
+     flagged for Chloe: the flow's errors render lavender here, trading the
+     red convention for legibility. */
+  --nobc-red: #b57edc;
+  --nobc-red-hover: color-mix(in oklab, #b57edc 88%, white);
+  --nobc-on-red: #2b063d;
+
+  color-scheme: dark;
+}
+
+/* Keyboard focus must carry the glow on velvet - the default ring
+   disappears into the plum. Theme presentation, so it lives here. */
+[data-event-theme='night'] :focus-visible {
+  outline-color: #b57edc;
+}

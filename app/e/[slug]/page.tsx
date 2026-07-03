@@ -56,7 +56,11 @@ export async function generateMetadata({
       rawDescription.length > 200
         ? `${rawDescription.slice(0, 197).trimEnd()}...`
         : rawDescription;
-    const image = toAbsoluteImageUrl(getEventHeroDisplayUrl(event.heroImageAssetId));
+    // No-hero events fall back to the site default card instead of an
+    // imageless unfurl (this openGraph object replaces the root's wholesale).
+    const image =
+      toAbsoluteImageUrl(getEventHeroDisplayUrl(event.heroImageAssetId)) ??
+      `${SITE_BASE_URL}/og-default.png`;
 
     return {
       title,
@@ -95,7 +99,7 @@ export default async function PublicEventPage({
   // active event's two-choice fork lives in the access-card slot inside the
   // template (see TemplateSplit), not as a whole-page replacement.
   return (
-    <PublicEventShell>
+    <PublicEventShell theme={dto.pageStyle.theme}>
       <EventDetail event={dto} />
     </PublicEventShell>
   );

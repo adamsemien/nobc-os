@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./event-themes.css";
 
 /* ============================================================
    FONTS: PP Editorial New + Neue Haas Grotesk Display Pro
@@ -489,8 +490,8 @@
   --hero-fg-soft: rgba(255, 255, 255, 0.85);
 }
 [data-hero-text='dark'] {
-  --hero-fg: var(--apply-ink);
-  --hero-fg-soft: color-mix(in srgb, var(--apply-ink) 78%, transparent);
+  --hero-fg: var(--ev-ink);
+  --hero-fg-soft: color-mix(in srgb, var(--ev-ink) 78%, transparent);
 }
 
 /* Hero title color — set by EventPageStyleWrapper via data-hero-title, independent
@@ -500,16 +501,16 @@
   --hero-title-fg: #ffffff;
 }
 [data-hero-title='dark'] {
-  --hero-title-fg: var(--apply-ink);
+  --hero-title-fg: var(--ev-ink);
 }
 [data-hero-title='red'] {
-  --hero-title-fg: var(--nobc-red);
+  --hero-title-fg: var(--ev-accent);
 }
 
 /* Brand accent — reddens a leading "No Bad" in the hero title when on. Off (default)
    leaves the accent span inheriting the title color, so the title is single-color. */
 [data-hero-title-accent='on'] .ev-title-accent {
-  color: var(--nobc-red);
+  color: var(--ev-brand-accent);
 }
 
 /* Access card elevation — set by EventPageStyleWrapper via data-card-shadow.
@@ -651,10 +652,13 @@
 }
 
 /* Cheap insurance against a leaky child scrolling the whole page sideways on
-   mobile. (MOBILE-IPHONE-AUDIT-2026-06-22, #9.) */
+   mobile. (MOBILE-IPHONE-AUDIT-2026-06-22, #9.) `clip`, NOT `hidden`: hidden
+   makes body a scroll container (overflow-y computes to auto), which silently
+   disables position: sticky under it - the operator rail's pinned Settings
+   was the visible casualty. clip clips without creating a scroll container. */
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {

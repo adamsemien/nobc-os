@@ -19,6 +19,29 @@ export type SendResult =
 
 const FROM = 'The No Bad Company <team@thenobadcompany.com>';
 
+/** One-off blast send (Stage 18) - the same locked FROM as every send in
+ *  NoBC OS. No per-send auditEvent here: the Blast/BlastRecipient rows ARE
+ *  the delivery record. Throws on provider errors so the blast engine's
+ *  bounded retry can classify them (err.name / err.statusCode). */
+export async function sendBlastEmail(args: {
+  to: string;
+  subject: string;
+  text: string;
+}): Promise<{ id: string | null }> {
+  const send = await resend.emails.send({
+    from: FROM,
+    to: [args.to],
+    subject: args.subject,
+    text: args.text,
+  });
+  if (send.error) {
+    const err = new Error(send.error.message) as Error & { statusCode?: number };
+    err.name = send.error.name;
+    throw err;
+  }
+  return { id: send.data?.id ?? null };
+}
+
 /** Flatten {member: {firstName: 'X'}} → {'member.firstName': 'X'} so callers can
  *  pass nested objects too. */
 function flatten(obj: Record<string, unknown>, prefix = ''): EmailVariables {

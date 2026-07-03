@@ -99,24 +99,24 @@ export function PageStyleEditor({
   return (
     <div
       ref={panelRef}
-      className="fixed z-40 flex max-h-[calc(100vh-1.5rem)] w-[300px] flex-col overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-events-paper-card/95 shadow-[0_4px_24px_rgba(28,16,8,0.18)] backdrop-blur font-[family-name:var(--font-dm-sans)]"
+      className="fixed z-40 flex max-h-[calc(100vh-1.5rem)] w-[300px] flex-col overflow-hidden rounded-sm border border-[var(--ev-rule)] bg-[var(--ev-ground-raised)]/95 shadow-[0_4px_24px_rgba(28,16,8,0.18)] backdrop-blur font-[family-name:var(--font-dm-sans)]"
       style={pos ? { left: pos.x, top: pos.y } : { left: 12, top: 12 }}
     >
       <div
         onPointerDown={startDrag}
         onPointerMove={onDrag}
         onPointerUp={endDrag}
-        className="flex cursor-move touch-none select-none items-center justify-between gap-3 border-b border-[var(--apply-rule)] px-3 py-2.5"
+        className="flex cursor-move touch-none select-none items-center justify-between gap-3 border-b border-[var(--ev-rule)] px-3 py-2.5"
       >
-        <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--apply-ink)]">
-          Page design <span className="text-[var(--apply-muted)]">· drag</span>
+        <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--ev-ink)]">
+          Page design <span className="text-[var(--ev-muted)]">· drag</span>
         </span>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onPointerDown={stop}
             onClick={() => setCollapsed((c) => !c)}
-            className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)]"
+            className="text-[10px] uppercase tracking-widest text-[var(--ev-muted)] transition-colors hover:text-[var(--ev-ink)]"
           >
             {collapsed ? 'Expand' : 'Hide'}
           </button>
@@ -124,7 +124,7 @@ export function PageStyleEditor({
             type="button"
             onPointerDown={stop}
             onClick={onClose}
-            className="text-[10px] uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--nobc-red)]"
+            className="text-[10px] uppercase tracking-widest text-[var(--ev-muted)] transition-colors hover:text-[var(--ev-accent)]"
           >
             Close
           </button>
@@ -232,16 +232,16 @@ export function PageStyleEditor({
             </Section>
           </div>
 
-          <div className="border-t border-[var(--apply-rule)] px-3 py-2.5">
+          <div className="border-t border-[var(--ev-rule)] px-3 py-2.5">
             {error ? (
-              <p className="mb-2 text-[10px] uppercase tracking-wide text-[var(--nobc-red)]">{error}</p>
+              <p className="mb-2 text-[10px] uppercase tracking-wide text-[var(--ev-accent)]">{error}</p>
             ) : null}
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={save}
                 disabled={!dirty || saving}
-                className="flex-1 rounded-sm bg-[var(--nobc-red)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--nobc-on-red)] transition-opacity hover:bg-[var(--nobc-red-hover)] disabled:opacity-40"
+                className="flex-1 rounded-sm bg-[var(--ev-accent)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--ev-on-accent)] transition-opacity hover:bg-[var(--ev-accent-hover)] disabled:opacity-40"
               >
                 {saving ? 'Saving' : 'Save & close'}
               </button>
@@ -249,7 +249,7 @@ export function PageStyleEditor({
                 type="button"
                 onClick={() => onChange(saved)}
                 disabled={!dirty || saving}
-                className="rounded-sm border border-[var(--apply-rule)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)] disabled:opacity-40"
+                className="rounded-sm border border-[var(--ev-rule)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--ev-muted)] transition-colors hover:text-[var(--ev-ink)] disabled:opacity-40"
               >
                 Discard
               </button>
@@ -257,7 +257,7 @@ export function PageStyleEditor({
                 type="button"
                 onClick={() => onChange(PAGE_STYLE_DEFAULTS)}
                 disabled={saving}
-                className="rounded-sm border border-[var(--apply-rule)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)] disabled:opacity-40"
+                className="rounded-sm border border-[var(--ev-rule)] px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-[var(--ev-muted)] transition-colors hover:text-[var(--ev-ink)] disabled:opacity-40"
               >
                 Reset
               </button>
@@ -283,11 +283,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-3 border-b border-[var(--apply-rule)] pb-3 last:mb-0 last:border-0 last:pb-0">
+    <div className="mb-3 border-b border-[var(--ev-rule)] pb-3 last:mb-0 last:border-0 last:pb-0">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between text-[9px] font-medium uppercase tracking-widest text-[var(--apply-muted)] transition-colors hover:text-[var(--apply-ink)]"
+        className="flex w-full items-center justify-between text-[9px] font-medium uppercase tracking-widest text-[var(--ev-muted)] transition-colors hover:text-[var(--ev-ink)]"
       >
         <span>{title}</span>
         <span className="text-[12px] leading-none">{open ? '–' : '+'}</span>
@@ -317,8 +317,8 @@ function RangeRow({
   return (
     <label className="block">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] text-[var(--apply-ink)]">{label}</span>
-        <span className="text-[10px] tabular-nums text-[var(--apply-muted)]">{format(value)}</span>
+        <span className="text-[11px] text-[var(--ev-ink)]">{label}</span>
+        <span className="text-[10px] tabular-nums text-[var(--ev-muted)]">{format(value)}</span>
       </div>
       <input
         type="range"
@@ -328,7 +328,7 @@ function RangeRow({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="h-1 w-full cursor-pointer"
-        style={{ accentColor: 'var(--nobc-red)' }}
+        style={{ accentColor: 'var(--ev-accent)' }}
       />
     </label>
   );
@@ -347,8 +347,8 @@ function SegRow<T extends string>({
 }) {
   return (
     <div>
-      <p className="mb-1 text-[11px] text-[var(--apply-ink)]">{label}</p>
-      <div className="flex items-center rounded-sm bg-events-paper p-0.5">
+      <p className="mb-1 text-[11px] text-[var(--ev-ink)]">{label}</p>
+      <div className="flex items-center rounded-sm bg-[var(--ev-ground)] p-0.5">
         {options.map((opt) => (
           <button
             key={opt}
@@ -356,8 +356,8 @@ function SegRow<T extends string>({
             onClick={() => onChange(opt)}
             className={`flex-1 rounded-sm px-2 py-1 text-[9px] font-medium uppercase tracking-widest transition-colors ${
               value === opt
-                ? 'bg-[var(--nobc-red)] text-[var(--nobc-on-red)]'
-                : 'text-[var(--apply-muted)] hover:text-[var(--apply-ink)]'
+                ? 'bg-[var(--ev-accent)] text-[var(--ev-on-accent)]'
+                : 'text-[var(--ev-muted)] hover:text-[var(--ev-ink)]'
             }`}
           >
             {opt}

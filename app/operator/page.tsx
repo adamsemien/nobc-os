@@ -5,6 +5,7 @@ import { Activity, ArrowRight, Calendar, CalendarDays, MoonStar, TrendingUp } fr
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { Avatar } from './_components/Avatar';
+import { ComposeEventBox } from './_components/ComposeEventBox';
 import { GlassPanel } from './_components/dashboard/GlassPanel';
 import { StatFigure } from './_components/dashboard/StatFigure';
 import { SectionHeader } from './_components/dashboard/SectionHeader';
@@ -254,6 +255,11 @@ export default async function OperatorDashboardPage() {
           </div>
           <DeskClock sub="Austin, TX" />
         </header>
+
+        {/* COMPOSE — plain English to a reviewable draft (Phase E) */}
+        <section className="op-rise mt-[26px]" style={{ animationDelay: '0.08s' }}>
+          <ComposeEventBox />
+        </section>
 
         {/* FIGURES — asymmetric: Pending (lead) + Members / Upcoming stacked */}
         <section className="mt-[34px] grid grid-cols-1 gap-[18px] md:grid-cols-2 lg:grid-cols-[1.5fr_1fr]">

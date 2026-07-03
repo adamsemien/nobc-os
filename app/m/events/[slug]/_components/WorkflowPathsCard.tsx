@@ -20,32 +20,32 @@ export function WorkflowPathsCard({
   const wrapper =
     variant === 'bare'
       ? ''
-      : 'rounded-md border border-[var(--apply-rule)] bg-events-paper-card p-6 shadow-[0_2px_12px_rgba(28,16,8,0.05)] sm:p-8';
+      : 'rounded-md border border-[var(--ev-rule)] bg-[var(--ev-ground-raised)] p-6 shadow-[0_2px_12px_rgba(28,16,8,0.05)] sm:p-8';
 
   return (
     <section className={wrapper}>
-      <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+      <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
         How to attend
       </p>
       <div className="mt-5 flex flex-col">
         {paths.map((p, i) => (
           <div
             key={p.id}
-            className={`flex gap-4 py-4 ${i > 0 ? 'border-t border-[var(--apply-rule)]' : ''}`}
+            className={`flex gap-4 py-4 ${i > 0 ? 'border-t border-[var(--ev-rule)]' : ''}`}
           >
-            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--apply-rule)] text-[11px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--ev-rule)] text-[11px] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
               {i + 1}
             </span>
             <div className="min-w-0">
-              <p className="text-[19px] italic leading-snug text-[var(--apply-ink)] font-[family-name:var(--font-cormorant)]">
+              <p className="text-[19px] italic leading-snug text-[var(--ev-ink)] font-[family-name:var(--font-cormorant)]">
                 {p.label}
               </p>
               {p.description ? (
-                <p className="mt-1 text-[14px] leading-relaxed text-[var(--apply-ink)] font-[family-name:var(--font-dm-sans)]">
+                <p className="mt-1 text-[14px] leading-relaxed text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]">
                   {p.description}
                 </p>
               ) : null}
-              <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">
+              <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">
                 {renderPathSummary(p)}
               </p>
             </div>
