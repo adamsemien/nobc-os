@@ -16,6 +16,7 @@ import {
   type Question,
   type SubField,
 } from '../_lib/questions';
+import { PREVIEW_ANSWERS, PREVIEW_REVEAL } from '../_lib/preview-fixture';
 
 const FroggerGame = dynamic(() => import('./FroggerGame'), { ssr: false });
 
@@ -384,7 +385,9 @@ function resolveApplyDevFlags(
   };
 }
 
-export default function MembershipForm() {
+export default function MembershipForm({
+  previewMode = false,
+}: { previewMode?: boolean } = {}) {
   const searchParams = useSearchParams();
   // Operator signal: an active Clerk-organization membership. Applicants are
   // personal Clerk accounts (no org), so orgId is null for them and the fence
@@ -402,7 +405,9 @@ export default function MembershipForm() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionDirection, setTransitionDirection] = useState<'forward' | 'backward'>('forward');
   const [data, setData] = useState<FormData>(EMPTY_FORM);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    previewMode ? PREVIEW_ANSWERS : {},
+  );
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -563,7 +568,7 @@ export default function MembershipForm() {
 
   useEffect(() => {
     const id = searchParams.get('id');
-    if (!id || isDemo) return;
+    if (!id || isDemo || previewMode) return;
     // The URL id is the source of truth for applicationId: adopt it up front,
     // independent of the GET rehydrate below. If the rehydrate fails (a 403 draft
     // this browser can't write, a 404, or a network error) the form still knows its
@@ -599,7 +604,7 @@ export default function MembershipForm() {
         setShowResumeBanner(true);
       } catch { /* start fresh */ }
     })();
-  }, [searchParams, isDemo]);
+  }, [searchParams, isDemo, previewMode]);
 
   useEffect(() => {
     if (!showResumeBanner) return;
@@ -754,7 +759,7 @@ export default function MembershipForm() {
   // Restore on load only when there is no server ?id= resume in flight and we
   // are not in demo/dev. We surface a prompt rather than silently jumping them.
   useEffect(() => {
-    if (isDemo || isDev) return;
+    if (isDemo || isDev || previewMode) return;
     if (searchParams.get('id')) return;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -773,7 +778,7 @@ export default function MembershipForm() {
 
   // Persist the draft to localStorage on every advance (step change).
   useEffect(() => {
-    if (isDemo || isDev) return;
+    if (isDemo || isDev || previewMode) return;
     if (step <= 0 || step >= REVEAL_STEP) return;
     if (Object.keys(answers).length === 0) return;
     try {
@@ -788,7 +793,7 @@ export default function MembershipForm() {
   // Requires an existing draft (applicationId — set from ?id= for the
   // account-first flow); skips demo/dev and non-question steps.
   useEffect(() => {
-    if (isDemo || isDev) return;
+    if (isDemo || isDev || previewMode) return;
     if (!applicationId) return;
     if (step >= QUESTION_STEPS) return;
     if (Object.keys(answers).length === 0) return;
@@ -816,7 +821,7 @@ export default function MembershipForm() {
   // has answer edits newer than the last successful autosave.
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
-      if (isDemo || isDev || !applicationId || step >= QUESTION_STEPS) return;
+      if (isDemo || isDev || previewMode || !applicationId || step >= QUESTION_STEPS) return;
       if (Object.keys(answers).length === 0) return;
       if (JSON.stringify(answers) === lastSavedAnswersRef.current) return;
       e.preventDefault();
@@ -824,7 +829,7 @@ export default function MembershipForm() {
     }
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [answers, applicationId, step, isDemo, isDev]);
+  }, [answers, applicationId, step, isDemo, isDev, previewMode]);
 
   // Clear the local draft once a submission has succeeded. Watching submitResult
   // keeps the submission handler itself byte-for-byte untouched.
@@ -881,6 +886,8 @@ export default function MembershipForm() {
   }, []);
 
   async function handleSaveDraft() {
+    // Preview mode has no draft to save and must never write to the network.
+    if (previewMode) return;
     try {
       if (!applicationId) {
         if (!data.fullName.trim() || !data.email.trim()) return;
@@ -1026,7 +1033,7 @@ export default function MembershipForm() {
     // picker empty (File objects never survive a reload). Send the applicant
     // back to the photo page instead of submitting a photo-less application.
     // Demo mode keeps its no-validation walkthrough. handleSubmit is unchanged.
-    if (!isDemo && PHOTO_REQUIRED && photoFiles.length === 0) {
+    if (!isDemo && !previewMode && PHOTO_REQUIRED && photoFiles.length === 0) {
       setError('Please add at least one photo to finish your application.');
       advance(PHOTO_PAGE_INDEX);
       return;
@@ -1034,6 +1041,15 @@ export default function MembershipForm() {
     if (submittingRef.current) return;
     submittingRef.current = true;
     try {
+      // Preview mode never calls handleSubmit (no upload, no PATCH, no POST
+      // /submit — no scorer, no tagApplication, no DB write). The reveal is a
+      // hardcoded local fixture so operators can still review Screen 8.
+      if (previewMode) {
+        setSubmitResult(PREVIEW_REVEAL);
+        setStep(REVEAL_STEP);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       await handleSubmit();
     } finally {
       submittingRef.current = false;
@@ -1453,7 +1469,7 @@ export default function MembershipForm() {
 
   function submitPage(pageIndex: number) {
     const page = PAGES[pageIndex];
-    if (!isDemo) {
+    if (!isDemo && !previewMode) {
       const missing = missingRequiredFields(page);
       if (missing.length > 0) {
         // F2: name the specific missing fields instead of a generic banner.
@@ -1468,6 +1484,12 @@ export default function MembershipForm() {
       }
     }
     setError('');
+    // Preview mode navigates locally only — patchAndAdvance (real network
+    // create/PATCH) is never called.
+    if (previewMode) {
+      advance(pageIndex + 1);
+      return;
+    }
     patchAndAdvance(answersForPage(page), pageIndex + 1);
   }
 
@@ -1642,6 +1664,29 @@ export default function MembershipForm() {
           borderRadius: 0,
         }}>
           DEMO
+        </div>
+      )}
+
+      {/* PREVIEW badge — persists on EVERY screen, including the reveal, so a
+          screenshot can never be mistaken for a real member result. */}
+      {previewMode && (
+        <div style={{
+          position: 'fixed',
+          top: 14,
+          right: 14,
+          zIndex: 110,
+          background: '#000000',
+          color: '#ffffff',
+          fontSize: 10,
+          fontFamily: bodyFont,
+          fontWeight: 600,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          padding: '5px 12px',
+          borderRadius: 0,
+          pointerEvents: 'none',
+        }}>
+          Preview — not a real applicant
         </div>
       )}
 
@@ -2051,7 +2096,7 @@ export default function MembershipForm() {
                 </div>
                 )}
 
-                {!isDemo && (
+                {!isDemo && !previewMode && (
                   <p style={{
                     fontFamily: bodyFont,
                     fontSize: 14,
