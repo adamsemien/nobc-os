@@ -19,7 +19,7 @@ function renderBrandTitle(title: string) {
   if (title.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase()) {
     return (
       <>
-        <span className="text-[var(--ev-accent)]">{title.slice(0, prefix.length)}</span>
+        <span className="text-[var(--ev-brand-accent)]">{title.slice(0, prefix.length)}</span>
         {title.slice(prefix.length)}
       </>
     );
@@ -147,7 +147,7 @@ export function TemplateSplit({ event }: { event: EventDetailDTO }) {
                   className="italic leading-none font-[family-name:var(--font-cormorant)]"
                   style={{ fontSize: 'calc(clamp(1.5rem, 2.6vw, 2.25rem) * var(--footer-scale, 1))' }}
                 >
-                  <span className="text-[var(--ev-accent)]">No Bad</span>
+                  <span className="text-[var(--ev-brand-accent)]">No Bad</span>
                   <span className="text-[var(--ev-ink)]"> Company</span>
                 </p>
                 <p className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]">

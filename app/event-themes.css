@@ -36,6 +36,17 @@
   --ev-accent-hover: var(--nobc-red-hover);
   --ev-on-accent: #ffffff;
   --ev-cta-glow: rgba(178, 46, 33, 0.28);
+  /* brand - the wordmark accent ("No Bad" in the mark). A token, never a
+     literal, so a future Night brand-mark variant (Chloe's purple logo
+     suite) is an asset/token swap, not a refactor. */
+  --ev-brand-accent: var(--nobc-red);
+  /* nav CTA - the shell nav's Apply button. On paper it is the solid brand
+     button it has always been; a theme may resolve it to a ghost. */
+  --ev-nav-cta-bg: var(--nobc-red);
+  --ev-nav-cta-edge: var(--nobc-red);
+  --ev-nav-cta-ink: var(--nobc-on-red);
+  --ev-nav-cta-hover-bg: var(--nobc-red-hover);
+  --ev-nav-cta-hover-ink: var(--nobc-on-red);
 }
 
 /* ------------------------------------------------------------
@@ -68,6 +79,17 @@
   --ev-accent-hover: color-mix(in oklab, #b57edc 88%, white);
   --ev-on-accent: #2b063d;
   --ev-cta-glow: rgba(181, 126, 220, 0.32);
+  /* brand - red dies on plum (2.65:1); the wordmark speaks lavender until
+     the real Night mark ships (future Chloe project - swap this token). */
+  --ev-brand-accent: #b57edc;
+  /* nav CTA - a cream ghost, NOT a second lavender fill: the page keeps one
+     bright note and the access card's CTA owns it. Hover joins the accent
+     system. (2-NAV decision, documented in the report.) */
+  --ev-nav-cta-bg: transparent;
+  --ev-nav-cta-edge: color-mix(in oklab, #f2eae3 55%, transparent);
+  --ev-nav-cta-ink: #f2eae3;
+  --ev-nav-cta-hover-bg: #b57edc;
+  --ev-nav-cta-hover-ink: #2b063d;
 
   /* Frozen-zone bridge: EventAccessFlow internals are read-only and speak
      the apply namespace. Rebinding those names INSIDE the night scope keeps
@@ -77,6 +99,15 @@
   --apply-muted: #b5a0b5;
   --apply-rule: #4f284b;
   --apply-cream: #38254b;
+  /* 2-NAV: red does not appear anywhere on a Night guest page. The frozen
+     flow reads the brand red directly (CTA fill, step dots, focus rings,
+     error text) and 2.65:1 red-on-plum is illegible - so the brand pair
+     rebinds to the accent system inside night scope only. Known tradeoff,
+     flagged for Chloe: the flow's errors render lavender here, trading the
+     red convention for legibility. */
+  --nobc-red: #b57edc;
+  --nobc-red-hover: color-mix(in oklab, #b57edc 88%, white);
+  --nobc-on-red: #2b063d;
 
   color-scheme: dark;
 }

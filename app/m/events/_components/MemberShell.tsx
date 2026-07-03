@@ -36,10 +36,11 @@ export function MemberShellNav({
             : 'text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-ref-ink sm:text-[0.7rem] sm:tracking-[0.16em]'
         }${overlay ? ' [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]' : ''}`}
         // Over a photo, "Company" follows the hero text-mode (light/dark); "No Bad"
-        // keeps its own brand-red class below, so the wordmark is always red + legible.
+        // speaks the brand-accent token below (red on paper, lavender on night -
+        // 2-NAV), so the wordmark is always on-brand + legible.
         style={overlay ? { color: 'var(--hero-fg)' } : undefined}
       >
-        <span className="text-nobc-red">NO BAD </span>
+        <span className="text-[var(--ev-brand-accent)]">NO BAD </span>
         <span>COMPANY</span>
       </Link>
       <div className="flex items-center gap-6 sm:gap-8">
@@ -56,12 +57,16 @@ export function MemberShellNav({
         </Link>
         <Link
           href="/apply"
+          // The Apply CTA resolves through the nav-CTA token slots (2-NAV):
+          // paper renders the exact prior treatments (solid brand button on
+          // overlay, ink ghost with brand hover elsewhere); night resolves a
+          // cream ghost with a lavender hover - red never reaches the plum.
           className={
             overlay
-              ? 'border border-nobc-red bg-nobc-red px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-nobc-on-red transition-colors hover:bg-nobc-red-hover sm:px-4 sm:text-[0.65rem]'
+              ? 'border border-[var(--ev-nav-cta-edge)] bg-[var(--ev-nav-cta-bg)] px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-[var(--ev-nav-cta-ink)] transition-colors hover:border-[var(--ev-nav-cta-hover-bg)] hover:bg-[var(--ev-nav-cta-hover-bg)] hover:text-[var(--ev-nav-cta-hover-ink)] sm:px-4 sm:text-[0.65rem]'
               : dark
-                ? 'border border-events-cta-border px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-cta-fg transition-colors hover:border-nobc-red hover:bg-nobc-red hover:text-nobc-on-red sm:px-4 sm:text-[0.65rem]'
-                : 'border border-events-ref-ink px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-ref-ink transition-colors hover:border-nobc-red hover:bg-nobc-red hover:text-nobc-on-red sm:px-4 sm:text-[0.65rem]'
+                ? 'border border-events-cta-border px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-events-cta-fg transition-colors hover:border-[var(--ev-accent)] hover:bg-[var(--ev-accent)] hover:text-[var(--ev-on-accent)] sm:px-4 sm:text-[0.65rem]'
+                : 'border border-[var(--ev-ink)] px-3 py-2 text-[0.6rem] font-medium uppercase tracking-[0.22em] text-[var(--ev-ink)] transition-colors hover:border-[var(--ev-accent)] hover:bg-[var(--ev-accent)] hover:text-[var(--ev-on-accent)] sm:px-4 sm:text-[0.65rem]'
           }
           style={{ borderRadius: '4px' }}
         >
@@ -97,7 +102,7 @@ export function MemberShellFooter({
                 : 'text-[0.65rem] font-normal uppercase tracking-[0.14em] text-events-ref-ink sm:text-[0.7rem] sm:tracking-[0.16em]'
             }
           >
-            <span className="text-nobc-red">NO BAD </span>
+            <span className="text-[var(--ev-brand-accent)]">NO BAD </span>
             <span>COMPANY</span>
           </p>
         </div>
@@ -114,7 +119,7 @@ export function MemberShellFooter({
           >
             Programme
           </Link>
-          <Link href={applyHref} className="w-fit hover:text-nobc-red">
+          <Link href={applyHref} className="w-fit hover:text-[var(--ev-accent)]">
             Apply
           </Link>
         </div>
@@ -139,7 +144,7 @@ export function MemberShellFooter({
               : 'text-[0.6rem] font-normal uppercase tracking-[0.14em] text-events-ref-muted'
           }
         >
-          <span className="text-nobc-red">No Bad </span>
+          <span className="text-[var(--ev-brand-accent)]">No Bad </span>
           <span>Company · By application</span>
         </p>
       </div>

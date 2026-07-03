@@ -18,7 +18,7 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
           href="/m/events"
           className="text-[10px] uppercase tracking-[0.3em] text-[var(--ev-ink)] font-[family-name:var(--font-dm-sans)]"
         >
-          <span className="text-[var(--ev-accent)]">NO BAD </span>
+          <span className="text-[var(--ev-brand-accent)]">NO BAD </span>
           <span>COMPANY</span>
         </Link>
       </header>
@@ -93,7 +93,7 @@ export function TemplateMinimal({ event }: { event: EventDetailDTO }) {
           className="uppercase tracking-[0.24em] text-[var(--ev-muted)] font-[family-name:var(--font-dm-sans)]"
           style={{ fontSize: 'calc(10px * var(--footer-scale, 1))' }}
         >
-          <span className="text-[var(--ev-accent)]">NO BAD </span>
+          <span className="text-[var(--ev-brand-accent)]">NO BAD </span>
           <span>COMPANY</span>
         </p>
         <a
