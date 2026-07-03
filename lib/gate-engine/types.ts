@@ -59,6 +59,10 @@ export type VerifyArgs<C> = {
   member: Member;
   workspaceId: string;
   resource: { type: GateResourceType; id: string };
+  /** The node under verification. Lets a verifier bind server-stamped facts
+   *  (the PAY discount stamp) to exactly this node - a stamp minted for a
+   *  cheaper node must never satisfy a different one. */
+  nodeId: string;
 };
 
 export type GrowthEdgeWrite = {

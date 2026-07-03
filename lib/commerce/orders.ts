@@ -103,6 +103,14 @@ async function upsertConfirmedRsvp(
  *  actually received (the fee-adjusted mint amount); the service fee is the
  *  difference - derived from the real charge, never recomputed on a policy
  *  that might have changed between mint and confirm.
+ *
+ *  Discounts (D6): when the verifier's proof carries the server stamp, the
+ *  Order keeps the honest split - subtotal stays the base price, the
+ *  discount is its own column, the fee is what the buyer paid over the
+ *  discounted price. The maxUses claim is the same guarded increment comp
+ *  codes use (D9), inside this transaction: a race loser throws
+ *  PromoExhaustedError and every write rolls back - the bridge then refunds
+ *  the charge, mirroring the Phase F capacity race.
  */
 export async function recordPaidAdmission(
   db: PrismaClient,
@@ -115,6 +123,7 @@ export async function recordPaidAdmission(
     amountReceivedCents: number;
     currency: string;
     gateSessionId: string | null;
+    promo?: { promoCodeId: string; discountCents: number } | null;
   },
 ): Promise<AdmissionResult> {
   const existing = await db.order.findFirst({
@@ -140,13 +149,48 @@ export async function recordPaidAdmission(
     };
   }
 
+  const discountCents = args.promo?.discountCents ?? 0;
   const serviceFeeCents = Math.max(
     0,
-    args.amountReceivedCents - args.subtotalCents,
+    args.amountReceivedCents - (args.subtotalCents - discountCents),
   );
   const capacity = await eventCapacity(db, args.workspaceId, args.eventId);
 
   return db.$transaction(async (tx) => {
+    if (args.promo) {
+      // Fail-closed: the code must still exist in this workspace, honor its
+      // per-customer cap, and win the guarded claim - all atomically with
+      // the Order it justifies.
+      const promoRow = await tx.promoCode.findFirst({
+        where: { id: args.promo.promoCodeId, workspaceId: args.workspaceId },
+        select: { maxUses: true, maxUsesPerCustomer: true },
+      });
+      if (!promoRow) throw new PromoExhaustedError();
+      if (promoRow.maxUsesPerCustomer !== null) {
+        const mine = await tx.promoRedemption.count({
+          where: {
+            workspaceId: args.workspaceId,
+            promoCodeId: args.promo.promoCodeId,
+            order: { buyerMemberId: args.member.id },
+          },
+        });
+        if (mine >= promoRow.maxUsesPerCustomer) {
+          throw new PromoExhaustedError();
+        }
+      }
+      const claimed = await tx.promoCode.updateMany({
+        where: {
+          id: args.promo.promoCodeId,
+          workspaceId: args.workspaceId,
+          ...(promoRow.maxUses !== null
+            ? { usedCount: { lt: promoRow.maxUses } }
+            : {}),
+        },
+        data: { usedCount: { increment: 1 } },
+      });
+      if (claimed.count === 0) throw new PromoExhaustedError();
+    }
+
     const order = await tx.order.create({
       data: {
         workspaceId: args.workspaceId,
@@ -156,13 +200,24 @@ export async function recordPaidAdmission(
         buyerEmail: args.member.email,
         subtotalCents: args.subtotalCents,
         serviceFeeCents,
-        promoDiscountCents: 0,
+        promoDiscountCents: discountCents,
         totalCents: args.amountReceivedCents,
         stripePaymentIntentId: args.paymentIntentId,
         paymentStatus: "CAPTURED",
+        ...(args.promo ? { promoCodeId: args.promo.promoCodeId } : {}),
       },
       select: { id: true },
     });
+    if (args.promo) {
+      await tx.promoRedemption.create({
+        data: {
+          workspaceId: args.workspaceId,
+          promoCodeId: args.promo.promoCodeId,
+          orderId: order.id,
+          amountSavedCents: discountCents,
+        },
+      });
+    }
     const rsvpId = await upsertConfirmedRsvp(tx, {
       workspaceId: args.workspaceId,
       eventId: args.eventId,
@@ -203,6 +258,16 @@ export class CompExhaustedError extends Error {
   constructor() {
     super("comp_code_exhausted");
     this.name = "CompExhaustedError";
+  }
+}
+
+/** D6: a paid discount lost the guarded maxUses claim (or its code vanished)
+ *  AFTER the charge succeeded. Thrown inside the admission transaction so
+ *  nothing lands; the bridge refunds the charge and expires the proof. */
+export class PromoExhaustedError extends Error {
+  constructor() {
+    super("promo_code_exhausted");
+    this.name = "PromoExhaustedError";
   }
 }
 

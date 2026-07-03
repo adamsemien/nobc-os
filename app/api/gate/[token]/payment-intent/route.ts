@@ -21,7 +21,13 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { applyServiceFee, feePolicyFromEvent } from "@/lib/commerce/service-fee";
+import { checkDiscountCode } from "@/lib/commerce/promo-codes";
+import {
+  applyServiceFee,
+  applyServiceFeeWithDiscount,
+  feePolicyFromEvent,
+  type ServiceFeePolicy,
+} from "@/lib/commerce/service-fee";
 import { db } from "@/lib/db";
 import { getDefaultRegistry } from "@/lib/gate-engine";
 import { payNodeAvailability } from "@/lib/gate-engine/conditions/pay";
@@ -33,7 +39,18 @@ import { stripe } from "@/lib/stripe";
 
 const intentLimiter = createRateLimiter({ limit: 6, windowMs: 60_000 });
 
-const bodySchema = z.object({ nodeId: z.string().min(1).max(64) });
+const bodySchema = z.object({
+  nodeId: z.string().min(1).max(64),
+  /** D6: an optional code. The server resolves and prices it - the client
+   *  never sends amounts. Comp-class codes get { compCode: true } so the
+   *  guest UI routes them through the existing zero-Stripe redemption. */
+  promoCode: z.string().min(1).max(80).optional(),
+});
+
+// One generic decline for every unusable code - reasons never leak to guests.
+const CODE_DECLINED = "That code did not work. Check it and try again.";
+const CODE_IS_FULL_COMP =
+  "That code covers the full ticket - ask your host for a comp code instead.";
 
 // Narrow read of the ALREADY-validated config (the registry schema parsed it,
 // including the currency default) - not a second validation layer.
@@ -69,12 +86,13 @@ export async function POST(
     );
   }
 
-  let nodeId: string;
+  let body: z.infer<typeof bodySchema>;
   try {
-    nodeId = bodySchema.parse(await req.json()).nodeId;
+    body = bodySchema.parse(await req.json());
   } catch {
     return UNREADABLE;
   }
+  const { nodeId } = body;
 
   const context = await loadGuestGateContext(db, token);
   if (!context) {
@@ -150,11 +168,11 @@ export async function POST(
   // Service fee (Decision 3): the event's fee policy shapes what the buyer is
   // charged. Default absorb = the flat ticket price. The line items go back to
   // the client so the pay step never shows a silently inflated single price.
-  let lineItems = applyServiceFee(price.data.priceCents, {
+  let feePolicy: ServiceFeePolicy = {
     mode: "absorb",
     percentBps: null,
     flatCents: null,
-  });
+  };
   if (gate.resourceType === "EVENT") {
     const event = await db.event.findFirst({
       where: { id: gate.resourceId, workspaceId: session.workspaceId },
@@ -183,9 +201,42 @@ export async function POST(
           );
         }
       }
-      lineItems = applyServiceFee(price.data.priceCents, feePolicyFromEvent(event));
+      feePolicy = feePolicyFromEvent(event);
     }
   }
+
+  // D6: resolve any code entirely server-side - the discount is computed and
+  // stamped here, never taken from client input. Comp-class codes route to
+  // the existing zero-Stripe redemption instead of minting.
+  let promo: { id: string; code: string } | null = null;
+  let discountCents = 0;
+  if (body.promoCode) {
+    if (gate.resourceType !== "EVENT") {
+      return NextResponse.json({ error: CODE_DECLINED }, { status: 409 });
+    }
+    const check = await checkDiscountCode(db, {
+      workspaceId: session.workspaceId,
+      eventId: gate.resourceId,
+      memberId: session.memberId,
+      code: body.promoCode,
+      baseCents: price.data.priceCents,
+    });
+    if (!check.ok) {
+      if (check.reason === "comp_code") {
+        return NextResponse.json({ compCode: true });
+      }
+      if (check.reason === "covers_full_ticket") {
+        return NextResponse.json({ error: CODE_IS_FULL_COMP }, { status: 409 });
+      }
+      return NextResponse.json({ error: CODE_DECLINED }, { status: 409 });
+    }
+    promo = { id: check.promo.id, code: check.promo.code };
+    discountCents = check.discountCents;
+  }
+
+  const lineItems = promo
+    ? applyServiceFeeWithDiscount(price.data.priceCents, discountCents, feePolicy)
+    : applyServiceFee(price.data.priceCents, feePolicy);
 
   if (liveChargesBlocked()) {
     console.error(
@@ -214,13 +265,35 @@ export async function POST(
           // Ticket/fee split for the Stripe record (total - fee = ticket).
           subtotalCents: String(lineItems.subtotalCents),
           serviceFeeCents: String(lineItems.serviceFeeCents),
+          // D6: the server-computed discount stamp the PAY verifier reads.
+          // Node-bound by the nodeId above; never derived from client input.
+          ...(promo
+            ? {
+                promoCodeId: promo.id,
+                promoCode: promo.code,
+                baseCents: String(lineItems.subtotalCents),
+                discountCents: String(lineItems.discountCents),
+                discountedCents: String(
+                  lineItems.subtotalCents - lineItems.discountCents
+                ),
+              }
+            : {}),
         },
       },
       // Total in the key: a price OR fee-policy change mints a fresh intent
-      // instead of Stripe returning the stale-amount original.
-      { idempotencyKey: `gate-pay:${session.id}:${node.id}:${lineItems.totalCents}` }
+      // instead of Stripe returning the stale-amount original. The promo id
+      // rides the key too, so applying or switching a code mints fresh.
+      {
+        idempotencyKey:
+          `gate-pay:${session.id}:${node.id}:${lineItems.totalCents}` +
+          (promo ? `:promo:${promo.id}` : ""),
+      }
     );
-    return NextResponse.json({ clientSecret: intent.client_secret, lineItems });
+    return NextResponse.json({
+      clientSecret: intent.client_secret,
+      lineItems,
+      ...(promo ? { promoApplied: { code: promo.code } } : {}),
+    });
   } catch (err) {
     console.error("[gate-pay] intent mint failed", {
       nodeId: node.id,

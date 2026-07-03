@@ -206,6 +206,7 @@ export function createGateEngine(deps: {
         member,
         workspaceId,
         resource: args.resource,
+        nodeId: node.id,
       });
     } catch (err) {
       console.error("[gate-engine] verifier threw - evaluating fail-closed", {

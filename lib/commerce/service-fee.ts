@@ -96,6 +96,36 @@ export function applyServiceFee(
   };
 }
 
+/** Line items for a discounted PAY price (D6). The fee is computed on what
+ *  the buyer actually pays - the DISCOUNTED price - never on the base. The
+ *  Ticket row keeps the base price so the split reads honestly:
+ *  total = base - discount + fee, exactly.
+ *
+ *  Callers refuse zeroing discounts before any money math (D6-2); if one
+ *  slips through anyway this fails closed to the undiscounted items. */
+export function applyServiceFeeWithDiscount(
+  baseCents: number,
+  discountCents: number,
+  policy: ServiceFeePolicy,
+): FeeLineItems {
+  if (
+    !Number.isInteger(baseCents) ||
+    baseCents <= 0 ||
+    !Number.isInteger(discountCents) ||
+    discountCents <= 0 ||
+    discountCents >= baseCents
+  ) {
+    return applyServiceFee(baseCents, policy);
+  }
+  const onDiscounted = applyServiceFee(baseCents - discountCents, policy);
+  return {
+    subtotalCents: baseCents,
+    discountCents,
+    serviceFeeCents: onDiscounted.serviceFeeCents,
+    totalCents: onDiscounted.totalCents,
+  };
+}
+
 /** The fee policy shape straight off an Event row (null-safe defaults). */
 export function feePolicyFromEvent(event: {
   serviceFeeMode: ServiceFeeMode;

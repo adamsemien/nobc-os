@@ -15,7 +15,7 @@ const config = def.configSchema.parse({
 });
 
 const verify = (submission: unknown) =>
-  def.verify({ config, submission, member, workspaceId: "w1", resource });
+  def.verify({ config, submission, member, workspaceId: "w1", resource, nodeId: "node_collect" });
 
 describe("COLLECT_INFO", () => {
   it("is stamped honestly: first-party internal record, never AI", () => {

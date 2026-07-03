@@ -324,6 +324,88 @@ export async function createCompCode(
   return { ok: true, promoCodeId: promo.id };
 }
 
+// ── Discount codes (D6) ─────────────────────────────────────────────────────
+
+const discountCodeSchema = z.object({
+  code: z
+    .string()
+    .min(3)
+    .max(40)
+    .regex(/^[A-Za-z0-9-]+$/, "letters, numbers, and hyphens"),
+  discountType: z.enum(["percent", "flat"]),
+  /** percent: whole percent. flat: cents off. */
+  discountValue: z.number().int().min(1),
+  maxUses: z.number().int().min(1).max(10_000).nullable().optional(),
+  maxUsesPerCustomer: z.number().int().min(1).max(100).nullable().optional(),
+  validFrom: z.string().nullable().optional(),
+  validUntil: z.string().nullable().optional(),
+});
+
+function parseWindowDate(
+  value: string | null | undefined,
+): Date | null | "invalid" {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "invalid" : date;
+}
+
+export async function createDiscountCode(
+  eventId: string,
+  input: z.infer<typeof discountCodeSchema>,
+): Promise<ActionResult<{ promoCodeId: string }>> {
+  const gate = await requireStaff();
+  if (!gate.ok) return gate;
+  const event = await ownedEvent(gate.op, eventId);
+  if (!event) return { ok: false, error: "Event not found." };
+  const parsed = discountCodeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Codes are 3-40 letters, numbers, or hyphens." };
+  }
+  // A 100% discount is a comp in disguise - the comp machinery owns full
+  // comps (D6-2), so percent caps at 99 here.
+  if (parsed.data.discountType === "percent" && parsed.data.discountValue > 99) {
+    return {
+      ok: false,
+      error: "Percent discounts run 1-99. Use a comp code for full comps.",
+    };
+  }
+  if (
+    parsed.data.discountType === "flat" &&
+    parsed.data.discountValue > 1_000_000
+  ) {
+    return { ok: false, error: "That discount is too large." };
+  }
+  const validFrom = parseWindowDate(parsed.data.validFrom);
+  const validUntil = parseWindowDate(parsed.data.validUntil);
+  if (validFrom === "invalid" || validUntil === "invalid") {
+    return { ok: false, error: "That date could not be read." };
+  }
+  if (validFrom && validUntil && validUntil.getTime() <= validFrom.getTime()) {
+    return { ok: false, error: "The window must end after it starts." };
+  }
+  const code = parsed.data.code.toUpperCase();
+  const existing = await db.promoCode.findFirst({
+    where: { workspaceId: gate.op.workspaceId, eventId: event.id, code },
+    select: { id: true },
+  });
+  if (existing) return { ok: false, error: "That code already exists." };
+  const promo = await db.promoCode.create({
+    data: {
+      workspaceId: gate.op.workspaceId,
+      eventId: event.id,
+      code,
+      discountType: parsed.data.discountType,
+      discountValue: parsed.data.discountValue,
+      maxUses: parsed.data.maxUses ?? null,
+      maxUsesPerCustomer: parsed.data.maxUsesPerCustomer ?? null,
+      validFrom,
+      validUntil,
+    },
+    select: { id: true },
+  });
+  return { ok: true, promoCodeId: promo.id };
+}
+
 export async function deactivateCompCode(
   eventId: string,
   promoCodeId: string,
@@ -430,6 +512,16 @@ export type BuilderState = {
     usedCount: number;
     active: boolean;
   }[];
+  discountCodes: {
+    id: string;
+    code: string;
+    discountType: string;
+    discountValue: number;
+    maxUses: number | null;
+    maxUsesPerCustomer: number | null;
+    usedCount: number;
+    active: boolean;
+  }[];
 };
 
 export async function getBuilderState(
@@ -480,6 +572,25 @@ export async function getBuilderState(
       validUntil: true,
     },
   });
+  const partials = await db.promoCode.findMany({
+    where: {
+      workspaceId: gate.op.workspaceId,
+      eventId: event.id,
+      discountType: { in: ["percent", "flat"] },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      code: true,
+      discountType: true,
+      discountValue: true,
+      maxUses: true,
+      maxUsesPerCustomer: true,
+      usedCount: true,
+      validFrom: true,
+      validUntil: true,
+    },
+  });
 
   return {
     ok: true,
@@ -509,6 +620,18 @@ export async function getBuilderState(
         maxUses: c.maxUses,
         usedCount: c.usedCount,
         active: c.validUntil === null || c.validUntil.getTime() > Date.now(),
+      })),
+      discountCodes: partials.map((c) => ({
+        id: c.id,
+        code: c.code,
+        discountType: c.discountType,
+        discountValue: c.discountValue,
+        maxUses: c.maxUses,
+        maxUsesPerCustomer: c.maxUsesPerCustomer,
+        usedCount: c.usedCount,
+        active:
+          (c.validFrom === null || c.validFrom.getTime() <= Date.now()) &&
+          (c.validUntil === null || c.validUntil.getTime() > Date.now()),
       })),
     },
   };

@@ -25,6 +25,7 @@ import { CONDITION_COLLECT_INFO, CONDITION_PAY } from "@/lib/gate-engine/types";
 import { sendTicketConfirmation } from "./confirmation";
 import {
   CapacityFullError,
+  PromoExhaustedError,
   ensureOpenAdmission,
   recordPaidAdmission,
   type AdmissionMember,
@@ -34,6 +35,10 @@ const payPayloadShape = z.object({
   paymentIntentId: z.string().min(1),
   amountReceived: z.number().int().min(0),
   currency: z.string().min(3).max(3),
+  // D6: present only when the verifier honored a node-bound discount stamp.
+  promoCodeId: z.string().min(1).optional(),
+  baseCents: z.number().int().min(1).optional(),
+  discountCents: z.number().int().min(1).optional(),
 });
 
 const priceShape = z.object({ priceCents: z.number().int().min(0) });
@@ -47,7 +52,7 @@ async function recordForPayNode(
     gateSessionId: string;
     node: { id: string; config: unknown };
   },
-): Promise<void> {
+): Promise<"recorded" | "skipped" | "refunded"> {
   const proof = await db.gateProof.findFirst({
     where: { nodeId: args.node.id, memberId: args.member.id },
     select: { status: true, expiresAt: true, mechanism: true, payload: true },
@@ -57,11 +62,25 @@ async function recordForPayNode(
     proof.mechanism !== "STRIPE_PAYMENT" ||
     !isProofLive(proof, new Date())
   ) {
-    return;
+    return "skipped";
   }
   const payload = payPayloadShape.safeParse(proof.payload);
-  if (!payload.success) return;
+  if (!payload.success) return "skipped";
   const price = priceShape.safeParse(args.node.config ?? {});
+
+  // D6: a discounted charge keeps the honest split - subtotal is the base
+  // price from the verifier's stamp, the discount rides its own column.
+  const promo =
+    payload.data.promoCodeId &&
+    payload.data.baseCents &&
+    payload.data.discountCents &&
+    payload.data.discountCents < payload.data.baseCents
+      ? {
+          promoCodeId: payload.data.promoCodeId,
+          baseCents: payload.data.baseCents,
+          discountCents: payload.data.discountCents,
+        }
+      : null;
 
   try {
     const admission = await recordPaidAdmission(db, {
@@ -69,12 +88,17 @@ async function recordForPayNode(
       eventId: args.eventId,
       member: args.member,
       paymentIntentId: payload.data.paymentIntentId,
-      subtotalCents: price.success
-        ? Math.min(price.data.priceCents, payload.data.amountReceived)
-        : payload.data.amountReceived,
+      subtotalCents: promo
+        ? promo.baseCents
+        : price.success
+          ? Math.min(price.data.priceCents, payload.data.amountReceived)
+          : payload.data.amountReceived,
       amountReceivedCents: payload.data.amountReceived,
       currency: payload.data.currency,
       gateSessionId: args.gateSessionId,
+      promo: promo
+        ? { promoCodeId: promo.promoCodeId, discountCents: promo.discountCents }
+        : null,
     });
     // Phase F (ADD 2): confirmation on the FIRST record only - the webhook
     // provably never emails gate purchases (row absent or already CAPTURED
@@ -87,32 +111,19 @@ async function recordForPayNode(
         rsvpId: admission.rsvpId,
       });
     }
+    return "recorded";
   } catch (err) {
     if (err instanceof CapacityFullError) {
       // Phase F (ADD 3): the last seat went to a racing buyer AFTER this
       // charge succeeded. No Order was written (the transaction rolled
       // back); return the money immediately and expire the proof so the
       // gate cannot open on a refunded charge.
-      const { stripe } = await import("@/lib/stripe");
-      await stripe.refunds
-        .create(
-          { payment_intent: payload.data.paymentIntentId },
-          { idempotencyKey: `capfull-${payload.data.paymentIntentId}` },
-        )
-        .catch((refundErr) => {
-          console.error("[gate-bridge] capacity-race auto-refund failed", {
-            paymentIntentId: payload.data.paymentIntentId,
-            error:
-              refundErr instanceof Error ? refundErr.message : String(refundErr),
-          });
-        });
-      await db.gateProof.updateMany({
-        where: {
-          nodeId: args.node.id,
-          memberId: args.member.id,
-          status: "SATISFIED",
-        },
-        data: { expiresAt: new Date() },
+      await refundChargeAndExpireProof(db, {
+        nodeId: args.node.id,
+        memberId: args.member.id,
+        paymentIntentId: payload.data.paymentIntentId,
+        idempotencyPrefix: "capfull",
+        logLabel: "capacity-race",
       });
       void alert({
         severity: "warn",
@@ -123,10 +134,70 @@ async function recordForPayNode(
           paymentIntentId: payload.data.paymentIntentId,
         },
       });
-      return;
+      return "refunded";
+    }
+    if (err instanceof PromoExhaustedError) {
+      // D6: the code's last use went to a racing redeemer AFTER this charge
+      // succeeded. Same treatment as the capacity race - nothing landed,
+      // return the money, expire the proof.
+      await refundChargeAndExpireProof(db, {
+        nodeId: args.node.id,
+        memberId: args.member.id,
+        paymentIntentId: payload.data.paymentIntentId,
+        idempotencyPrefix: "promoexh",
+        logLabel: "promo-race",
+      });
+      void alert({
+        severity: "warn",
+        event: "gate.promo_race_refunded",
+        workspaceId: args.workspaceId,
+        context: {
+          eventId: args.eventId,
+          paymentIntentId: payload.data.paymentIntentId,
+          promoCodeId: promo?.promoCodeId ?? null,
+        },
+      });
+      return "refunded";
     }
     throw err;
   }
+}
+
+/** Shared race-loser treatment: the charge succeeded but the admission
+ *  transaction rolled back - refund the intent and expire the proof so the
+ *  gate cannot open on money we returned. Refund failures are loud but do
+ *  not throw: the proof expiry below must still run. */
+async function refundChargeAndExpireProof(
+  db: PrismaClient,
+  args: {
+    nodeId: string;
+    memberId: string;
+    paymentIntentId: string;
+    idempotencyPrefix: string;
+    logLabel: string;
+  },
+): Promise<void> {
+  const { stripe } = await import("@/lib/stripe");
+  await stripe.refunds
+    .create(
+      { payment_intent: args.paymentIntentId },
+      { idempotencyKey: `${args.idempotencyPrefix}-${args.paymentIntentId}` },
+    )
+    .catch((refundErr) => {
+      console.error(`[gate-bridge] ${args.logLabel} auto-refund failed`, {
+        paymentIntentId: args.paymentIntentId,
+        error:
+          refundErr instanceof Error ? refundErr.message : String(refundErr),
+      });
+    });
+  await db.gateProof.updateMany({
+    where: {
+      nodeId: args.nodeId,
+      memberId: args.memberId,
+      status: "SATISFIED",
+    },
+    data: { expiresAt: new Date() },
+  });
 }
 
 const collectPayloadShape = z.object({
@@ -233,17 +304,21 @@ export async function bridgeGateAdmission(
     const targets = args.open
       ? payNodes // open sweep: self-heal any recorded-charge gap
       : payNodes.filter((n) => n.id === args.submittedNodeId);
+    let raceRefunded = false;
     for (const node of targets) {
-      await recordForPayNode(db, {
+      const result = await recordForPayNode(db, {
         workspaceId,
         eventId,
         member,
         gateSessionId: session.id,
         node,
       });
+      if (result === "refunded") raceRefunded = true;
     }
 
-    if (args.open) {
+    // A race-lose refund just expired the proof that justified this pass's
+    // `open` - the stale decision must not hand out a free confirmed seat.
+    if (args.open && !raceRefunded) {
       try {
         await ensureOpenAdmission(db, {
           workspaceId,

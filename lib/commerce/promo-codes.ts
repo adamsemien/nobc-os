@@ -29,6 +29,36 @@ export function isCompCode(promo: Pick<PromoCode, "discountType" | "discountValu
   );
 }
 
+/** Shared window + cap checks - the comp and discount paths must never
+ *  drift on what "usable" means. Per-customer counting goes through
+ *  PromoRedemption -> order.buyerMemberId (the only linkage that exists). */
+async function promoUsable(
+  db: PrismaClient,
+  promo: PromoCode,
+  args: { workspaceId: string; memberId: string; now: Date },
+): Promise<"ok" | "expired" | "exhausted"> {
+  if (promo.validFrom && promo.validFrom.getTime() > args.now.getTime()) {
+    return "expired";
+  }
+  if (promo.validUntil && promo.validUntil.getTime() <= args.now.getTime()) {
+    return "expired";
+  }
+  if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
+    return "exhausted";
+  }
+  if (promo.maxUsesPerCustomer !== null) {
+    const mine = await db.promoRedemption.count({
+      where: {
+        workspaceId: args.workspaceId,
+        promoCodeId: promo.id,
+        order: { buyerMemberId: args.memberId },
+      },
+    });
+    if (mine >= promo.maxUsesPerCustomer) return "exhausted";
+  }
+  return "ok";
+}
+
 /** Validate a code for one event + member. Fail-closed; reasons are for the
  *  server - guests get one generic message regardless. */
 export async function checkCompCode(
@@ -54,30 +84,104 @@ export async function checkCompCode(
   });
   if (!promo) return { ok: false, reason: "not_found" };
 
-  if (promo.validFrom && promo.validFrom.getTime() > now.getTime()) {
-    return { ok: false, reason: "expired" };
-  }
-  if (promo.validUntil && promo.validUntil.getTime() <= now.getTime()) {
-    return { ok: false, reason: "expired" };
-  }
-  if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
-    return { ok: false, reason: "exhausted" };
-  }
-  if (promo.maxUsesPerCustomer !== null) {
-    const mine = await db.promoRedemption.count({
-      where: {
-        workspaceId: args.workspaceId,
-        promoCodeId: promo.id,
-        order: { buyerMemberId: args.memberId },
-      },
-    });
-    if (mine >= promo.maxUsesPerCustomer) {
-      return { ok: false, reason: "exhausted" };
-    }
-  }
+  const usable = await promoUsable(db, promo, {
+    workspaceId: args.workspaceId,
+    memberId: args.memberId,
+    now,
+  });
+  if (usable !== "ok") return { ok: false, reason: usable };
   if (!isCompCode(promo)) return { ok: false, reason: "not_comp" };
 
   return { ok: true, promo };
+}
+
+// ── Partial-discount codes (D6) ─────────────────────────────────────────────
+
+export type DiscountCodeCheck =
+  | { ok: true; promo: PromoCode; discountCents: number; discountedCents: number }
+  | {
+      ok: false;
+      reason:
+        | "not_found"
+        | "expired"
+        | "exhausted"
+        | "comp_code"
+        | "covers_full_ticket"
+        | "out_of_scope";
+    };
+
+/** The discount a partial code takes off a base price (D6-2). Percent rounds
+ *  on the cent; flat is the authored cents. Null = not a partial type. */
+export function discountForPromo(
+  promo: Pick<PromoCode, "discountType" | "discountValue">,
+  baseCents: number,
+): number | null {
+  if (promo.discountType === "percent") {
+    return Math.round((baseCents * promo.discountValue) / 100);
+  }
+  if (promo.discountType === "flat") return promo.discountValue;
+  return null;
+}
+
+/** Validate a partial-discount code against one PAY price (D6). Comp-class
+ *  codes report "comp_code" so the caller routes them through the existing
+ *  zero-Stripe machinery - never a second zero-charge path. A discount that
+ *  zeroes or inverts the price is refused, not clamped (D6-2). Fail-closed. */
+export async function checkDiscountCode(
+  db: PrismaClient,
+  args: {
+    workspaceId: string;
+    eventId: string;
+    memberId: string;
+    code: string;
+    baseCents: number;
+    now?: Date;
+  },
+): Promise<DiscountCodeCheck> {
+  const now = args.now ?? new Date();
+  const code = args.code.trim();
+  if (!code || !Number.isInteger(args.baseCents) || args.baseCents <= 0) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const promo = await db.promoCode.findFirst({
+    where: {
+      workspaceId: args.workspaceId,
+      eventId: args.eventId,
+      code: { equals: code, mode: "insensitive" },
+    },
+  });
+  if (!promo) return { ok: false, reason: "not_found" };
+  // A PAY node has no tier - tier-scoped codes do not redeem at a gate
+  // (D6-7). Series codes have no eventId, so the query above never finds
+  // them here.
+  if (promo.tierId !== null) return { ok: false, reason: "out_of_scope" };
+  if (isCompCode(promo)) return { ok: false, reason: "comp_code" };
+
+  const usable = await promoUsable(db, promo, {
+    workspaceId: args.workspaceId,
+    memberId: args.memberId,
+    now,
+  });
+  if (usable !== "ok") return { ok: false, reason: usable };
+
+  const discountCents = discountForPromo(promo, args.baseCents);
+  if (
+    discountCents === null ||
+    !Number.isInteger(discountCents) ||
+    discountCents <= 0
+  ) {
+    return { ok: false, reason: "not_found" };
+  }
+  if (discountCents >= args.baseCents) {
+    return { ok: false, reason: "covers_full_ticket" };
+  }
+  return {
+    ok: true,
+    promo,
+    discountCents,
+    discountedCents: args.baseCents - discountCents,
+  };
 }
 
 /** Redeem a validated comp code against one PAY node: money records via

@@ -29,6 +29,7 @@ function verifyArgs(overrides: {
   config?: unknown;
   submission?: unknown;
   member?: Member;
+  nodeId?: string;
 }) {
   return {
     config: overrides.config as never,
@@ -36,6 +37,7 @@ function verifyArgs(overrides: {
     member: overrides.member ?? member(),
     workspaceId: WORKSPACE,
     resource: RESOURCE,
+    nodeId: overrides.nodeId ?? "node_test",
   };
 }
 

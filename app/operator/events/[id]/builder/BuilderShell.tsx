@@ -19,6 +19,7 @@ import { HeroImageUpload } from "../../_components/HeroImageUpload";
 import type { GateNodeSpec } from "@/lib/gate-engine/types";
 import {
   createCompCode,
+  createDiscountCode,
   deactivateCompCode,
   getBuilderState,
   publishEvent,
@@ -564,6 +565,16 @@ export function BuilderShell({
   const [saving, startSaving] = useTransition();
   const [notice, setNotice] = useState("");
   const [newCode, setNewCode] = useState("");
+  const emptyDiscount = {
+    code: "",
+    discountType: "percent" as "percent" | "flat",
+    value: "",
+    maxUses: "",
+    perCustomer: "",
+    from: "",
+    until: "",
+  };
+  const [newDiscount, setNewDiscount] = useState(emptyDiscount);
 
   const event = state.event;
   const published = event.status === "PUBLISHED";
@@ -1027,7 +1038,7 @@ export function BuilderShell({
             </div>
           </Disclosure>
 
-          <Disclosure title="Comp codes">
+          <Disclosure title="Comp + discount codes">
             <div className="flex flex-col gap-2">
               {state.compCodes.length === 0 ? (
                 <p className="text-xs text-text-tertiary">
@@ -1080,6 +1091,143 @@ export function BuilderShell({
                 >
                   Create code
                 </button>
+              </div>
+
+              {/* Discount codes (D6): part of the price off, guest pays the
+                  rest through the normal ticket step. */}
+              <div className="mt-2 flex flex-col gap-2 border-t border-border pt-3">
+                {state.discountCodes.length === 0 ? (
+                  <p className="text-xs text-text-tertiary">
+                    A discount code takes part of the price off - the guest
+                    pays the rest through the normal ticket step.
+                  </p>
+                ) : null}
+                {state.discountCodes.map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between rounded-sm border border-border bg-card px-3 py-2"
+                  >
+                    <div>
+                      <span className={`text-sm font-medium ${c.active ? "text-text-primary" : "text-text-tertiary line-through"}`}>
+                        {c.code}
+                      </span>
+                      <span className="ml-2 text-xs text-text-tertiary">
+                        {c.discountType === "percent"
+                          ? `${c.discountValue}% off`
+                          : `$${(c.discountValue / 100).toFixed(2).replace(/\.00$/, "")} off`}
+                        {" · "}
+                        {c.usedCount} used{c.maxUses ? ` of ${c.maxUses}` : ""}
+                        {c.maxUsesPerCustomer ? ` · ${c.maxUsesPerCustomer} per person` : ""}
+                      </span>
+                    </div>
+                    {c.active ? (
+                      <button
+                        type="button"
+                        onClick={() => run(() => deactivateCompCode(event.id, c.id))}
+                        className="text-xs text-text-tertiary underline underline-offset-2"
+                      >
+                        Deactivate
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={newDiscount.code}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, code: e.target.value })}
+                    placeholder="SUMMER20"
+                    maxLength={40}
+                    className={`${fieldClass} w-36 uppercase`}
+                  />
+                  <select
+                    value={newDiscount.discountType}
+                    onChange={(e) =>
+                      setNewDiscount({
+                        ...newDiscount,
+                        discountType: e.target.value as "percent" | "flat",
+                      })
+                    }
+                    className={`${fieldClass} w-28`}
+                  >
+                    <option value="percent">% off</option>
+                    <option value="flat">$ off</option>
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newDiscount.value}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, value: e.target.value })}
+                    placeholder={newDiscount.discountType === "percent" ? "20" : "15"}
+                    className={`${fieldClass} w-20`}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    value={newDiscount.maxUses}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, maxUses: e.target.value })}
+                    placeholder="Max uses"
+                    className={`${fieldClass} w-24`}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={newDiscount.perCustomer}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, perCustomer: e.target.value })}
+                    placeholder="Per person"
+                    className={`${fieldClass} w-24`}
+                  />
+                  <input
+                    type="datetime-local"
+                    value={newDiscount.from}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, from: e.target.value })}
+                    aria-label="Valid from"
+                    className={`${fieldClass} w-44`}
+                  />
+                  <input
+                    type="datetime-local"
+                    value={newDiscount.until}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, until: e.target.value })}
+                    aria-label="Valid until"
+                    className={`${fieldClass} w-44`}
+                  />
+                  <button
+                    type="button"
+                    disabled={
+                      saving ||
+                      newDiscount.code.trim().length < 3 ||
+                      !(Number.parseFloat(newDiscount.value) > 0)
+                    }
+                    onClick={() => {
+                      const draft = newDiscount;
+                      setNewDiscount(emptyDiscount);
+                      const value =
+                        draft.discountType === "percent"
+                          ? Math.round(Number.parseFloat(draft.value))
+                          : Math.round(Number.parseFloat(draft.value) * 100);
+                      run(() =>
+                        createDiscountCode(event.id, {
+                          code: draft.code.trim(),
+                          discountType: draft.discountType,
+                          discountValue: Number.isFinite(value) ? value : 0,
+                          maxUses: draft.maxUses
+                            ? Number.parseInt(draft.maxUses, 10)
+                            : null,
+                          maxUsesPerCustomer: draft.perCustomer
+                            ? Number.parseInt(draft.perCustomer, 10)
+                            : null,
+                          validFrom: draft.from || null,
+                          validUntil: draft.until || null,
+                        }),
+                      );
+                    }}
+                    className="rounded-sm border border-border px-3 py-2 text-xs font-medium text-text-primary disabled:opacity-50"
+                  >
+                    Create discount
+                  </button>
+                </div>
               </div>
             </div>
           </Disclosure>

@@ -11,6 +11,14 @@
  *  intent to the member inside this workspace. Without this, any guest could
  *  satisfy PAY with someone else's intent id.
  *
+ *  Discounts (D6): the mint route stamps a server-computed discount into the
+ *  intent metadata. The verifier honors that stamp ONLY when it names this
+ *  exact node + workspace and its integers reconcile (base - discount =
+ *  discounted, 0 < discounted < configured price); then the amount defense is
+ *  amount_received >= discountedCents. Any other intent - no stamp, foreign
+ *  node, malformed stamp - keeps the full-price defense unchanged, so a
+ *  discounted intent minted for a cheap node can never satisfy a dearer one.
+ *
  *  Carry-forward: NEVER (§16.4 LOCKED - payment is per-event).
  */
 import { z } from "zod";
@@ -123,6 +131,49 @@ function formatPrice(priceCents: number, currency: string): string {
     : `${amount} ${currency.toUpperCase()}`;
 }
 
+export type DiscountStamp = {
+  promoCodeId: string;
+  promoCode: string | null;
+  baseCents: number;
+  discountCents: number;
+  discountedCents: number;
+};
+
+/** Read the mint route's discount stamp off intent metadata - null unless it
+ *  binds to exactly this node + workspace and every integer reconciles. A
+ *  null here is never an error: the caller falls back to the full-price
+ *  defense (fail-closed toward charging more, never less). */
+export function readDiscountStamp(
+  metadata: Record<string, string> | undefined,
+  bind: { nodeId: string; workspaceId: string; priceCents: number },
+): DiscountStamp | null {
+  if (!metadata) return null;
+  if (metadata.kind !== "gate-pay") return null;
+  if (!metadata.promoCodeId) return null;
+  if (metadata.nodeId !== bind.nodeId) return null;
+  if (metadata.workspaceId !== bind.workspaceId) return null;
+  const baseCents = Number.parseInt(metadata.baseCents ?? "", 10);
+  const discountCents = Number.parseInt(metadata.discountCents ?? "", 10);
+  const discountedCents = Number.parseInt(metadata.discountedCents ?? "", 10);
+  if (
+    !Number.isInteger(baseCents) ||
+    !Number.isInteger(discountCents) ||
+    !Number.isInteger(discountedCents)
+  ) {
+    return null;
+  }
+  if (discountCents <= 0 || discountedCents <= 0) return null;
+  if (baseCents - discountCents !== discountedCents) return null;
+  if (discountedCents >= bind.priceCents) return null;
+  return {
+    promoCodeId: metadata.promoCodeId,
+    promoCode: metadata.promoCode ?? null,
+    baseCents,
+    discountCents,
+    discountedCents,
+  };
+}
+
 export function createPayCondition(ports?: {
   readIntent?: StripeIntentReader;
   ownsIntent?: IntentOwnershipCheck;
@@ -141,7 +192,7 @@ export function createPayCondition(ports?: {
         : `Get Ticket - ${formatPrice(config.priceCents, config.currency)}`,
     isPassive: false,
     carryForward: { kind: "NEVER" },
-    async verify({ config, submission, member, workspaceId }) {
+    async verify({ config, submission, member, workspaceId, nodeId }) {
       const parsed = paySubmissionSchema.safeParse(submission);
       if (!parsed.success) {
         return { outcome: "REJECTED", reason: "missing_payment_intent" };
@@ -156,8 +207,19 @@ export function createPayCondition(ports?: {
       if (intent.currency.toLowerCase() !== config.currency.toLowerCase()) {
         return { outcome: "REJECTED", reason: "currency_mismatch" };
       }
-      if (intent.amount_received < config.priceCents) {
-        return { outcome: "REJECTED", reason: "amount_below_price" };
+      // D6: a node-bound server stamp lowers the required amount to the
+      // discounted price; anything else keeps the full-price defense.
+      const stamp = readDiscountStamp(intent.metadata, {
+        nodeId,
+        workspaceId,
+        priceCents: config.priceCents,
+      });
+      const requiredCents = stamp ? stamp.discountedCents : config.priceCents;
+      if (intent.amount_received < requiredCents) {
+        return {
+          outcome: "REJECTED",
+          reason: stamp ? "amount_below_discounted_price" : "amount_below_price",
+        };
       }
       const ownedByMetadata = intent.metadata?.memberId === member.id;
       const owned =
@@ -176,6 +238,16 @@ export function createPayCondition(ports?: {
           paymentIntentId: intent.id,
           amountReceived: intent.amount_received,
           currency: intent.currency,
+          // The promo facts the commerce bridge records (D6-9). Stamped from
+          // the server-validated mint metadata, never from the submission.
+          ...(stamp
+            ? {
+                promoCodeId: stamp.promoCodeId,
+                ...(stamp.promoCode ? { promoCode: stamp.promoCode } : {}),
+                baseCents: stamp.baseCents,
+                discountCents: stamp.discountCents,
+              }
+            : {}),
         },
       };
     },

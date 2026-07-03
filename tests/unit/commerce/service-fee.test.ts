@@ -5,7 +5,11 @@
  *  no Stripe.
  */
 import { describe, expect, it } from "vitest";
-import { applyServiceFee, feePolicyFromEvent } from "@/lib/commerce/service-fee";
+import {
+  applyServiceFee,
+  applyServiceFeeWithDiscount,
+  feePolicyFromEvent,
+} from "@/lib/commerce/service-fee";
 
 /** Stripe's cut on a charged amount: 2.9% (rounded) + 30c. */
 const stripeCut = (chargedCents: number) => Math.round(chargedCents * 0.029) + 30;
@@ -97,6 +101,49 @@ describe("applyServiceFee - guards", () => {
       discountCents: 0,
       totalCents: price,
     });
+  });
+});
+
+describe("applyServiceFeeWithDiscount (D6) - fee on the discounted price", () => {
+  it("absorb: $25.00 with $5.00 off charges $20.00, split honest", () => {
+    expect(applyServiceFeeWithDiscount(2500, 500, absorb)).toEqual({
+      subtotalCents: 2500,
+      serviceFeeCents: 0,
+      discountCents: 500,
+      totalCents: 2000,
+    });
+  });
+
+  it("pass_stripe_only: the directive's exact cents - 2500 with 1500 off -> 1000 -> total 1061, fee 61", () => {
+    const items = applyServiceFeeWithDiscount(2500, 1500, passStripe);
+    expect(items).toEqual({
+      subtotalCents: 2500,
+      serviceFeeCents: 61,
+      discountCents: 1500,
+      totalCents: 1061,
+    });
+    // The line items sum exactly: base - discount + fee = total.
+    expect(items.subtotalCents - items.discountCents + items.serviceFeeCents).toBe(
+      items.totalCents,
+    );
+  });
+
+  it("nets the operator the discounted price within a cent under gross-up", () => {
+    const { totalCents } = applyServiceFeeWithDiscount(2500, 1500, passStripe);
+    const net = totalCents - stripeCut(totalCents);
+    expect(Math.abs(net - 1000)).toBeLessThanOrEqual(1);
+  });
+
+  it.each([
+    { discount: 0, label: "zero" },
+    { discount: -100, label: "negative" },
+    { discount: 2500, label: "equal to the price" },
+    { discount: 3000, label: "above the price" },
+    { discount: 12.5, label: "non-integer" },
+  ])("fails closed to the undiscounted items when the discount is $label", ({ discount }) => {
+    expect(applyServiceFeeWithDiscount(2500, discount, passStripe)).toEqual(
+      applyServiceFee(2500, passStripe),
+    );
   });
 });
 
