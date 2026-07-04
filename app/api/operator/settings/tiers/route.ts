@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
-import { OperatorRole } from '@prisma/client';
+
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
-import { requireRole } from '@/lib/operator-role';
+import { requirePermission } from '@/lib/operator-role';
 import { resolveTierNames, DEFAULT_TIER_NAMES } from '@/lib/score-display';
 import { emitEvent } from '@/lib/emit-event';
 
@@ -26,7 +26,7 @@ const BodySchema = z.object({
 });
 
 export async function PUT(req: NextRequest) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('settings.edit');
   if (!gate.ok) return gate.response;
   const { workspaceId } = gate;
 

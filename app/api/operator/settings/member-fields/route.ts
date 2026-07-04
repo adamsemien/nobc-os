@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
+import { requireRole, requirePermission } from '@/lib/operator-role';
 import { emitEvent } from '@/lib/emit-event';
 import { isReservedKey, slugifyFieldKey } from '@/lib/member-editable';
 
@@ -54,7 +54,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('settings.edit');
   if (!gate.ok) return gate.response;
   const { userId, workspaceId } = gate;
 

@@ -10,9 +10,11 @@ import { AddMemberDrawer, type CreatedMember } from './AddMemberDrawer';
 export function MembersView({
   initialMembers,
   canAddMembers,
+  canBulk,
 }: {
   initialMembers: MembersBulkMember[];
   canAddMembers: boolean;
+  canBulk: boolean;
 }) {
   const [members, setMembers] = useState<MembersBulkMember[]>(initialMembers);
   const [toast, setToast] = useState<string | null>(null);
@@ -90,7 +92,7 @@ export function MembersView({
           }
         />
       ) : (
-        <MembersBulkActions members={members} canEdit={canAddMembers} />
+        <MembersBulkActions members={members} canEdit={canAddMembers} canBulk={canBulk} />
       )}
 
       {toast ? (

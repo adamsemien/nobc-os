@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { getMemberWorkspaceId } from '@/lib/auth';
-import { isStaff } from '@/lib/operator-role';
+import { isStaff, isAdmin } from '@/lib/operator-role';
 import { MembersView } from './_components/MembersView';
 
 type MemberRow = {
@@ -22,7 +22,13 @@ type MemberRow = {
 export default async function MembersPage() {
   const { userId } = await auth();
   const workspaceId = await getMemberWorkspaceId(userId);
-  const canAddMembers = await isStaff(userId, workspaceId);
+  // member.edit (STAFF+) gates Add Member + inline edit; member.bulk (OWNER/ADMIN,
+  // i.e. isAdmin under the RBAC RANK) gates the bulk-action bar. Defense-in-depth —
+  // the server routes enforce both independently.
+  const [canAddMembers, canBulk] = await Promise.all([
+    isStaff(userId, workspaceId),
+    isAdmin(userId, workspaceId),
+  ]);
 
   const res = await operatorServerFetch('/api/operator/members');
   if (!res.ok) {
@@ -39,6 +45,7 @@ export default async function MembersPage() {
       <div className="w-full">
         <MembersView
           canAddMembers={canAddMembers}
+          canBulk={canBulk}
           initialMembers={members.map((m) => ({
             id: m.id,
             fullName: m.fullName,

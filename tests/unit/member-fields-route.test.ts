@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const m = vi.hoisted(() => ({
   requireRole: vi.fn(),
+  requirePermission: vi.fn(),
   findMany: vi.fn(),
   updateMany: vi.fn(),
   update: vi.fn(),
@@ -13,7 +14,11 @@ const m = vi.hoisted(() => ({
   transaction: vi.fn(),
   emitEvent: vi.fn(),
 }));
-vi.mock('@/lib/operator-role', () => ({ requireRole: m.requireRole }));
+// GET is requireRole(STAFF); PATCH is requirePermission('settings.edit') (Phase 1.5 RBAC).
+vi.mock('@/lib/operator-role', () => ({
+  requireRole: m.requireRole,
+  requirePermission: m.requirePermission,
+}));
 vi.mock('@/lib/db', () => ({
   db: {
     fieldDefinition: { findMany: m.findMany, updateMany: m.updateMany, update: m.update, create: m.create },
@@ -33,6 +38,7 @@ function patch(body: unknown) {
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
   m.requireRole.mockResolvedValue(ADMIN_GATE);
+  m.requirePermission.mockResolvedValue(ADMIN_GATE);
   m.findMany.mockResolvedValue([]);
   m.updateMany.mockResolvedValue({ count: 0 });
   m.update.mockResolvedValue({});
@@ -59,8 +65,8 @@ describe('GET /api/operator/settings/member-fields', () => {
 });
 
 describe('PATCH /api/operator/settings/member-fields', () => {
-  it('returns the gate response for a non-ADMIN caller, no DB work', async () => {
-    m.requireRole.mockResolvedValue({ ok: false, response: new Response(null, { status: 403 }) });
+  it('returns the gate response for a caller without settings.edit, no DB work', async () => {
+    m.requirePermission.mockResolvedValue({ ok: false, response: new Response(null, { status: 403 }) });
     const res = await patch({ fields: [{ name: 'Dietary', type: 'text' }] });
     expect(res.status).toBe(403);
     expect(m.transaction).not.toHaveBeenCalled();

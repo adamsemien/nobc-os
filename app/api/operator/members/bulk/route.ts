@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { OperatorRole } from '@prisma/client';
+
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
+import { requirePermission } from '@/lib/operator-role';
 import { emitEvent } from '@/lib/emit-event';
 
 const PostSchema = z.object({
@@ -12,7 +12,7 @@ const PostSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('member.bulk');
   if (!gate.ok) return gate.response;
   const { userId, workspaceId } = gate;
 

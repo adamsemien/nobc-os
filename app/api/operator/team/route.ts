@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
+import { requirePermission } from '@/lib/operator-role';
 import { emitEvent } from '@/lib/emit-event';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+// Minimal RBAC (Phase 1.5): all four roles are assignable, including OWNER.
 const ROLES = new Set<OperatorRole>([
+  OperatorRole.OWNER,
   OperatorRole.ADMIN,
   OperatorRole.STAFF,
   OperatorRole.READ_ONLY,
 ]);
 
-// Invite a team member by email — ADMIN only. No email is sent yet (V2); the
-// row is stored with no clerkUserId and activates when that person signs in.
+// Invite a team member by email — role.manage (OWNER only). No email is sent yet
+// (V2); the row is stored with no clerkUserId and activates when that person signs in.
 export async function POST(req: NextRequest) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('role.manage');
   if (!gate.ok) return gate.response;
   const { userId, workspaceId } = gate;
 

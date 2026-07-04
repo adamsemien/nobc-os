@@ -1,10 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { OperatorRole } from '@prisma/client';
+
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
-import { requireRole } from '@/lib/operator-role';
+import { requirePermission } from '@/lib/operator-role';
 import { AI_MODELS, type AIModelId } from '@/lib/ai-models';
 
 const VALID_IDS = AI_MODELS.map((m) => m.id) as [AIModelId, ...AIModelId[]];
@@ -24,7 +24,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('settings.edit');
   if (!gate.ok) return gate.response;
   const { userId, workspaceId } = gate;
 

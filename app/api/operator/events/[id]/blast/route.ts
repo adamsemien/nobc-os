@@ -1,5 +1,6 @@
 /** Blast send (Stage 18, 4D) - one-off operator message to one event's
- *  confirmed attendees. ADMIN only; requireRole is the security boundary.
+ *  confirmed attendees. blast.send permission (OWNER/ADMIN); requirePermission is
+ *  the security boundary.
  *
  *  Safety rails, all server-enforced:
  *   - the dry run is mandatory: `expectedRecipients` must equal the live
@@ -20,10 +21,9 @@
  *  disabled state honestly.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { OperatorRole } from '@prisma/client';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
+import { requirePermission } from '@/lib/operator-role';
 import { marketingSmsConfigured } from '@/lib/twilio';
 import { resolveBlastRecipients } from '@/lib/blast/recipients';
 import { BlastAlreadyFiredError, createBlast, fireBlast } from '@/lib/blast/run';
@@ -44,7 +44,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('blast.send');
   if (!gate.ok) return gate.response;
   const { id } = await params;
   const event = await db.event.findFirst({
@@ -61,7 +61,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('blast.send');
   if (!gate.ok) return gate.response;
   const { userId, workspaceId } = gate;
   const { id } = await params;

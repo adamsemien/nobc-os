@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { OperatorRole } from '@prisma/client';
+
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
+import { requirePermission } from '@/lib/operator-role';
 import { createRateLimiter } from '@/lib/rate-limit';
 import {
   listRefundableRsvps,
@@ -28,7 +28,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('payment.refund');
   if (!gate.ok) return gate.response;
   const { userId, workspaceId } = gate;
   const { id: eventId } = await params;
