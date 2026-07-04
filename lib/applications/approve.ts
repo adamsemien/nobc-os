@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { resolveMember } from '@/lib/member-identity';
 import { ACTIVE_EVENT_ID } from '@/lib/active-event';
 import { emitEvent } from '@/lib/emit-event';
+import { syncMemberChannelConsent } from '@/lib/comms/consent-sync';
 import { welcomeEmail } from '@/lib/email-templates';
 import { generateMemberPass } from '@/lib/wallet-pass';
 import { resend } from '@/lib/resend';
@@ -87,6 +88,11 @@ export async function approveApplication(params: {
       metadata: { applicationId, email: app.email },
     });
   }
+
+  // Consent floor (CRM substrate, Phase 1): reconcile ChannelSubscription from the
+  // applicant's opt-ins (Application emailOptIn / smsOptInAt -> EXPRESS_OPTIN).
+  // Fire-and-forget + no-downgrade; the legacy consent columns are untouched.
+  void syncMemberChannelConsent({ workspaceId, memberId: member.id, context: 'application_approval' });
 
   // Door 1: confirm the application-issued comp RSVP for the active event. The
   // comp was minted pending_approval on apply-submit; approving confirms the

@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/operator-role';
 import { generateMemberQrCode } from '@/lib/member-qr';
 import { emitEvent } from '@/lib/emit-event';
+import { syncMemberChannelConsent } from '@/lib/comms/consent-sync';
 
 // Manual member creation can only set these three statuses from the operator UI.
 const ALLOWED_STATUSES: MemberStatus[] = [
@@ -126,6 +127,11 @@ export async function POST(req: NextRequest) {
     entityId: member.id,
     metadata: { email, status, source: 'manual', note: 'Added manually by operator.' },
   });
+
+  // Consent floor (CRM substrate, Phase 1): seed ChannelSubscription rows. Manual
+  // create captures no marketing consent today, so this yields PENDING rows (honest);
+  // an explicit operator-asserts-consent action (OPERATOR_ADDED) can elevate later.
+  void syncMemberChannelConsent({ workspaceId, memberId: member.id, context: 'operator_manual' });
 
   return NextResponse.json(
     {

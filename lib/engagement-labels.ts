@@ -35,6 +35,10 @@ const ENGAGEMENT_META: Record<MemberEngagementEventType, EngagementMeta> = {
   referral_made: { label: 'Made a referral', tone: 'info' },
   enrichment_synced: { label: 'Profile enriched', tone: 'neutral' },
   merged: { label: 'Merged a duplicate record', tone: 'neutral' },
+  // Consent floor (CRM substrate, Phase 1).
+  channel_subscribed: { label: 'Subscribed to a channel', tone: 'positive' },
+  channel_unsubscribed: { label: 'Unsubscribed from a channel', tone: 'negative' },
+  suppression_added: { label: 'Added to the suppression list', tone: 'negative' },
 };
 
 /** Humanize an unrecognized token so the UI never shows a raw enum (e.g. new DB value). */

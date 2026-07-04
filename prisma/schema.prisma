@@ -26,45 +26,45 @@ model Workspace {
   tierWaitlistName  String  @default("Waitlist")
   defaultTemplateId String?
 
-  members              Member[]
-  applications         Application[]
-  events               Event[]
-  eventSeries          EventSeries[]
-  rsvps                RSVP[]
-  orders               Order[]
-  tickets              Ticket[]
-  payments             Payment[]
-  waitlistEntries      WaitlistEntry[]
-  auditEvents          AuditEvent[]
-  redList              RedList[]
-  eventFlowTemplates   EventFlowTemplate[]
-  questionDefinitions  QuestionDefinition[]
-  applicationTemplates ApplicationTemplate[]
-  intelligenceInsights IntelligenceInsight[]
-  savedReports         SavedReport[]
-  agentConversations   AgentConversation[]
-  ticketTiers          TicketTier[]
-  accessTokens         AccessToken[]
-  promoCodes           PromoCode[]
-  tags                 Tag[]
-  entityTags           EntityTag[]
-  sponsorBrandProfiles SponsorBrandProfile[]
-  generatedAssets      GeneratedAsset[]
-  recapSnapshots       RecapSnapshot[]
-  surveyResponses      SurveyResponse[]
-  svixAppId            String?
-  watchList            WatchList[]
-  emailTemplates       EmailTemplate[]
-  platformSettings     PlatformSetting[]
-  eventWorkflows       EventWorkflow[]
-  operatorComments     OperatorComment[]
-  operatorNotifications OperatorNotification[]
-  qaMissions           QAMission[]
-  membershipTiers      MembershipTier[]
-  smsConversations     SmsConversation[]
-  workspaceMembers     WorkspaceMember[]
+  members                Member[]
+  applications           Application[]
+  events                 Event[]
+  eventSeries            EventSeries[]
+  rsvps                  RSVP[]
+  orders                 Order[]
+  tickets                Ticket[]
+  payments               Payment[]
+  waitlistEntries        WaitlistEntry[]
+  auditEvents            AuditEvent[]
+  redList                RedList[]
+  eventFlowTemplates     EventFlowTemplate[]
+  questionDefinitions    QuestionDefinition[]
+  applicationTemplates   ApplicationTemplate[]
+  intelligenceInsights   IntelligenceInsight[]
+  savedReports           SavedReport[]
+  agentConversations     AgentConversation[]
+  ticketTiers            TicketTier[]
+  accessTokens           AccessToken[]
+  promoCodes             PromoCode[]
+  tags                   Tag[]
+  entityTags             EntityTag[]
+  sponsorBrandProfiles   SponsorBrandProfile[]
+  generatedAssets        GeneratedAsset[]
+  recapSnapshots         RecapSnapshot[]
+  surveyResponses        SurveyResponse[]
+  svixAppId              String?
+  watchList              WatchList[]
+  emailTemplates         EmailTemplate[]
+  platformSettings       PlatformSetting[]
+  eventWorkflows         EventWorkflow[]
+  operatorComments       OperatorComment[]
+  operatorNotifications  OperatorNotification[]
+  qaMissions             QAMission[]
+  membershipTiers        MembershipTier[]
+  smsConversations       SmsConversation[]
+  workspaceMembers       WorkspaceMember[]
   memberEngagementEvents MemberEngagementEvent[]
-  contactSources       ContactSource[]
+  contactSources         ContactSource[]
 
   // Digital Asset Manager (Stage 15)
   assets         Asset[]
@@ -73,8 +73,8 @@ model Workspace {
   assetDownloads AssetDownload[]
 
   // Instagram Story Automation
-  instagramStories       InstagramStory[]
-  instagramStoryBatches  InstagramStoryBatch[]
+  instagramStories      InstagramStory[]
+  instagramStoryBatches InstagramStoryBatch[]
 
   // Access Gate Engine v3 - M1 (Stage 17)
   gates        Gate[]
@@ -87,17 +87,22 @@ model Workspace {
   blasts             Blast[]
   suppressedContacts SuppressedContact[]
 
+  // Consent floor (CRM substrate, Phase 1) — the channel-consent axis. Relation
+  // fields only; no columns on Workspace.
+  channelSubscriptions ChannelSubscription[]
+  suppressionEntries   SuppressionEntry[]
+
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
   // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
-  aiModel              String?
+  aiModel String?
 
   // Editable tier labels for the 0-100 score. null = use defaults (Resident/Member/Considering).
   // Shape: { top: string, mid: string, low: string }.
-  tierNames            Json?
+  tierNames Json?
 
   // DAM total stored bytes; +on upload, -on permanent delete (Stage 15)
-  storageBytes         BigInt   @default(0)
+  storageBytes BigInt @default(0)
 }
 
 /// Operator role within a workspace. Hierarchy: ADMIN > STAFF > READ_ONLY.
@@ -128,18 +133,18 @@ model WorkspaceMember {
 }
 
 model EmailTemplate {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
   key         String
   name        String
   description String?
   subject     String
-  bodyHtml    String   @db.Text
-  bodyText    String   @db.Text
+  bodyHtml    String    @db.Text
+  bodyText    String    @db.Text
   variables   Json
-  enabled     Boolean  @default(true)
-  updatedAt   DateTime @updatedAt
+  enabled     Boolean   @default(true)
+  updatedAt   DateTime  @updatedAt
   updatedBy   String?
 
   @@unique([workspaceId, key])
@@ -147,14 +152,14 @@ model EmailTemplate {
 }
 
 model PlatformSetting {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
   key         String
   value       String
   type        String
   description String?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
 
   @@unique([workspaceId, key])
   @@index([workspaceId])
@@ -220,40 +225,40 @@ model ContactSource {
 }
 
 model Member {
-  id                String       @id @default(cuid())
-  workspaceId       String
-  workspace         Workspace    @relation(fields: [workspaceId], references: [id])
-  clerkUserId       String
-  email             String
-  firstName         String
-  lastName          String
-  phone             String?
+  id                    String        @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace     @relation(fields: [workspaceId], references: [id])
+  clerkUserId           String
+  email                 String
+  firstName             String
+  lastName              String
+  phone                 String?
   /// Checkout consent capture (Event Builder Rebuild, Phase F - ADD 1).
   /// Three separate signals, never bundled, never pre-checked; affirmative
   /// consent only ever sets them true (+ timestamp). Mirrors the apply
   /// flow's structured consent model on Application. Gates marketing
   /// contact, never the ticket.
-  marketingEmailOptIn   Boolean   @default(false)
+  marketingEmailOptIn   Boolean       @default(false)
   marketingEmailOptInAt DateTime?
-  marketingSmsOptIn     Boolean   @default(false)
+  marketingSmsOptIn     Boolean       @default(false)
   marketingSmsOptInAt   DateTime?
-  status            MemberStatus @default(PENDING)
-  tags              String[]
+  status                MemberStatus  @default(PENDING)
+  tags                  String[]
   /// Multi-valued CRM roles. Orthogonal to `status` (the membership lifecycle) —
   /// a person can be e.g. member + subscriber + sponsor_contact at once. Additive;
   /// default empty so existing rows are unaffected.
-  roles             ContactRole[] @default([])
-  energyScore       Int?
-  networkValueScore Int?
-  aiSummary         String?
-  redListed         Boolean      @default(false)
-  approved          Boolean      @default(false)
-  approvedAt        DateTime?
-  memberQrCode      String?      @unique
-  walletPassId      String?
-  passIssuedAt      DateTime?
-  totalEventsAttended Int        @default(0)
-  lastAttendedDate  DateTime?
+  roles                 ContactRole[] @default([])
+  energyScore           Int?
+  networkValueScore     Int?
+  aiSummary             String?
+  redListed             Boolean       @default(false)
+  approved              Boolean       @default(false)
+  approvedAt            DateTime?
+  memberQrCode          String?       @unique
+  walletPassId          String?
+  passIssuedAt          DateTime?
+  totalEventsAttended   Int           @default(0)
+  lastAttendedDate      DateTime?
 
   // Referral linkage + network-effect scoring
   referredByMemberId  String?
@@ -262,16 +267,16 @@ model Member {
   // Soft-merge (member-intelligence PR1): a duplicate person points at its
   // canonical record; reads resolve through it, history re-points to canonical.
   // Nullable + additive — no row deletion.
-  mergedIntoId        String?
-  mergedAt            DateTime?
+  mergedIntoId String?
+  mergedAt     DateTime?
 
   // Sponsor intelligence — self-reported / enriched demographic + firmographic fields
-  industry          String?
-  jobFunction       String?
-  seniority         String?
-  companySize       String?
-  ageRange          String?
-  householdIncome   String?
+  industry        String?
+  jobFunction     String?
+  seniority       String?
+  companySize     String?
+  ageRange        String?
+  householdIncome String?
 
   // PR2 — member-intelligence dimensions. Firmographic/demographic values live in
   // customFields (keyed by FieldDefinition.stableKey); fieldProvenance carries the
@@ -289,37 +294,41 @@ model Member {
   enrichmentStatus     MemberEnrichmentStatus @default(NONE)
   enrichmentLastSynced DateTime?
 
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   // Set when a real Clerk userId is first claimed from a placeholder. Additive — Adam runs
   // prisma/sql/add-member-claimed-at.sql before this field is in production.
-  claimedAt         DateTime?
+  claimedAt DateTime?
 
   rsvps           RSVP[]
   tickets         Ticket[]
   waitlistEntries WaitlistEntry[]
 
   // Self-relation: who referred this member, and who they referred.
-  referredByMember Member?  @relation("MemberReferrals", fields: [referredByMemberId], references: [id])
-  referredMembers  Member[] @relation("MemberReferrals")
+  referredByMember Member?                 @relation("MemberReferrals", fields: [referredByMemberId], references: [id])
+  referredMembers  Member[]                @relation("MemberReferrals")
   engagementEvents MemberEngagementEvent[]
   surveyResponses  SurveyResponse[]
 
   // Self-relation: soft-merge canonical pointer.
-  mergedInto       Member?  @relation("MemberMerge", fields: [mergedIntoId], references: [id])
-  mergedFrom       Member[] @relation("MemberMerge")
+  mergedInto Member?  @relation("MemberMerge", fields: [mergedIntoId], references: [id])
+  mergedFrom Member[] @relation("MemberMerge")
 
   // Psychographic data — separate table, firewalled from sponsor surfaces.
-  psychographics   MemberPsychographics?
+  psychographics MemberPsychographics?
 
   // CRM provenance — which source systems this person came from.
-  contactSources   ContactSource[]
+  contactSources ContactSource[]
 
   // Access Gate Engine v3 - M1 (Stage 17)
   gateProofs      GateProof[]
   gateSessions    GateSession[]
-  growthEdgesFrom GrowthEdge[] @relation("GrowthEdgeFrom")
-  growthEdgesTo   GrowthEdge[] @relation("GrowthEdgeTo")
+  growthEdgesFrom GrowthEdge[]  @relation("GrowthEdgeFrom")
+  growthEdgesTo   GrowthEdge[]  @relation("GrowthEdgeTo")
+
+  // Consent floor (CRM substrate, Phase 1). Relation fields only; no columns on Member.
+  channelSubscriptions ChannelSubscription[]
+  suppressionEntries   SuppressionEntry[]
 
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
@@ -395,48 +404,48 @@ enum AiApplicationRecommendation {
 }
 
 model Application {
-  id          String            @id @default(cuid())
-  workspaceId String
-  workspace   Workspace         @relation(fields: [workspaceId], references: [id])
-  memberId    String?
+  id                      String                       @id @default(cuid())
+  workspaceId             String
+  workspace               Workspace                    @relation(fields: [workspaceId], references: [id])
+  memberId                String?
   // Real Clerk user id once the applicant creates/links an account. Nullable +
   // additive: pre-account (cookie) drafts and all existing rows stay null.
   // Enables cross-device, account-based resume.
-  clerkUserId String?
-  email       String
-  fullName    String
-  phone        String?
-  city         String?
-  neighborhood String?
-  referredBy   String?
-  consentEmail Boolean           @default(false)
-  consentSms   Boolean           @default(false)
+  clerkUserId             String?
+  email                   String
+  fullName                String
+  phone                   String?
+  city                    String?
+  neighborhood            String?
+  referredBy              String?
+  consentEmail            Boolean                      @default(false)
+  consentSms              Boolean                      @default(false)
   // --- Phase A: structured consent + lifecycle (additive; legacy consentEmail/consentSms above are unchanged) ---
-  agreedToMembershipTerms Boolean   @default(false)
+  agreedToMembershipTerms Boolean                      @default(false)
   termsAcceptedAt         DateTime?
   termsVersion            String?
-  emailOptIn              Boolean   @default(false)
+  emailOptIn              Boolean                      @default(false)
   emailOptInAt            DateTime?
   smsOptInAt              DateTime?
   consentIp               String?
   consentUserAgent        String?
   archivedAt              DateTime?
-  status       ApplicationStatus @default(PENDING)
-  reviewedAt  DateTime?
-  reviewedBy  String?
-  reviewNote  String?
-  rejectionReason String?
-  aiTags      String[]
-  aiScore          Float?
-  aiRecommendation AiApplicationRecommendation?
-  aiReasoning      String?
-  duplicateFlag    Boolean           @default(false)
-  archetype        String?
-  archetypeScores  Json?
-  personalizedCopy String?
-  templateId       String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  status                  ApplicationStatus            @default(PENDING)
+  reviewedAt              DateTime?
+  reviewedBy              String?
+  reviewNote              String?
+  rejectionReason         String?
+  aiTags                  String[]
+  aiScore                 Float?
+  aiRecommendation        AiApplicationRecommendation?
+  aiReasoning             String?
+  duplicateFlag           Boolean                      @default(false)
+  archetype               String?
+  archetypeScores         Json?
+  personalizedCopy        String?
+  templateId              String?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
 
   answers  ApplicationAnswer[]
   template ApplicationTemplate? @relation(fields: [templateId], references: [id])
@@ -528,20 +537,20 @@ enum WaitlistPromotion {
 }
 
 model Event {
-  id               String          @id @default(cuid())
-  workspaceId      String
-  workspace        Workspace       @relation(fields: [workspaceId], references: [id])
-  slug             String
-  title            String
-  description      String?
+  id                    String          @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace       @relation(fields: [workspaceId], references: [id])
+  slug                  String
+  title                 String
+  description           String?
   /// Full public hero image URL (e.g. Vercel Blob). Used directly as img src.
   heroImageAssetId      String?
-  startAt          DateTime
-  endAt            DateTime?
-  location         String?
+  startAt               DateTime
+  endAt                 DateTime?
+  location              String?
   /// Optional deep link (Google Maps, Apple Maps, etc.).
   mapsUrl               String?
-  capacity         Int?
+  capacity              Int?
   accessMode            EventAccessMode @default(OPEN)
   approvalRequired      Boolean         @default(false)
   plusOnesAllowed       Boolean         @default(false)
@@ -558,15 +567,15 @@ model Event {
   eventAccess           Json            @default("{\"member\":{\"enabled\":true,\"gate\":\"auto_confirm\",\"priceCents\":0},\"guest\":{\"enabled\":false,\"gate\":\"pay\",\"priceCents\":0},\"comp\":{\"enabled\":false,\"budgetCap\":null}}")
 
   // Recurring — seriesId links to EventSeries
-  seriesId              String?
-  instanceNumber        Int?
-  recurrenceRule        String?
-  series                EventSeries?    @relation(fields: [seriesId], references: [id])
+  seriesId       String?
+  instanceNumber Int?
+  recurrenceRule String?
+  series         EventSeries? @relation(fields: [seriesId], references: [id])
 
   // Visibility & calendar
-  visibility            EventVisibility @default(public)
-  publishesAt           DateTime?
-  featured              Boolean         @default(false)
+  visibility  EventVisibility @default(public)
+  publishesAt DateTime?
+  featured    Boolean         @default(false)
 
   // Group buy
   groupBuyEnabled                 Boolean @default(true)
@@ -578,28 +587,28 @@ model Event {
   serviceFeeFlatCents  Int?
 
   // Refund policy default (tier can override)
-  defaultRefundPolicy  RefundPolicy   @default(window)
+  defaultRefundPolicy RefundPolicy @default(window)
 
   // Waitlist behavior
-  waitlistPromotion    WaitlistPromotion @default(same_tier_only)
+  waitlistPromotion WaitlistPromotion @default(same_tier_only)
 
   // Producer Phase J sync — set when an event originates from or is synced with Producer
-  producerEventId      String?         @unique
+  producerEventId String? @unique
 
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  customQuestions EventCustomQuestion[]
-  rsvps           RSVP[]
-  tickets         Ticket[]
-  waitlistEntries WaitlistEntry[]
-  ticketTiers     TicketTier[]
-  orders          Order[]
-  accessTokens    AccessToken[]
-  promoCodes      PromoCode[]
-  ticketHolds     TicketHold[]
-  blasts          Blast[]
-  workflow        EventWorkflow?
+  customQuestions  EventCustomQuestion[]
+  rsvps            RSVP[]
+  tickets          Ticket[]
+  waitlistEntries  WaitlistEntry[]
+  ticketTiers      TicketTier[]
+  orders           Order[]
+  accessTokens     AccessToken[]
+  promoCodes       PromoCode[]
+  ticketHolds      TicketHold[]
+  blasts           Blast[]
+  workflow         EventWorkflow?
   smsConversations SmsConversation[]
 
   @@unique([workspaceId, slug])
@@ -613,15 +622,15 @@ model Event {
 /// Flexible workflow gating for an event. Replaces the rigid accessMode enum.
 /// `paths` is a WorkflowPath[] (see lib/workflows/types.ts). null templateKey = custom.
 model EventWorkflow {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  eventId     String   @unique
+  eventId     String    @unique
   event       Event     @relation(fields: [eventId], references: [id])
   templateKey String?
   paths       Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([workspaceId, eventId])
 }
@@ -644,24 +653,24 @@ enum QuestionFlowStep {
 }
 
 model EventCustomQuestion {
-  id           String           @id @default(cuid())
-  eventId      String
-  event        Event            @relation(fields: [eventId], references: [id])
-  workspaceId  String
-  label        String
-  fieldType    FieldType
-  options      String[]
-  required     Boolean          @default(false)
-  order        Int
-  showToMember Boolean          @default(true)
-  showToGuest  Boolean          @default(true)
-  whenInFlow   QuestionFlowStep @default(BEFORE_SUBMIT)
+  id             String               @id @default(cuid())
+  eventId        String
+  event          Event                @relation(fields: [eventId], references: [id])
+  workspaceId    String
+  label          String
+  fieldType      FieldType
+  options        String[]
+  required       Boolean              @default(false)
+  order          Int
+  showToMember   Boolean              @default(true)
+  showToGuest    Boolean              @default(true)
+  whenInFlow     QuestionFlowStep     @default(BEFORE_SUBMIT)
   // Sponsor-scoped activation/booth form (Sponsor Intelligence, Phase 2). Null = a normal
   // registration field; set = a question shown at the sponsor's at-activation booth surface.
   sponsorBrandId String?
   sponsorBrand   SponsorBrandProfile? @relation(fields: [sponsorBrandId], references: [id])
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
   @@index([workspaceId])
   @@index([eventId])
@@ -675,38 +684,38 @@ enum RSVPStatus {
 }
 
 model RSVP {
-  id          String     @id @default(cuid())
-  workspaceId String
-  workspace   Workspace  @relation(fields: [workspaceId], references: [id])
-  eventId     String
-  event       Event      @relation(fields: [eventId], references: [id])
-  memberId    String
-  member      Member     @relation(fields: [memberId], references: [id])
-  status             RSVPStatus @default(CONFIRMED)
-  ticketStatus       String     @default("confirmed")
-  origin             String     @default("direct")
-  plusOneOfMemberId  String?
-  customAnswers      Json?
-  checkedIn          Boolean    @default(false)
-  checkedInAt        DateTime?
+  id                    String     @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace  @relation(fields: [workspaceId], references: [id])
+  eventId               String
+  event                 Event      @relation(fields: [eventId], references: [id])
+  memberId              String
+  member                Member     @relation(fields: [memberId], references: [id])
+  status                RSVPStatus @default(CONFIRMED)
+  ticketStatus          String     @default("confirmed")
+  origin                String     @default("direct")
+  plusOneOfMemberId     String?
+  customAnswers         Json?
+  checkedIn             Boolean    @default(false)
+  checkedInAt           DateTime?
   stripePaymentIntentId String?
-  paymentStatus      String?
-  capturedAt         DateTime?
-  amountCents        Int?
-  refundedAt         DateTime?
-  refundAmountCents  Int?
-  isComp             Boolean    @default(false)
-  compType           String?
-  guestEmail         String?
-  guestName          String?
+  paymentStatus         String?
+  capturedAt            DateTime?
+  amountCents           Int?
+  refundedAt            DateTime?
+  refundAmountCents     Int?
+  isComp                Boolean    @default(false)
+  compType              String?
+  guestEmail            String?
+  guestName             String?
 
   // Order / tier / token linkage
-  orderId            String?
-  order              Order?        @relation(fields: [orderId], references: [id])
-  tierId             String?
-  tier               TicketTier?   @relation(fields: [tierId], references: [id])
-  accessTokenId      String?
-  accessToken        AccessToken?  @relation(fields: [accessTokenId], references: [id])
+  orderId       String?
+  order         Order?       @relation(fields: [orderId], references: [id])
+  tierId        String?
+  tier          TicketTier?  @relation(fields: [tierId], references: [id])
+  accessTokenId String?
+  accessToken   AccessToken? @relation(fields: [accessTokenId], references: [id])
 
   // Per-attendee fields (group buy + requireAttendeeDetailsPerTicket)
   attendeeName          String?
@@ -715,14 +724,14 @@ model RSVP {
   attendeeCustomAnswers Json?
 
   // Day-of reminder dedupe
-  reminderSentAt        DateTime?
+  reminderSentAt DateTime?
 
   // Plus-one capture (Task 10)
-  plusOneName           String?
-  plusOneInstagram      String?
+  plusOneName      String?
+  plusOneInstagram String?
 
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tickets Ticket[]
 
@@ -910,17 +919,17 @@ enum WatchListType {
 }
 
 model WatchList {
-  id          String        @id @default(cuid())
-  workspaceId String
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
-  type        WatchListType
-  matchEmail  String?
-  matchPhone  String?
+  id             String        @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id])
+  type           WatchListType
+  matchEmail     String?
+  matchPhone     String?
   matchInstagram String?
-  note        String?
-  createdBy   String?
-  createdAt   DateTime      @default(now())
-  deletedAt   DateTime?
+  note           String?
+  createdBy      String?
+  createdAt      DateTime      @default(now())
+  deletedAt      DateTime?
 
   @@index([workspaceId])
   @@index([workspaceId, type])
@@ -930,28 +939,28 @@ model WatchList {
 }
 
 model QuestionDefinition {
-  id                  String   @id @default(cuid())
-  workspaceId         String
-  templateId          String
-  stableKey           String
-  label               String
-  type                String
-  section             String
-  order               Int
-  required            Boolean  @default(false)
-  isActive            Boolean  @default(true)
-  insightLabel        String
-  insightDescription  String
-  scoringDimension    String?
-  scoringWeight       Float    @default(0.5)
-  scoringLogic        String
-  archetypeSignals    String[]
-  sponsorRelevance    String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  templateId         String
+  stableKey          String
+  label              String
+  type               String
+  section            String
+  order              Int
+  required           Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  insightLabel       String
+  insightDescription String
+  scoringDimension   String?
+  scoringWeight      Float    @default(0.5)
+  scoringLogic       String
+  archetypeSignals   String[]
+  sponsorRelevance   String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  workspace   Workspace           @relation(fields: [workspaceId], references: [id])
-  template    ApplicationTemplate @relation(fields: [templateId], references: [id])
+  workspace Workspace           @relation(fields: [workspaceId], references: [id])
+  template  ApplicationTemplate @relation(fields: [templateId], references: [id])
 
   @@index([workspaceId])
   @@index([templateId])
@@ -959,18 +968,18 @@ model QuestionDefinition {
 }
 
 model ApplicationTemplate {
-  id                    String   @id @default(cuid())
-  workspaceId           String
-  name                  String
-  description           String?
-  slug                  String
-  isActive              Boolean  @default(true)
-  isDefault             Boolean  @default(false)
-  scoringInstructions   String
-  archetypesEnabled     Boolean  @default(true)
-  memberWorthEnabled    Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  workspaceId         String
+  name                String
+  description         String?
+  slug                String
+  isActive            Boolean  @default(true)
+  isDefault           Boolean  @default(false)
+  scoringInstructions String
+  archetypesEnabled   Boolean  @default(true)
+  memberWorthEnabled  Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   workspace    Workspace            @relation(fields: [workspaceId], references: [id])
   questions    QuestionDefinition[]
@@ -1077,12 +1086,12 @@ model EventSeries {
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
 
-  name        String
-  description String?
+  name           String
+  description    String?
   recurrenceRule String
-  startsAt    DateTime
-  endsAt      DateTime?
-  count       Int?
+  startsAt       DateTime
+  endsAt         DateTime?
+  count          Int?
 
   // Defaults inherited by instances on creation
   defaultHeroImageAssetId String?
@@ -1096,23 +1105,23 @@ model EventSeries {
   defaultRefundPolicy     RefundPolicy    @default(window)
   brandColorHex           String?
 
-  active      Boolean @default(true)
+  active Boolean @default(true)
 
-  events        Event[]
-  ticketTiers   TicketTier[]
-  promoCodes    PromoCode[]
-  orders        Order[]
+  events         Event[]
+  ticketTiers    TicketTier[]
+  promoCodes     PromoCode[]
+  orders         Order[]
   seriesSponsors SeriesSponsor[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
   @@index([active])
 }
 
 model SeriesSponsor {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   workspaceId    String
   seriesId       String
   sponsorBrandId String
@@ -1123,7 +1132,7 @@ model SeriesSponsor {
   series       EventSeries         @relation(fields: [seriesId], references: [id])
   sponsorBrand SponsorBrandProfile @relation(fields: [sponsorBrandId], references: [id])
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([seriesId, sponsorBrandId])
   @@index([workspaceId])
@@ -1135,16 +1144,16 @@ model TicketTier {
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
 
   // XOR: exactly one of eventId or seriesId must be set
-  eventId     String?
-  seriesId    String?
-  event       Event?       @relation(fields: [eventId], references: [id])
-  series      EventSeries? @relation(fields: [seriesId], references: [id])
+  eventId  String?
+  seriesId String?
+  event    Event?       @relation(fields: [eventId], references: [id])
+  series   EventSeries? @relation(fields: [seriesId], references: [id])
 
   name        String
   description String?
   imageUrl    String?
   perksJson   Json?
-  sortOrder   Int      @default(0)
+  sortOrder   Int     @default(0)
 
   // Pricing — null = not purchasable by that audience
   memberPriceCents    Int?
@@ -1200,8 +1209,8 @@ model TicketHold {
   expiresAt   DateTime
   orderId     String?
 
-  tier        TicketTier @relation(fields: [tierId], references: [id])
-  event       Event?     @relation(fields: [eventId], references: [id])
+  tier  TicketTier @relation(fields: [tierId], references: [id])
+  event Event?     @relation(fields: [eventId], references: [id])
 
   @@index([workspaceId])
   @@index([tierId, expiresAt])
@@ -1214,10 +1223,10 @@ model Order {
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
 
   // XOR: eventId for single-event orders, seriesId for season pass orders
-  eventId     String?
-  seriesId    String?
-  event       Event?       @relation(fields: [eventId], references: [id])
-  series      EventSeries? @relation(fields: [seriesId], references: [id])
+  eventId  String?
+  seriesId String?
+  event    Event?       @relation(fields: [eventId], references: [id])
+  series   EventSeries? @relation(fields: [seriesId], references: [id])
 
   buyerMemberId String?
   buyerName     String
@@ -1296,9 +1305,9 @@ model PromoCode {
   validUntil         DateTime?
   usedCount          Int       @default(0)
 
-  event       Event?       @relation(fields: [eventId], references: [id])
-  series      EventSeries? @relation(fields: [seriesId], references: [id])
-  tier        TicketTier?  @relation(fields: [tierId], references: [id])
+  event       Event?            @relation(fields: [eventId], references: [id])
+  series      EventSeries?      @relation(fields: [seriesId], references: [id])
+  tier        TicketTier?       @relation(fields: [tierId], references: [id])
   redemptions PromoRedemption[]
   orders      Order[]
 
@@ -1371,7 +1380,7 @@ model SponsorBrandProfile {
   id           String   @id @default(cuid())
   workspaceId  String
   name         String
-  contactEmail String?  // primary sponsor contact for recap delivery (additive 2026-06-17)
+  contactEmail String? // primary sponsor contact for recap delivery (additive 2026-06-17)
   icp          String?
   icpTags      String[]
   category     String?
@@ -1381,15 +1390,15 @@ model SponsorBrandProfile {
   // Sponsor Brief intake (Sponsor Intelligence, Phase 0). Brand-level brief — there is no
   // per-event sponsor model; per-event reproducibility is captured in RecapSnapshot.
   declaredObjectives    String? // sponsor's stated objectives in their own language (Awareness/Affinity/Acquisition/Activation + targets)
-  targetPersonaCriteria Json?   // persona to match the audience against: { archetypes, industries, seniority, companySizes, minAttendance }
-  rightsFeeCents        Int?    // sponsorship rights fee in cents (money-as-cents convention) — drives the value-vs-fee multiple
+  targetPersonaCriteria Json? // persona to match the audience against: { archetypes, industries, seniority, companySizes, minAttendance }
+  rightsFeeCents        Int? // sponsorship rights fee in cents (money-as-cents convention) — drives the value-vs-fee multiple
 
-  generatedAssets GeneratedAsset[]
-  recapSnapshots  RecapSnapshot[]
-  surveyResponses SurveyResponse[]
+  generatedAssets        GeneratedAsset[]
+  recapSnapshots         RecapSnapshot[]
+  surveyResponses        SurveyResponse[]
   sponsorScopedQuestions EventCustomQuestion[]
-  seriesSponsors  SeriesSponsor[]
-  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
+  seriesSponsors         SeriesSponsor[]
+  workspace              Workspace             @relation(fields: [workspaceId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1517,9 +1526,9 @@ model QAMission {
   operatorId     String
   operatorName   String
   scenario       String
-  missionType    String    // 'speed_run' | 'discovery' | 'workflow' | 'stress_test' | 'bug_hunt'
-  difficulty     String    // 'easy' | 'medium' | 'hard'
-  targetSteps    Json      // Array of { id, instruction, checkpoint, points }
+  missionType    String // 'speed_run' | 'discovery' | 'workflow' | 'stress_test' | 'bug_hunt'
+  difficulty     String // 'easy' | 'medium' | 'hard'
+  targetSteps    Json // Array of { id, instruction, checkpoint, points }
   completedSteps Json      @default("[]")
   score          Int       @default(0)
   bugsFound      Json      @default("[]")
@@ -1599,16 +1608,16 @@ model SmsMessage {
 // Append-only log of member engagement signals. Feeds network-capital scoring,
 // intelligence, and sponsor reporting. Fire-and-forget writes (lib/engagement.ts).
 model MemberEngagementEvent {
-  id          String   @id @default(cuid())
+  id          String                    @id @default(cuid())
   workspaceId String
   memberId    String
   eventType   MemberEngagementEventType
   eventId     String?
   metadata    Json?
-  occurredAt  DateTime @default(now())
+  occurredAt  DateTime                  @default(now())
 
-  member      Member    @relation(fields: [memberId], references: [id])
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  member    Member    @relation(fields: [memberId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
   @@index([memberId])
@@ -1636,6 +1645,11 @@ enum MemberEngagementEventType {
   referral_made
   enrichment_synced
   merged
+  // Added 2026-07-03 (CRM substrate Phase 1 — consent floor). Each is added to the
+  // DB via a standalone `ALTER TYPE ... ADD VALUE` (see prisma/sql/crm-consent-floor-enums.sql).
+  channel_subscribed
+  channel_unsubscribed
+  suppression_added
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1662,9 +1676,9 @@ enum ShareLinkMode {
 }
 
 model Asset {
-  id            String        @id @default(cuid())
+  id            String                      @id @default(cuid())
   workspaceId   String
-  workspace     Workspace     @relation(fields: [workspaceId], references: [id])
+  workspace     Workspace                   @relation(fields: [workspaceId], references: [id])
   filename      String
   url           String // R2 object key for the private full-res original
   thumbnailUrl  String // R2 object key for the 800px thumbnail
@@ -1675,8 +1689,8 @@ model Asset {
   height        Int?
   duration      Float? // seconds, video only
   shootDate     DateTime? // EXIF DateTimeOriginal; default sort key, falls back to createdAt
-  tags          String[]      @default([]) // manual
-  aiTags        String[]      @default([]) // AI auto-tags (separate from manual)
+  tags          String[]                    @default([]) // manual
+  aiTags        String[]                    @default([]) // AI auto-tags (separate from manual)
   qualityScore  Float? // heuristic overall (Phase 1)
   qualityScores Json? // breakdown { sharpness, exposure, ... }
   energyLevel   String? // low | medium | high (inferred from scene labels)
@@ -1695,16 +1709,16 @@ model Asset {
   /// Full-text search vector — maintained by the dam_asset_search_vector trigger
   /// (filename + tags + aiTags + sponsorName). GIN-indexed in prisma/sql/dam-search-vector.sql.
   searchVector  Unsupported("tsvector")?
-  isSelect      Boolean       @default(false)
-  sortOrder     Int           @default(0) // manual ordering
+  isSelect      Boolean                     @default(false)
+  sortOrder     Int                         @default(0) // manual ordering
   folderId      String?
-  folder        MediaFolder?  @relation(fields: [folderId], references: [id])
+  folder        MediaFolder?                @relation(fields: [folderId], references: [id])
   eventId       String? // plain string + index, NO FK (mirrors Event.heroImageAssetId)
   sponsorName   String?
   uploadedBy    String // Clerk userId
   deletedAt     DateTime? // soft delete; null = live, set = trashed (30-day recover)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
 
   downloads AssetDownload[]
 
@@ -1797,44 +1811,44 @@ model StripeEvent {
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum StoryStatus {
-  DRAFT      // Story generated, not yet scheduled
-  QUEUED     // Scheduled, pending publishing
-  PUBLISHED  // Successfully posted to Instagram
-  FAILED     // Publication attempt failed
-  CANCELLED  // Operator cancelled the story
+  DRAFT // Story generated, not yet scheduled
+  QUEUED // Scheduled, pending publishing
+  PUBLISHED // Successfully posted to Instagram
+  FAILED // Publication attempt failed
+  CANCELLED // Operator cancelled the story
 }
 
 model InstagramStory {
-  id              String        @id @default(cuid())
-  workspaceId     String
-  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  
-  eventId         String?       // Associated event (optional)
-  sourceAssetId   String?       // Original DAM asset ID
-  
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  eventId       String? // Associated event (optional)
+  sourceAssetId String? // Original DAM asset ID
+
   // Story metadata
-  status          StoryStatus   @default(DRAFT)
-  title           String?       // Event name or story name
-  dayCounter      Int?          // Day 1, Day 2, etc. (optional)
-  
+  status     StoryStatus @default(DRAFT)
+  title      String? // Event name or story name
+  dayCounter Int? // Day 1, Day 2, etc. (optional)
+
   // Generated story
-  storyImageUrl   String?       // R2 signed URL for the generated 1080x1920 PNG
-  storyR2Key      String?       // R2 object key (for expiry/presign refresh)
-  
+  storyImageUrl String? // R2 signed URL for the generated 1080x1920 PNG
+  storyR2Key    String? // R2 object key (for expiry/presign refresh)
+
   // Instagram metadata
-  instagramMediaId String?      // The actual Instagram post ID after publishing
-  scheduledAt     DateTime?     // When it should be posted
-  publishedAt     DateTime?     // When it was actually posted
-  
+  instagramMediaId String? // The actual Instagram post ID after publishing
+  scheduledAt      DateTime? // When it should be posted
+  publishedAt      DateTime? // When it was actually posted
+
   // Workflow tracking
-  createdBy       String        // Clerk userId
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
+  createdBy String // Clerk userId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Retry tracking for failed stories
-  lastError       String?
-  attemptCount    Int           @default(0)
-  
+  lastError    String?
+  attemptCount Int     @default(0)
+
   @@index([workspaceId])
   @@index([eventId])
   @@index([status])
@@ -1843,24 +1857,24 @@ model InstagramStory {
 }
 
 model InstagramStoryBatch {
-  id              String                @id @default(cuid())
-  workspaceId     String
-  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   // Batch metadata
-  name            String
-  eventId         String?               // Associated event
-  
+  name    String
+  eventId String? // Associated event
+
   // Scheduling
-  startDate       DateTime              // First story publish date
-  publishInterval Int                   @default(1) // days between posts
-  
+  startDate       DateTime // First story publish date
+  publishInterval Int      @default(1) // days between posts
+
   // Track what's in this batch
-  storyIds        String[]              @default([]) // InstagramStory IDs
-  
-  createdBy       String                // Clerk userId
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  storyIds String[] @default([]) // InstagramStory IDs
+
+  createdBy String // Clerk userId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
   @@index([eventId])
@@ -1960,14 +1974,14 @@ model Gate {
 /// key, deliberately NOT a Postgres enum - new condition types must not
 /// require DDL, and no type is usable until its verifier exists and is tested.
 model GateNode {
-  id          String       @id @default(cuid())
+  id          String     @id @default(cuid())
   workspaceId String
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id])
   gateId      String
-  gate        Gate         @relation(fields: [gateId], references: [id], onDelete: Cascade)
+  gate        Gate       @relation(fields: [gateId], references: [id], onDelete: Cascade)
   parentId    String?
-  parent      GateNode?    @relation("GateNodeTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children    GateNode[]   @relation("GateNodeTree")
+  parent      GateNode?  @relation("GateNodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    GateNode[] @relation("GateNodeTree")
 
   kind     GateNodeKind
   position Int          @default(0)
@@ -2132,20 +2146,20 @@ model Blast {
 /// Per-recipient outcome log. rsvpId/memberId are plain references (no FK):
 /// these rows are the delivery record and must survive RSVP/member cleanup.
 model BlastRecipient {
-  id          String               @id @default(cuid())
-  workspaceId String
-  blastId     String
-  blast       Blast                @relation(fields: [blastId], references: [id], onDelete: Cascade)
-  rsvpId      String
-  memberId    String?
-  destination String
-  status      BlastRecipientStatus
+  id            String               @id @default(cuid())
+  workspaceId   String
+  blastId       String
+  blast         Blast                @relation(fields: [blastId], references: [id], onDelete: Cascade)
+  rsvpId        String
+  memberId      String?
+  destination   String
+  status        BlastRecipientStatus
   /// Which signal authorized the send: profile | application. Null on skips.
   consentSource String?
-  error       String?
-  providerId  String?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  error         String?
+  providerId    String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
   @@index([workspaceId, blastId])
   @@index([blastId, status])
@@ -2165,4 +2179,90 @@ model SuppressedContact {
 
   @@unique([workspaceId, channel, destination])
   @@index([workspaceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consent floor (CRM substrate, Phase 1) — the CHANNEL axis: "may we message
+// this identifier on this channel." Orthogonal to the ACCESS axis (redListed /
+// RedList / WatchList PURPLE = "can this person enter"); the two must NEVER be
+// conflated (naming-collision guard in lib/comms/suppression.ts).
+//
+// Reproduced EXACTLY from NoBadOS__spec__crm-substrate__2026-07-03.md §1
+// (Appendix A). Do not redesign. canSend (lib/comms/can-send.ts) is the one
+// path every send routes through: suppression floor first, then SUBSCRIBED.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum CommChannel {
+  EMAIL
+  SMS
+}
+
+enum SubscriptionStatus {
+  SUBSCRIBED
+  UNSUBSCRIBED
+  PENDING
+  CLEANED
+  NEVER_SUBSCRIBED
+}
+
+enum ConsentBasis {
+  EXPRESS_OPTIN
+  IMPLIED_RELATIONSHIP
+  IMPORTED_LEGACY
+  OPERATOR_ADDED
+  UNKNOWN
+}
+
+enum SuppressionReason {
+  UNSUBSCRIBE
+  HARD_BOUNCE
+  SPAM_COMPLAINT
+  CARRIER_REJECT
+  MANUAL_BLOCK
+  GLOBAL_EXCLUDE
+  INVALID
+}
+
+model ChannelSubscription {
+  id            String               @id @default(cuid())
+  workspaceId   String
+  memberId      String
+  channel       CommChannel
+  stream        String               @default("*")
+  status        SubscriptionStatus   @default(PENDING)
+  consentBasis  ConsentBasis         @default(UNKNOWN)
+  consentText   String?
+  consentSource String?
+  consentIp     String?
+  consentAt     DateTime?
+  externalId    String?
+  source        ContactSourceSystem?
+  syncedAt      DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  member        Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, memberId, channel, stream])
+  @@index([workspaceId])
+  @@index([memberId])
+  @@index([workspaceId, channel, status])
+}
+
+model SuppressionEntry {
+  id          String            @id @default(cuid())
+  workspaceId String
+  channel     CommChannel
+  identifier  String
+  reason      SuppressionReason
+  source      String?
+  memberId    String?
+  note        String?
+  createdAt   DateTime          @default(now())
+  member      Member?           @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, channel, identifier])
+  @@index([workspaceId, channel])
+  @@index([memberId])
 }

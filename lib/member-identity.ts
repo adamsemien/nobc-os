@@ -2,6 +2,7 @@ import { MemberStatus, Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { generateMemberQrCode } from '@/lib/member-qr';
 import { logEngagementEvent } from '@/lib/engagement';
+import { syncMemberChannelConsent } from '@/lib/comms/consent-sync';
 
 /**
  * Canonical Member resolution — the ONE place a Member row is born.
@@ -110,6 +111,10 @@ export async function resolveMember(input: ResolveMemberInput): Promise<Resolved
       eventType: 'guest_created',
       metadata: { source },
     });
+    // Consent floor (CRM substrate, Phase 1): seed this person's ChannelSubscription
+    // rows from whatever consent signals exist now. Fire-and-forget + no-downgrade;
+    // application approval re-runs it to elevate on the applicant's opt-ins.
+    void syncMemberChannelConsent({ workspaceId, memberId: created.id, context: 'member_create' });
     return created;
   } catch (err) {
     // Concurrent create on the same identity key — re-resolve the winner.

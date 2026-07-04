@@ -27,6 +27,7 @@ import { requireRole } from '@/lib/operator-role';
 import { marketingSmsConfigured } from '@/lib/twilio';
 import { resolveBlastRecipients } from '@/lib/blast/recipients';
 import { BlastAlreadyFiredError, createBlast, fireBlast } from '@/lib/blast/run';
+import { shadowProbeRecipients } from '@/lib/comms/can-send';
 
 const BLASTS_PER_EVENT_PER_HOUR = 4;
 const SMS_RECIPIENT_CAP = 200;
@@ -133,6 +134,28 @@ export async function POST(
       },
       { status: 422 },
     );
+  }
+
+  // Consent floor (Phase 1) — SHADOW ONLY. Compute what canSend WOULD decide for
+  // each queued recipient and log a summary; this does NOT change who is sent to.
+  // The blast's own verdicts (Member marketing booleans + SuppressedContact) stay
+  // authoritative until enforcement flips (COMMS_CONSENT_ENFORCEMENT=enforce) AFTER
+  // the Phase-2 backfill. Guarded — a probe failure never blocks the send.
+  try {
+    await shadowProbeRecipients({
+      workspaceId,
+      channel: body.channel,
+      site: 'blast.send',
+      recipients: resolution.verdicts
+        .filter((v) => v.status === 'QUEUED' && v.destination)
+        .map((v) => ({
+          id: v.memberId ?? '',
+          email: body.channel === 'EMAIL' ? v.destination : null,
+          phone: body.channel === 'SMS' ? v.destination : null,
+        })),
+    });
+  } catch (err) {
+    console.error('[blast] consent shadow probe failed (non-blocking):', err);
   }
 
   const { blast, created } = await createBlast(db, {

@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { sendSms } from '@/lib/twilio';
 import { alert } from '@/lib/alerting';
+import { evaluateConsent } from '@/lib/comms/can-send';
 
 // Operator manual reply from the shared inbox. Authorized by Clerk org
 // membership: any member of the resolved workspace's Clerk org may reply (no
@@ -36,6 +37,23 @@ export async function POST(req: NextRequest) {
   });
   if (!conversation) {
     return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  // Consent floor (Phase 1) — SHADOW ONLY, observability. A House Phone reply is a
+  // 1:1 conversational message to someone who texted in; it is consent-EXEMPT and
+  // must NEVER be blocked by marketing consent, even after enforcement flips.
+  // evaluateConsent in shadow mode returns block=false, so this only logs.
+  // TODO(enforcement): keep replies exempt — do NOT gate this path on `.block`.
+  try {
+    const member = await db.member.findFirst({
+      where: { workspaceId, phone: conversation.phone },
+      select: { id: true, email: true, phone: true },
+    });
+    if (member) {
+      await evaluateConsent({ workspaceId, member, channel: 'SMS', site: 'sms.reply' });
+    }
+  } catch (err) {
+    console.error('[sms/reply] consent shadow probe failed (non-blocking):', err);
   }
 
   try {

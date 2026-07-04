@@ -89,6 +89,15 @@ async function loadTemplate(workspaceId: string, key: string) {
   };
 }
 
+// Consent floor (CRM substrate, Phase 1) — BOUNDARY, deliberately NOT routed
+// through canSend. sendTemplatedEmail carries TRANSACTIONAL lifecycle mail
+// (welcome, approval, rejection, comp, receipts) which is consent-exempt and must
+// never be muted by marketing consent — and it has no Member in scope (keyed by
+// workspaceId + raw to-address). The MARKETING email path is the Blast
+// (lib/blast/recipients.ts -> sendBlastEmail), which IS shadow-wired to canSend.
+// TODO(enforcement): if a marketing-category templated send is ever added here,
+// classify by templateKey and route only those through canSend — never the
+// transactional keys. Do not blanket-gate this function.
 export async function sendTemplatedEmail(
   workspaceId: string,
   templateKey: string,
