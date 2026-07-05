@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OperatorRole } from '@prisma/client';
 import { Loader2, Trash2, UserPlus } from 'lucide-react';
+// Minimal RBAC (Phase 1.5): role labels + the assignable set are the single source
+// of truth in lib/auth/can (READ_ONLY shows as "Viewer"; never expose raw enums).
+import { ROLE_LABEL as ROLE_LABELS, ASSIGNABLE_ROLES as ROLES } from '@/lib/auth/can';
 
 export type TeamMemberDTO = {
   id: string;
@@ -14,22 +17,15 @@ export type TeamMemberDTO = {
   createdAt: string;
 };
 
-const ROLE_LABELS: Record<OperatorRole, string> = {
-  [OperatorRole.ADMIN]: 'Admin',
-  [OperatorRole.STAFF]: 'Staff',
-  [OperatorRole.READ_ONLY]: 'Read only',
-};
-const ROLES: OperatorRole[] = [OperatorRole.ADMIN, OperatorRole.STAFF, OperatorRole.READ_ONLY];
-
 const inputCls =
   'rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 export function TeamManager({
   members,
-  isAdmin,
+  canManage,
 }: {
   members: TeamMemberDTO[];
-  isAdmin: boolean;
+  canManage: boolean;
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -92,7 +88,7 @@ export function TeamManager({
         </p>
       ) : null}
 
-      {isAdmin ? (
+      {canManage ? (
         <form onSubmit={invite} className="rounded-lg border border-border bg-card p-4">
           <p className="mb-3 text-sm font-medium text-text-primary">Invite a team member</p>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -143,7 +139,7 @@ export function TeamManager({
             <tr className="bg-surface-elevated text-left text-xs uppercase tracking-wide text-text-muted">
               <th className="px-4 py-3 font-medium">Member</th>
               <th className="px-4 py-3 font-medium">Role</th>
-              {isAdmin ? <th className="px-4 py-3" /> : null}
+              {canManage ? <th className="px-4 py-3" /> : null}
             </tr>
           </thead>
           <tbody>
@@ -159,7 +155,7 @@ export function TeamManager({
                   ) : null}
                 </td>
                 <td className="px-4 py-3">
-                  {isAdmin ? (
+                  {canManage ? (
                     <select
                       value={m.role}
                       disabled={busyId === m.id}
@@ -177,7 +173,7 @@ export function TeamManager({
                     <span className="text-text-secondary">{ROLE_LABELS[m.role]}</span>
                   )}
                 </td>
-                {isAdmin ? (
+                {canManage ? (
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"

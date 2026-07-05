@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  */
 
 const m = vi.hoisted(() => ({
-  requireRole: vi.fn(),
+  requirePermission: vi.fn(),
   rsvpFindFirst: vi.fn(),
   rsvpUpdateMany: vi.fn(),
   piRetrieve: vi.fn(),
@@ -28,7 +28,7 @@ const m = vi.hoisted(() => ({
   alert: vi.fn(),
 }));
 
-vi.mock('@/lib/operator-role', () => ({ requireRole: m.requireRole }));
+vi.mock('@/lib/operator-role', () => ({ requirePermission: m.requirePermission }));
 vi.mock('@/lib/db', () => ({
   db: { rSVP: { findFirst: m.rsvpFindFirst, updateMany: m.rsvpUpdateMany } },
 }));
@@ -48,7 +48,7 @@ const post = (body: Record<string, unknown> = { rsvpId: 'r1' }) =>
 
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
-  m.requireRole.mockResolvedValue({ ok: true, userId: 'u1', workspaceId: 'w1' });
+  m.requirePermission.mockResolvedValue({ ok: true, userId: 'u1', workspaceId: 'w1' });
   m.rsvpUpdateMany.mockResolvedValue({ count: 1 });
   m.emitEvent.mockResolvedValue(undefined);
   // Default RSVP: a captured $50 ticket, nothing refunded yet.
@@ -155,7 +155,7 @@ describe('refund route: guards', () => {
   });
 
   it('non-admin gate is enforced', async () => {
-    m.requireRole.mockResolvedValue({ ok: false, response: new Response('no', { status: 403 }) });
+    m.requirePermission.mockResolvedValue({ ok: false, response: new Response('no', { status: 403 }) });
     const res = await post();
     expect(res.status).toBe(403);
     expect(m.rsvpFindFirst).not.toHaveBeenCalled();

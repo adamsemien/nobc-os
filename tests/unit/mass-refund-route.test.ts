@@ -9,14 +9,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const m = vi.hoisted(() => ({
-  requireRole: vi.fn(),
+  requirePermission: vi.fn(),
   eventFindFirst: vi.fn(),
   auditCreate: vi.fn(),
   listRefundableRsvps: vi.fn(),
   refundRsvp: vi.fn(),
 }));
 
-vi.mock("@/lib/operator-role", () => ({ requireRole: m.requireRole }));
+vi.mock("@/lib/operator-role", () => ({ requirePermission: m.requirePermission }));
 vi.mock("@/lib/db", () => ({
   db: {
     event: { findFirst: m.eventFindFirst },
@@ -47,7 +47,7 @@ const post = (body: unknown, eventId?: string) => {
 
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
-  m.requireRole.mockResolvedValue({ ok: true, userId: "u1", workspaceId: "w1", role: "ADMIN" });
+  m.requirePermission.mockResolvedValue({ ok: true, userId: "u1", workspaceId: "w1", role: "ADMIN" });
   m.eventFindFirst.mockResolvedValue({ id: "ev1", title: "Gala" });
   m.auditCreate.mockResolvedValue({});
 });
@@ -65,7 +65,7 @@ const row = (id: string, amountCents = 2606, refunded = 0) => ({
 
 describe("mass refund", () => {
   it("is ADMIN-gated", async () => {
-    m.requireRole.mockResolvedValue({
+    m.requirePermission.mockResolvedValue({
       ok: false,
       response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
     });

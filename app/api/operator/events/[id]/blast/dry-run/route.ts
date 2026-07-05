@@ -6,10 +6,10 @@
  *  resolution and refuses if the counts moved.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { OperatorRole } from '@prisma/client';
+
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
+import { requirePermission } from '@/lib/operator-role';
 import { marketingSmsConfigured } from '@/lib/twilio';
 import { consentBasisCopy } from '@/lib/blast/consent';
 import { confirmSentence, resolveBlastRecipients } from '@/lib/blast/recipients';
@@ -22,7 +22,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('blast.send');
   if (!gate.ok) return gate.response;
   const { workspaceId } = gate;
   const { id } = await params;

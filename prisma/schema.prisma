@@ -107,6 +107,12 @@ model Workspace {
 
 /// Operator role within a workspace. Hierarchy: ADMIN > STAFF > READ_ONLY.
 enum OperatorRole {
+  // Minimal RBAC (CRM substrate, Phase 1.5). Hierarchy OWNER > ADMIN > STAFF >
+  // READ_ONLY, enforced in code (lib/operator-role.ts RANK + lib/auth/can.ts).
+  // READ_ONLY is the read tier, displayed "Viewer" in the UI. OWNER is additive;
+  // existing ADMIN operators are backfilled to OWNER so nobody loses access on
+  // deploy (see prisma/sql/crm-rbac-backfill.sql).
+  OWNER
   ADMIN
   STAFF
   READ_ONLY
@@ -1650,6 +1656,9 @@ enum MemberEngagementEventType {
   channel_subscribed
   channel_unsubscribed
   suppression_added
+  // Minimal RBAC (CRM substrate, Phase 1.5) — operator role change. Added to the
+  // DB via a standalone ALTER TYPE ADD VALUE (prisma/sql/crm-rbac-enums.sql).
+  role_changed
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/operator-role';
-import { OperatorRole } from '@prisma/client';
+import { requirePermission } from '@/lib/operator-role';
+
 import { getSvix } from '@/lib/svix';
 import { db } from '@/lib/db';
 
@@ -8,7 +8,7 @@ import { db } from '@/lib/db';
 // ADMIN-gated: the token grants full outbound-webhook management and first call provisions
 // the Svix app, matching the rest of settings/*.
 export async function GET() {
-  const gate = await requireRole(OperatorRole.ADMIN);
+  const gate = await requirePermission('settings.edit');
   if (!gate.ok) return gate.response;
   const { workspaceId } = gate;
 

@@ -39,6 +39,9 @@ const ENGAGEMENT_META: Record<MemberEngagementEventType, EngagementMeta> = {
   channel_subscribed: { label: 'Subscribed to a channel', tone: 'positive' },
   channel_unsubscribed: { label: 'Unsubscribed from a channel', tone: 'negative' },
   suppression_added: { label: 'Added to the suppression list', tone: 'negative' },
+  // Minimal RBAC (Phase 1.5) — operator role change (surfaces only when the
+  // operator maps to a Member; otherwise it lives in the AuditEvent trail).
+  role_changed: { label: 'Operator role changed', tone: 'neutral' },
 };
 
 /** Humanize an unrecognized token so the UI never shows a raw enum (e.g. new DB value). */

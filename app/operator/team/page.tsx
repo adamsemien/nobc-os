@@ -1,10 +1,13 @@
 import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
 import { requireRolePage } from '@/lib/operator-role';
+import { can } from '@/lib/auth/can';
 import { PageHeader } from '../_components/PageHeader';
 import { TeamManager, type TeamMemberDTO } from './_components/TeamManager';
 
-// Any operator can view the team (READ_ONLY+); only admins get edit controls.
+// Any operator can view the team (READ_ONLY+); only OWNER gets role-management
+// controls (role.manage). The server routes enforce role.manage independently —
+// this flag is defense-in-depth UI gating (Minimal RBAC, Phase 1.5).
 export default async function TeamPage() {
   const { role, workspaceId } = await requireRolePage(OperatorRole.READ_ONLY);
 
@@ -38,7 +41,7 @@ export default async function TeamPage() {
           title="Team"
           subtitle="Operators who can access this workspace."
         />
-        <TeamManager members={dto} isAdmin={role === OperatorRole.ADMIN} />
+        <TeamManager members={dto} canManage={can({ role }, 'role.manage')} />
       </div>
     </div>
   );

@@ -131,9 +131,14 @@ function SortButton({
 export function MembersBulkActions({
   members,
   canEdit = false,
+  canBulk = false,
 }: {
   members: MembersBulkMember[];
   canEdit?: boolean;
+  // member.bulk (OWNER/ADMIN). Defense-in-depth: hides selection + the bulk bar for
+  // roles the server would 403 (STAFF/Viewer). The /api/operator/members/bulk route
+  // is the real gate.
+  canBulk?: boolean;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Action | null>(null);
@@ -233,7 +238,7 @@ export function MembersBulkActions({
         </div>
       ) : null}
 
-      {count > 0 ? (
+      {canBulk && count > 0 ? (
         <div className="sticky top-2 z-20 mb-3 flex items-center gap-3 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm shadow-sm">
           <span className="text-text-secondary">
             {count} of {allCount} selected
@@ -326,7 +331,7 @@ export function MembersBulkActions({
 
       <DataTableShell>
         <DataTableHead>
-          <DataTableHeader className="w-8" />
+          {canBulk ? <DataTableHeader className="w-8" /> : null}
           <DataTableHeader>
             <SortButton k="name" sort={sort}>Member</SortButton>
           </DataTableHeader>
@@ -348,15 +353,17 @@ export function MembersBulkActions({
         <DataTableBody>
           {visible.map((m) => (
             <DataTableRow key={m.id}>
-              <DataTableCell>
-                <input
-                  type="checkbox"
-                  checked={selected.has(m.id)}
-                  onChange={() => toggle(m.id)}
-                  aria-label={`Select ${m.fullName}`}
-                  className="h-4 w-4 cursor-pointer rounded border-border accent-primary"
-                />
-              </DataTableCell>
+              {canBulk ? (
+                <DataTableCell>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(m.id)}
+                    onChange={() => toggle(m.id)}
+                    aria-label={`Select ${m.fullName}`}
+                    className="h-4 w-4 cursor-pointer rounded border-border accent-primary"
+                  />
+                </DataTableCell>
+              ) : null}
               <DataTableCell>
                 <Link
                   href={`/operator/members/${m.id}`}

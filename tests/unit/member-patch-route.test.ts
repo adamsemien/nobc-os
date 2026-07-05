@@ -5,12 +5,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // the role gate, the audit emit, and module-load-only deps are mocked.
 
 const m = vi.hoisted(() => ({
-  requireRole: vi.fn(),
+  requirePermission: vi.fn(),
   findFirst: vi.fn(),
   update: vi.fn(),
   emitEvent: vi.fn(),
 }));
-vi.mock('@/lib/operator-role', () => ({ requireRole: m.requireRole }));
+vi.mock('@/lib/operator-role', () => ({ requirePermission: m.requirePermission }));
 vi.mock('@/lib/db', () => ({ db: { member: { findFirst: m.findFirst, update: m.update } } }));
 vi.mock('@/lib/emit-event', () => ({ emitEvent: m.emitEvent }));
 // Imported at module load by the GET handler; unused by PATCH but must resolve.
@@ -30,7 +30,7 @@ function call(body: unknown, id = 'M') {
 
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
-  m.requireRole.mockResolvedValue(STAFF_GATE);
+  m.requirePermission.mockResolvedValue(STAFF_GATE);
   m.findFirst.mockResolvedValue({ id: 'M', customFields: null, fieldProvenance: null, mergedIntoId: null });
   m.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ id: 'M', ...data }),
@@ -66,7 +66,7 @@ describe('PATCH /api/operator/members/[id] — provenance write-path', () => {
 
   it('writes the member as a STAFF-gated audit event, no engagement for operator edits', async () => {
     await call({ fields: { city: { value: 'NYC' } } });
-    expect(m.requireRole).toHaveBeenCalled();
+    expect(m.requirePermission).toHaveBeenCalled();
     const emit = m.emitEvent.mock.calls[0][0];
     expect(emit).toMatchObject({ action: 'member.fields_updated', entityType: 'member', entityId: 'M' });
     expect(emit.engagement).toBeUndefined();
@@ -93,7 +93,7 @@ describe('PATCH /api/operator/members/[id] — provenance write-path', () => {
 
   it('returns 403 (gate response) for a non-STAFF caller, never touching the DB', async () => {
     const forbidden = new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
-    m.requireRole.mockResolvedValue({ ok: false, response: forbidden });
+    m.requirePermission.mockResolvedValue({ ok: false, response: forbidden });
     const res = await call({ fields: { city: { value: 'NYC' } } });
     expect(res.status).toBe(403);
     expect(m.findFirst).not.toHaveBeenCalled();

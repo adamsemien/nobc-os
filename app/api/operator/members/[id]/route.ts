@@ -1,9 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { OperatorRole, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
-import { requireRole } from '@/lib/operator-role';
+import { requirePermission } from '@/lib/operator-role';
 import { emitEvent } from '@/lib/emit-event';
 import { applyFieldWrites, patchMemberSchema, type FieldWrite } from '@/lib/member-provenance';
 import { classifyFieldKey, isReservedKey, isReadOnlyMemberKey } from '@/lib/member-editable';
@@ -108,7 +108,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireRole(OperatorRole.STAFF);
+  const gate = await requirePermission('member.edit');
   if (!gate.ok) return gate.response;
   const { userId, workspaceId } = gate;
   const { id } = await params;

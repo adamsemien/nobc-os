@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { requireRole } from '@/lib/operator-role';
-import { OperatorRole } from '@prisma/client';
+import { requirePermission } from '@/lib/operator-role';
+
 import { emitEvent } from '@/lib/emit-event';
 import { cancelRsvp } from '@/lib/waitlist';
 import { ACTIVE_EVENT_ID } from '@/lib/active-event';
@@ -10,7 +10,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const gate = await requireRole(OperatorRole.STAFF);
+  const gate = await requirePermission('application.decide');
   if (!gate.ok) return gate.response;
   const { userId, workspaceId } = gate;
   const { id } = await params;
