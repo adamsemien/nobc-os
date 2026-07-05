@@ -3,96 +3,117 @@
 -- RUN THIS SECOND, only AFTER crm-rbac-enums.sql has COMMITTED (it uses the new
 -- 'OWNER' enum value). Data-only: it updates WorkspaceMember.role. No schema change.
 --
--- POLICY (Adam, 2026-07-05 — supersedes the earlier "all ADMIN -> OWNER" version):
+-- POLICY (Adam, 2026-07-05 — four-member Clerk org, roles reconciled in Clerk):
 --   FAIL CLOSED. Set EVERY operator to the lowest tier (READ_ONLY / "Viewer") first,
---   then elevate ONLY the two named accounts to OWNER:
---     - Adam  (adamsemien@gmail.com   / Clerk user_3EEcOi5IB0LYQavOrNoxZbndux8)
---     - Chloe (chloe@chloechiang.com  / Clerk user_3E3X3Mdfa34uODgC7bgDcEVQgIU)
+--   then elevate ONLY the four named accounts:
+--     OWNER : adamsemien@gmail.com      (Clerk Admin, user_3EEcOi5IB0LYQavOrNoxZbndux8)
+--     OWNER : adam@thenobadcompany.com  (Clerk Admin, Clerk id not supplied — floor covers)
+--     OWNER : chloe@chloechiang.com     (Clerk Admin, user_3E3X3Mdfa34uODgC7bgDcEVQgIU)
+--     ADMIN : eric@tenur.co             (Clerk MEMBER — DB column is his real role)
 --   Nobody else ends up with operator-level (OWNER/ADMIN/STAFF) access.
 --
+--   Matching Clerk roles (Adam sets these in the Clerk dashboard, not here):
+--     the three OWNERs are Clerk Admins (floor -> OWNER); Eric is a Clerk MEMBER
+--     (floor -> Viewer), so his access comes ENTIRELY from the DB column below.
+--
 -- SCOPE — this file ONLY touches WorkspaceMember, the OPERATOR table. Members,
---   applicants, and imported contacts are NOT operators (no WorkspaceMember row, no
---   OperatorRole at all), so they are already closed out and this file cannot grant
---   them access.
+--   applicants, and imported contacts are NOT operators and are untouched.
 --
--- WHY WE WRITE clerkUserId (not just email): getOperatorRole() matches strictly by
---   clerkUserId. Nothing in the app links clerkUserId onto an invited row on sign-in,
---   so an email-only OWNER grant would resolve to NULL and fall back to the floor.
---   The upserts below set clerkUserId so each grant actually resolves.
+-- clerkUserId MATTERS: getOperatorRole() matches strictly by clerkUserId, and nothing
+--   links it onto a row on sign-in. So a column grant resolves at runtime ONLY if the
+--   row carries the person's Clerk id.
+--     - The three OWNERs are Clerk Admins, so the org-admin FLOOR gives them OWNER even
+--       if their column doesn't resolve — they are safe regardless.
+--     - ERIC IS A CLERK MEMBER: no floor. His ADMIN resolves ONLY if his row carries his
+--       Clerk id. His upsert below PRESERVES an existing clerkUserId; if his row has none,
+--       run step (5b) with his Clerk id or he will fail closed to Viewer (safe, but not
+--       the intended ADMIN). The verify SELECT reads the column, so it will show him at
+--       ADMIN even when the grant would not resolve — do not treat the SELECT alone as
+--       proof Eric resolves to ADMIN.
 --
--- CLERK-FLOOR CAVEAT (read before you trust the verify SELECT):
---   Effective role = the HIGHER of this column and the Clerk-org floor
---   (lib/operator-role.ts). The floor raises ANY Clerk org admin to OWNER at runtime,
---   regardless of this column, and SQL cannot see that. So the COMPLETE owner set =
---   (rows below with role='OWNER') UNION (all Clerk org admins). To be truly
---   fail-closed, your Clerk org admins must be exactly {Adam} (and Chloe only if you
---   deliberately want her floored). Recommendation: keep Chloe as Clerk org:member so
---   this column is her single source of truth and you can demote her from the Team UI.
+-- CLERK-FLOOR CAVEAT: effective role = HIGHER of column and floor (never lower). The
+--   floor raises ANY Clerk org admin to OWNER, invisible to SQL. Complete owner set =
+--   (rows with role='OWNER') UNION (Clerk org admins). Confirm in the Clerk dashboard
+--   that your org admins are exactly the three OWNERs above and Eric is a MEMBER.
+--   (Chloe is now a Clerk Admin, so the floor pins her at OWNER: she can NO LONGER be
+--   demoted from the Team UI — change her in Clerk first if you ever need to.)
 --
 -- SAFE BY DEFAULT: this file ends in ROLLBACK, so running it PREVIEWS the outcome and
---   persists NOTHING. Read the final SELECT; if — and only if — it shows exactly Adam
---   + Chloe as OWNER and nobody else at OWNER/ADMIN/STAFF, change the last line
---   ROLLBACK -> COMMIT and re-run to persist.
+--   persists NOTHING. Read the final SELECT; if — and only if — it shows exactly the
+--   four accounts above and nobody else, change the last line ROLLBACK -> COMMIT and
+--   re-run to persist.
 --
--- WHERE TO RUN: the Neon SQL editor or an interactive `psql "$DIRECT_URL"` session,
---   so the SELECTs are VISIBLE and you control COMMIT/ROLLBACK. Do NOT run this through
+-- WHERE TO RUN: the Neon SQL editor or an interactive `psql "$DIRECT_URL"` session, so
+--   the SELECTs are VISIBLE and you control COMMIT/ROLLBACK. Do NOT run this through
 --   `prisma db execute` — it does not print query results, so you'd commit blind.
---   (`prisma db execute` is fine for the enum file, which returns no rows.)
 
 BEGIN;
 
--- (0) DIAGNOSTIC — the current operators and which workspace(s) they live in. Use it
---     to confirm the workspace and to SEE who you're demoting to Viewer (any current
---     STAFF/ADMIN loses write access until an OWNER re-grants them via Settings > Team).
---     You may see a stale 'chloe@thenobadcompany.com' placeholder here from an earlier
---     seed — harmless; step (1) drops it to Viewer. Delete it later from the Team UI.
+-- (0) DIAGNOSTIC — current operators + workspace(s). Confirm the workspace, see who
+--     you're demoting to Viewer, and CHECK eric@tenur.co's clerkUserId: if it is null
+--     or he has no row, his ADMIN will not resolve until you run step (5b).
 SELECT "workspaceId", email, "clerkUserId", role
 FROM "WorkspaceMember"
 ORDER BY "workspaceId", role DESC, email;
 
 -- (1) FAIL CLOSED: every operator down to the lowest tier first.
---     NOTE: no WHERE = all workspaces. Single-tenant today (Tenant Zero = NoBC), so this
---     is correct. If (0) shows more than one workspace, add
---     WHERE "workspaceId" = '<the NoBC workspace id>' here and on (2) and (3).
+--     NOTE: no WHERE = all workspaces. Single-tenant today (Tenant Zero = NoBC). If (0)
+--     shows more than one workspace, add WHERE "workspaceId" = '<NoBC id>' here and on
+--     each upsert's Workspace subquery below.
 UPDATE "WorkspaceMember" SET role = 'READ_ONLY';
 
--- (2) ELEVATE Adam. Upsert by email so he ends up with an explicit OWNER row that both
---     appears in the verify SELECT and lets the Team UI's last-owner guard count him
---     (the guard counts explicit OWNER rows, not the Clerk floor). Sets clerkUserId so
---     the grant resolves. He is also OWNER via the org-admin floor (belt-and-suspenders).
+-- (2) OWNER — adamsemien@gmail.com (Clerk id known; also OWNER via floor).
 INSERT INTO "WorkspaceMember" (id, "workspaceId", email, "clerkUserId", role, "createdAt", "updatedAt")
-VALUES (
-  gen_random_uuid()::text,
-  (SELECT id FROM "Workspace" ORDER BY "createdAt" ASC LIMIT 1),  -- oldest = NoBC (single-tenant)
-  lower('adamsemien@gmail.com'),
-  'user_3EEcOi5IB0LYQavOrNoxZbndux8',
-  'OWNER', now(), now()
-)
+VALUES (gen_random_uuid()::text,
+        (SELECT id FROM "Workspace" ORDER BY "createdAt" ASC LIMIT 1),
+        lower('adamsemien@gmail.com'), 'user_3EEcOi5IB0LYQavOrNoxZbndux8', 'OWNER', now(), now())
 ON CONFLICT ("workspaceId", email)
-  DO UPDATE SET role = 'OWNER', "clerkUserId" = EXCLUDED."clerkUserId";
+  DO UPDATE SET role = 'OWNER',
+    "clerkUserId" = COALESCE(EXCLUDED."clerkUserId", "WorkspaceMember"."clerkUserId");
 
--- (3) ELEVATE Chloe. Same upsert-by-email; writes her real Clerk id onto the OWNER row
---     (supersedes any stale placeholder invite). Keep her as Clerk org:member so this
---     row is her single source of truth and you can drop her to ADMIN by clicking later.
+-- (3) OWNER — adam@thenobadcompany.com (Clerk id not supplied; OWNER via the org-admin
+--     floor. clerkUserId left null on insert, preserved if a row already links it.)
 INSERT INTO "WorkspaceMember" (id, "workspaceId", email, "clerkUserId", role, "createdAt", "updatedAt")
-VALUES (
-  gen_random_uuid()::text,
-  (SELECT id FROM "Workspace" ORDER BY "createdAt" ASC LIMIT 1),
-  lower('chloe@chloechiang.com'),
-  'user_3E3X3Mdfa34uODgC7bgDcEVQgIU',
-  'OWNER', now(), now()
-)
+VALUES (gen_random_uuid()::text,
+        (SELECT id FROM "Workspace" ORDER BY "createdAt" ASC LIMIT 1),
+        lower('adam@thenobadcompany.com'), NULL, 'OWNER', now(), now())
 ON CONFLICT ("workspaceId", email)
-  DO UPDATE SET role = 'OWNER', "clerkUserId" = EXCLUDED."clerkUserId";
+  DO UPDATE SET role = 'OWNER',
+    "clerkUserId" = COALESCE(EXCLUDED."clerkUserId", "WorkspaceMember"."clerkUserId");
 
--- (4) VERIFY — the COMPLETE operator-level (OWNER/ADMIN/STAFF) list after the backfill.
---     Expect EXACTLY: adamsemien@gmail.com + chloe@chloechiang.com, both OWNER, and
---     nobody at ADMIN or STAFF. Anyone else here = STOP and investigate before COMMIT.
---     (Reminder: also confirm in the Clerk dashboard that your org admins = {Adam}.)
+-- (4) OWNER — chloe@chloechiang.com (Clerk id known; also OWNER via floor).
+INSERT INTO "WorkspaceMember" (id, "workspaceId", email, "clerkUserId", role, "createdAt", "updatedAt")
+VALUES (gen_random_uuid()::text,
+        (SELECT id FROM "Workspace" ORDER BY "createdAt" ASC LIMIT 1),
+        lower('chloe@chloechiang.com'), 'user_3E3X3Mdfa34uODgC7bgDcEVQgIU', 'OWNER', now(), now())
+ON CONFLICT ("workspaceId", email)
+  DO UPDATE SET role = 'OWNER',
+    "clerkUserId" = COALESCE(EXCLUDED."clerkUserId", "WorkspaceMember"."clerkUserId");
+
+-- (5) ADMIN — eric@tenur.co (Clerk MEMBER, no floor). Preserves an existing clerkUserId;
+--     insert leaves it null. HIS ADMIN RESOLVES ONLY IF THE ROW CARRIES HIS CLERK ID.
+INSERT INTO "WorkspaceMember" (id, "workspaceId", email, "clerkUserId", role, "createdAt", "updatedAt")
+VALUES (gen_random_uuid()::text,
+        (SELECT id FROM "Workspace" ORDER BY "createdAt" ASC LIMIT 1),
+        lower('eric@tenur.co'), NULL, 'ADMIN', now(), now())
+ON CONFLICT ("workspaceId", email)
+  DO UPDATE SET role = 'ADMIN',
+    "clerkUserId" = COALESCE(EXCLUDED."clerkUserId", "WorkspaceMember"."clerkUserId");
+
+-- (5b) ONLY IF the diagnostic showed eric@tenur.co with a null clerkUserId (or no row):
+--      set his Clerk id so his ADMIN actually resolves. Replace ERIC_CLERK_USER_ID and
+--      uncomment. Without this, Eric fails closed to Viewer.
+-- UPDATE "WorkspaceMember" SET "clerkUserId" = 'ERIC_CLERK_USER_ID'
+-- WHERE email = lower('eric@tenur.co');
+
+-- (6) VERIFY — the operator-level (OWNER/ADMIN/STAFF) list after the backfill. Expect
+--     EXACTLY FOUR rows: three OWNER (both Adam accounts + Chloe) and one ADMIN (Eric),
+--     nobody else. Anyone else here = STOP before COMMIT. (Reads the column only, so an
+--     ADMIN row for Eric here still needs his clerkUserId to resolve — see (5)/(5b).)
 SELECT "workspaceId", email, "clerkUserId", role
 FROM "WorkspaceMember"
 WHERE role IN ('OWNER', 'ADMIN', 'STAFF')
 ORDER BY role DESC, email;
 
 ROLLBACK;  -- <-- SAFE DEFAULT: previews only, persists nothing.
-           --     Change to COMMIT and re-run ONLY after (4) shows exactly Adam + Chloe.
+           --     Change to COMMIT and re-run ONLY after (6) shows exactly those four.
