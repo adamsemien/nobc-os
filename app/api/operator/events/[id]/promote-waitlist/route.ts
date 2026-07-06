@@ -24,7 +24,7 @@ export async function POST(
   // seat: the lock serializes the count + claim, and the capacity re-check runs
   // against the freshly-locked state. Mirrors lib/waitlist.ts promoteFromWaitlist.
   let result:
-    | { kind: 'promoted'; rsvpId: string }
+    | { kind: 'promoted'; rsvpId: string; memberId: string }
     | { kind: 'full' }
     | { kind: 'empty' };
   try {
@@ -52,7 +52,7 @@ export async function POST(
           where: { id: next.id },
           data: { status: 'CONFIRMED', ticketStatus: 'confirmed' },
         });
-        return { kind: 'promoted' as const, rsvpId: updated.id };
+        return { kind: 'promoted' as const, rsvpId: updated.id, memberId: next.memberId };
       },
       { isolationLevel: 'Serializable' },
     );
@@ -67,7 +67,7 @@ export async function POST(
   if (result.kind === 'full') {
     return NextResponse.json({ error: 'Event is at capacity' }, { status: 409 });
   }
-  const { rsvpId } = result;
+  const { rsvpId, memberId } = result;
 
   await emitEvent({
     workspaceId,
@@ -76,6 +76,10 @@ export async function POST(
     entityType: 'RSVP',
     entityId: rsvpId,
     metadata: { promotedFromWaitlist: true, eventId, via: 'room' },
+    // Ways-In Phase A (spec §4): CRM dual-write - the promotion lands on the
+    // member's timeline. Exactly once: the tx claims exactly one WAITLISTED
+    // row under the Event lock before this emit is reachable.
+    engagement: { memberId, eventType: 'waitlist_promoted', eventId },
   }).catch(err => console.error('[promote-waitlist] emit failed:', err));
 
   return NextResponse.json({ ok: true, rsvpId });

@@ -21,6 +21,10 @@ export async function POST(
       ticketStatus: true,
       stripePaymentIntentId: true,
       paymentStatus: true,
+      // Ways-In Phase A (spec §4): keys for the rsvp_cancelled engagement fact.
+      eventId: true,
+      memberId: true,
+      member: { select: { personId: true } },
     },
   });
   if (!rsvp) return NextResponse.json({ error: 'RSVP not found' }, { status: 404 });
@@ -60,6 +64,15 @@ export async function POST(
     entityType: 'RSVP',
     entityId: id,
     metadata: { reason: 'operator_cancel' },
+    // Ways-In Phase A (spec §4): CRM dual-write - the cancellation lands on
+    // the member's timeline. Exactly once: the terminal-state 409 above
+    // blocks a second cancel from reaching this emit.
+    engagement: {
+      memberId: rsvp.memberId,
+      personId: rsvp.member?.personId ?? null,
+      eventType: 'rsvp_cancelled',
+      eventId: rsvp.eventId,
+    },
   });
 
   return NextResponse.json({ ok: true });

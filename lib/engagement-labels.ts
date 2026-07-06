@@ -45,6 +45,8 @@ const ENGAGEMENT_META: Record<MemberEngagementEventType, EngagementMeta> = {
   // Person spine (Phase 2A) — first-touch signals.
   account_created: { label: 'Created an account', tone: 'info' },
   application_started: { label: 'Started an application', tone: 'info' },
+  // Ways-In Phase A (Stage 17) — emitter lands with one-off links (Phase C).
+  access_link_redeemed: { label: 'Used a private access link', tone: 'positive' },
 };
 
 /** Humanize an unrecognized token so the UI never shows a raw enum (e.g. new DB value). */

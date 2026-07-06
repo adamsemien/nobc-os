@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { logEngagementEvent } from '@/lib/engagement';
 import { registerTool } from '@/lib/agent/registry';
 import type { AgentTool } from '@/lib/agent/types';
 
@@ -37,7 +38,9 @@ const promoteRsvp: AgentTool<Input, Output> = {
         id: true,
         status: true,
         ticketStatus: true,
-        member: { select: { firstName: true, lastName: true } },
+        eventId: true,
+        memberId: true,
+        member: { select: { firstName: true, lastName: true, personId: true } },
       },
     });
     if (!rsvp) return { ok: false, error: 'not_found' };
@@ -48,6 +51,18 @@ const promoteRsvp: AgentTool<Input, Output> = {
     await db.rSVP.update({
       where: { id: rsvp.id },
       data: { status: 'CONFIRMED', ticketStatus: 'confirmed' },
+    });
+
+    // Ways-In Phase A (spec §4): the promotion lands on the member's
+    // timeline. Exactly once: the not_waitlisted guard above blocks a
+    // second promote of the same RSVP. Fire-and-forget.
+    void logEngagementEvent({
+      workspaceId: ctx.workspaceId,
+      memberId: rsvp.memberId,
+      personId: rsvp.member.personId,
+      eventType: 'waitlist_promoted',
+      eventId: rsvp.eventId,
+      metadata: { rsvpId: rsvp.id, via: 'agent_tool' },
     });
 
     return { ok: true, rsvpId: rsvp.id, name: `${rsvp.member.firstName} ${rsvp.member.lastName}`.trim() };

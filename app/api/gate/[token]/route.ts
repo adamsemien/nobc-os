@@ -31,6 +31,7 @@ import { bridgeGateAdmission } from "@/lib/commerce/gate-bridge";
 import { CapacityFullError, CompExhaustedError } from "@/lib/commerce/orders";
 import { checkCompCode, redeemCompCode } from "@/lib/commerce/promo-codes";
 import { db } from "@/lib/db";
+import { logEngagementEvent } from "@/lib/engagement";
 import { getDefaultRegistry, getGateEngine } from "@/lib/gate-engine";
 import { findApplicationForMember } from "@/lib/gate-engine/application-bridge";
 import {
@@ -148,12 +149,33 @@ export async function POST(
 
   try {
     if (parsed.action === "identify") {
+      // Ways-In Phase A (spec §4): access_requested fires on the
+      // anonymous -> identified transition - a session mint has no person to
+      // key a fact to. Pre-read the session state here (the engine surface
+      // stays untouched); emit only when THIS call attached the member.
+      const before = await db.gateSession.findUnique({
+        where: { token },
+        select: { memberId: true },
+      });
       const context = await identifyGuestSession(db, {
         token,
         email: parsed.email,
         name: parsed.name,
       });
       if (!context) return NextResponse.json(UNAVAILABLE_BODY, { status: 404 });
+      if (
+        before?.memberId == null &&
+        context.session.memberId &&
+        context.gate.resourceType === "EVENT"
+      ) {
+        void logEngagementEvent({
+          workspaceId: context.session.workspaceId,
+          memberId: context.session.memberId,
+          eventType: "access_requested",
+          eventId: context.gate.resourceId,
+          metadata: { gateSessionId: context.session.id },
+        });
+      }
       await recordCheckoutConsent(context, {
         phone: parsed.phone,
         emailOptIn: parsed.emailOptIn,
@@ -318,7 +340,8 @@ async function redeemCompForSession(
   });
   const member = await db.member.findFirst({
     where: { id: session.memberId, workspaceId: session.workspaceId },
-    select: { id: true, email: true, firstName: true, lastName: true },
+    // personId rides along for the admission fact emitters (AdmissionMember).
+    select: { id: true, email: true, firstName: true, lastName: true, personId: true },
   });
   if (!node || !member) return declined();
 

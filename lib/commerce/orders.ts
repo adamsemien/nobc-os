@@ -13,10 +13,11 @@
  *  one transaction and every read/write is workspace-scoped.
  */
 import type { Member, Prisma, PrismaClient } from "@prisma/client";
+import { logEngagementEvent } from "@/lib/engagement";
 
 export type AdmissionMember = Pick<
   Member,
-  "id" | "email" | "firstName" | "lastName"
+  "id" | "email" | "firstName" | "lastName" | "personId"
 >;
 
 export type AdmissionResult = {
@@ -156,7 +157,7 @@ export async function recordPaidAdmission(
   );
   const capacity = await eventCapacity(db, args.workspaceId, args.eventId);
 
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     if (args.promo) {
       // Fail-closed: the code must still exist in this workspace, honor its
       // per-customer cap, and win the guarded claim - all atomically with
@@ -248,6 +249,34 @@ export async function recordPaidAdmission(
       alreadyRecorded: false,
     };
   });
+
+  // Ways-In Phase A (spec §4): the money fact + the seat fact, exactly once
+  // per admission - the Order's intent-id idempotency is the guard. Two
+  // facts, two meanings: ticket_purchased is the purchase, rsvp_confirmed is
+  // the confirmed seat the sponsor funnel counts. Fire-and-forget, after the
+  // transaction commits - a lost fact must never unwind an admission.
+  void logEngagementEvent({
+    workspaceId: args.workspaceId,
+    memberId: args.member.id,
+    personId: args.member.personId,
+    eventType: "ticket_purchased",
+    eventId: args.eventId,
+    metadata: {
+      orderId: result.orderId,
+      amountCents: args.amountReceivedCents,
+      paymentIntentId: args.paymentIntentId,
+    },
+  });
+  void logEngagementEvent({
+    workspaceId: args.workspaceId,
+    memberId: args.member.id,
+    personId: args.member.personId,
+    eventType: "rsvp_confirmed",
+    eventId: args.eventId,
+    metadata: { orderId: result.orderId, origin: "gate_paid" },
+  });
+
+  return result;
 }
 
 /** Money + attendance records for a 100%-off comp redemption. No Stripe
@@ -334,7 +363,7 @@ export async function recordCompAdmission(
 
   const capacity = await eventCapacity(db, args.workspaceId, args.eventId);
 
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     // Race-safe claim FIRST (Warden, Phase C): the increment only lands while
     // usedCount is still under the cap, so two concurrent redemptions of the
     // last use cannot both succeed - the loser rolls the whole admission back.
@@ -403,15 +432,51 @@ export async function recordCompAdmission(
       alreadyRecorded: false,
     };
   });
+
+  // Ways-In Phase A (spec §4): a comp redemption seats the guest - the seat
+  // fact fires; the money fact (ticket_purchased) deliberately does NOT
+  // (nothing was purchased). comp_issued stays the operator comp route's
+  // fact. Exactly once: the one-order-per-(member, event, promo) check above
+  // is the guard.
+  void logEngagementEvent({
+    workspaceId: args.workspaceId,
+    memberId: args.member.id,
+    personId: args.member.personId,
+    eventType: "rsvp_confirmed",
+    eventId: args.eventId,
+    metadata: { orderId: result.orderId, origin: "gate_comp", promoCodeId: args.promoCodeId },
+  });
+
+  return result;
 }
 
 /** A gate that opened with no PAY step (members-only, referred, applied)
  *  still needs the attendance row or the guest never reaches the door list.
- *  No Order, no Ticket - nothing was sold. */
+ *  No Order, no Ticket - nothing was sold.
+ *
+ *  Ways-In Phase A: returns whether THIS call newly confirmed the seat (an
+ *  already-confirmed row returns newlyConfirmed: false) so rsvp_confirmed
+ *  fires exactly once per admission, never on the idempotent re-walk. */
 export async function ensureOpenAdmission(
   db: PrismaClient,
-  args: { workspaceId: string; eventId: string; memberId: string },
-): Promise<void> {
+  args: {
+    workspaceId: string;
+    eventId: string;
+    memberId: string;
+    personId?: string | null;
+  },
+): Promise<{ newlyConfirmed: boolean; rsvpId: string | null }> {
+  const emitConfirmed = (rsvpId: string) => {
+    void logEngagementEvent({
+      workspaceId: args.workspaceId,
+      memberId: args.memberId,
+      personId: args.personId ?? null,
+      eventType: "rsvp_confirmed",
+      eventId: args.eventId,
+      metadata: { rsvpId, origin: "gate_open" },
+    });
+  };
+
   const existing = await db.rSVP.findFirst({
     where: {
       workspaceId: args.workspaceId,
@@ -426,11 +491,13 @@ export async function ensureOpenAdmission(
         where: { id: existing.id },
         data: { status: "CONFIRMED", ticketStatus: "confirmed" },
       });
+      emitConfirmed(existing.id);
+      return { newlyConfirmed: true, rsvpId: existing.id };
     }
-    return;
+    return { newlyConfirmed: false, rsvpId: existing.id };
   }
   const capacity = await eventCapacity(db, args.workspaceId, args.eventId);
-  await db.$transaction(async (tx) => {
+  const created = await db.$transaction(async (tx) => {
     if (capacity !== null) {
       const taken = await tx.rSVP.count({
         where: {
@@ -441,7 +508,7 @@ export async function ensureOpenAdmission(
       });
       if (taken >= capacity) throw new CapacityFullError();
     }
-    await tx.rSVP.create({
+    return tx.rSVP.create({
       data: {
         workspaceId: args.workspaceId,
         eventId: args.eventId,
@@ -450,6 +517,9 @@ export async function ensureOpenAdmission(
         ticketStatus: "confirmed",
         origin: "gate",
       },
+      select: { id: true },
     });
   });
+  emitConfirmed(created.id);
+  return { newlyConfirmed: true, rsvpId: created.id };
 }

@@ -292,6 +292,17 @@ Output rules (follow exactly):
   if (outcome instanceof NextResponse) return outcome;
   const { result, personalizedCopy } = outcome;
 
+  // TODO(ways-in-phase-a, ON HOLD): emit the application-submitted engagement
+  // fact here - the submit has definitively succeeded at this point. Emission
+  // is deliberately NOT wired yet: the fact name is pending reconciliation
+  // with the CRM owner between the two candidates -
+  //   'application_submitted' (in the enum since member-intelligence PR1; no
+  //     emitter anywhere) vs
+  //   'application_started' (Phase 2A value, already emitted at DRAFT CREATE
+  //     in app/api/apply/[slug]/route.ts and app/api/apply/membership/route.ts
+  //     - a different moment in the funnel).
+  // Do not pick a name here without that reconciliation (spec §11).
+
   // Durable off-platform backup of the completed application — the company's most
   // critical data asset. Runs OUT OF BAND via after() so it never affects this
   // response or its timing; backupApplication is itself fail-closed and never

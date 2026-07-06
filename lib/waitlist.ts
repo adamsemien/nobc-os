@@ -1,4 +1,5 @@
 import { db } from './db';
+import { logEngagementEvent } from './engagement';
 import { resend } from './resend';
 import { waitlistPromotedEmail } from './email-templates';
 
@@ -61,6 +62,18 @@ export async function cancelRsvp(rsvpId: string, workspaceId: string): Promise<v
       entityType: 'RSVP',
       entityId: rsvpId,
     },
+  });
+
+  // Ways-In Phase A (spec §4): the cancellation lands on the member's
+  // timeline. Exactly once: the conditional flip above returns before this
+  // point on a double-cancel. Covers member self-cancel (/api/rsvp/cancel)
+  // and the application-reject comp release. Fire-and-forget.
+  void logEngagementEvent({
+    workspaceId,
+    memberId: rsvp.memberId,
+    eventType: 'rsvp_cancelled',
+    eventId: rsvp.eventId,
+    metadata: { rsvpId, via: 'cancelRsvp' },
   });
 
   await promoteFromWaitlist(rsvp.eventId);

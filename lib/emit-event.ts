@@ -23,6 +23,8 @@ interface EmitEventInput {
    */
   engagement?: {
     memberId: string;
+    /** Person spine (Phase 2A): parallel Person pointer, when the call site has it. */
+    personId?: string | null;
     eventType: MemberEngagementEventType;
     eventId?: string;
   };
@@ -52,6 +54,7 @@ export async function emitEvent(input: EmitEventInput): Promise<void> {
     await logEngagementEvent({
       workspaceId,
       memberId: engagement.memberId,
+      personId: engagement.personId,
       eventType: engagement.eventType,
       eventId: engagement.eventId,
       metadata: metadata ?? undefined,

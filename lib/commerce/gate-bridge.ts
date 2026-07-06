@@ -287,7 +287,9 @@ export async function bridgeGateAdmission(
   try {
     const member = await db.member.findFirst({
       where: { id: session.memberId, workspaceId },
-      select: { id: true, email: true, firstName: true, lastName: true },
+      // personId rides along so the Phase A fact emitters key the Person
+      // spine too (spec §3 - facts land on Member today, Person post-2a).
+      select: { id: true, email: true, firstName: true, lastName: true, personId: true },
     });
     if (!member) return;
 
@@ -324,6 +326,7 @@ export async function bridgeGateAdmission(
           workspaceId,
           eventId,
           memberId: member.id,
+          personId: member.personId,
         });
       } catch (err) {
         if (err instanceof CapacityFullError) {

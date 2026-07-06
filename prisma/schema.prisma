@@ -108,6 +108,8 @@ model Workspace {
 
   // DAM total stored bytes; +on upload, -on permanent delete (Stage 15)
   storageBytes BigInt @default(0)
+
+  eventAccessModels EventAccessModel[]
 }
 
 /// Operator role within a workspace. Hierarchy: ADMIN > STAFF > READ_ONLY.
@@ -751,6 +753,7 @@ model Event {
   blasts           Blast[]
   workflow         EventWorkflow?
   smsConversations SmsConversation[]
+  accessModel      EventAccessModel?
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -1808,6 +1811,10 @@ enum MemberEngagementEventType {
   // Phase 2A person spine - first-touch activity.
   account_created
   application_started
+  // Ways-In Phase A (Stage 17) - added to the DB via a standalone
+  // `ALTER TYPE ... ADD VALUE` (see prisma/sql/ways-in-phase-a.sql). No emitter
+  // until the one-off-links phase (Phase C); the enum lands now so C needs no DDL.
+  access_link_redeemed
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2103,6 +2110,31 @@ enum GateSessionStatus {
   ACTIVE
   SATISFIED
   EXPIRED
+}
+
+/// Ways-In Phase A (Stage 17): the authored access document of record.
+/// `waysIn` holds the ordered Way-In list (Zod-validated in lib/ways-in) -
+/// labels, who, requirements, cost, constraints, approval, visibility -
+/// everything the gate tree cannot represent. The gate tree is a pure
+/// compile artifact regenerated from this list on every save; it is NEVER
+/// the source. `compiledTreeHash` anchors the "advanced gate" flag (a live
+/// tree whose hash differs was hand-edited); `compiledMap` carries
+/// wayInId -> node ids so recompiles keep GateNode ids and guests' proofs
+/// survive edits.
+model EventAccessModel {
+  id               String    @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace @relation(fields: [workspaceId], references: [id])
+  eventId          String    @unique
+  event            Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  waysIn           Json
+  compiledTreeHash String?
+  compiledMap      Json?
+  compiledAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([workspaceId])
 }
 
 /// One access gate per protected resource. The rule tree lives in GateNode;

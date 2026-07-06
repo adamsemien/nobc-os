@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { logEngagementEvent } from '@/lib/engagement';
 import { requireRole } from '@/lib/operator-role';
 import { OperatorRole } from '@prisma/client';
 import { findOrCreateGuestMember } from '@/lib/event-access-submit';
@@ -102,6 +103,17 @@ export async function POST(
       entityId: rsvp.id,
       metadata: { compType, email: email.trim().toLowerCase(), note: note ?? null },
     },
+  });
+
+  // Ways-In Phase A (spec §4): the comp lands on the member's timeline
+  // alongside the audit record. Exactly once: the already_comped duplicate
+  // guard in the transaction blocks a second issue. Fire-and-forget.
+  void logEngagementEvent({
+    workspaceId,
+    memberId: member.id,
+    eventType: 'comp_issued',
+    eventId,
+    metadata: { rsvpId: rsvp.id, compType },
   });
 
   if (process.env.RESEND_API_KEY) {
