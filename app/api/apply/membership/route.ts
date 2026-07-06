@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { resolveMember } from '@/lib/member-identity';
+import { resolvePerson } from '@/lib/crm/resolve-person';
 import { logEngagementEvent } from '@/lib/engagement';
 import { resolveDefaultApplyWorkspace } from '@/lib/apply-workspace';
 import { stampApplicationOwner, getVerifiedClerkEmail } from '@/lib/apply-account-link';
@@ -129,16 +129,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Link identity at submission: resolve (or mint) the GUEST Member now so the
-  // applicant has one continuous record before approval, not only at it.
-  const member = await resolveMember({
-    workspaceId: workspace.id,
-    email,
-    name: fullName ?? '',
-    phone: phone ?? undefined,
-    source: 'apply_membership',
-  });
-
   // D4c: for a signed-in applicant the verified Clerk email is the single source of
   // truth — override any email in the request body server-side. Falls back to the
   // validated body email only when unauthenticated or the Clerk email is
@@ -146,14 +136,38 @@ export async function POST(req: NextRequest) {
   // The reuse + P2002 recovery paths are gated on this same verified email, never body.
   const createEmail = verifiedEmail ?? email;
 
+  // Person spine first touch (Campaign 1 item 2): a draft mints a Person, NOT a
+  // guest Member — People is the first-touch surface; Members is the earned one,
+  // minted at submit (Door 1 comp) or approval, both of which resolve their own
+  // Member by email. A signed-in applicant's Clerk-verified email links to their
+  // existing Person; a typed email stays unverified and never links (strict
+  // policy). Non-fatal: an application must never fail on spine errors.
+  let personId: string | null = null;
+  try {
+    const nameParts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
+    const person = await resolvePerson({
+      workspaceId: workspace.id,
+      clerkUserId: userId ?? null,
+      email: createEmail,
+      emailVerified: Boolean(verifiedEmail),
+      phone: phone ?? null,
+      firstName: nameParts[0] || null,
+      lastName: nameParts.slice(1).join(' ') || null,
+      source: 'application',
+    });
+    personId = person.id;
+  } catch (err) {
+    console.error('[apply/membership] person spine mint failed:', err);
+  }
+
   let application: { id: string };
   try {
     application = await db.application.create({
       data: {
         workspaceId: workspace.id,
-        memberId: member.id,
-        // Person spine (Phase 2A): the human behind this application, minted at start.
-        personId: member.personId,
+        // No memberId at draft stage — the approval gate links it (Campaign 1 item 2).
+        // Person spine: the human behind this application, minted at start.
+        personId,
         clerkUserId: userId ?? null,
         email: createEmail,
         fullName: fullName ?? '',
@@ -210,8 +224,7 @@ export async function POST(req: NextRequest) {
   // if the applicant never submits (the Trent gap). Fire-and-forget.
   void logEngagementEvent({
     workspaceId: workspace.id,
-    memberId: member.id,
-    personId: member.personId,
+    personId,
     eventType: 'application_started',
     metadata: { applicationId: application.id, source: 'apply_membership' },
   });

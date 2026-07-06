@@ -64,10 +64,13 @@ describe('Application.memberId is linked at submission', () => {
     expect(src).toMatch(/memberId:\s*applicantMember\.id/);
   });
 
-  it('membership apply (/apply/membership) resolves a member and sets memberId', () => {
+  it('membership apply (/apply/membership) mints a Person at draft, not a guest Member', () => {
+    // Campaign 1 item 2: People is the first-touch surface; the Member mints at
+    // submit (Door 1) or approval, never at draft.
     const src = read('app/api/apply/membership/route.ts');
-    expect(src).toContain('resolveMember');
-    expect(src).toMatch(/memberId:\s*member\.id/);
+    expect(src).toContain('resolvePerson');
+    expect(src).not.toContain('resolveMember');
+    expect(src).not.toMatch(/memberId:\s*member\.id/);
   });
 
   it('the approval gate now also sets Application.memberId', () => {
