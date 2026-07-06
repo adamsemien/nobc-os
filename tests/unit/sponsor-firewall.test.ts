@@ -73,3 +73,33 @@ describe('sponsor firewall — sponsor_audience_member view definition', () => {
     expect(sql).toMatch(/"status"\s*=\s*'APPROVED'/i);
   });
 });
+
+// Person spine (Phase 2A). Person is identity-only; the sponsor firewall holds
+// because sponsor-facing surfaces never read Person (or its association tables)
+// and the view still selects FROM "Member" alone. Person carries no relation to
+// MemberPsychographics, so from Person the only route to psychographics is
+// Person -> Member -> psychographics — operator-only surfaces.
+describe('sponsor firewall — Person spine stays off sponsor surfaces', () => {
+  const PERSON_SPINE_READ = /\bdb\.person\b|\bdb\.personOrganization\b|resolvePerson|"Person"/;
+
+  it.each(SPONSOR_FACING)('%s reads no Person-spine source', (file) => {
+    const src = read(file);
+    const match = src.match(PERSON_SPINE_READ);
+    expect(
+      match,
+      match ? `person-spine token "${match[0]}" found in ${file}` : undefined,
+    ).toBeNull();
+  });
+
+  it('the view does not reference Person', () => {
+    const sql = read('prisma/sql/sponsor-audience-view.sql');
+    expect(sql).not.toMatch(/"Person"|personId/);
+  });
+
+  it('Person has no relation to MemberPsychographics in the schema', () => {
+    const schema = read('prisma/schema.prisma');
+    const personBlock = schema.match(/model Person \{[\s\S]*?\n\}/)?.[0] ?? '';
+    expect(personBlock).not.toBe('');
+    expect(personBlock).not.toMatch(/MemberPsychographics|psychographics/i);
+  });
+});
