@@ -10,14 +10,21 @@ export const MEMBER_STATUS_LABELS: Record<MemberStatus, string> = {
   GUEST: 'Guest',
 };
 
-export function personDisplayName(person: {
+export type PersonDisplay = {
+  label: string;
+  /** true when neither a name nor an email exists — render muted/placeholder. */
+  placeholder: boolean;
+};
+
+export function personDisplay(person: {
   firstName: string | null;
   lastName: string | null;
   email: string | null;
-  phone: string | null;
-}): string {
+}): PersonDisplay {
   const name = [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
-  return name || person.email || person.phone || 'Unnamed person';
+  if (name) return { label: name, placeholder: false };
+  if (person.email) return { label: person.email, placeholder: false };
+  return { label: 'Unnamed person', placeholder: true };
 }
 
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {

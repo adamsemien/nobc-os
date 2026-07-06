@@ -17,7 +17,7 @@ import {
   memberTone,
 } from '@/components/ui';
 import { CONTACT_SOURCE_LABELS } from '@/lib/crm/labels';
-import { MEMBER_STATUS_LABELS, personDisplayName, formatCrmDate } from './person-display';
+import { MEMBER_STATUS_LABELS, personDisplay, formatCrmDate } from './person-display';
 
 export default async function PeoplePage() {
   const { userId } = await auth();
@@ -67,7 +67,7 @@ export default async function PeoplePage() {
             </DataTableHead>
             <DataTableBody>
               {people.map((person) => {
-                const name = personDisplayName(person);
+                const display = personDisplay(person);
                 const membership = person.members[0] ?? null;
                 return (
                   <DataTableRow key={person.id}>
@@ -76,8 +76,17 @@ export default async function PeoplePage() {
                         href={`/operator/people/${person.id}`}
                         className="flex items-center gap-2.5 font-medium hover:underline"
                       >
-                        <Avatar name={name} email={person.email} size={28} />
-                        <span>{name}</span>
+                        <Avatar name={display.label} email={person.email} size={28} />
+                        <span
+                          className={display.placeholder ? 'font-normal italic' : undefined}
+                          style={
+                            display.placeholder
+                              ? { color: 'var(--text-tertiary, var(--text-muted))' }
+                              : undefined
+                          }
+                        >
+                          {display.label}
+                        </span>
                         {person.potentialDuplicateOfId ? (
                           <StatusBadge tone="warning" title="Flagged for the merge queue">
                             Possible duplicate

@@ -183,14 +183,19 @@ async function attachPersonSpine(
 ): Promise<string | null> {
   if (member.personId) return member.personId;
   try {
+    // Person names must be REAL data. Member rows default a missing name to
+    // firstName='Guest' (splitName above + lib/clerk-member.ts) — that
+    // placeholder must never be written to the Person record; pass null and
+    // let a later touch with a real name enrich-fill it.
+    const hasPlaceholderName = member.firstName === 'Guest' && !member.lastName;
     const person = await resolvePerson({
       workspaceId: member.workspaceId,
       clerkUserId: realClerkUserId(input.clerkUserId),
       email: member.email,
       emailVerified: false,
       phone: member.phone,
-      firstName: member.firstName,
-      lastName: member.lastName,
+      firstName: hasPlaceholderName ? null : member.firstName,
+      lastName: hasPlaceholderName ? null : member.lastName,
       source: contactSourceFromResolveSource(input.source),
     });
     await db.member.update({ where: { id: member.id }, data: { personId: person.id } });
