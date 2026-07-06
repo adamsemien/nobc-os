@@ -126,8 +126,11 @@ export default async function PersonDetailPage({
             >
               {personDisplay(person.potentialDuplicateOf).label}
             </Link>{' '}
-            — this record was created from an unverified email that matches theirs. Merge review
-            arrives with the merge queue.
+            — this record was created from an unverified email that matches theirs.{' '}
+            <Link href="/operator/people/merge" className="font-medium underline">
+              Review it in the merge queue
+            </Link>
+            .
           </div>
         ) : null}
 
