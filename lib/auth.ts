@@ -1,6 +1,7 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { MemberStatus } from '@prisma/client';
 import { db } from './db';
+import { resolvePerson } from '@/lib/crm/resolve-person';
 
 export async function getOrCreateWorkspaceForUser(clerkUserId: string) {
   // Resolve against the operator's ACTIVE Clerk org (the one they selected),
@@ -172,9 +173,24 @@ async function claimMemberIdentity(
     // more than one workspace, surface a picker instead of silently picking one.
     const claimed = await db.member.findMany({
       where: { clerkUserId, id: { in: eligible.map((c) => c.id) } },
-      select: { id: true, workspaceId: true, status: true, firstName: true, createdAt: true },
+      select: {
+        id: true,
+        workspaceId: true,
+        status: true,
+        firstName: true,
+        createdAt: true,
+        personId: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Person spine (Phase 2A): a claim is the strongest identity proof we get —
+    // a real Clerk session with a VERIFIED email. Stamp it through to the Person
+    // so the spine reflects the proven identity. Non-fatal: claiming must never
+    // fail on spine bookkeeping.
+    await Promise.all(
+      claimed.map((m) => stampPersonSpineOnClaim(m, clerkUserId, email)),
+    );
 
     if (eligible.length > 1) {
       console.warn(
@@ -196,6 +212,58 @@ async function claimMemberIdentity(
   } catch (err) {
     console.error('[claimMemberIdentity] unexpected error for clerkUserId=%s', clerkUserId, err);
     return null;
+  }
+}
+
+/**
+ * Person spine (Phase 2A): after a member claim, stamp the proven identity
+ * (real Clerk id + verified email) onto the linked Person — or resolve one if
+ * the member predates the spine. Never throws.
+ */
+async function stampPersonSpineOnClaim(
+  member: { id: string; workspaceId: string; personId: string | null },
+  clerkUserId: string,
+  verifiedEmail: string,
+): Promise<void> {
+  try {
+    if (!member.personId) {
+      const person = await resolvePerson({
+        workspaceId: member.workspaceId,
+        clerkUserId,
+        email: verifiedEmail,
+        emailVerified: true,
+        source: 'clerk',
+        sourceExternalId: clerkUserId,
+      });
+      await db.member.update({ where: { id: member.id }, data: { personId: person.id } });
+      return;
+    }
+
+    const person = await db.person.findUnique({
+      where: { id: member.personId },
+      select: { id: true, clerkUserId: true, email: true, emailVerified: true },
+    });
+    if (!person) return;
+
+    const data: { clerkUserId?: string; email?: string; emailVerified?: boolean } = {};
+    if (!person.clerkUserId) data.clerkUserId = clerkUserId;
+    if (!person.email) {
+      data.email = verifiedEmail;
+      data.emailVerified = true;
+    } else if (person.email.toLowerCase() === verifiedEmail && !person.emailVerified) {
+      data.emailVerified = true;
+    }
+    if (Object.keys(data).length > 0) {
+      await db.person.update({ where: { id: person.id }, data });
+    }
+  } catch (err) {
+    // A P2002 here means another Person in the workspace already holds this
+    // Clerk id (webhook/claim race) — keep the claim, log, move on.
+    console.error(
+      '[claimMemberIdentity] person spine stamp failed (member=%s):',
+      member.id,
+      err,
+    );
   }
 }
 

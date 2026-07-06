@@ -3,6 +3,11 @@ import { db } from '@/lib/db';
 import { generateMemberQrCode } from '@/lib/member-qr';
 import { logEngagementEvent } from '@/lib/engagement';
 import { syncMemberChannelConsent } from '@/lib/comms/consent-sync';
+import {
+  contactSourceFromResolveSource,
+  realClerkUserId,
+  resolvePerson,
+} from '@/lib/crm/resolve-person';
 
 /**
  * Canonical Member resolution — the ONE place a Member row is born.
@@ -46,6 +51,8 @@ export type ResolvedMember = {
   memberQrCode: string | null;
   phone: string | null;
   mergedIntoId: string | null;
+  /** Person spine (Phase 2A): the universal base record this Member is a profile on. */
+  personId: string | null;
 };
 
 const SELECT = {
@@ -59,6 +66,7 @@ const SELECT = {
   memberQrCode: true,
   phone: true,
   mergedIntoId: true,
+  personId: true,
 } as const;
 
 function splitName(name: string | undefined): { firstName: string; lastName: string } {
@@ -83,7 +91,9 @@ export async function resolveMember(input: ResolveMemberInput): Promise<Resolved
     // Soft-merge: if this row was merged into a canonical person, resolve through
     // it so all new activity attaches to the surviving record.
     const canonical = await followMergedInto(existing);
-    return ensureQrCode(canonical);
+    const withQr = await ensureQrCode(canonical);
+    const personId = await attachPersonSpine(withQr, input);
+    return personId && !withQr.personId ? { ...withQr, personId } : withQr;
   }
 
   const { firstName, lastName } = splitName(input.name);
@@ -102,20 +112,29 @@ export async function resolveMember(input: ResolveMemberInput): Promise<Resolved
 
   try {
     const created = await db.member.create({ data, select: SELECT });
+    // Person spine (Phase 2A): attach BEFORE the funnel signals so both carry
+    // the personId. Non-fatal — member resolution never fails on spine errors.
+    const personId = await attachPersonSpine(created, input);
     // Funnel entry signal — the canonical "a person now exists" event. Isolated
     // (logEngagementEvent never throws); degrades to a logged no-op until the
     // guest_created enum value is migrated.
     void logEngagementEvent({
       workspaceId,
       memberId: created.id,
+      personId,
       eventType: 'guest_created',
       metadata: { source },
     });
     // Consent floor (CRM substrate, Phase 1): seed this person's ChannelSubscription
     // rows from whatever consent signals exist now. Fire-and-forget + no-downgrade;
     // application approval re-runs it to elevate on the applicant's opt-ins.
-    void syncMemberChannelConsent({ workspaceId, memberId: created.id, context: 'member_create' });
-    return created;
+    void syncMemberChannelConsent({
+      workspaceId,
+      memberId: created.id,
+      personId,
+      context: 'member_create',
+    });
+    return personId ? { ...created, personId } : created;
   } catch (err) {
     // Concurrent create on the same identity key — re-resolve the winner.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -148,6 +167,41 @@ export async function promoteMemberToApproved(
     select: SELECT,
   });
   return ensureQrCode(member);
+}
+
+/**
+ * Person spine (Phase 2A): make sure the resolved Member hangs off a Person.
+ * Short-circuits when already linked. The email reaching this path was typed,
+ * not identity-provider-proven, so it goes in UNVERIFIED — resolvePerson will
+ * never use it to link to an existing Person (strict policy); a real Clerk id
+ * on the input still links authoritatively. Non-fatal by design: the CRM spine
+ * must never break member resolution.
+ */
+async function attachPersonSpine(
+  member: ResolvedMember,
+  input: ResolveMemberInput,
+): Promise<string | null> {
+  if (member.personId) return member.personId;
+  try {
+    const person = await resolvePerson({
+      workspaceId: member.workspaceId,
+      clerkUserId: realClerkUserId(input.clerkUserId),
+      email: member.email,
+      emailVerified: false,
+      phone: member.phone,
+      firstName: member.firstName,
+      lastName: member.lastName,
+      source: contactSourceFromResolveSource(input.source),
+    });
+    await db.member.update({ where: { id: member.id }, data: { personId: person.id } });
+    return person.id;
+  } catch (err) {
+    console.error(
+      `[resolveMember] person spine attach failed (member=${member.id} source=${input.source}):`,
+      err,
+    );
+    return null;
+  }
 }
 
 /**

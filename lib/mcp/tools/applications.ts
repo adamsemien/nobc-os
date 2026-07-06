@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { MemberStatus, OperatorRole, type ApplicationStatus } from '@prisma/client';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
+import { resolvePerson } from '@/lib/crm/resolve-person';
 import type { McpContext, McpTool } from '../types';
 
 const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'HOLD', 'WAITLISTED', 'DECLINED'] as const;
@@ -79,6 +80,36 @@ export async function approveApplication(ctx: McpContext, applicationId: string,
       },
     }),
   ]);
+
+  // Person spine (Phase 2A): attach the approved human to a Person. The typed
+  // application email is UNVERIFIED — resolvePerson never links it to an
+  // existing Person; a collision mints a flagged potential duplicate instead.
+  // Non-fatal: approval must never fail on spine bookkeeping.
+  try {
+    if (!member.personId) {
+      const person = await resolvePerson({
+        workspaceId: ctx.workspaceId,
+        email: app.email,
+        emailVerified: false,
+        phone: app.phone,
+        firstName,
+        lastName,
+        source: 'application',
+        sourceExternalId: app.id,
+      });
+      await db.member.update({ where: { id: member.id }, data: { personId: person.id } });
+      if (!app.personId) {
+        await db.application.update({ where: { id: app.id }, data: { personId: person.id } });
+      }
+    } else if (!app.personId) {
+      await db.application.update({
+        where: { id: app.id },
+        data: { personId: member.personId },
+      });
+    }
+  } catch (err) {
+    console.error('[mcp.approveApplication] person spine attach failed:', err);
+  }
 
   await emitEvent({
     workspaceId: ctx.workspaceId,

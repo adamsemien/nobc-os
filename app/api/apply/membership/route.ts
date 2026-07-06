@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { resolveMember } from '@/lib/member-identity';
+import { logEngagementEvent } from '@/lib/engagement';
 import { resolveDefaultApplyWorkspace } from '@/lib/apply-workspace';
 import { stampApplicationOwner, getVerifiedClerkEmail } from '@/lib/apply-account-link';
 import { publicRateLimit } from '@/lib/public-rate-limit';
@@ -151,6 +152,8 @@ export async function POST(req: NextRequest) {
       data: {
         workspaceId: workspace.id,
         memberId: member.id,
+        // Person spine (Phase 2A): the human behind this application, minted at start.
+        personId: member.personId,
         clerkUserId: userId ?? null,
         email: createEmail,
         fullName: fullName ?? '',
@@ -202,6 +205,16 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ error: 'Could not save application' }, { status: 500 });
   }
+
+  // Person spine (Phase 2A): first-touch funnel signal — the draft exists even
+  // if the applicant never submits (the Trent gap). Fire-and-forget.
+  void logEngagementEvent({
+    workspaceId: workspace.id,
+    memberId: member.id,
+    personId: member.personId,
+    eventType: 'application_started',
+    metadata: { applicationId: application.id, source: 'apply_membership' },
+  });
 
   if (Object.keys(answers).length > 0) {
     await Promise.all(

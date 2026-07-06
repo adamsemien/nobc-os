@@ -5,6 +5,7 @@ import { ApplySchema, answerQuestions } from '@/lib/apply-config';
 import { tagApplication } from '@/lib/ai/tag-application';
 import { attachEventRsvpAfterApply } from '@/lib/apply-event-rsvp';
 import { resolveMember } from '@/lib/member-identity';
+import { logEngagementEvent } from '@/lib/engagement';
 import { emitEvent } from '@/lib/emit-event';
 import { structuredConsentWrites, getConsentIp } from '@/lib/apply-consent';
 
@@ -83,6 +84,7 @@ export async function POST(
         // Link to the known person when we already have one; never mint a new
         // Member for a held/red-listed applicant.
         memberId: redListedMember?.id ?? null,
+        personId: redListedMember?.personId ?? null,
         email,
         fullName,
         phone: data.phone,
@@ -122,6 +124,8 @@ export async function POST(
       data: {
         workspaceId: workspace.id,
         memberId: applicantMember.id,
+        // Person spine (Phase 2A): the human behind this application.
+        personId: applicantMember.personId,
         email,
         fullName,
         phone: data.phone,
@@ -156,6 +160,16 @@ export async function POST(
     );
 
     return app;
+  });
+
+  // Person spine (Phase 2A): this route creates + submits in one shot, so the
+  // start signal fires here. Fire-and-forget.
+  void logEngagementEvent({
+    workspaceId: workspace.id,
+    memberId: applicantMember.id,
+    personId: applicantMember.personId,
+    eventType: 'application_started',
+    metadata: { applicationId: application.id, source: 'apply_slug' },
   });
 
   after(

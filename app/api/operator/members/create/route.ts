@@ -6,6 +6,7 @@ import { requireRole } from '@/lib/operator-role';
 import { generateMemberQrCode } from '@/lib/member-qr';
 import { emitEvent } from '@/lib/emit-event';
 import { syncMemberChannelConsent } from '@/lib/comms/consent-sync';
+import { resolvePerson } from '@/lib/crm/resolve-person';
 
 // Manual member creation can only set these three statuses from the operator UI.
 const ALLOWED_STATUSES: MemberStatus[] = [
@@ -96,10 +97,31 @@ export async function POST(req: NextRequest) {
     ...(aiSummary ? { aiSummary: stamp(aiSummary) } : {}),
   };
 
+  // Person spine (Phase 2A): an operator-typed email is UNVERIFIED — strict
+  // policy, no operator exception. It never links to an existing Person; a
+  // colliding email mints a new Person flagged as a potential duplicate for
+  // the merge queue. Non-fatal: manual add must not fail on spine errors.
+  let personId: string | null = null;
+  try {
+    const person = await resolvePerson({
+      workspaceId,
+      email,
+      emailVerified: false,
+      phone,
+      firstName,
+      lastName,
+      source: 'operator',
+    });
+    personId = person.id;
+  } catch (err) {
+    console.error('[members/create] person spine attach failed:', err);
+  }
+
   const isApproved = status === MemberStatus.APPROVED;
   const member = await db.member.create({
     data: {
       workspaceId,
+      personId,
       // No Clerk account for a manually-added member; mint a synthetic, unique id
       // (the approval path uses the same pattern with `applicant:<id>`).
       clerkUserId: `manual:${randomUUID()}`,
@@ -131,7 +153,12 @@ export async function POST(req: NextRequest) {
   // Consent floor (CRM substrate, Phase 1): seed ChannelSubscription rows. Manual
   // create captures no marketing consent today, so this yields PENDING rows (honest);
   // an explicit operator-asserts-consent action (OPERATOR_ADDED) can elevate later.
-  void syncMemberChannelConsent({ workspaceId, memberId: member.id, context: 'operator_manual' });
+  void syncMemberChannelConsent({
+    workspaceId,
+    memberId: member.id,
+    personId,
+    context: 'operator_manual',
+  });
 
   return NextResponse.json(
     {
