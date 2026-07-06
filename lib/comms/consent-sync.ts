@@ -95,6 +95,10 @@ function deriveSignal(
 export async function syncMemberChannelConsent(args: {
   workspaceId: string;
   memberId: string;
+  /** Person spine (Phase 2A, scoped unfreeze): written ALONGSIDE memberId on
+   *  ChannelSubscription rows. Optional — callers without a resolved Person
+   *  omit it and the backfill/next sync fills it. */
+  personId?: string | null;
   context: ConsentContext;
 }): Promise<void> {
   try {
@@ -130,7 +134,7 @@ export async function syncMemberChannelConsent(args: {
             stream: '*',
           },
         },
-        select: { id: true, status: true },
+        select: { id: true, status: true, personId: true },
       });
 
       // No-downgrade: never touch an already-SUBSCRIBED row, and never overwrite an
@@ -146,6 +150,8 @@ export async function syncMemberChannelConsent(args: {
             consentSource: `${signal.source}:${args.context}`,
             consentAt: signal.at,
             syncedAt: new Date(),
+            // Person spine (Phase 2A): fill when absent, never overwrite.
+            ...(args.personId && !existing.personId ? { personId: args.personId } : {}),
           },
         });
         void logEngagementEvent({
@@ -161,6 +167,8 @@ export async function syncMemberChannelConsent(args: {
         data: {
           workspaceId: args.workspaceId,
           memberId: args.memberId,
+          // Person spine (Phase 2A): parallel pointer alongside memberId.
+          personId: args.personId ?? null,
           channel,
           stream: '*',
           status: signal.status,

@@ -3,7 +3,10 @@ import type { MemberEngagementEventType, Prisma } from '@prisma/client';
 
 export type LogEngagementEventParams = {
   workspaceId: string;
-  memberId: string;
+  /** Optional since Phase 2A: member-less humans (Person spine) accrue activity too. */
+  memberId?: string | null;
+  /** Person spine (Phase 2A): parallel Person pointer, written alongside memberId. */
+  personId?: string | null;
   eventType: MemberEngagementEventType;
   eventId?: string;
   metadata?: Prisma.InputJsonValue;
@@ -22,7 +25,8 @@ export async function logEngagementEvent(params: LogEngagementEventParams): Prom
     await db.memberEngagementEvent.create({
       data: {
         workspaceId: params.workspaceId,
-        memberId: params.memberId,
+        memberId: params.memberId ?? null,
+        personId: params.personId ?? null,
         eventType: params.eventType,
         eventId: params.eventId ?? null,
         metadata: params.metadata,
@@ -30,7 +34,7 @@ export async function logEngagementEvent(params: LogEngagementEventParams): Prom
     });
   } catch (err) {
     console.error(
-      `[engagement] logEngagementEvent failed (type=${params.eventType} member=${params.memberId} workspace=${params.workspaceId}):`,
+      `[engagement] logEngagementEvent failed (type=${params.eventType} member=${params.memberId ?? 'none'} person=${params.personId ?? 'none'} workspace=${params.workspaceId}):`,
       err,
     );
   }

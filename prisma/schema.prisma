@@ -92,6 +92,11 @@ model Workspace {
   channelSubscriptions ChannelSubscription[]
   suppressionEntries   SuppressionEntry[]
 
+  // Person-centric CRM spine (Phase 2A)
+  persons             Person[]
+  organizations       Organization[]
+  personOrganizations PersonOrganization[]
+
   // Operator-selected Claude model for AI features.
   // Display preference + server fallback. CLAUDE.md still locks the application-scoring
   // call to claude-sonnet-4-20250514; this column gates agent/chat surfaces.
@@ -202,6 +207,9 @@ enum ContactSourceSystem {
   producer
   csv
   tenur
+  clerk
+  application
+  event
 }
 
 /// CRM provenance — one row per (member, source) system a person appears in.
@@ -211,8 +219,11 @@ model ContactSource {
   id           String              @id @default(cuid())
   workspaceId  String
   workspace    Workspace           @relation(fields: [workspaceId], references: [id])
-  memberId     String
-  member       Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  // Phase 2A: provenance now hangs off Person; memberId kept for back-compat reads.
+  memberId     String?
+  member       Member?             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  personId     String?
+  person       Person?             @relation(fields: [personId], references: [id], onDelete: Cascade)
   source       ContactSourceSystem
   /// Stable id of this person in the source system (email / opaque id) — the key
   /// the ingestion match chain dedupes on.
@@ -225,9 +236,122 @@ model ContactSource {
   lastSyncedAt DateTime            @default(now())
 
   @@unique([workspaceId, memberId, source])
+  @@unique([workspaceId, personId, source])
   @@index([workspaceId])
   @@index([workspaceId, source, externalId])
   @@index([memberId])
+  @@index([personId])
+}
+
+/// Person-centric CRM spine (Phase 2A). Universal base record: every human the
+/// platform touches is a Person from first contact - applicants who never
+/// submit, guests, sponsor staff, SaaS prospects, members. Identity fields are
+/// nullable (an SMS-only contact has only a phone). Membership is a profile ON
+/// a Person (Member.personId). Psychographics stay in MemberPsychographics on
+/// the Member side of the sponsor firewall and NEVER move here. Rows are minted
+/// only via resolvePerson() (lib/crm/resolve-person.ts) - no parallel minting.
+model Person {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  clerkUserId String?
+  /// emailVerified=true only when the address was proven by an identity
+  /// provider (Clerk verified email). Typed-in emails (application forms,
+  /// operator entry) stay false. An UNVERIFIED email NEVER links to an
+  /// existing Person at resolve time - resolvePerson mints a new Person and
+  /// flags the pair via potentialDuplicateOfId. (workspaceId, email) is
+  /// therefore deliberately NON-unique: email duplicates are legitimate
+  /// until the 2B merge queue resolves them.
+  email         String?
+  emailVerified Boolean @default(false)
+  phone         String?
+  firstName     String?
+  lastName      String?
+
+  /// Multi-valued CRM roles - same vocabulary as Member.roles.
+  roles ContactRole[] @default([])
+
+  /// 2B merge-queue flag: set when this Person was minted with an unverified
+  /// email matching an existing Person. Cleared on merge or dismiss.
+  potentialDuplicateOfId String?
+  potentialDuplicateOf   Person?  @relation("PersonPotentialDuplicate", fields: [potentialDuplicateOfId], references: [id])
+  potentialDuplicates    Person[] @relation("PersonPotentialDuplicate")
+
+  // Soft-merge: a duplicate person points at its canonical record (mirrors Member merge).
+  mergedIntoId String?
+  mergedAt     DateTime?
+  mergedInto   Person?   @relation("PersonMerge", fields: [mergedIntoId], references: [id])
+  mergedFrom   Person[]  @relation("PersonMerge")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members              Member[]
+  applications         Application[]
+  contactSources       ContactSource[]
+  engagementEvents     MemberEngagementEvent[]
+  rsvps                RSVP[]
+  organizations        PersonOrganization[]
+  channelSubscriptions ChannelSubscription[]
+  suppressionEntries   SuppressionEntry[]
+
+  // clerkUserId stays unique when present (NULLs are distinct in Postgres).
+  // email is a plain index - see emailVerified doc above.
+  @@unique([workspaceId, clerkUserId])
+  @@index([workspaceId, email])
+  @@index([workspaceId])
+  @@index([workspaceId, phone])
+  @@index([mergedIntoId])
+  @@index([potentialDuplicateOfId])
+}
+
+enum OrganizationKind {
+  sponsor
+  saas_prospect
+  member_company
+  vendor
+  other
+}
+
+/// First-class account record (Phase 2A): sponsor accounts, SaaS prospects,
+/// members' companies. Deal (Phase 2B) will hang off this - nothing here blocks it.
+model Organization {
+  id          String           @id @default(cuid())
+  workspaceId String
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id])
+  name        String
+  domain      String?
+  kind        OrganizationKind @default(other)
+  website     String?
+  notes       String?          @db.Text
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  people PersonOrganization[]
+
+  @@unique([workspaceId, domain])
+  @@index([workspaceId])
+}
+
+/// Person <-> Organization affiliation. Sponsor staff are Persons affiliated to
+/// a sponsor Organization; sponsor-facing surfaces still read ONLY the
+/// sponsor_audience_member view - never Person or this table.
+model PersonOrganization {
+  id             String       @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id])
+  personId       String
+  person         Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           String?
+  isPrimary      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@unique([personId, organizationId])
+  @@index([workspaceId])
+  @@index([organizationId])
 }
 
 model Member {
@@ -239,6 +363,9 @@ model Member {
   firstName             String
   lastName              String
   phone                 String?
+  // Person spine (Phase 2A): Member is the membership profile ON a Person.
+  // Nullable + additive - backfill links existing rows.
+  personId              String?
   /// Checkout consent capture (Event Builder Rebuild, Phase F - ADD 1).
   /// Three separate signals, never bundled, never pre-checked; affirmative
   /// consent only ever sets them true (+ timestamp). Mirrors the apply
@@ -323,6 +450,9 @@ model Member {
   // Psychographic data — separate table, firewalled from sponsor surfaces.
   psychographics MemberPsychographics?
 
+  // Person spine (Phase 2A)
+  person Person? @relation(fields: [personId], references: [id])
+
   // CRM provenance — which source systems this person came from.
   contactSources ContactSource[]
 
@@ -342,6 +472,7 @@ model Member {
   @@index([referredByMemberId])
   @@index([mergedIntoId])
   @@index([workspaceId, phone])
+  @@index([personId])
 }
 
 enum MemberEnrichmentStatus {
@@ -420,6 +551,9 @@ model Application {
   clerkUserId             String?
   email                   String
   fullName                String
+  // Person spine (Phase 2A): the human behind this application, minted at application start.
+  personId                String?
+  person                  Person?                      @relation(fields: [personId], references: [id])
   phone                   String?
   city                    String?
   neighborhood            String?
@@ -460,6 +594,7 @@ model Application {
   @@index([workspaceId])
   @@index([templateId])
   @@index([clerkUserId])
+  @@index([personId])
 }
 
 model ApplicationAnswer {
@@ -697,6 +832,9 @@ model RSVP {
   event                 Event      @relation(fields: [eventId], references: [id])
   memberId              String
   member                Member     @relation(fields: [memberId], references: [id])
+  // Person spine (Phase 2A): seam only - the event stream wires this later.
+  personId              String?
+  person                Person?    @relation(fields: [personId], references: [id])
   status                RSVPStatus @default(CONFIRMED)
   ticketStatus          String     @default("confirmed")
   origin                String     @default("direct")
@@ -745,6 +883,7 @@ model RSVP {
   @@index([workspaceId])
   @@index([eventId])
   @@index([memberId])
+  @@index([personId])
   @@index([orderId])
   @@index([tierId])
 }
@@ -1077,6 +1216,8 @@ enum TagEntityType {
   order
   application
   rsvp
+  person
+  organization
 }
 
 enum TagSource {
@@ -1616,17 +1757,22 @@ model SmsMessage {
 model MemberEngagementEvent {
   id          String                    @id @default(cuid())
   workspaceId String
-  memberId    String
+  // Phase 2A: activity generalizes to Person; memberId nullable so member-less
+  // humans (applicant who never submits) can still accrue activity.
+  memberId    String?
+  personId    String?
   eventType   MemberEngagementEventType
   eventId     String?
   metadata    Json?
   occurredAt  DateTime                  @default(now())
 
-  member    Member    @relation(fields: [memberId], references: [id])
+  member    Member?   @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  person    Person?   @relation(fields: [personId], references: [id])
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
   @@index([memberId])
+  @@index([personId])
   @@index([occurredAt])
 }
 
@@ -1659,6 +1805,9 @@ enum MemberEngagementEventType {
   // Minimal RBAC (CRM substrate, Phase 1.5) — operator role change. Added to the
   // DB via a standalone ALTER TYPE ADD VALUE (prisma/sql/crm-rbac-enums.sql).
   role_changed
+  // Phase 2A person spine - first-touch activity.
+  account_created
+  application_started
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2236,6 +2385,8 @@ model ChannelSubscription {
   id            String               @id @default(cuid())
   workspaceId   String
   memberId      String
+  // Phase 2A: parallel Person pointer, written alongside memberId (scoped unfreeze).
+  personId      String?
   channel       CommChannel
   stream        String               @default("*")
   status        SubscriptionStatus   @default(PENDING)
@@ -2250,12 +2401,14 @@ model ChannelSubscription {
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   member        Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  person        Person?              @relation(fields: [personId], references: [id])
   workspace     Workspace            @relation(fields: [workspaceId], references: [id])
 
   @@unique([workspaceId, memberId, channel, stream])
   @@index([workspaceId])
   @@index([memberId])
   @@index([workspaceId, channel, status])
+  @@index([personId])
 }
 
 model SuppressionEntry {
@@ -2266,12 +2419,16 @@ model SuppressionEntry {
   reason      SuppressionReason
   source      String?
   memberId    String?
+  // Phase 2A: parallel Person pointer, written alongside memberId (scoped unfreeze).
+  personId    String?
   note        String?
   createdAt   DateTime          @default(now())
   member      Member?           @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  person      Person?           @relation(fields: [personId], references: [id])
   workspace   Workspace         @relation(fields: [workspaceId], references: [id])
 
   @@unique([workspaceId, channel, identifier])
   @@index([workspaceId, channel])
   @@index([memberId])
+  @@index([personId])
 }

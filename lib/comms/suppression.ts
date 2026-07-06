@@ -51,6 +51,8 @@ export type CreateSuppressionInput = {
   reason: SuppressionReason;
   source?: string | null;
   memberId?: string | null;
+  /** Person spine (Phase 2A, scoped unfreeze): written ALONGSIDE memberId. */
+  personId?: string | null;
   note?: string | null;
 };
 
@@ -89,6 +91,7 @@ export async function createSuppressionEntry(
       reason: input.reason,
       source: input.source ?? null,
       memberId: input.memberId ?? null,
+      personId: input.personId ?? null,
       note: input.note ?? null,
     },
     update: {},
