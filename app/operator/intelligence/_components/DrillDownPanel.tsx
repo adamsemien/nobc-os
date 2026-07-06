@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { encodeFilters, type IntelligenceFilterState } from '@/lib/intelligence/filters';
+import { archetypeDisplayName } from '@/config/archetypes';
 
 type Row = Record<string, string | number | boolean | null>;
 
@@ -82,7 +83,7 @@ export function DrillDownPanel({
             </h2>
             <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
               {filters.demo ? 'demo data' : 'live data'}
-              {filters.archetype.length ? ` · ${filters.archetype.join(', ')}` : ''}
+              {filters.archetype.length ? ` · ${filters.archetype.map(archetypeDisplayName).join(', ')}` : ''}
             </p>
           </div>
           <button onClick={onClose} aria-label="Close" style={{ color: 'var(--text-secondary)' }}>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { archetypeDisplayName } from '@/config/archetypes';
 
 type FeedItem = {
   id: string;
@@ -94,7 +95,7 @@ export function LiveRsvpFeed({ eventId, enabled = true }: { eventId: string; ena
               <div className="min-w-0 flex-1">
                 <p className="truncate text-text-primary">{name}</p>
                 {it.archetype ? (
-                  <p className="text-[10px] uppercase tracking-widest text-text-secondary">{it.archetype}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-text-secondary">{archetypeDisplayName(it.archetype)}</p>
                 ) : null}
               </div>
               <span className="ml-3 shrink-0 text-[11px] text-text-tertiary">{relative(it.createdAt)}</span>

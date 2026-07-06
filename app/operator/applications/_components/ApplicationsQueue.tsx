@@ -7,6 +7,7 @@ import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { LEGACY_ANSWER_LABELS } from '@/lib/legacy-answer-labels';
 import { DEFAULT_TIER_NAMES, type TierNames } from '@/lib/score-display';
 import { isPortraitRef, portraitSrc } from '@/lib/apply-photo';
+import { archetypeDisplayName } from '@/config/archetypes';
 import { EmptyState } from '../../_components/EmptyState';
 import { useTheme } from '../../_components/ThemeToggle';
 import { Avatar } from '../../_components/Avatar';
@@ -637,7 +638,7 @@ export function ApplicationsQueue({
                         className="obs-app-archetype mt-1.5 inline-block rounded border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-text-secondary"
                         style={{ borderRadius: '4px' }}
                       >
-                        {app.archetype}
+                        {archetypeDisplayName(app.archetype)}
                       </span>
                     )}
                     {refs.length > 0 && (
@@ -780,8 +781,10 @@ function scorePct(raw: number | undefined | null): number {
 
 function memberWorthScores(scores: Record<string, number>): { influence: number; contribution: number; activation: number; total: number } {
   const get = (k: string) => scorePct(scores[k]);
-  const influence = Math.round((get('Connector') + get('Curator')) / 20);
-  const contribution = Math.round((get('Builder') + get('Maker')) / 20);
+  // Reads both the current cast (Sage/Spark) and the retired cast (Curator/Maker);
+  // a row only carries one cast's keys, so the other reads 0 and the 0-30 scale holds.
+  const influence = Math.round((get('Connector') + get('Curator') + get('Sage')) / 20);
+  const contribution = Math.round((get('Builder') + get('Maker') + get('Spark')) / 20);
   const activation = Math.round((get('Host') + get('Patron')) / 20);
   const total = influence + contribution + activation;
   return { influence, contribution, activation, total };
@@ -1061,7 +1064,7 @@ function DetailPanel({
           )}
 
           {app.archetype && (
-            <p className="mt-2 text-lg font-semibold text-text-primary">{app.archetype}</p>
+            <p className="mt-2 text-lg font-semibold text-text-primary">{archetypeDisplayName(app.archetype)}</p>
           )}
 
           {app.archetypeScores && (() => {
@@ -1087,11 +1090,11 @@ function DetailPanel({
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 @2xl:grid-cols-2">
-                  {['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'].map(name => {
+                  {['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'].map(name => {
                     const v = scorePct(app.archetypeScores![name]);
                     return (
                       <div key={name} className="flex items-center gap-2">
-                        <span className="w-20 shrink-0 text-[10px] text-text-muted">{name}</span>
+                        <span className="w-20 shrink-0 text-[10px] text-text-muted">{archetypeDisplayName(name)}</span>
                         <div className="flex-1 overflow-hidden rounded-full bg-border" style={{ height: 4 }}>
                           <div
                             className="h-full rounded-full bg-primary transition-[width]"

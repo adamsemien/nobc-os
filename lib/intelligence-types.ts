@@ -2,8 +2,8 @@
  *  import from both server aggregation (lib/intelligence.ts) and client/demo
  *  code (lib/demo-data.ts) without pulling in the Prisma client. */
 
-export type ArchetypeName = 'Connector' | 'Host' | 'Curator' | 'Builder' | 'Maker' | 'Patron';
-export const ARCHETYPE_NAMES: ArchetypeName[] = ['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'];
+export type ArchetypeName = 'Connector' | 'Host' | 'Builder' | 'Patron' | 'Sage' | 'Spark';
+export const ARCHETYPE_NAMES: ArchetypeName[] = ['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'];
 
 export type WorthBand = 'Charter' | 'Standard' | 'Waitlist';
 
@@ -50,8 +50,8 @@ export type QuestionInsight = {
 export const ARCHETYPE_SPONSOR_SEGMENT: Record<ArchetypeName, string> = {
   Connector: 'Premium travel, members clubs, executive services — people who move others through doors.',
   Host: 'Spirits, F&B, hospitality — people who build the rooms others want to be in.',
-  Curator: 'Fashion, beauty, luxury goods, creative tools — people whose taste sets demand.',
   Builder: 'B2B SaaS, fintech, business banking — operators who ship and lead.',
-  Maker: 'Creative tools, home & interiors, craft brands — people who create with their hands.',
   Patron: 'Wealth management, real estate, premium services — people with capital and access.',
+  Sage: 'Books, media, wellness, education - people others come to for perspective and understanding.',
+  Spark: 'Nightlife, events, travel, beverage - people who set the energy of a room.',
 };

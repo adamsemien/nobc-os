@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { logQAAction } from '@/lib/dev/qa-action-log';
+import { archetypeDisplayName } from '@/config/archetypes';
 
 export type RoomData = {
   event: {
@@ -46,6 +47,8 @@ const ARCHETYPE_TINTS: Record<string, string> = {
   Builder: 'rgba(132, 188, 222, 0.10)',
   Maker: 'rgba(166, 209, 137, 0.10)',
   Patron: 'rgba(225, 184, 138, 0.10)',
+  Sage: 'rgba(199, 167, 222, 0.10)',
+  Spark: 'rgba(166, 209, 137, 0.10)',
 };
 
 const ARCHETYPE_CHIP: Record<string, string> = {
@@ -55,6 +58,8 @@ const ARCHETYPE_CHIP: Record<string, string> = {
   Builder: 'rgba(132, 188, 222, 0.85)',
   Maker: 'rgba(166, 209, 137, 0.85)',
   Patron: 'rgba(225, 184, 138, 0.85)',
+  Sage: 'rgba(199, 167, 222, 0.85)',
+  Spark: 'rgba(166, 209, 137, 0.85)',
 };
 
 function fmtRelative(iso: string, now: number): string {
@@ -631,7 +636,7 @@ function ArchetypeChip({ name, small = false }: { name: string; small?: boolean 
         background: `${color.replace('0.85', '0.12')}`,
       }}
     >
-      {name}
+      {archetypeDisplayName(name)}
     </span>
   );
 }

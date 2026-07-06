@@ -3,8 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { encodeFilters, type IntelligenceFilterState } from '@/lib/intelligence/filters';
 import type { TierKey } from '@/lib/intelligence/types';
+import { archetypeDisplayName } from '@/config/archetypes';
 
-const ARCHETYPES = ['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'];
+// Stored enum values - the filter matches on these. Chips render displayNames.
+const ARCHETYPES = ['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'];
 const TIERS: TierKey[] = ['charter', 'standard', 'waitlist'];
 
 function chipStyle(active: boolean): React.CSSProperties {
@@ -60,7 +62,7 @@ export function FilterBar({ filters }: { filters: IntelligenceFilterState }) {
         {ARCHETYPES.map((a) => (
           <button key={a} style={chipStyle(filters.archetype.includes(a))}
             onClick={() => apply({ ...filters, archetype: toggle(filters.archetype, a) })}>
-            {a}
+            {archetypeDisplayName(a)}
           </button>
         ))}
       </div>

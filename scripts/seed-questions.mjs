@@ -1,12 +1,15 @@
 /**
- * Canonical membership scoring model - single source of truth for the 23 scored
+ * Canonical membership scoring model - single source of truth for the 15 scored
  * QuestionDefinitions that drive AI archetype scoring (lib/scoring.ts).
  *
- * Authored 2026-06-23 against the CURRENT /apply form (app/apply/_lib/questions.ts).
- * Every stableKey === the live form field id, so lib/scoring.ts resolves each
- * answer by identity (lib/question-key-map.ts) with NO bridge, except the two
- * GROUP questions (referrals, recSources) whose answers live under dotted
- * subfield keys - those keep a bridge entry that joins the subfields.
+ * Authored 2026-07-06 for the six-archetype recut (Builder, Connector, Host as
+ * Caregiver, Sage, Patron as Champion, Spark) against the CURRENT /apply form
+ * (app/apply/_lib/questions.ts). Every stableKey === the live form field id, so
+ * lib/scoring.ts resolves each answer by identity (lib/question-key-map.ts) with
+ * NO bridge, except the one GROUP question (referrals) whose answers live under
+ * dotted first/last subfield keys - that keeps a bridge entry that joins them.
+ *
+ * Signals use STORED enum names (Host, not Caregiver; Patron, not Champion).
  *
  * Two modes:
  *   node scripts/seed-questions.mjs                      → seed the DEV workspace
@@ -19,11 +22,17 @@
  *
  * Prod is seeded by the printed SQL (the repo's prod-DB-ops-in-Neon-Console
  * invariant), never by this script's dev path.
+ *
+ * The QUESTIONS rubric is exported so the sync guard test
+ * (tests/unit/question-key-map.test.ts) can assert every scored stableKey
+ * resolves against the live form. main() only runs on direct execution.
  */
+
+import { fileURLToPath } from 'node:url';
 
 const SCORING_INSTRUCTIONS =
   'Score this applicant on genuine fit for No Bad Company - a premium, curated members club in Austin. ' +
-  'Reward specificity, evidence of building and connecting, real taste, and authentic contribution to community ' +
+  'Reward specificity, evidence of building and connecting, real generosity, and authentic contribution to community ' +
   'over polish, status, or credentials. Thin, generic, or status-signaling answers score low. ' +
   "Apply each question's own scoring logic and weight faithfully.";
 
@@ -38,155 +47,104 @@ const TEMPLATE = {
 const PROD_WORKSPACE_ID = 'cmpd6xckn000004jl47xpwghx';
 
 /**
- * The 23 scored questions, in form order. stableKey === form field id.
+ * The 15 scored questions, in scoring order. stableKey === form field id.
  *   dim    = primary scoringDimension (influence | contribution | activation | taste)
  *   wt     = scoringWeight (0 ignore .. 1 primary)
- *   sig    = archetypeSignals (hints to the LLM's archetype pick)
+ *   sig    = archetypeSignals - STORED enum names (Connector, Host, Builder, Patron, Sage, Spark)
  *   logic  = scoringLogic rubric (injected verbatim into the scoring prompt)
- *   spon   = sponsorRelevance tag (orthogonal to the archetype reveal; tagged
- *            now, consumed later by Sponsor Intelligence as rolled-up data only)
+ *   spon   = sponsorRelevance tag (all null in this recut - no surviving question
+ *            carried one; carried as an input to a future Sponsor Intelligence re-fire)
  */
-const QUESTIONS = [
-  // ── Section 01 - Who You Are ───────────────────────────────────────────────
-  { stableKey: 'whatYouDo', label: 'What Do You Do', type: 'long_text', section: 'who-you-are',
+export const QUESTIONS = [
+  { stableKey: 'whatYouDo', label: 'What do you do?', type: 'long_text', section: 'who-you-are',
     insightLabel: 'what they do / what they build',
-    insightDescription: 'Primary work and what they are building - reach, ownership, and field-command signal.',
-    dim: 'influence', wt: 0.9, sig: ['Builder', 'Patron', 'Maker'], spon: null,
-    logic: 'Work that carries reach, builds something, or commands a field scores high; ownership/creation over title. Vague "employed by" scores lower.' },
+    insightDescription: 'Primary work - ownership, and whether they build, ship, or back something.',
+    dim: 'influence', wt: 0.9, sig: ['Builder', 'Patron'], spon: null,
+    logic: 'Work that builds, ships, or backs something scores high; ownership over title; vague "employed by" low.' },
+
+  { stableKey: 'comeToYouFor', label: 'What do people consistently come to you for?', type: 'long_text', section: 'how-you-move',
+    insightLabel: 'what people rely on them for',
+    insightDescription: 'ANCHOR - the answer itself drives the archetype.',
+    dim: 'influence', wt: 1.0, sig: ['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'], spon: null,
+    logic: 'ANCHOR. The content decides: intros to Connector, advice/perspective to Sage, showing-up/backing to Patron, building help to Builder, tending people to Host, energy/fun to Spark. Specific repeated reliance scores high; generic scores low.' },
+
+  { stableKey: 'characteristicsGoodAtJob', label: 'What characteristics make you good at your job?', type: 'long_text', section: 'who-you-are',
+    insightLabel: 'traits that make them good at their work',
+    insightDescription: 'Execution/ownership traits vs perception/judgment traits - Builder vs Sage tell.',
+    dim: 'influence', wt: 0.6, sig: ['Builder', 'Sage'], spon: null,
+    logic: 'Execution/ownership traits point to Builder; perception/judgment/reading-people traits point to Sage. Concrete self-knowledge high; cliché low.' },
 
   { stableKey: 'creativePursuits', label: 'Creative Pursuits and Passion Projects', type: 'long_text', section: 'who-you-are',
     insightLabel: 'creative pursuits outside work',
-    insightDescription: 'Making vs consuming - the core Maker signal.',
-    dim: 'taste', wt: 0.5, sig: ['Maker', 'Curator'], spon: null,
-    logic: 'Active making - craft, art, building with hands or code - scores high for Maker; pure consumption scores low.' },
+    insightDescription: 'Active making/building vs pure consumption.',
+    dim: 'activation', wt: 0.5, sig: ['Builder'], spon: null,
+    logic: 'Active making/building outside work scores high; pure consumption scores low.' },
+
+  { stableKey: 'obsessedWith', label: "What's something you've become obsessed with?", type: 'long_text', section: 'how-you-move',
+    insightLabel: 'current obsession',
+    insightDescription: 'Generative obsession (making/learning) plus specificity vs passive.',
+    dim: 'activation', wt: 0.6, sig: ['Builder', 'Sage'], spon: null,
+    logic: 'Generative obsession (making/learning) plus specificity scores high; passive consumption scores low.' },
 
   { stableKey: 'referrals', label: 'Who referred you?', type: 'group', section: 'who-you-are',
     insightLabel: 'who referred them',
-    insightDescription: 'Referral trust - the strongest single fit signal. Joins referral1-3.',
+    insightDescription: 'Referral trust. Joins referral1-3 first/last names.',
     dim: 'contribution', wt: 0.9, sig: ['Connector', 'Patron', 'Host'], spon: null,
-    logic: 'Named referrers who are existing approved members score highest; multiple strong referrals raise contribution; vague or none scores low.' },
+    logic: 'Named existing-member referrers score highest; multiple strong referrals raise contribution; vague or none scores low.' },
 
-  { stableKey: 'cities', label: 'What cities do you split time between or visit regularly?', type: 'short_text', section: 'who-you-are',
+  { stableKey: 'cities', label: 'What other cities do you spend real time in?', type: 'short_text', section: 'who-you-are',
     insightLabel: 'cities they move between',
-    insightDescription: 'Cross-market reach - a mild activation signal.',
+    insightDescription: 'Cross-market movement - a mild reach signal.',
     dim: 'activation', wt: 0.3, sig: ['Connector', 'Patron'], spon: null,
-    logic: 'Multiple real cities / cross-market movement is a mild reach signal; single home city is neutral.' },
-
-  // ── Section 02 - How You Move Through the World ────────────────────────────
-  { stableKey: 'comeToYouFor', label: 'What do people consistently come to you for?', type: 'long_text', section: 'how-you-move',
-    insightLabel: 'what people rely on them for',
-    insightDescription: 'The anchor archetype tell - the answer itself drives the archetype.',
-    dim: 'influence', wt: 1.0, sig: ['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'], spon: null,
-    logic: 'The content decides: intros to Connector, recs/taste to Curator, gatherings to Host, advice/capital to Patron, building help to Builder, craft to Maker. Specific repeated reliance scores high; generic "good listener" low.' },
-
-  { stableKey: 'expertIn', label: 'What would you call yourself a genuine expert in?', type: 'long_text', section: 'how-you-move',
-    insightLabel: 'genuine domain expertise',
-    insightDescription: 'Demonstrable depth vs hedged or hobby-level claims.',
-    dim: 'influence', wt: 0.8, sig: ['Builder', 'Maker', 'Curator'], spon: null,
-    logic: 'Genuine demonstrable domain depth scores high; hedged or hobby-level claims score low.' },
-
-  { stableKey: 'recommendForPay', label: "What do you recommend to everyone like you're getting paid for it?", type: 'long_text', section: 'how-you-move',
-    insightLabel: 'unpaid evangelism',
-    insightDescription: 'Tastemaker influence - do others follow their unsolicited recommendations.',
-    dim: 'influence', wt: 0.7, sig: ['Curator', 'Connector', 'Host'], spon: 'medium',
-    logic: 'Unpaid evangelism others actually follow signals tastemaker influence; scores high when it reveals real discernment.' },
-
-  { stableKey: 'lastConvinced', label: "What's the last thing you convinced a friend to buy?", type: 'long_text', section: 'how-you-move',
-    insightLabel: 'last thing they convinced a friend to buy',
-    insightDescription: 'Whether others act on their word - a concrete influence proof.',
-    dim: 'influence', wt: 0.6, sig: ['Connector', 'Curator'], spon: 'medium',
-    logic: 'Evidence others act on their word - a specific successful recommendation - scores high; "nothing comes to mind" scores low.' },
-
-  { stableKey: 'obsessedWith', label: "What's something you've become obsessed with lately?", type: 'long_text', section: 'how-you-move',
-    insightLabel: 'current obsession',
-    insightDescription: 'Generative energy (making/learning) vs passive consumption, plus specificity.',
-    dim: 'activation', wt: 0.6, sig: ['Maker', 'Builder', 'Curator'], spon: null,
-    logic: 'Depth of current obsession and whether it is generative (making/learning) vs passive; high energy plus specificity scores high.' },
+    logic: 'Multi-market movement is a mild reach signal; a single home city is neutral.' },
 
   { stableKey: 'connectionCreated', label: 'Tell us about a connection or opportunity you helped create for someone else.', type: 'long_text', section: 'how-you-move',
     insightLabel: 'a connection they created for someone',
-    insightDescription: 'The core contribution signal - a concrete, consequential connection.',
+    insightDescription: 'CORE contribution - a concrete, consequential connection.',
     dim: 'contribution', wt: 1.0, sig: ['Connector', 'Patron', 'Host'], spon: null,
-    logic: 'A concrete consequential connection or opportunity created for someone else scores highest. This is the core contribution signal. Hypothetical or self-serving scores low.' },
+    logic: 'CORE contribution. A concrete consequential connection created for someone else scores highest; hypothetical or self-serving scores low.' },
 
-  { stableKey: 'loyalCommunity', label: "Tell us about a group or community you've stayed loyal to - and what keeps you there.", type: 'long_text', section: 'how-you-move',
+  { stableKey: 'loyalCommunity', label: "Tell us about a group or community you've stayed loyal to - and what keeps you there?", type: 'long_text', section: 'how-you-move',
     insightLabel: 'a community they stayed loyal to',
-    insightDescription: 'Sustained investment in a group vs transactional membership.',
+    insightDescription: 'Sustained investment in a group plus a clear reason.',
     dim: 'contribution', wt: 0.7, sig: ['Host', 'Connector'], spon: null,
-    logic: 'Sustained investment in a group plus a clear reason for staying scores high; transactional membership scores low.' },
+    logic: 'Sustained investment in a group plus a clear reason scores high; transactional membership scores low.' },
 
   { stableKey: 'goodCompany', label: "How do you know when you're in good company?", type: 'long_text', section: 'how-you-move',
     insightLabel: 'how they recognize good company',
-    insightDescription: 'Values around generosity and presence vs status/access-only framing.',
+    insightDescription: 'Values centering generosity and presence vs status/access-only.',
     dim: 'contribution', wt: 0.6, sig: ['Host', 'Connector'], spon: null,
-    logic: 'Values centering mutual generosity, presence, good-faith company score high; status/access-only framing scores low.' },
+    logic: 'Values centering mutual generosity and presence score high; status or access-only framing scores low.' },
 
-  { stableKey: 'detailsRight', label: "What's a restaurant, hotel, bar, or shop that gets the details right? And why?", type: 'long_text', section: 'how-you-move',
-    insightLabel: 'a place that gets the details right',
-    insightDescription: 'Precision of taste - naming the specific details that make a place work.',
-    dim: 'taste', wt: 0.8, sig: ['Curator', 'Host', 'Maker'], spon: 'high',
-    logic: 'Naming a specific place and the precise details that make it work signals strong taste; generic "nice vibes" scores low.' },
-
-  { stableKey: 'trustedTaste', label: 'Whose taste do you trust almost automatically - and what did they do to earn it?', type: 'long_text', section: 'how-you-move',
-    insightLabel: 'whose taste they trust and why',
-    insightDescription: 'Discernment and the reasoning behind who they calibrate against.',
-    dim: 'taste', wt: 0.7, sig: ['Curator', 'Maker'], spon: null,
-    logic: 'Articulate reasoning for whose taste they trust and why it was earned signals real discernment; name-drop without reasoning scores low.' },
-
-  { stableKey: 'brandPartner', label: 'If a brand reached out to partner with you tomorrow, which one would make sense - and why?', type: 'long_text', section: 'how-you-move',
-    insightLabel: 'a brand partnership that fits',
-    insightDescription: 'Taste and self-awareness in fit - values/aesthetic over reach-for-money.',
-    dim: 'taste', wt: 0.6, sig: ['Curator', 'Patron'], spon: 'high',
-    logic: 'A partner brand justified on values/aesthetic (not reach-for-money) signals taste and self-awareness.' },
-
-  { stableKey: 'loyalBrands', label: 'What brands are you most loyal to and why?', type: 'long_text', section: 'how-you-move',
-    insightLabel: 'brands they are loyal to and why',
-    insightDescription: 'Taste consistency - specific brands with a coherent reason.',
-    dim: 'taste', wt: 0.5, sig: ['Curator', 'Patron'], spon: 'high',
-    logic: 'Specific brands with a coherent "why" signal taste consistency.' },
-
-  { stableKey: 'splurgeSave', label: 'Where do you splurge and where do you save?', type: 'long_text', section: 'how-you-move',
-    insightLabel: 'where they splurge vs save',
-    insightDescription: 'Where quality genuinely matters to them - a priorities/taste hierarchy.',
-    dim: 'taste', wt: 0.5, sig: ['Patron', 'Curator', 'Host'], spon: 'medium',
-    logic: 'A deliberate splurge/save logic reveals where quality genuinely matters to them.' },
-
-  { stableKey: 'idealSaturday', label: "What's your ideal Saturday?", type: 'long_text', section: 'how-you-move',
-    insightLabel: 'their ideal Saturday',
-    insightDescription: 'Gathering/making/hosting vs passive consumption.',
-    dim: 'activation', wt: 0.5, sig: ['Host', 'Maker', 'Patron'], spon: null,
-    logic: 'A Saturday built around gathering, making, or hosting scores toward those archetypes; passive consumption scores low on activation.' },
-
-  { stableKey: 'recSources', label: 'Where do you turn for recommendations?', type: 'group', section: 'how-you-move',
-    insightLabel: 'where they get recommendations',
-    insightDescription: 'Their information diet across categories. Joins travel/food/health/beauty/fashion.',
-    dim: 'taste', wt: 0.4, sig: ['Curator'], spon: 'medium',
-    logic: "Specific discerning sources across categories signal a curator's information diet." },
-
-  { stableKey: 'scrollStopping', label: 'What kind of content stops you scrolling - and where is it living?', type: 'long_text', section: 'how-you-move',
-    insightLabel: 'content that stops their scroll',
-    insightDescription: 'Aesthetic and the channels they value (platform matters as much as content).',
-    dim: 'taste', wt: 0.4, sig: ['Curator', 'Maker'], spon: 'medium',
-    logic: 'What stops their scroll and where it lives signals aesthetic and valued channels.' },
-
-  // ── Section 03 - What You're Here For ──────────────────────────────────────
   { stableKey: 'flowThrough', label: 'What kind of people, ideas, or opportunities tend to flow through your world?', type: 'long_text', section: 'what-youre-here-for',
     insightLabel: 'what flows through their world',
     insightDescription: 'Network gravity - the caliber of what moves through them.',
-    dim: 'influence', wt: 0.8, sig: ['Connector', 'Patron', 'Curator'], spon: null,
-    logic: 'High-quality people/ideas/opportunities flowing through their world signals network gravity; thin or self-focused answers score low.' },
+    dim: 'influence', wt: 0.8, sig: ['Connector', 'Patron'], spon: null,
+    logic: 'High-quality people, ideas, or opportunities flowing through their world signals network gravity; thin or self-focused answers score low.' },
 
   { stableKey: 'investedIn', label: "What's something you've invested heavily in recently?", type: 'long_text', section: 'what-youre-here-for',
     insightLabel: 'what they invested heavily in',
-    insightDescription: 'Patron/Builder backing - money, time, or energy into a person/project/cause.',
+    insightDescription: 'Backing a person, project, or cause - Patron/Builder tell.',
     dim: 'contribution', wt: 0.6, sig: ['Patron', 'Builder'], spon: null,
-    logic: 'Heavy recent investment in a person, project, or cause signals Patron/Builder; money, time, or backing all count. Investment in self only scores lower on contribution.' },
+    logic: 'Heavy recent investment in a person, project, or cause scores high; backing others scores above self-investment.' },
 
-  { stableKey: 'friendDescribe', label: 'How would a close friend describe you at a party?', type: 'long_text', section: 'what-youre-here-for',
-    insightLabel: 'how a friend describes them at a party',
-    insightDescription: 'Social energy - gathering and making people comfortable.',
-    dim: 'activation', wt: 0.5, sig: ['Host', 'Connector'], spon: null,
-    logic: 'A party-description centering energy, gathering, or making people comfortable signals Host/Connector activation.' },
+  { stableKey: 'walkIntoRoom', label: "You walk into a room where you don't know anyone. What do you actually do?", type: 'long_text', section: 'how-you-move',
+    insightLabel: 'what they do walking into a room of strangers',
+    insightDescription: 'NEUTRAL DISCRIMINATOR - behavior sorts the archetype.',
+    dim: 'activation', wt: 0.9, sig: ['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'], spon: null,
+    logic: 'NEUTRAL DISCRIMINATOR. Behavior sorts: works-the-room / first-to-talk to Spark, finds-the-person-alone to Host, maps-who-should-meet to Connector, reads-the-room-first to Sage, finds-their-person to Patron, assesses-the-space / setup to Builder. Reward specificity; generic "I mingle" scores low.' },
+
+  { stableKey: 'unplannedFun', label: "What's the most fun you've had recently that wasn't planned?", type: 'long_text', section: 'how-you-move',
+    insightLabel: 'their best unplanned recent fun',
+    insightDescription: 'The say-yes instinct - ease and specificity of a spontaneous story.',
+    dim: 'activation', wt: 0.6, sig: ['Spark'], spon: null,
+    logic: "Ease and specificity of a spontaneous story scores high; can't-recall or reframed-as-planned scores low. Catches the say-yes instinct." },
+
+  { stableKey: 'meetPeople', label: 'Where do you meet new people?', type: 'long_text', section: 'how-you-move',
+    insightLabel: 'where they meet new people',
+    insightDescription: 'Rich people-oriented sources vs thin or purely online.',
+    dim: 'contribution', wt: 0.4, sig: ['Connector', 'Spark'], spon: null,
+    logic: 'Rich people-oriented sources (hobbies, gatherings, through-friends) score high; thin or purely online scores low.' },
 ];
 
 // ── SQL emitter (--print-sql) ────────────────────────────────────────────────
@@ -195,7 +153,7 @@ const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
 const arr = (a) => 'ARRAY[' + a.map(q).join(', ') + ']::text[]';
 const nullable = (s) => (s == null ? 'NULL' : q(s));
 
-function buildSql(workspaceId) {
+export function buildSql(workspaceId) {
   const wid = q(workspaceId);
   const tmplId = `(SELECT id FROM "ApplicationTemplate" WHERE "workspaceId" = ${wid} AND slug = ${q(TEMPLATE.slug)})`;
 
@@ -323,7 +281,11 @@ async function main() {
   await seedDev();
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// Only run on direct execution (`node scripts/seed-questions.mjs ...`); importing
+// this module (the sync guard test) must not connect to a DB or print SQL.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

@@ -39,6 +39,13 @@ export interface SubField {
   required?: boolean;
   system?: boolean;
   placeholder?: string;
+  /** For `select` sub-fields (e.g. the home-address state dropdown). */
+  options?: string[];
+  /** Layout hint: sub-fields sharing a `row` render side by side on one line.
+   *  When ANY sub-field in a group carries a row, the group is laid out row by
+   *  row (a sub-field with no row gets its own full-width line). Groups with no
+   *  row hints keep the default responsive two-column grid. */
+  row?: string;
 }
 
 export interface Question {
@@ -97,6 +104,48 @@ export const INTRO = {
   bold: 'We read every application. Nothing goes unnoticed.',
 };
 
+/** US states + District of Columbia, full names, for the home-address select. */
+export const US_STATES: string[] = [
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
+  'Delaware', 'District of Columbia', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois',
+  'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts',
+  'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+  'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota',
+  'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina',
+  'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+  'West Virginia', 'Wisconsin', 'Wyoming',
+];
+
+const ENNEAGRAM_OPTIONS: string[] = [
+  '1 - The Reformer',
+  '2 - The Helper',
+  '3 - The Achiever',
+  '4 - The Individualist',
+  '5 - The Investigator',
+  '6 - The Loyalist',
+  '7 - The Enthusiast',
+  '8 - The Challenger',
+  '9 - The Peacemaker',
+  "I don't know",
+];
+
+const MBTI_OPTIONS: string[] = [
+  'INTJ', 'INTP', 'ENTJ', 'ENTP',
+  'INFJ', 'INFP', 'ENFJ', 'ENFP',
+  'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
+  'ISTP', 'ISFP', 'ESTP', 'ESFP',
+  "I don't know",
+];
+
+const LOVE_LANGUAGE_OPTIONS: string[] = [
+  'Words of Affirmation',
+  'Quality Time',
+  'Physical Touch',
+  'Acts of Service',
+  'Receiving Gifts',
+  "I don't know",
+];
+
 export const QUESTIONS: Question[] = [
   // ---- Section 01 - Who You Are ----
   { id: 'firstName', section: 'who-you-are', label: 'First Name', type: 'text', required: true, system: true, row: 'name' },
@@ -111,13 +160,26 @@ export const QUESTIONS: Question[] = [
     row: 'contact',
   },
   { id: 'cell', section: 'who-you-are', label: 'Cell', type: 'tel', required: true, system: true, row: 'contact' },
-  { id: 'homeAddress', section: 'who-you-are', label: 'Home Address', type: 'text', required: true },
+  {
+    id: 'homeAddress',
+    section: 'who-you-are',
+    label: 'Home Address',
+    type: 'group',
+    fields: [
+      // Row 1: street on its own line. Row 2: city + state + zip across.
+      { id: 'street', label: 'Street Address', type: 'text', required: true, row: 'addr1' },
+      { id: 'city', label: 'City', type: 'text', required: true, row: 'addr2' },
+      { id: 'state', label: 'State', type: 'select', required: true, options: US_STATES, row: 'addr2' },
+      { id: 'zip', label: 'ZIP', type: 'text', required: true, row: 'addr2' },
+    ],
+  },
   {
     id: 'cities',
     section: 'who-you-are',
-    label: 'What cities do you split time between or visit regularly?',
+    label: 'What other cities do you spend real time in?',
     type: 'text',
     required: true,
+    help: 'Outside Austin - places you visit often, have people in, or feel part of.',
   },
   {
     id: 'birthInfo',
@@ -178,11 +240,17 @@ export const QUESTIONS: Question[] = [
   {
     id: 'whatYouDo',
     section: 'who-you-are',
-    label: 'What Do You Do',
+    label: 'What do you do?',
     type: 'textarea',
     required: true,
-    help:
-      "Your primary role and industry. What you actually spend most of your time on (it may be different). What you're building or working toward right now.",
+    help: 'Your primary role, industry, and company.',
+  },
+  {
+    id: 'characteristicsGoodAtJob',
+    section: 'who-you-are',
+    label: 'What characteristics make you good at your job?',
+    type: 'textarea',
+    required: true,
   },
   {
     id: 'creativePursuits',
@@ -199,18 +267,37 @@ export const QUESTIONS: Question[] = [
     type: 'group',
     help: 'Up to three names.',
     fields: [
-      { id: 'referral1', label: 'Referral 1', type: 'text', required: true },
-      { id: 'referral2', label: 'Referral 2', type: 'text', required: false },
-      { id: 'referral3', label: 'Referral 3', type: 'text', required: false },
+      { id: 'referral1First', label: 'Referral 1 - First Name', type: 'text', required: true },
+      { id: 'referral1Last', label: 'Referral 1 - Last Name', type: 'text', required: true },
+      { id: 'referral2First', label: 'Referral 2 - First Name', type: 'text', required: false },
+      { id: 'referral2Last', label: 'Referral 2 - Last Name', type: 'text', required: false },
+      { id: 'referral3First', label: 'Referral 3 - First Name', type: 'text', required: false },
+      { id: 'referral3Last', label: 'Referral 3 - Last Name', type: 'text', required: false },
     ],
   },
   {
     id: 'enneagram',
     section: 'who-you-are',
     label: 'Enneagram Type',
-    type: 'number',
+    type: 'select',
     required: false,
-    help: "If you don't know yours, skip it - we'll figure it out together.",
+    options: ENNEAGRAM_OPTIONS,
+  },
+  {
+    id: 'mbti',
+    section: 'who-you-are',
+    label: 'Myers-Briggs Type',
+    type: 'select',
+    required: false,
+    options: MBTI_OPTIONS,
+  },
+  {
+    id: 'loveLanguage',
+    section: 'who-you-are',
+    label: "What's your love language?",
+    type: 'select',
+    required: false,
+    options: LOVE_LANGUAGE_OPTIONS,
   },
   {
     id: 'otherTests',
@@ -218,22 +305,14 @@ export const QUESTIONS: Question[] = [
     label: 'Other Personality Tests',
     type: 'textarea',
     required: false,
-    help:
-      "Any other personality tests you've taken? List your results below. Myers-Briggs, StrengthsFinder, DISC, Love Languages - whatever you've got. It all helps us put the right people in the room with you.",
+    help: "Anything else - StrengthsFinder, DISC, Human Design, whatever you've got.",
   },
 
   // ---- Section 02 - How You Move Through the World ----
   {
-    id: 'lastConvinced',
-    section: 'how-you-move',
-    label: "What's the last thing you convinced a friend to buy?",
-    type: 'textarea',
-    required: true,
-  },
-  {
     id: 'obsessedWith',
     section: 'how-you-move',
-    label: "What's something you've become obsessed with lately?",
+    label: "What's something you've become obsessed with?",
     type: 'textarea',
     required: true,
   },
@@ -254,97 +333,33 @@ export const QUESTIONS: Question[] = [
       'Could be advice, recommendations, introductions, certain opportunities, experiences, perspective - or something else entirely.',
   },
   {
-    id: 'loyalBrands',
+    id: 'walkIntoRoom',
     section: 'how-you-move',
-    label: 'What brands are you most loyal to and why?',
-    type: 'textarea',
-    required: true,
-  },
-  {
-    id: 'expertIn',
-    section: 'how-you-move',
-    label: 'What would you call yourself a genuine expert in?',
+    label: "You walk into a room where you don't know anyone. What do you actually do?",
     type: 'textarea',
     required: true,
     help:
-      'This may or may not be what people come to you for - and it may or may not be what you do for a living.',
+      'Be honest, not aspirational - what you actually do, not what you wish you did. Do you find someone to talk to, or hang back and get a read on the room first? Be specific.',
   },
   {
-    id: 'splurgeSave',
+    id: 'unplannedFun',
     section: 'how-you-move',
-    label: 'Where do you splurge and where do you save?',
+    label: "What's the most fun you've had recently that wasn't planned?",
     type: 'textarea',
     required: true,
     help:
-      'This helps us understand how you make decisions and match you with brands that actually fit the way you spend.',
+      'A day or a night that started as nothing and turned into a story. Maybe you went to the park and ended up in a pickup game with strangers who are now your Sunday soccer crew. What happened?',
   },
   {
-    id: 'brandPartner',
+    id: 'meetPeople',
     section: 'how-you-move',
-    label:
-      'If a brand reached out to partner with you tomorrow, which one would actually make sense - and why would it work?',
+    label: 'Where do you meet new people?',
     type: 'textarea',
     required: true,
-    help: 'Think fit, not fantasy.',
-  },
-  {
-    id: 'detailsRight',
-    section: 'how-you-move',
-    label: "What's a restaurant, hotel, bar, or shop that gets the details right? And why?",
-    type: 'textarea',
-    required: true,
-    help: 'Tell us about it. What did they get right?',
-  },
-  {
-    id: 'idealSaturday',
-    section: 'how-you-move',
-    label: "What's your ideal Saturday?",
-    type: 'textarea',
-    required: true,
+    help:
+      "Is it a bar, the gym, a friend's house? A hobby, a class? Wherever the good ones actually come from.",
   },
   { id: 'workout', section: 'how-you-move', label: 'Preferred workout?', type: 'text', required: true },
-  {
-    id: 'trustedTaste',
-    section: 'how-you-move',
-    label: 'Whose taste do you trust almost automatically - and what did they do to earn it?',
-    type: 'textarea',
-    required: true,
-    help: 'Could be a friend, celebrity, creator, athlete, or someone in your life.',
-  },
-  {
-    id: 'recSources',
-    section: 'how-you-move',
-    label: 'Where do you turn for recommendations?',
-    type: 'group',
-    required: true,
-    help: 'Give us a source, person, platform, or community for each.',
-    fields: [
-      { id: 'travel', label: 'Travel', type: 'text', required: true },
-      { id: 'food', label: 'Food', type: 'text', required: true },
-      { id: 'healthWellness', label: 'Health & wellness', type: 'text', required: true },
-      { id: 'beauty', label: 'Beauty', type: 'text', required: true },
-      { id: 'fashionDesign', label: 'Fashion & Design', type: 'text', required: true },
-    ],
-  },
-  {
-    id: 'podcasts',
-    section: 'how-you-move',
-    label: 'Top 2 to 3 podcasts you listen to most',
-    type: 'group',
-    fields: [
-      { id: 'podcast1', label: 'Podcast 1', type: 'text', required: true },
-      { id: 'podcast2', label: 'Podcast 2', type: 'text', required: false },
-      { id: 'podcast3', label: 'Podcast 3', type: 'text', required: false },
-    ],
-  },
-  {
-    id: 'scrollStopping',
-    section: 'how-you-move',
-    label: 'What kind of content stops you scrolling - and where is it living?',
-    type: 'textarea',
-    required: true,
-    help: 'Platform matters as much as content type here.',
-  },
   {
     id: 'goodCompany',
     section: 'how-you-move',
@@ -362,17 +377,9 @@ export const QUESTIONS: Question[] = [
   {
     id: 'loyalCommunity',
     section: 'how-you-move',
-    label: "Tell us about a group or community you've stayed loyal to - and what keeps you there.",
+    label: "Tell us about a group or community you've stayed loyal to - and what keeps you there?",
     type: 'textarea',
     required: true,
-  },
-  {
-    id: 'karaoke',
-    section: 'how-you-move',
-    label: "What's your go-to karaoke song?",
-    type: 'text',
-    required: true,
-    help: 'Be honest.',
   },
 
   // ---- Section 03 - What You're Here For ----
@@ -399,16 +406,9 @@ export const QUESTIONS: Question[] = [
     help: 'Time, money, energy, attention - any of the above.',
   },
   {
-    id: 'friendDescribe',
-    section: 'what-youre-here-for',
-    label: 'How would a close friend describe you at a party?',
-    type: 'textarea',
-    required: true,
-  },
-  {
     id: 'nominate',
     section: 'what-youre-here-for',
-    label: 'Who would you nominate to join No Bad Company?',
+    label: "Who's someone you've wanted to bring to a No Bad Company party?",
     type: 'textarea',
     required: false,
     help: 'Applications are reviewed personally. We will be in touch.',

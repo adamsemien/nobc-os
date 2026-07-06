@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { archetypeDisplayName } from '@/config/archetypes';
 
 export type ConstellationMember = {
   id: string;
@@ -11,7 +12,7 @@ export type ConstellationMember = {
   score: number;
 };
 
-const ARCHETYPE_KEYS = ['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'] as const;
+const ARCHETYPE_KEYS = ['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'] as const;
 
 const ARCHETYPE_COLOR: Record<string, string> = {
   Connector: 'var(--archetype-connector, #4A9EFF)',
@@ -20,6 +21,8 @@ const ARCHETYPE_COLOR: Record<string, string> = {
   Builder: 'var(--archetype-builder, #4EBA7A)',
   Maker: 'var(--archetype-maker, #E85B4E)',
   Patron: 'var(--archetype-patron, #E0B84A)',
+  Sage: 'var(--archetype-sage, #B47ED8)',
+  Spark: 'var(--archetype-spark, #E85B4E)',
 };
 
 function hashStr(s: string): number {
@@ -166,7 +169,7 @@ export function MemberConstellation({ members }: { members: ConstellationMember[
           }}
         >
           <span style={{ color: tip.m.color }}>●</span> {tip.m.name}
-          <span style={{ opacity: 0.6 }}> · {tip.m.archetype} · {Math.round(tip.m.score * 100)}</span>
+          <span style={{ opacity: 0.6 }}> · {archetypeDisplayName(tip.m.archetype)} · {Math.round(tip.m.score * 100)}</span>
         </div>
       )}
       <div

@@ -56,8 +56,8 @@ describe('archetype → influence tier mapping', () => {
   it('maps the six archetypes to the five tiers (Host folds into Connector)', () => {
     expect(archetypeToBucket('Patron')).toBe('Founder');
     expect(archetypeToBucket('Builder')).toBe('Operator');
-    expect(archetypeToBucket('Maker')).toBe('Creator');
-    expect(archetypeToBucket('Curator')).toBe('Tastemaker');
+    expect(archetypeToBucket('Spark')).toBe('Creator');
+    expect(archetypeToBucket('Sage')).toBe('Tastemaker');
     expect(archetypeToBucket('Connector')).toBe('Connector');
     expect(archetypeToBucket('Host')).toBe('Connector');
   });

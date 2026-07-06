@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
+import { archetypeDisplayName } from '@/config/archetypes';
 import {
   Avatar,
   DataTableShell,
@@ -408,7 +409,7 @@ export function MembersBulkActions({
               <DataTableCell tone="secondary">
                 {m.archetype ? (
                   <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
-                    {m.archetype}
+                    {archetypeDisplayName(m.archetype)}
                   </span>
                 ) : (
                   <span className="text-text-muted">—</span>

@@ -6,7 +6,10 @@
  *
  *  No per-archetype colour logic — one style, all archetypes.
  *  Renders nothing when `archetype` is null/empty.
+ *  The `archetype` prop is the STORED enum value; the pill renders its
+ *  user-facing displayName (Host -> Caregiver, Patron -> Champion).
  */
+import { archetypeDisplayName } from '@/config/archetypes';
 
 type Props = { archetype: string | null | undefined };
 
@@ -22,7 +25,7 @@ export function ArchetypeChip({ archetype }: Props) {
         borderColor: 'var(--border)',
       }}
     >
-      {archetype}
+      {archetypeDisplayName(archetype)}
     </span>
   );
 }

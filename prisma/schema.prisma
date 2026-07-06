@@ -585,6 +585,9 @@ model Application {
   archetype               String?
   archetypeScores         Json?
   personalizedCopy        String?
+  // Reveal "Why we called you this" note (six-archetype recut, 2026-07). Written
+  // fresh for new applications; legacy rows keep personalizedCopy. Additive-only.
+  personalNote            String?
   templateId              String?
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt

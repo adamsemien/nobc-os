@@ -102,14 +102,14 @@ export const DEMO_FUNNEL = {
 
 /** Synthetic dormant-member cohort for demo mode. */
 export const DEMO_DORMANT = [
-  { name: 'Greta Lindqvist', cohort: 'Jul 2025', daysSinceRsvp: 167, archetype: 'Curator' },
+  { name: 'Greta Lindqvist', cohort: 'Jul 2025', daysSinceRsvp: 167, archetype: 'Sage' },
   { name: 'Roman Vasquez', cohort: 'Jul 2025', daysSinceRsvp: 154, archetype: 'Host' },
   { name: 'Wesley Kim', cohort: 'Aug 2025', daysSinceRsvp: 142, archetype: 'Builder' },
   { name: 'Margot Devereux', cohort: 'Aug 2025', daysSinceRsvp: 131, archetype: 'Connector' },
-  { name: 'Hugo Almeida', cohort: 'Sep 2025', daysSinceRsvp: 119, archetype: 'Maker' },
+  { name: 'Hugo Almeida', cohort: 'Sep 2025', daysSinceRsvp: 119, archetype: 'Spark' },
   { name: 'Talia Brooks', cohort: 'Sep 2025', daysSinceRsvp: 108, archetype: 'Connector' },
   { name: 'Levi Steinberg', cohort: 'Sep 2025', daysSinceRsvp: 101, archetype: 'Host' },
-  { name: 'Frances Okafor', cohort: 'Oct 2025', daysSinceRsvp: 96, archetype: 'Curator' },
+  { name: 'Frances Okafor', cohort: 'Oct 2025', daysSinceRsvp: 96, archetype: 'Sage' },
 ];
 
 /** Synthetic weekly Charter-share trend for demo mode (percent). */

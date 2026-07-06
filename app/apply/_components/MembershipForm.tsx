@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName } from '@/config/archetypes';
+import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName, archetypeDisplayName } from '@/config/archetypes';
 import { CONSENT_DISCLOSURES, TERMS_VERSION } from '@/lib/apply-consent';
 import dynamic from 'next/dynamic';
 import { Mic } from 'lucide-react';
@@ -58,9 +58,27 @@ interface SubmitResult {
   archetype: string;
   archetypeScores: Record<string, number>;
   tags: string[];
-  personalizedCopy: string;
+  personalNote: string;
   rsvpId?: string | null;
   memberQrCode?: string | null;
+}
+
+/** Archetype art path convention. Adam drops the six finals at these paths;
+ *  the reveal + share card hide the slot gracefully if the file is missing. */
+function archetypeArtSrc(archetype: string): string {
+  return `/archetypes/${archetype.toLowerCase()}.png`;
+}
+
+/** Top-two blend from the archetype scores, as { top, second } stored enums.
+ *  `top` is the assigned archetype; `second` is the next-highest scorer. */
+function topTwoBlend(
+  scores: Record<string, number>,
+  topArchetype: string,
+): { top: string; second: string | null } {
+  const ranked = Object.entries(scores)
+    .filter(([name]) => name !== topArchetype)
+    .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+  return { top: topArchetype, second: ranked.length ? ranked[0][0] : null };
 }
 
 // Door 1 reveal QR — mirrors the Door 2 confirmation QR treatment (qrcode -> SVG,
@@ -134,25 +152,25 @@ const EMPTY_FORM: FormData = {
 
 // ---------------------------------------------------------------------------
 // Chapter pagination - the questions module is the single source of truth for
-// CONTENT; this map is the single source of truth for LAYOUT. The 40 questions
-// are grouped into 6 chapter-pages. Nothing is cut, renamed, or duplicated -
-// every id below resolves to a question in the module. Each page belongs to
-// exactly one section, so the three section interstitials still fire only at
-// the section boundaries (pages 1, 3, and 6).
+// CONTENT; this map is the single source of truth for LAYOUT. The current
+// question set is grouped into 6 chapter-pages. Nothing is cut, renamed, or
+// duplicated - every id below resolves to a question in the module. Each page
+// belongs to exactly one section, so the three section interstitials still fire
+// only at the section boundaries (the first page of each section).
 // ---------------------------------------------------------------------------
 
 const CHAPTER_PAGE_IDS: string[][] = [
-  // Section 01 - Who You Are (pages follow module order; personality-test
-  // questions kept together on Page 2). Photos close the identity page - the
+  // Section 01 - Who You Are. Personality selects (enneagram / MBTI / love
+  // language) kept together on Page 2. Photos close the identity page - the
   // natural end of "tell us who you are", per Adam's placement call.
   ['firstName', 'lastName', 'email', 'cell', 'homeAddress', 'cities', 'birthInfo', 'gender', 'dietary', 'links', 'photos'],
-  ['whatYouDo', 'creativePursuits', 'referrals', 'enneagram', 'otherTests'],
+  ['whatYouDo', 'characteristicsGoodAtJob', 'creativePursuits', 'referrals', 'enneagram', 'mbti', 'loveLanguage', 'otherTests'],
   // Section 02 - How You Move Through the World
-  ['lastConvinced', 'obsessedWith', 'recommendForPay', 'comeToYouFor', 'loyalBrands', 'expertIn'],
-  ['splurgeSave', 'brandPartner', 'detailsRight', 'trustedTaste', 'recSources'],
-  ['idealSaturday', 'workout', 'podcasts', 'scrollStopping', 'goodCompany', 'connectionCreated', 'loyalCommunity', 'karaoke'],
+  ['obsessedWith', 'recommendForPay', 'comeToYouFor', 'walkIntoRoom'],
+  ['unplannedFun', 'meetPeople', 'workout'],
+  ['goodCompany', 'connectionCreated', 'loyalCommunity'],
   // Section 03 - What You're Here For
-  ['chapter', 'flowThrough', 'investedIn', 'friendDescribe', 'nominate'],
+  ['chapter', 'flowThrough', 'investedIn', 'nominate'],
 ];
 
 const QUESTION_BY_ID: Record<string, Question> = Object.fromEntries(
@@ -212,6 +230,29 @@ const SECTION_BY_ID = Object.fromEntries(SECTIONS.map(s => [s.id, s] as const));
 /** Answer key for a simple field or a group sub-field. */
 function answerKey(q: Question, sub?: SubField): string {
   return sub ? `${q.id}.${sub.id}` : q.id;
+}
+
+/** Group a question's sub-fields into visual rows for the group renderer.
+ *  Sub-fields that share a `row` value render on one line together; a sub-field
+ *  with no `row` gets its own full-width line. Declaration order is preserved.
+ *  (Used by the home-address group: street on its own row, then city/state/zip.) */
+function groupSubFieldsByRow(fields: SubField[]): SubField[][] {
+  const rows: SubField[][] = [];
+  const byRow = new Map<string, SubField[]>();
+  for (const f of fields) {
+    if (!f.row) {
+      rows.push([f]);
+      continue;
+    }
+    let bucket = byRow.get(f.row);
+    if (!bucket) {
+      bucket = [];
+      byRow.set(f.row, bucket);
+      rows.push(bucket);
+    }
+    bucket.push(f);
+  }
+  return rows;
 }
 
 /** Every answer key a page reads/writes, used for validation + step resume. */
@@ -1056,39 +1097,59 @@ export default function MembershipForm({
     }
   }
 
-  function generateShareCard() {
+  async function generateShareCard() {
     if (!submitResult) return;
     const canvas = document.createElement('canvas');
     canvas.width = 1080; canvas.height = 1080;
     const ctx = canvas.getContext('2d')!;
 
-    ctx.fillStyle = '#0d0d0f';
+    // Cream ground (design token --bg day) with warm near-black text.
+    ctx.fillStyle = '#f9f7f2';
     ctx.fillRect(0, 0, 1080, 1080);
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#1a1520';
     ctx.font = '500 18px Helvetica Neue, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.letterSpacing = '0.2em';
-    ctx.fillText('THE NO BAD COMPANY', 540, 120);
+    ctx.fillText('THE NO BAD COMPANY', 540, 110);
+    ctx.letterSpacing = '0em';
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'italic 140px Georgia, serif';
+    // Animal art centered above the name. Best-effort: if the file is missing or
+    // fails to decode, skip it and lay the name out at a default position.
+    let nameY = 560;
+    try {
+      const art = new Image();
+      art.src = archetypeArtSrc(submitResult.archetype);
+      await art.decode();
+      const boxW = 340;
+      const scale = art.naturalWidth ? boxW / art.naturalWidth : 1;
+      const h = Math.min(360, (art.naturalHeight || boxW) * scale);
+      const w = (art.naturalWidth || boxW) * (h / ((art.naturalHeight || boxW) * scale)) * scale;
+      ctx.drawImage(art, 540 - w / 2, 180, w, h);
+      nameY = 180 + h + 130;
+    } catch {
+      // no art yet — name sits at the default y
+    }
+
+    const displayName = archetypeDisplayName(submitResult.archetype);
+    ctx.fillStyle = '#1a1520';
+    ctx.font = 'italic 130px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText(submitResult.archetype, 540, 520);
+    ctx.fillText(displayName, 540, nameY);
 
     const oneLiner = ARCHETYPES[submitResult.archetype as ArchetypeName]?.oneLiner ?? '';
-    ctx.font = '32px Helvetica Neue, Arial, sans-serif';
-    ctx.fillStyle = '#9e9a9a';
-    ctx.fillText(oneLiner, 540, 600);
+    ctx.font = 'italic 30px Georgia, serif';
+    ctx.fillStyle = '#5a5560';
+    ctx.fillText(oneLiner, 540, nameY + 80);
 
     const topTags = (submitResult.tags ?? []).slice(0, 2);
     if (topTags.length > 0) {
       ctx.fillStyle = '#B22E21';
       ctx.font = '500 24px Helvetica Neue, Arial, sans-serif';
-      ctx.fillText(topTags.join('  ·  ').toUpperCase(), 540, 900);
+      ctx.fillText(topTags.join('  ·  ').toUpperCase(), 540, 960);
     }
 
-    ctx.fillStyle = '#666666';
+    ctx.fillStyle = '#8a8590';
     ctx.font = '16px Helvetica Neue, Arial, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText('nobc-os.vercel.app/apply', 1040, 1040);
@@ -1155,11 +1216,13 @@ export default function MembershipForm({
   }
 
   const archetypeData = submitResult ? ARCHETYPES[submitResult.archetype as ArchetypeName] : null;
-  const dayStory = archetypeData?.dayStory ?? '';
-  const nightStory = archetypeData?.nightStory ?? '';
-  // The AI personalization (empty when scoring fell back). Do NOT default to
-  // dayStory — that made "YOUR STORY" render a verbatim copy of "BY DAY".
-  const personalizedStory = (submitResult?.personalizedCopy ?? '').trim();
+  const revealDisplayName = archetypeDisplayName(submitResult?.archetype);
+  // The AI reveal note (empty when scoring/generation fell back). Rendered as
+  // "Why we called you this"; the beat is omitted when empty.
+  const personalNote = (submitResult?.personalNote ?? '').trim();
+  // Blend line from the top two archetype scores, rendered as displayNames.
+  const blend = submitResult ? topTwoBlend(submitResult.archetypeScores, submitResult.archetype) : null;
+  const blendSecondName = blend?.second ? archetypeDisplayName(blend.second) : '';
 
   // ----- Generic question rendering -----
 
@@ -1366,6 +1429,23 @@ export default function MembershipForm({
   function renderSubInput(q: Question, sub: SubField) {
     const key = answerKey(q, sub);
     const value = answers[key] ?? '';
+    if (sub.type === 'select') {
+      return (
+        <select
+          id={key}
+          style={{ ...getInputStyle(key), colorScheme: isNight ? 'dark' : 'light', appearance: 'none' }}
+          onFocus={() => setFocusedField(key)}
+          onBlur={() => setFocusedField(null)}
+          value={value}
+          onChange={e => setAnswer(key, e.target.value)}
+        >
+          <option value="" disabled>Select…</option>
+          {(sub.options ?? []).map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      );
+    }
     const inputType =
       sub.type === 'email' ? 'email'
       : sub.type === 'tel' ? 'tel'
@@ -1392,19 +1472,44 @@ export default function MembershipForm({
 
   function renderQuestion(q: Question, hintKey: string | null = null) {
     if (q.type === 'group') {
+      const fields = q.fields ?? [];
+      const subLabel = (sub: SubField) =>
+        sub.label ? (
+          <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>
+            {sub.label}{sub.required && <span style={{ color: theme.accent }}> *</span>}
+          </label>
+        ) : null;
+      const hasRows = fields.some(f => f.row);
       return (
         <div key={q.id} style={fieldGroup}>
           <label style={labelStyle}>{q.label}</label>
           {q.help && <p style={helpStyle}>{q.help}</p>}
-          {/* One column on phones, two columns from 600px up (see .apply-group-grid). */}
-          <div className="apply-group-grid" style={{ marginTop: 12 }}>
-            {(q.fields ?? []).map(sub => (
-              <div key={sub.id}>
-                {sub.label && <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>{sub.label}{sub.required && <span style={{ color: theme.accent }}> *</span>}</label>}
-                {renderSubInput(q, sub)}
-              </div>
-            ))}
-          </div>
+          {hasRows ? (
+            // Row-based layout: sub-fields sharing a `row` sit side by side; a
+            // sub-field with no row gets its own full-width line.
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {groupSubFieldsByRow(fields).map((rowFields, ri) => (
+                <div key={ri} style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                  {rowFields.map(sub => (
+                    <div key={sub.id} style={{ flex: '1 1 140px', minWidth: 0 }}>
+                      {subLabel(sub)}
+                      {renderSubInput(q, sub)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Default: one column on phones, two columns from 600px up (see .apply-group-grid).
+            <div className="apply-group-grid" style={{ marginTop: 12 }}>
+              {fields.map(sub => (
+                <div key={sub.id}>
+                  {subLabel(sub)}
+                  {renderSubInput(q, sub)}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
@@ -1969,6 +2074,23 @@ export default function MembershipForm({
                 flexDirection: 'column',
                 justifyContent: 'flex-start',
               }}>
+                {/* Animal art — placeholder path per archetype; hides itself if
+                    the final art has not been dropped into /public/archetypes yet. */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- static per-archetype art from /public, not a remote asset */}
+                <img
+                  src={archetypeArtSrc(submitResult.archetype)}
+                  alt=""
+                  aria-hidden="true"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  style={{
+                    width: 'clamp(120px, 20vw, 200px)',
+                    height: 'auto',
+                    marginBottom: 24,
+                    animation: 'fadeInUp 500ms ease 0ms forwards',
+                    opacity: 0,
+                  }}
+                />
+
                 <span style={{
                   fontFamily: bodyFont,
                   fontSize: 11,
@@ -1981,7 +2103,7 @@ export default function MembershipForm({
                   animation: 'fadeInUp 500ms ease 0ms forwards',
                   opacity: 0,
                 }}>
-                  YOUR ARCHETYPE
+                  YOU&apos;RE THE
                 </span>
 
                 <h1 style={{
@@ -1996,18 +2118,20 @@ export default function MembershipForm({
                   animation: 'fadeInUp 500ms ease 0ms forwards',
                   opacity: 0,
                 }}>
-                  {submitResult.archetype}
+                  {revealDisplayName}
                 </h1>
 
+                {/* oneLiner pulled out as the identity line. */}
                 <p style={{
-                  fontFamily: bodyFont,
-                  fontSize: 18,
+                  fontFamily: displayFont,
+                  fontSize: 'clamp(22px, 3vw, 30px)',
                   fontWeight: 400,
-                  color: THEME.night.muted,
-                  maxWidth: 480,
+                  fontStyle: 'italic',
+                  color: THEME.night.text,
+                  maxWidth: 560,
                   marginBottom: 0,
                   marginTop: 0,
-                  lineHeight: 1.5,
+                  lineHeight: 1.4,
                   animation: 'fadeInUp 500ms ease 400ms forwards',
                   opacity: 0,
                 }}>
@@ -2016,62 +2140,45 @@ export default function MembershipForm({
 
                 <div style={{ height: 48 }} />
 
-                <div style={{
-                  marginBottom: 32,
-                  animation: 'fadeInUp 500ms ease 800ms forwards',
-                  opacity: 0,
-                }}>
-                  <span style={{
-                    fontFamily: bodyFont,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: THEME.night.accent,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    display: 'block',
-                    marginBottom: 12,
-                  }}>BY DAY</span>
-                  <p style={{
-                    fontFamily: displayFont,
-                    fontSize: 20,
-                    fontStyle: 'italic',
-                    lineHeight: 1.8,
-                    color: THEME.night.text,
-                    maxWidth: 520,
-                    margin: 0,
-                  }}>{dayStory}</p>
-                </div>
+                {/* Three copy beats from config/archetypes.ts. */}
+                {([
+                  { label: 'Who you are', text: archetypeData?.whoYouAre ?? '' },
+                  { label: 'The cost', text: archetypeData?.theCost ?? '' },
+                  { label: 'How you move through a room', text: archetypeData?.howYouMove ?? '' },
+                ] as const).map((beat, bi) => beat.text ? (
+                  <div key={beat.label} style={{
+                    marginBottom: 32,
+                    animation: `fadeInUp 500ms ease ${800 + bi * 400}ms forwards`,
+                    opacity: 0,
+                  }}>
+                    <span style={{
+                      fontFamily: bodyFont,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: THEME.night.accent,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      display: 'block',
+                      marginBottom: 12,
+                    }}>{beat.label}</span>
+                    <p style={{
+                      fontFamily: displayFont,
+                      fontSize: 20,
+                      fontStyle: 'italic',
+                      lineHeight: 1.8,
+                      color: THEME.night.text,
+                      maxWidth: 520,
+                      margin: 0,
+                    }}>{beat.text}</p>
+                  </div>
+                ) : null)}
 
-                <div style={{
-                  marginBottom: 32,
-                  animation: 'fadeInUp 500ms ease 1200ms forwards',
-                  opacity: 0,
-                }}>
-                  <span style={{
-                    fontFamily: bodyFont,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: THEME.night.accent,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    display: 'block',
-                    marginBottom: 12,
-                  }}>BY NIGHT</span>
-                  <p style={{
-                    fontFamily: displayFont,
-                    fontSize: 20,
-                    fontStyle: 'italic',
-                    lineHeight: 1.8,
-                    color: THEME.night.text,
-                    maxWidth: 520,
-                    margin: 0,
-                  }}>{nightStory}</p>
-                </div>
-
-                {personalizedStory && (
+                {/* Why we called you this — the personalized note. Omitted when
+                    generation failed or fell back to empty. */}
+                {personalNote && (
                 <div style={{
                   marginBottom: 0,
-                  animation: 'fadeInUp 500ms ease 1600ms forwards',
+                  animation: 'fadeInUp 500ms ease 2000ms forwards',
                   opacity: 0,
                 }}>
                   <span style={{
@@ -2083,7 +2190,7 @@ export default function MembershipForm({
                     textTransform: 'uppercase',
                     display: 'block',
                     marginBottom: 12,
-                  }}>YOUR STORY</span>
+                  }}>Why we called you this</span>
                   <p style={{
                     fontFamily: displayFont,
                     fontSize: 20,
@@ -2092,8 +2199,24 @@ export default function MembershipForm({
                     color: THEME.night.text,
                     maxWidth: 520,
                     margin: 0,
-                  }}>{personalizedStory}</p>
+                  }}>{personalNote}</p>
                 </div>
+                )}
+
+                {/* Blend line from the top two archetype scores. */}
+                {blendSecondName && (
+                <p style={{
+                  fontFamily: bodyFont,
+                  fontSize: 15,
+                  color: THEME.night.muted,
+                  letterSpacing: '0.04em',
+                  marginTop: 32,
+                  marginBottom: 0,
+                  animation: 'fadeInUp 500ms ease 2200ms forwards',
+                  opacity: 0,
+                }}>
+                  {revealDisplayName}, with a {blendSecondName} streak.
+                </p>
                 )}
 
                 {!isDemo && !previewMode && (
@@ -2150,7 +2273,7 @@ export default function MembershipForm({
                     return (
                       <div key={name} style={{ marginBottom: 16 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, fontFamily: bodyFont, color: isTop ? THEME.night.accent : THEME.night.text, fontWeight: isTop ? 600 : 400 }}>{name}</span>
+                          <span style={{ fontSize: 12, fontFamily: bodyFont, color: isTop ? THEME.night.accent : THEME.night.text, fontWeight: isTop ? 600 : 400 }}>{archetypeDisplayName(name)}</span>
                           <span style={{ fontSize: 12, fontFamily: bodyFont, color: THEME.night.muted }}>{score}</span>
                         </div>
                         <div style={{ height: 4, background: THEME.night.border, borderRadius: 0, overflow: 'hidden' }}>

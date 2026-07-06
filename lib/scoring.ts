@@ -15,14 +15,14 @@ import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
 const SCORING_MODEL = JUDGMENT_MODEL;
 
 export const ScoringResultSchema = z.object({
-  archetype: z.enum(['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron']),
+  archetype: z.enum(['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark']),
   archetypeScores: z.object({
     Connector: z.number(),
     Host: z.number(),
-    Curator: z.number(),
     Builder: z.number(),
-    Maker: z.number(),
     Patron: z.number(),
+    Sage: z.number(),
+    Spark: z.number(),
   }),
   dimensionScores: z.object({
     influence: z.number(),
@@ -40,7 +40,7 @@ export type ScoringResult = z.infer<typeof ScoringResultSchema>;
 
 const FALLBACK: ScoringResult = {
   archetype: 'Connector',
-  archetypeScores: { Connector: 50, Host: 50, Curator: 50, Builder: 50, Maker: 50, Patron: 50 },
+  archetypeScores: { Connector: 50, Host: 50, Builder: 50, Patron: 50, Sage: 50, Spark: 50 },
   dimensionScores: { influence: 5, contribution: 5, activation: 5, taste: 5 },
   memberWorthTotal: 50,
   aiRecommendation: 'unclear',
@@ -119,7 +119,13 @@ ${questionBlock || '(no scored questions answered)'}
 
 Score each dimension (influence, contribution, activation, taste) on a scale of 1-10.
 Weight each question's contribution by its stated weight (0 = ignore, 1 = primary).
-archetypeScores are 0-100 per archetype. Assign the top archetype from: Connector, Host, Curator, Builder, Maker, Patron.
+archetypeScores are 0-100 per archetype. Assign the top archetype from these six (score and emit the STORED enum value on the left; the name in parentheses is the concept it represents):
+- Connector - gives before asking; makes introductions; two steps ahead for everyone around them.
+- Host (scored as the "Caregiver" concept - notices what people need and quietly handles it; makes people feel held, not hosted).
+- Builder - makes things from nothing; pulls others into the making; a blank page is just Tuesday.
+- Patron (scored as the "Champion" concept - loyal and brave; moves closer when it gets hard; makes people feel safe, not admired).
+- Sage - collects understanding over attention; reads a room before speaking; people trust them with the real stuff.
+- Spark - instinct for joy; creates momentum; people remember how they felt around them.
 Use the ARCHETYPE SIGNALS on each question to weight your archetype decision.
 memberWorthTotal is overall fit on a 0-100 scale.
 Also produce 3-5 short lowercase tags capturing this person's vibe/identity.`;

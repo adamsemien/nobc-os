@@ -24,8 +24,8 @@ export type InfluenceBucket = InfluenceTier | 'Unsegmented';
 export const ARCHETYPE_TO_INFLUENCE_TIER: Record<ArchetypeName, InfluenceTier> = {
   Patron: 'Founder',
   Builder: 'Operator',
-  Maker: 'Creator',
-  Curator: 'Tastemaker',
+  Sage: 'Tastemaker',
+  Spark: 'Creator',
   Connector: 'Connector',
   Host: 'Connector',
 };

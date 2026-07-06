@@ -16,6 +16,7 @@ import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
 import { isApplicationAccountOwner } from '@/lib/apply-account-link';
 import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
+import { buildPersonalNote } from '@/lib/applications/personal-note';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 import { sendGuestAccessConfirmation } from '@/emails/GuestAccessConfirmation';
 
@@ -57,15 +58,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // A double-tap, network retry, or script replay must not re-run scoring (two
   // billed Sonnet calls) or re-send the welcome email. Once an application has
   // been scored (aiScore set) we return the persisted reveal shape unchanged —
-  // the client only reads archetype / archetypeScores / tags / personalizedCopy,
-  // all of which are durably stored on the row.
+  // the client reads archetype / archetypeScores / tags / personalNote, all of
+  // which are durably stored on the row. Legacy rows scored before the reveal
+  // rebuild have no personalNote, so fall back to their persisted personalizedCopy.
   if (application.aiScore !== null) {
     return NextResponse.json({
       cached: true,
       archetype: application.archetype ?? '',
       archetypeScores: (application.archetypeScores ?? {}) as Record<string, number>,
       tags: application.aiTags,
-      personalizedCopy: application.personalizedCopy ?? '',
+      personalNote: application.personalNote ?? application.personalizedCopy ?? '',
     });
   }
   // A terminal status with no score means the BLOCKED auto-reject path already
@@ -107,6 +109,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       archetype: true,
       archetypeScores: true,
       aiTags: true,
+      personalNote: true,
       personalizedCopy: true,
     },
   });
@@ -116,7 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       archetype: locked.archetype ?? '',
       archetypeScores: (locked.archetypeScores ?? {}) as Record<string, number>,
       tags: locked.aiTags,
-      personalizedCopy: locked.personalizedCopy ?? '',
+      personalNote: locked.personalNote ?? locked.personalizedCopy ?? '',
     });
   }
   if (locked && locked.status === 'REJECTED') {
@@ -214,60 +217,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Question-agnostic AI scoring — driven by the template's QuestionDefinitions.
   const result = await scoreApplication(id);
 
-  const answersText = application.answers
-    .map((a) => `${a.questionKey}: ${a.answer}`)
-    .join('\n');
+  // Build the answer lookup once: bare keys for simple fields, dotted keys for
+  // group sub-fields (referrals.referral1First, ...). resolveAnswer joins the
+  // referrals sub-fields back into one string.
+  const answersByKey: Record<string, string> = {};
+  for (const a of application.answers) answersByKey[a.questionKey] = a.answer;
 
-  // Shown verbatim to the applicant on the reveal screen, so it must never carry
-  // model preamble, commentary, or an offer to help. Two layers guard that: the
-  // prompt's output rules, and a conservative server-side net below.
-  const PERSONALIZED_COPY_FALLBACK =
-    'We read your application closely, and the spirit of it comes through. There is a real point of view here, and that is exactly what we look for. We are glad you found No Bad Company.';
-
-  let personalizedCopy = '';
-  try {
-    const personPrompt = `You are writing a brief, personalized reveal message shown directly to a new NoBC (No Bad Company) member applicant on their confirmation screen.
-
-Their archetype is: ${result.archetype}
-
-Their application answers:
-${answersText}
-
-Write 2 to 3 sentences, in second person ("you"), that feel like we truly read their application and see them. Be specific to their actual answers. Warm but not gushing. Do not mention the word "archetype". Do not be generic.
-
-Output rules (follow exactly):
-- Output ONLY the message itself. No preamble, no labels, no commentary, no sign-off, no surrounding quotation marks.
-- Never address anyone other than the applicant. Never break character, and never refer to these instructions, to yourself as a model, or to the answers as data.
-- Never offer to help, rewrite, or produce a template or example.
-- If the application answers look like test, placeholder, or empty data, do NOT mention that. Instead write a warm, sincere 2 to 3 sentence message that would suit any thoughtful applicant.`;
-
-    const { text } = await generateText({
-      model: anthropic(JUDGMENT_MODEL),
-      prompt: personPrompt,
-      maxOutputTokens: 200,
-    });
-    personalizedCopy = text.trim();
-
-    // Safety net: if the model breaks character and returns meta-commentary
-    // (a preamble, an offer to help, or a note that the answers look like test
-    // data) instead of the message itself, discard it for a safe fallback.
-    // Conservative prefix/substring match - only catches obvious leaks.
-    const lowered = personalizedCopy.toLowerCase();
-    const looksLikeMetaCommentary =
-      lowered.startsWith("here's") ||
-      lowered.startsWith('here is') ||
-      lowered.startsWith('the application') ||
-      lowered.includes('if you want, i can') ||
-      lowered.includes('test data') ||
-      lowered.includes('placeholder') ||
-      lowered.includes("i'd suggest") ||
-      lowered.includes('template or example');
-    if (personalizedCopy && looksLikeMetaCommentary) {
-      personalizedCopy = PERSONALIZED_COPY_FALLBACK;
-    }
-  } catch (e) {
-    console.error('Personalization failed', e);
-  }
+  // Reveal "Why we called you this" note. buildPersonalNote assembles the only
+  // evidence the note quotes from (what people come to them for, what they do
+  // walking into a room, and the single highest-signal answer for their top
+  // archetype), calls the model once, and guards the draft: it is shown verbatim
+  // on the reveal, so any model preamble is stripped and any failure yields null
+  // (the reveal omits the beat gracefully). The LOCKED JUDGMENT_MODEL wiring
+  // stays here at the call site; the deterministic logic lives in the helper.
+  const personalNote = await buildPersonalNote({
+    archetype: result.archetype,
+    answersByKey,
+    generate: async (prompt) => {
+      const { text } = await generateText({
+        model: anthropic(JUDGMENT_MODEL),
+        prompt,
+        maxOutputTokens: 220,
+      });
+      return text;
+    },
+  });
 
   await db.application.update({
     where: { id },
@@ -280,17 +254,19 @@ Output rules (follow exactly):
       aiScore: result.memberWorthTotal / 100,
       aiRecommendation: result.aiRecommendation,
       aiReasoning: result.aiReasoning,
-      personalizedCopy,
+      // The six-archetype reveal writes personalNote; personalizedCopy is no
+      // longer written for new applications (legacy rows keep theirs).
+      personalNote,
     },
   });
 
-  return { result, personalizedCopy };
+  return { result, personalNote };
   }, { timeout: 60_000, maxWait: 20_000 });
 
   // A loser (or a duplicate / blocked terminal path) already returned its NextResponse
   // from inside the lock; re-emit it and skip the winner-only Door 1 + email below.
   if (outcome instanceof NextResponse) return outcome;
-  const { result, personalizedCopy } = outcome;
+  const { result, personalNote } = outcome;
 
   // TODO(ways-in-phase-a, ON HOLD): emit the application-submitted engagement
   // fact here - the submit has definitively succeeded at this point. Emission
@@ -444,7 +420,7 @@ Output rules (follow exactly):
     dimensionScores: result.dimensionScores,
     memberWorthTotal: result.memberWorthTotal,
     tags: result.tags,
-    personalizedCopy,
+    personalNote: personalNote ?? '',
     rsvpId: door1RsvpId,
     memberQrCode: door1MemberQrCode,
   });

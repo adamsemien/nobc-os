@@ -26,7 +26,7 @@ The way we think about it: the operator does five things — review applications
     title: 'Applications',
     body: `Every application lands here as PENDING. The score and recommendation are AI — and the AI only knows what your questions told it.
 
-**How the scoring works.** Each question in Settings → Application Form carries a dimension (influence / contribution / activation / taste) and a weight. The AI reads each answer against the question's own scoring logic and aggregates. Add a new question and it auto-includes; remove one and nothing breaks. The model returns an archetype guess (Connector / Host / Curator / Builder / Maker / Patron) plus a 0–1 score that maps to your tiers.
+**How the scoring works.** Each question in Settings → Application Form carries a dimension (influence / contribution / activation / taste) and a weight. The AI reads each answer against the question's own scoring logic and aggregates. Add a new question and it auto-includes; remove one and nothing breaks. The model returns an archetype guess (Connector / Caregiver / Builder / Champion / Sage / Spark) plus a 0–1 score that maps to your tiers.
 
 **Tiers** (rename them in Settings → Member Tiers):
 - Charter — score ≥ 0.73 (22+/30). Strong yes, move fast, consider the personal note.

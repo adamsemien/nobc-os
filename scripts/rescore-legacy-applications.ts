@@ -18,7 +18,7 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 const WRITE = process.argv.includes('--write');
-const ARCHETYPES = ['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'] as const;
+const ARCHETYPES = ['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'] as const;
 
 // Tier cutoffs — identical to lib/agent/tools/applications/find.ts.
 const CHARTER_MIN = 22 / 30; // ≈0.73

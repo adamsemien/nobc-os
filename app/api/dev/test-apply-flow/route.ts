@@ -69,7 +69,7 @@ Generate personalized copy (2 sentences) describing who this person is to the No
 
 Respond ONLY with valid JSON:
 {
-  "scores": { "Connector": 0, "Host": 0, "Curator": 0, "Builder": 0, "Maker": 0, "Patron": 0 },
+  "scores": { "Connector": 0, "Host": 0, "Builder": 0, "Patron": 0, "Sage": 0, "Spark": 0 },
   "primaryArchetype": "Builder",
   "tags": ["founder", "builder", "connector"],
   "recommendation": "APPROVE",

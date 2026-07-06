@@ -4,15 +4,15 @@ import type { Breakdown, DrillDownRecord, Metric, MetricContext, MetricResult } 
 import { ARCHETYPE_COLORS } from '@/lib/intelligence/worth';
 import { DEMO_MEMBERS } from '@/lib/intelligence/demo-data';
 
-const ARCHETYPES = ['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'];
+const ARCHETYPES = ['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'];
 
 const SPONSOR_INDEX: Record<string, string> = {
-  Curator: 'a Curator-heavy mix indexes to fashion, beauty, and hotel sponsors.',
+  Sage: 'a Sage-heavy mix indexes to media, wellness, and education sponsors.',
   Patron: 'a Patron-heavy mix indexes to wealth-management and automotive sponsors.',
   Connector: 'a Connector-heavy mix indexes to card, travel, and members-club sponsors.',
   Host: 'a Host-heavy mix indexes to spirits and hospitality sponsors.',
   Builder: 'a Builder-heavy mix indexes to B2B SaaS and fintech sponsors.',
-  Maker: 'a Maker-heavy mix indexes to home, interiors, and creative-tool sponsors.',
+  Spark: 'a Spark-heavy mix indexes to nightlife, events, and beverage sponsors.',
 };
 
 function buildBreakdown(counts: Record<string, number>): Breakdown {

@@ -9,6 +9,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { archetypeDisplayName } from '@/config/archetypes';
 
 // Fallback targets the app domain (which serves /m and /api/qr), NOT the
 // marketing site, so an unset NEXT_PUBLIC_APP_URL can't point the CTA at a
@@ -35,7 +36,7 @@ export default function WelcomeEmail({
           <Text style={headline}>{firstName}, you&apos;re in.</Text>
 
           {archetype && (
-            <Text style={archetypeLabel}>{archetype}</Text>
+            <Text style={archetypeLabel}>{archetypeDisplayName(archetype)}</Text>
           )}
 
           <Text style={paragraph}>

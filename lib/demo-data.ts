@@ -28,9 +28,9 @@ const NAMES = [
 const ARCHETYPE_PLAN: ArchetypeName[] = [
   ...Array<ArchetypeName>(18).fill('Connector'),
   ...Array<ArchetypeName>(12).fill('Host'),
-  ...Array<ArchetypeName>(8).fill('Curator'),
+  ...Array<ArchetypeName>(8).fill('Sage'),
   ...Array<ArchetypeName>(6).fill('Builder'),
-  ...Array<ArchetypeName>(4).fill('Maker'),
+  ...Array<ArchetypeName>(4).fill('Spark'),
   ...Array<ArchetypeName>(2).fill('Patron'),
 ];
 
@@ -58,20 +58,20 @@ const SUMMARIES: Record<ArchetypeName, string[]> = {
     'Has hosted the same Sunday gathering for six years. People plan their week around it.',
     'Cooks for thirty without flinching. The room they build is the product.',
   ],
-  Curator: [
-    'Found the ceramics studio before it had an Instagram. Taste runs a full season ahead of the feed.',
-    'Recommends like they are paid for it — and they are right often enough that people listen.',
-    'Notices the details a place gets right. The first call when anyone needs to know where to go.',
+  Sage: [
+    'Reads a room before saying a word. People leave a five-minute conversation thinking about it for a week.',
+    'The one friends call before a hard decision. Listens more than talks and says the thing that matters.',
+    'Quietly the most perceptive person in any room. Knows what is going on with people before they do.',
   ],
   Builder: [
     'Shipped a product to ten thousand users from a spare bedroom. Talks in outcomes, not plans.',
     'Second-time founder. Has the scar tissue and the calm that comes with it.',
     'Leads a team of twelve and still writes code on weekends. Builds because they cannot not build.',
   ],
-  Maker: [
-    'Works in clay and cold email with equal seriousness. The studio is the center of gravity.',
-    'Writes, records, and presses their own records. Craft over reach, every time.',
-    'A chef who left the restaurant to cook the way they actually want to cook.',
+  Spark: [
+    'Turns a slow Tuesday into the story everyone retells. Energy follows them into a room and stays.',
+    'First to say yes to the dumb idea, and the dumb idea becomes the best part of the night.',
+    'Can lift a whole table without trying. People just feel better with them around.',
   ],
   Patron: [
     'Backs three artists and one founder quietly. Capital is just a way to move good things forward.',
@@ -82,9 +82,9 @@ const SUMMARIES: Record<ArchetypeName, string[]> = {
 const TAG_POOL: Record<ArchetypeName, string[]> = {
   Connector: ['founder', 'high-energy', 'strong-referral', 'austin-local'],
   Host: ['hospitality', 'community-builder', 'f&b', 'warm'],
-  Curator: ['creative', 'taste-maker', 'fashion', 'design'],
+  Sage: ['insight', 'listener', 'perceptive', 'trusted'],
   Builder: ['founder', 'operator', 'technical', 'shipped'],
-  Maker: ['artist', 'craft', 'creative', 'chef'],
+  Spark: ['high-energy', 'catalyst', 'social', 'fun'],
   Patron: ['investor', 'patron', 'access', 'capital'],
 };
 
@@ -123,7 +123,7 @@ export const DEMO_INTELLIGENCE: IntelligenceData = {
   totalMembers: 50,
   totalApplications: 71,
   approvedThisMonth: 14,
-  archetypeDistribution: (['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'] as ArchetypeName[]).map(
+  archetypeDistribution: (['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'] as ArchetypeName[]).map(
     (archetype) => ({ archetype, count: DEMO_MEMBERS.filter((m) => m.archetype === archetype).length }),
   ),
   worthHistogram: [
@@ -159,9 +159,9 @@ export const DEMO_INTELLIGENCE: IntelligenceData = {
     counts: {
       Connector: [2, 3, 2, 4, 3, 4, 5, 4][i],
       Host: [1, 2, 2, 2, 2, 3, 3, 3][i],
-      Curator: [1, 1, 1, 1, 2, 2, 2, 2][i],
+      Sage: [1, 1, 1, 1, 2, 2, 2, 2][i],
       Builder: [1, 1, 0, 1, 1, 1, 2, 2][i],
-      Maker: [0, 0, 1, 1, 0, 1, 1, 1][i],
+      Spark: [0, 0, 1, 1, 0, 1, 1, 1][i],
       Patron: [0, 0, 0, 0, 0, 0, 0, 0][i],
     },
   })),

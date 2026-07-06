@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { operatorServerFetch } from '@/lib/operator-server-fetch';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
-import { ARCHETYPES, type ArchetypeName } from '@/config/archetypes';
+import { ARCHETYPES, archetypeDisplayName, type ArchetypeName } from '@/config/archetypes';
 import { formatDateTime } from '@/lib/operator-application-display';
 import { Breadcrumbs } from '@/app/operator/_components/PageHeader';
 import { Avatar } from '@/app/operator/_components/Avatar';
@@ -67,7 +67,7 @@ type DetailPayload = {
 // archetypeScores is keyed by the six archetype names (0–100). The old
 // influence/contribution/activation/taste keys never existed on the object, so
 // the bars rendered empty — iterate the real archetype names instead.
-const ARCHETYPE_NAMES = ['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'] as const;
+const ARCHETYPE_NAMES = ['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'] as const;
 
 /** archetypeScores are stored 0–100; some legacy rows used 0–1 fractions.
  *  Coerce either form to a clamped 0–100 integer (mirror of the split-view's
@@ -275,12 +275,12 @@ export default async function OperatorApplicationDetailPage({
                         className="text-lg font-semibold"
                         style={{ color: 'var(--primary)' }}
                       >
-                        {app.archetype}
+                        {archetypeDisplayName(app.archetype)}
                       </p>
                     </div>
                   )}
                 </div>
-                {app.archetype && ARCHETYPES[app.archetype as ArchetypeName] && (
+                {app.archetype && ARCHETYPES[app.archetype as ArchetypeName]?.dayStory && (
                   <p
                     className="mt-3 text-sm leading-relaxed"
                     style={{ color: 'var(--text-primary)' }}
@@ -306,7 +306,7 @@ export default async function OperatorApplicationDetailPage({
                             className="w-24 text-[11px] uppercase tracking-[0.12em]"
                             style={{ color: 'var(--text-secondary)' }}
                           >
-                            {name}
+                            {archetypeDisplayName(name)}
                           </span>
                           <div
                             className="h-1.5 flex-1 overflow-hidden rounded-full"

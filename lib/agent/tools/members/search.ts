@@ -7,7 +7,7 @@ import type { AgentTool } from '@/lib/agent/types';
 const inputSchema = z.object({
   query: z.string().optional().describe('Name or email substring to match.'),
   archetype: z
-    .enum(['Connector', 'Host', 'Curator', 'Builder', 'Maker', 'Patron'])
+    .enum(['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark'])
     .optional()
     .describe('Filter to members whose application archetype matches.'),
   limit: z.number().int().min(1).max(20).optional(),

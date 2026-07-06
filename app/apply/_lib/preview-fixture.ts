@@ -5,6 +5,10 @@
  * here, none of it is sourced from the DB, and none of it is ever sent over
  * the network. Answers are a deliberate PARTIAL fill (not every question) so
  * operators can see both the filled and the empty/required-field states.
+ *
+ * Keyed to the current question set (app/apply/_lib/questions.ts): the address
+ * group writes homeAddress.{street,city,state,zip}, referrals write first/last
+ * sub-keys, and the reveal reflects the six-archetype cast.
  */
 
 export const PREVIEW_ANSWERS: Record<string, string> = {
@@ -12,35 +16,37 @@ export const PREVIEW_ANSWERS: Record<string, string> = {
   lastName: 'Fixture',
   email: 'preview-fixture@example.test',
   cell: '000-000-0000',
-  cities: '[preview fixture — example cities]',
+  'homeAddress.street': '[preview fixture] 100 Example St',
+  'homeAddress.city': 'Austin',
+  'homeAddress.state': 'Texas',
+  'homeAddress.zip': '78701',
+  cities: '[preview fixture - example cities]',
   'birthInfo.birthDate': '1990-01-01',
   'birthInfo.birthCity': '[preview fixture]',
   gender: 'Prefer not to say',
-  whatYouDo: '[PREVIEW FIXTURE] Example answer for operator review — not a real applicant response.',
+  whatYouDo: '[PREVIEW FIXTURE] Example answer for operator review - not a real applicant response.',
+  characteristicsGoodAtJob: '[PREVIEW FIXTURE] Example answer for operator review.',
   creativePursuits: '[PREVIEW FIXTURE] Example answer for operator review.',
-  'referrals.referral1': '[preview fixture]',
-  enneagram: '5',
-  lastConvinced: '[PREVIEW FIXTURE] Example answer for operator review.',
+  'referrals.referral1First': '[preview]',
+  'referrals.referral1Last': '[fixture]',
+  enneagram: '5 - The Investigator',
+  mbti: 'INTJ',
+  loveLanguage: 'Quality Time',
   obsessedWith: '[PREVIEW FIXTURE] Example answer for operator review.',
+  recommendForPay: '[PREVIEW FIXTURE] Example answer for operator review.',
   comeToYouFor: '[PREVIEW FIXTURE] Example answer for operator review.',
-  expertIn: '[PREVIEW FIXTURE] Example answer for operator review.',
-  idealSaturday: '[PREVIEW FIXTURE] Example answer for operator review.',
+  walkIntoRoom: '[PREVIEW FIXTURE] Example answer for operator review.',
+  unplannedFun: '[PREVIEW FIXTURE] Example answer for operator review.',
+  meetPeople: '[PREVIEW FIXTURE] Example answer for operator review.',
   workout: '[preview fixture]',
-  'recSources.travel': '[preview fixture]',
-  'recSources.food': '[preview fixture]',
-  'podcasts.podcast1': '[preview fixture]',
   goodCompany: '[PREVIEW FIXTURE] Example answer for operator review.',
-  karaoke: '[preview fixture]',
+  connectionCreated: '[PREVIEW FIXTURE] Example answer for operator review.',
   chapter: '[PREVIEW FIXTURE] Example answer for operator review.',
   investedIn: '[PREVIEW FIXTURE] Example answer for operator review.',
-  friendDescribe: '[PREVIEW FIXTURE] Example answer for operator review.',
-  // Remaining required fields (homeAddress, dietary, links.*, recommendForPay,
-  // loyalBrands, splurgeSave, brandPartner, detailsRight, trustedTaste, the
-  // rest of recSources/podcasts, scrollStopping, connectionCreated,
-  // loyalCommunity, flowThrough, otherTests, nominate) are left unanswered on
-  // purpose, so the preview also shows the empty/required-field state exactly
-  // as production renders it. Photos are files, not answers — the picker
-  // simply stays empty in preview.
+  // Remaining required fields (dietary, links.*, loyalCommunity, flowThrough,
+  // otherTests, nominate) are left unanswered on purpose, so the preview also
+  // shows the empty/required-field state exactly as production renders it.
+  // Photos are files, not answers — the picker simply stays empty in preview.
 };
 
 /** Shape mirrors `SubmitResult` in MembershipForm.tsx without importing it. */
@@ -48,31 +54,32 @@ export interface PreviewReveal {
   archetype: string;
   archetypeScores: Record<string, number>;
   tags: string[];
-  personalizedCopy: string;
+  personalNote: string;
   rsvpId?: string | null;
   memberQrCode?: string | null;
 }
 
 /**
  * Fabricated reveal, computed entirely client-side. This is NEVER the output
- * of scoreApplication/tagApplication or any Anthropic call — the archetype
- * copy (oneLiner/dayStory/nightStory) is real production copy from
- * config/archetypes.ts (that's what operators need to review), but the
- * scores, tags, and personalized copy are hardcoded and unmistakably fake.
+ * of scoreApplication or any Anthropic call — the archetype copy (oneLiner and
+ * the who-you-are / the-cost / how-you-move beats) is real production copy from
+ * config/archetypes.ts (that's what operators need to review), but the scores,
+ * tags, and personal note are hardcoded and unmistakably fake. A Sage top with a
+ * Connector runner-up so operators see the reveal AND the blend line.
  */
 export const PREVIEW_REVEAL: PreviewReveal = {
-  archetype: 'Connector',
+  archetype: 'Sage',
   archetypeScores: {
-    Connector: 82,
-    Host: 61,
-    Curator: 54,
-    Builder: 45,
-    Maker: 39,
-    Patron: 28,
+    Sage: 84,
+    Connector: 66,
+    Host: 52,
+    Builder: 44,
+    Patron: 38,
+    Spark: 30,
   },
   tags: ['preview fixture', 'not a real applicant'],
-  personalizedCopy:
-    '[PREVIEW FIXTURE] This reveal text is a hardcoded example for operator review. No AI scoring call was made and no real applicant exists.',
+  personalNote:
+    '[PREVIEW FIXTURE] This note is a hardcoded example for operator review. No AI call was made and no real applicant exists.',
   rsvpId: null,
   memberQrCode: 'PREVIEW-FIXTURE-NOT-A-REAL-MEMBER-QR',
 };

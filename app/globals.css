@@ -94,6 +94,11 @@
   --archetype-builder: #2D5A3D;
   --archetype-maker: #4A3580;
   --archetype-patron: #1A3A5C;
+  /* New six-cast archetypes. Placeholder hues per Adam (F10): Sage inherits the
+     retired Curator gold, Spark inherits the retired Maker purple. The Curator/
+     Maker vars stay for legacy scored rows. Spark's real hue lands later with Chloe. */
+  --archetype-sage: #8B6914;
+  --archetype-spark: #4A3580;
   --worth-charter: #8B6914;
   --worth-standard: #2D5A3D;
   --worth-waitlist: #A8978A;

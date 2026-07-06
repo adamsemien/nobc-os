@@ -88,6 +88,7 @@ const baseApp = {
   archetypeScores: null,
   aiTags: [],
   personalizedCopy: null,
+  personalNote: null,
   answers: [{ questionKey: 'q1', answer: 'hello' }],
 };
 
@@ -165,7 +166,8 @@ describe('apply submit: idempotency (BLOCKER 3)', () => {
     expect(body.archetype).toBe('The Connector');
     expect(body.archetypeScores).toEqual({ 'The Connector': 0.8 });
     expect(body.tags).toEqual(['curious']);
-    expect(body.personalizedCopy).toBe('You clearly care.');
+    // Legacy row has no personalNote, so the cached reveal falls back to personalizedCopy.
+    expect(body.personalNote).toBe('You clearly care.');
 
     // The expensive / side-effecting work must NOT run on replay.
     expect(m.scoreApplication).not.toHaveBeenCalled();
@@ -239,7 +241,7 @@ describe('apply submit: happy path', () => {
     );
     expect(body.archetype).toBe('The Connector');
     expect(body.tags).toEqual(['curious']);
-    expect(body.personalizedCopy).toBe('You clearly care.');
+    expect(body.personalNote).toBe('You clearly care.');
     expect(m.emailSend).not.toHaveBeenCalled(); // no email on normal submit
   });
 });

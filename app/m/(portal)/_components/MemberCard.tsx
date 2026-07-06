@@ -1,6 +1,8 @@
 /** Vanity member card — screenshotable.
  *  Inline-styled (no Tailwind tokens) so it renders consistently if shared. */
 
+import { archetypeDisplayName } from '@/config/archetypes';
+
 export function MemberCard({
   firstName,
   lastName,
@@ -48,7 +50,7 @@ export function MemberCard({
               className="mt-2 text-[0.65rem] uppercase tracking-[0.2em]"
               style={{ color: 'var(--events-warm-accent)' }}
             >
-              {archetype}
+              {archetypeDisplayName(archetype)}
             </p>
           ) : null}
         </div>
