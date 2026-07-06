@@ -1,9 +1,22 @@
 'use server';
 
 import { unstable_cache, revalidateTag } from 'next/cache';
+import { OperatorRole } from '@prisma/client';
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/operator-role';
+
+/** AUTH GATE: every 'use server' export below is a network-invocable endpoint,
+ *  so workspaceId derives ONLY from the authenticated operator context — never
+ *  from client input (a client-supplied id let any signed-in user pull another
+ *  workspace's narrative; fixed 2026-07-06). ADMIN matches the sponsor page's
+ *  own requireRolePage gate. */
+async function adminWorkspace(): Promise<string> {
+  const gate = await requireRole(OperatorRole.ADMIN);
+  if (!gate.ok) throw new Error('Forbidden');
+  return gate.workspaceId;
+}
 
 // MODEL NOTE: claude-haiku-4-5-20251001 is used here for this sponsor-narrative
 // feature (cheap, high-level editorial summarization) - the MECHANICAL_MODEL tier
@@ -78,7 +91,8 @@ async function synthesize(workspaceId: string): Promise<string> {
 }
 
 /** Cached read (1h). Used by the server page for the initial render. */
-export async function getAudienceNarrative(workspaceId: string): Promise<string> {
+export async function getAudienceNarrative(): Promise<string> {
+  const workspaceId = await adminWorkspace();
   const cached = unstable_cache(() => synthesize(workspaceId), ['audience-narrative', workspaceId], {
     revalidate: 3600,
     tags: [`audience-narrative-${workspaceId}`],
@@ -87,7 +101,8 @@ export async function getAudienceNarrative(workspaceId: string): Promise<string>
 }
 
 /** Regenerate — invalidates the cache and returns a fresh narrative. */
-export async function regenerateAudienceNarrative(workspaceId: string): Promise<string> {
+export async function regenerateAudienceNarrative(): Promise<string> {
+  const workspaceId = await adminWorkspace();
   revalidateTag(`audience-narrative-${workspaceId}`);
   return synthesize(workspaceId);
 }

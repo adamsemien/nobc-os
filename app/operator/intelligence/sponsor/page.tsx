@@ -380,7 +380,7 @@ export default async function SponsorIntelligencePage() {
   const [networkSettled, retentionSettled, narrativeSettled] = await Promise.allSettled([
     loadNetworkCapital(workspaceId),
     loadRetention(workspaceId),
-    getAudienceNarrative(workspaceId),
+    getAudienceNarrative(),
   ]);
 
   const network = panelValue(networkSettled, 'Network Capital');
@@ -399,7 +399,7 @@ export default async function SponsorIntelligencePage() {
       {retention ? <RetentionPanel data={retention} /> : <PanelError label="Retention & Velocity" />}
       <Hairline />
 
-      <SentimentPanel workspaceId={workspaceId} initialNarrative={initialNarrative} />
+      <SentimentPanel initialNarrative={initialNarrative} />
 
       <SponsorBriefBar />
     </div>

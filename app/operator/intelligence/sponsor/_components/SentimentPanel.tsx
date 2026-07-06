@@ -6,10 +6,8 @@ import { regenerateAudienceNarrative } from '../actions';
 const DISPLAY = 'var(--font-display)';
 
 export function SentimentPanel({
-  workspaceId,
   initialNarrative,
 }: {
-  workspaceId: string;
   initialNarrative: string | null;
 }) {
   const [narrative, setNarrative] = useState(initialNarrative ?? '');
@@ -18,7 +16,7 @@ export function SentimentPanel({
   const regenerate = () => {
     startTransition(async () => {
       try {
-        const fresh = await regenerateAudienceNarrative(workspaceId);
+        const fresh = await regenerateAudienceNarrative();
         setNarrative(fresh);
       } catch (err) {
         // Keep the current narrative on failure — never blank the panel.
