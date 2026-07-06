@@ -42,6 +42,9 @@ const ENGAGEMENT_META: Record<MemberEngagementEventType, EngagementMeta> = {
   // Minimal RBAC (Phase 1.5) — operator role change (surfaces only when the
   // operator maps to a Member; otherwise it lives in the AuditEvent trail).
   role_changed: { label: 'Operator role changed', tone: 'neutral' },
+  // Person spine (Phase 2A) — first-touch signals.
+  account_created: { label: 'Created an account', tone: 'info' },
+  application_started: { label: 'Started an application', tone: 'info' },
 };
 
 /** Humanize an unrecognized token so the UI never shows a raw enum (e.g. new DB value). */
