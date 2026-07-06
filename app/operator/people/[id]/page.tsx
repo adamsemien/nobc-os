@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
+import { isStaff, isAdmin } from '@/lib/operator-role';
 import { Avatar, EmptyState, PageHeader, StatusBadge, memberTone } from '@/components/ui';
+import { EditPersonFields } from '../_components/EditPersonFields';
 import { engagementMeta } from '@/lib/engagement-labels';
 import {
   CONTACT_ROLE_LABELS,
@@ -57,6 +59,11 @@ export default async function PersonDetailPage({
     },
   });
   if (!person) notFound();
+
+  const [canEdit, canDelete] = await Promise.all([
+    isStaff(userId, workspaceId),
+    isAdmin(userId, workspaceId),
+  ]);
 
   const memberIds = person.members.map((m) => m.id);
   const activity = await db.memberEngagementEvent.findMany({
@@ -132,6 +139,17 @@ export default async function PersonDetailPage({
             </Link>
             .
           </div>
+        ) : null}
+
+        {!person.mergedInto ? (
+          <EditPersonFields
+            personId={person.id}
+            firstName={person.firstName}
+            lastName={person.lastName}
+            phone={person.phone}
+            canEdit={canEdit}
+            canDelete={canDelete}
+          />
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">

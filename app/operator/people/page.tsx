@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { auth } from '@clerk/nextjs/server';
-import { BookUser } from 'lucide-react';
+import { BookUser, GitMerge } from 'lucide-react';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
+import { isStaff } from '@/lib/operator-role';
+import { AddPersonSheet } from './_components/AddPersonSheet';
 import {
   Avatar,
   DataTableBody,
@@ -30,6 +32,8 @@ export default async function PeoplePage() {
     );
   }
 
+  const canAdd = await isStaff(userId, workspaceId);
+
   const people = await db.person.findMany({
     where: { workspaceId, mergedIntoId: null },
     orderBy: { createdAt: 'desc' },
@@ -49,6 +53,18 @@ export default async function PeoplePage() {
         <PageHeader
           title="People"
           subtitle={`Every human the platform has touched — ${people.length} ${people.length === 1 ? 'person' : 'people'}.`}
+          action={
+            <>
+              <Link
+                href="/operator/people/merge"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3.5 text-sm font-medium text-text-secondary hover:text-text-primary"
+              >
+                <GitMerge className="h-4 w-4" />
+                Merge queue
+              </Link>
+              {canAdd ? <AddPersonSheet /> : null}
+            </>
+          }
         />
         {people.length === 0 ? (
           <EmptyState
