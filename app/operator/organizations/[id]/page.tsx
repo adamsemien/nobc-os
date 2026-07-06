@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { Avatar, EmptyState, PageHeader, StatusBadge } from '@/components/ui';
 import { ORGANIZATION_KIND_LABELS } from '@/lib/crm/labels';
-import { personDisplayName, formatCrmDate } from '../../people/person-display';
+import { personDisplay, formatCrmDate } from '../../people/person-display';
 
 export default async function OrganizationDetailPage({
   params,
@@ -94,15 +94,24 @@ export default async function OrganizationDetailPage({
           ) : (
             <ul className="space-y-2.5">
               {organization.people.map((affiliation) => {
-                const name = personDisplayName(affiliation.person);
+                const display = personDisplay(affiliation.person);
                 return (
                   <li key={affiliation.id} className="flex items-center justify-between gap-3">
                     <Link
                       href={`/operator/people/${affiliation.person.id}`}
                       className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium text-text-primary hover:underline"
                     >
-                      <Avatar name={name} email={affiliation.person.email} size={26} />
-                      <span className="truncate">{name}</span>
+                      <Avatar name={display.label} email={affiliation.person.email} size={26} />
+                      <span
+                        className={`truncate ${display.placeholder ? 'font-normal italic' : ''}`}
+                        style={
+                          display.placeholder
+                            ? { color: 'var(--text-tertiary, var(--text-muted))' }
+                            : undefined
+                        }
+                      >
+                        {display.label}
+                      </span>
                     </Link>
                     <span className="shrink-0 text-[13px] text-text-secondary">
                       {affiliation.role ?? (affiliation.isPrimary ? 'Primary contact' : '—')}

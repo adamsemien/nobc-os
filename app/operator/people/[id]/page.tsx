@@ -10,7 +10,7 @@ import {
   CONTACT_SOURCE_LABELS,
   ORGANIZATION_KIND_LABELS,
 } from '@/lib/crm/labels';
-import { MEMBER_STATUS_LABELS, personDisplayName, formatCrmDate } from '../person-display';
+import { MEMBER_STATUS_LABELS, personDisplay, formatCrmDate } from '../person-display';
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -69,7 +69,7 @@ export default async function PersonDetailPage({
     select: { id: true, eventType: true, occurredAt: true },
   });
 
-  const name = personDisplayName(person);
+  const display = personDisplay(person);
 
   return (
     <div className="px-6 pb-16 pt-8 sm:px-10 lg:px-14 xl:px-20">
@@ -77,12 +77,21 @@ export default async function PersonDetailPage({
         <PageHeader
           title={
             <span className="flex items-center gap-3">
-              <Avatar name={name} email={person.email} size={36} />
-              {name}
+              <Avatar name={display.label} email={person.email} size={36} />
+              <span
+                className={display.placeholder ? 'font-normal italic' : undefined}
+                style={
+                  display.placeholder
+                    ? { color: 'var(--text-tertiary, var(--text-muted))' }
+                    : undefined
+                }
+              >
+                {display.label}
+              </span>
             </span>
           }
           subtitle={`In the CRM since ${formatCrmDate(person.createdAt)}.`}
-          crumbs={[{ href: '/operator/people', label: 'People' }, { label: name }]}
+          crumbs={[{ href: '/operator/people', label: 'People' }, { label: display.label }]}
         />
 
         {person.mergedInto ? (
@@ -115,7 +124,7 @@ export default async function PersonDetailPage({
               href={`/operator/people/${person.potentialDuplicateOf.id}`}
               className="font-medium underline"
             >
-              {personDisplayName(person.potentialDuplicateOf)}
+              {personDisplay(person.potentialDuplicateOf).label}
             </Link>{' '}
             — this record was created from an unverified email that matches theirs. Merge review
             arrives with the merge queue.
