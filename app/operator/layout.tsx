@@ -81,14 +81,14 @@ export default async function OperatorLayout({
               Preview Site
             </a>
             <a
-              href="/apply"
+              href="/apply/preview"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-[var(--primary)]"
               style={{ color: 'var(--text-muted)' }}
             >
               <ExternalLink className="h-[13px] w-[13px]" aria-hidden />
-              Apply Form
+              Apply Form (Preview)
             </a>
             <OrganizationSwitcher hidePersonal afterSelectOrganizationUrl="/operator" />
             <UserButton />
