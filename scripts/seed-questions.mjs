@@ -1,5 +1,5 @@
 /**
- * Canonical membership scoring model - single source of truth for the 15 scored
+ * Canonical membership scoring model - single source of truth for the 13 scored
  * QuestionDefinitions that drive AI archetype scoring (lib/scoring.ts).
  *
  * Authored 2026-07-06 for the six-archetype recut (Builder, Connector, Host as
@@ -47,7 +47,7 @@ const TEMPLATE = {
 const PROD_WORKSPACE_ID = 'cmpd6xckn000004jl47xpwghx';
 
 /**
- * The 15 scored questions, in scoring order. stableKey === form field id.
+ * The 13 scored questions, in scoring order. stableKey === form field id.
  *   dim    = primary scoringDimension (influence | contribution | activation | taste)
  *   wt     = scoringWeight (0 ignore .. 1 primary)
  *   sig    = archetypeSignals - STORED enum names (Connector, Host, Builder, Patron, Sage, Spark)
@@ -115,18 +115,6 @@ export const QUESTIONS = [
     insightDescription: 'Values centering generosity and presence vs status/access-only.',
     dim: 'contribution', wt: 0.6, sig: ['Host', 'Connector'], spon: null,
     logic: 'Values centering mutual generosity and presence score high; status or access-only framing scores low.' },
-
-  { stableKey: 'flowThrough', label: 'What kind of people, ideas, or opportunities tend to flow through your world?', type: 'long_text', section: 'what-youre-here-for',
-    insightLabel: 'what flows through their world',
-    insightDescription: 'Network gravity - the caliber of what moves through them.',
-    dim: 'influence', wt: 0.8, sig: ['Connector', 'Patron'], spon: null,
-    logic: 'High-quality people, ideas, or opportunities flowing through their world signals network gravity; thin or self-focused answers score low.' },
-
-  { stableKey: 'investedIn', label: "What's something you've invested heavily in recently?", type: 'long_text', section: 'what-youre-here-for',
-    insightLabel: 'what they invested heavily in',
-    insightDescription: 'Backing a person, project, or cause - Patron/Builder tell.',
-    dim: 'contribution', wt: 0.6, sig: ['Patron', 'Builder'], spon: null,
-    logic: 'Heavy recent investment in a person, project, or cause scores high; backing others scores above self-investment.' },
 
   { stableKey: 'walkIntoRoom', label: "You walk into a room where you don't know anyone. What do you actually do?", type: 'long_text', section: 'how-you-move',
     insightLabel: 'what they do walking into a room of strangers',

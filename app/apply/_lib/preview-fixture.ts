@@ -41,11 +41,9 @@ export const PREVIEW_ANSWERS: Record<string, string> = {
   workout: '[preview fixture]',
   goodCompany: '[PREVIEW FIXTURE] Example answer for operator review.',
   connectionCreated: '[PREVIEW FIXTURE] Example answer for operator review.',
-  chapter: '[PREVIEW FIXTURE] Example answer for operator review.',
-  investedIn: '[PREVIEW FIXTURE] Example answer for operator review.',
-  // Remaining required fields (dietary, links.*, loyalCommunity, flowThrough,
-  // otherTests, nominate) are left unanswered on purpose, so the preview also
-  // shows the empty/required-field state exactly as production renders it.
+  // Remaining required fields (dietary, links.*, loyalCommunity, otherTests,
+  // nominate) are left unanswered on purpose, so the preview also shows the
+  // empty/required-field state exactly as production renders it.
   // Photos are files, not answers — the picker simply stays empty in preview.
 };
 

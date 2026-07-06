@@ -14,10 +14,10 @@ import { resolveAnswer } from '@/lib/question-key-map';
 // reveal note). Mirrors the archetypeSignals in scripts/seed-questions.mjs.
 // Used to pick the third, archetype-specific evidence answer for the note.
 export const TOP_SIGNAL_KEYS: Record<string, string[]> = {
-  Connector: ['connectionCreated', 'referrals', 'flowThrough', 'loyalCommunity', 'goodCompany', 'meetPeople', 'cities'],
+  Connector: ['connectionCreated', 'referrals', 'loyalCommunity', 'goodCompany', 'meetPeople', 'cities'],
   Host: ['connectionCreated', 'referrals', 'loyalCommunity', 'goodCompany'],
-  Builder: ['whatYouDo', 'characteristicsGoodAtJob', 'investedIn', 'obsessedWith', 'creativePursuits'],
-  Patron: ['connectionCreated', 'whatYouDo', 'referrals', 'flowThrough', 'investedIn', 'cities'],
+  Builder: ['whatYouDo', 'characteristicsGoodAtJob', 'obsessedWith', 'creativePursuits'],
+  Patron: ['connectionCreated', 'whatYouDo', 'referrals', 'cities'],
   Sage: ['characteristicsGoodAtJob', 'obsessedWith'],
   Spark: ['unplannedFun', 'meetPeople'],
 };

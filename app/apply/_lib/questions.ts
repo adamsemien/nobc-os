@@ -305,7 +305,7 @@ export const QUESTIONS: Question[] = [
     label: 'Other Personality Tests',
     type: 'textarea',
     required: false,
-    help: "Anything else - StrengthsFinder, DISC, Human Design, whatever you've got.",
+    help: "Anything else: StrengthsFinder, DISC, Human Design, whatever you've got.",
   },
 
   // ---- Section 02 - How You Move Through the World ----
@@ -330,7 +330,7 @@ export const QUESTIONS: Question[] = [
     type: 'textarea',
     required: true,
     help:
-      'Could be advice, recommendations, introductions, certain opportunities, experiences, perspective - or something else entirely.',
+      'A good tax guy, a margarita recipe, cooking advice - whatever people keep coming back to you for.',
   },
   {
     id: 'walkIntoRoom',
@@ -339,7 +339,7 @@ export const QUESTIONS: Question[] = [
     type: 'textarea',
     required: true,
     help:
-      'Be honest, not aspirational - what you actually do, not what you wish you did. Do you find someone to talk to, or hang back and get a read on the room first? Be specific.',
+      'This is how we make the room comfortable for you. Do you find someone to talk to, or hang back and read the room first?',
   },
   {
     id: 'unplannedFun',
@@ -384,31 +384,9 @@ export const QUESTIONS: Question[] = [
 
   // ---- Section 03 - What You're Here For ----
   {
-    id: 'chapter',
-    section: 'what-youre-here-for',
-    label: 'What chapter are you in right now?',
-    type: 'textarea',
-    required: true,
-  },
-  {
-    id: 'flowThrough',
-    section: 'what-youre-here-for',
-    label: 'What kind of people, ideas, or opportunities tend to flow through your world?',
-    type: 'textarea',
-    required: true,
-  },
-  {
-    id: 'investedIn',
-    section: 'what-youre-here-for',
-    label: "What's something you've invested heavily in recently?",
-    type: 'textarea',
-    required: true,
-    help: 'Time, money, energy, attention - any of the above.',
-  },
-  {
     id: 'nominate',
     section: 'what-youre-here-for',
-    label: "Who's someone you've wanted to bring to a No Bad Company party?",
+    label: "Who's someone you think we should meet?",
     type: 'textarea',
     required: false,
     help: 'Applications are reviewed personally. We will be in touch.',

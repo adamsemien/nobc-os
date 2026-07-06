@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { resolveAnswer, MEMBERSHIP_ANSWER_KEY_BY_STABLE_KEY } from '@/lib/question-key-map';
 import { QUESTIONS } from '@/app/apply/_lib/questions';
 
-// The scored QuestionDefinition stableKeys - MUST mirror the 15-row rubric in
+// The scored QuestionDefinition stableKeys - MUST mirror the 13-row rubric in
 // scripts/seed-questions.mjs (six-archetype recut, 2026-07). Every stableKey ===
 // the live form field id (app/apply/_lib/questions.ts), so simple questions
 // resolve by identity and only the one GROUP question (referrals) needs a bridge
@@ -12,7 +12,7 @@ import { QUESTIONS } from '@/app/apply/_lib/questions';
 const SCORED_STABLE_KEYS = [
   'whatYouDo', 'comeToYouFor', 'characteristicsGoodAtJob', 'creativePursuits', 'obsessedWith',
   'referrals', 'cities', 'connectionCreated', 'loyalCommunity', 'goodCompany',
-  'flowThrough', 'investedIn', 'walkIntoRoom', 'unplannedFun', 'meetPeople',
+  'walkIntoRoom', 'unplannedFun', 'meetPeople',
 ] as const;
 
 // The scored GROUP question whose answers live under dotted subfield keys.
@@ -37,8 +37,6 @@ const FORM_ANSWERS: Record<string, string> = {
   connectionCreated: 'introduced two cofounders',
   loyalCommunity: 'my run club for 6 years',
   goodCompany: 'people who ask real questions',
-  flowThrough: 'founders and artists',
-  investedIn: 'a gallery show for a friend',
   walkIntoRoom: 'I find the person standing alone',
   unplannedFun: 'a pickup soccer game that became a Sunday crew',
   meetPeople: 'through friends and a climbing gym',
@@ -107,6 +105,10 @@ describe('scored rubric <-> form question set', () => {
   for (const q of QUESTIONS) {
     for (const sub of q.fields ?? []) formSubKeys.add(`${q.id}.${sub.id}`);
   }
+
+  it('is exactly the 13 scored rubric keys', () => {
+    expect(SCORED_STABLE_KEYS).toHaveLength(13);
+  });
 
   it('every simple scored stableKey exists as a live form question id', () => {
     const missing = SCORED_STABLE_KEYS.filter(

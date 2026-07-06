@@ -21,12 +21,12 @@ afterEach(() => {
 
 describe('pickTopSignal — deterministic top-archetype evidence answer', () => {
   it('picks the highest-weight signal (first in rubric order) that has an answer', () => {
-    // Builder rubric order: whatYouDo > characteristicsGoodAtJob > investedIn > ...
-    // Both present -> the earliest (highest-weight) key wins the tiebreak.
+    // Builder rubric order: whatYouDo > characteristicsGoodAtJob > obsessedWith > creativePursuits.
+    // Multiple present -> the earliest (highest-weight) key wins the tiebreak.
     const picked = pickTopSignal('Builder', {
       whatYouDo: 'I ship developer tools',
       characteristicsGoodAtJob: 'persistence',
-      investedIn: 'open source',
+      obsessedWith: 'open source',
     });
     expect(picked).toEqual({ key: 'whatYouDo', answer: 'I ship developer tools' });
   });

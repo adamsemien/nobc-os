@@ -170,7 +170,7 @@ const CHAPTER_PAGE_IDS: string[][] = [
   ['unplannedFun', 'meetPeople', 'workout'],
   ['goodCompany', 'connectionCreated', 'loyalCommunity'],
   // Section 03 - What You're Here For
-  ['chapter', 'flowThrough', 'investedIn', 'nominate'],
+  ['nominate'],
 ];
 
 const QUESTION_BY_ID: Record<string, Question> = Object.fromEntries(
@@ -2140,10 +2140,10 @@ export default function MembershipForm({
 
                 <div style={{ height: 48 }} />
 
-                {/* Three copy beats from config/archetypes.ts. */}
+                {/* Copy beats from config/archetypes.ts. `theCost` is intentionally
+                    not rendered here (the field is retained in config). */}
                 {([
                   { label: 'Who you are', text: archetypeData?.whoYouAre ?? '' },
-                  { label: 'The cost', text: archetypeData?.theCost ?? '' },
                   { label: 'How you move through a room', text: archetypeData?.howYouMove ?? '' },
                 ] as const).map((beat, bi) => beat.text ? (
                   <div key={beat.label} style={{
