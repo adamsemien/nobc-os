@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Gift, Loader2, X, DollarSign, AlertTriangle, ArrowUpCircle, UserX, Ban } from 'lucide-react';
+import { Gift, Loader2, Mail, X, DollarSign, AlertTriangle, ArrowUpCircle, UserX, Ban } from 'lucide-react';
 import { EmptyState } from '../../../_components/EmptyState';
 import { logQAAction } from '@/lib/dev/qa-action-log';
 
@@ -127,6 +127,7 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
   const [promoteLoading, setPromoteLoading] = useState<Record<string, boolean>>({});
   const [rejectLoading, setRejectLoading] = useState<Record<string, boolean>>({});
   const [cancelLoading, setCancelLoading] = useState<Record<string, boolean>>({});
+  const [resendState, setResendState] = useState<Record<string, 'sending' | 'sent'>>({});
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -258,6 +259,35 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
       }
     } finally {
       setCancelLoading((p) => ({ ...p, [rsvpId]: false }));
+    }
+  }
+
+  async function handleResendTicket(rsvpId: string) {
+    setResendState((p) => ({ ...p, [rsvpId]: 'sending' }));
+    try {
+      const res = await fetch(`/api/operator/rsvps/${rsvpId}/resend-ticket`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Resend failed');
+        setResendState((p) => {
+          const next = { ...p };
+          delete next[rsvpId];
+          return next;
+        });
+      } else {
+        logQAAction('resent ticket email');
+        setResendState((p) => ({ ...p, [rsvpId]: 'sent' }));
+      }
+    } catch {
+      alert('Network error — the email was not sent.');
+      setResendState((p) => {
+        const next = { ...p };
+        delete next[rsvpId];
+        return next;
+      });
     }
   }
 
@@ -525,6 +555,27 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
                               <Ban className="h-3 w-3" />
                             )}
                             Cancel
+                          </button>
+                        )}
+                        {rsvp.ticketStatus === 'confirmed' && (
+                          <button
+                            type="button"
+                            disabled={resendState[rsvp.id] === 'sending' || resendState[rsvp.id] === 'sent'}
+                            onClick={() => handleResendTicket(rsvp.id)}
+                            title="Re-send the confirmation email with the QR ticket"
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors"
+                            style={{
+                              background: 'var(--muted)',
+                              color: 'var(--text-secondary)',
+                              borderRadius: '5px',
+                            }}
+                          >
+                            {resendState[rsvp.id] === 'sending' ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Mail className="h-3 w-3" />
+                            )}
+                            {resendState[rsvp.id] === 'sent' ? 'Sent ✓' : 'Resend ticket'}
                           </button>
                         )}
                         {isAuthorized && (
