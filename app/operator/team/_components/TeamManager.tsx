@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OperatorRole } from '@prisma/client';
 import { Loader2, Trash2, UserPlus } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 // Minimal RBAC (Phase 1.5): role labels + the assignable set are the single source
 // of truth in lib/auth/can (READ_ONLY shows as "Viewer"; never expose raw enums).
 import { ROLE_LABEL as ROLE_LABELS, ASSIGNABLE_ROLES as ROLES } from '@/lib/auth/can';
@@ -15,6 +16,8 @@ export type TeamMemberDTO = {
   role: OperatorRole;
   pending: boolean;
   createdAt: string;
+  /** Clerk org admins floor to OWNER — role/removal is managed in Clerk, not here. */
+  managedInClerk: boolean;
 };
 
 const inputCls =
@@ -33,6 +36,7 @@ export function TeamManager({
   const [email, setEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<OperatorRole>(OperatorRole.STAFF);
   const [inviting, setInviting] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<TeamMemberDTO | null>(null);
 
   async function call(url: string, init: RequestInit): Promise<boolean> {
     setError(null);
@@ -155,7 +159,7 @@ export function TeamManager({
                   ) : null}
                 </td>
                 <td className="px-4 py-3">
-                  {canManage ? (
+                  {canManage && !m.managedInClerk ? (
                     <select
                       value={m.role}
                       disabled={busyId === m.id}
@@ -170,25 +174,37 @@ export function TeamManager({
                       ))}
                     </select>
                   ) : (
-                    <span className="text-text-secondary">{ROLE_LABELS[m.role]}</span>
+                    <span className="text-text-secondary">
+                      {ROLE_LABELS[m.role]}
+                      {m.managedInClerk ? (
+                        <span
+                          className="ml-2 inline-block rounded-full bg-surface-elevated px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-muted"
+                          title="Clerk organization admins floor to Owner. Change their role in Clerk (org:admin → org:member) to manage them here."
+                        >
+                          Managed in Clerk
+                        </span>
+                      ) : null}
+                    </span>
                   )}
                 </td>
                 {canManage ? (
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => remove(m.id)}
-                      disabled={busyId === m.id}
-                      aria-label={`Remove ${m.email}`}
-                      className="inline-flex items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-danger disabled:opacity-50"
-                    >
-                      {busyId === m.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                      Remove
-                    </button>
+                    {m.managedInClerk ? null : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRemove(m)}
+                        disabled={busyId === m.id}
+                        aria-label={`Remove ${m.email}`}
+                        className="inline-flex items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-danger disabled:opacity-50"
+                      >
+                        {busyId === m.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                        Remove
+                      </button>
+                    )}
                   </td>
                 ) : null}
               </tr>
@@ -199,6 +215,22 @@ export function TeamManager({
           <p className="px-4 py-6 text-sm text-text-muted">No team members yet.</p>
         ) : null}
       </div>
+
+      {confirmRemove ? (
+        <ConfirmModal
+          title={`Remove ${confirmRemove.name || confirmRemove.email}?`}
+          subtitle="They lose operator access to this workspace immediately. Re-invite them to restore it."
+          confirmLabel="Remove"
+          confirmTone="danger"
+          busy={busyId === confirmRemove.id}
+          onConfirm={() => {
+            const id = confirmRemove.id;
+            setConfirmRemove(null);
+            void remove(id);
+          }}
+          onCancel={() => setConfirmRemove(null)}
+        />
+      ) : null}
     </div>
   );
 }

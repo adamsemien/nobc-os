@@ -52,8 +52,8 @@ const CARDS: Card[] = [
   },
   {
     href: '/operator/settings/model',
-    title: 'AI Model',
-    description: 'Choose which Claude model powers your platform.',
+    title: 'AI Models',
+    description: 'The locked two-tier model policy behind AI features.',
     Icon: Sparkles,
   },
   {
