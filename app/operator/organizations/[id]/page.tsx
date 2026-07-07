@@ -3,9 +3,15 @@ import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
+import { isStaff, isAdmin } from '@/lib/operator-role';
 import { Avatar, EmptyState, PageHeader, StatusBadge } from '@/components/ui';
 import { ORGANIZATION_KIND_LABELS } from '@/lib/crm/labels';
 import { personDisplay, formatCrmDate } from '../../people/person-display';
+import { EditOrganizationFields } from '../_components/EditOrganizationFields';
+import {
+  AddAffiliationForm,
+  RemoveAffiliationButton,
+} from '../_components/AffiliationControls';
 
 export default async function OrganizationDetailPage({
   params,
@@ -38,6 +44,27 @@ export default async function OrganizationDetailPage({
   });
   if (!organization) notFound();
 
+  const [canEdit, canDelete] = await Promise.all([
+    isStaff(userId, workspaceId),
+    isAdmin(userId, workspaceId),
+  ]);
+
+  // Picker options for a new affiliation: unmerged workspace persons not
+  // already affiliated (the API still 409s duplicates as the backstop).
+  const affiliatedIds = new Set(organization.people.map((a) => a.person.id));
+  const personOptions = canEdit
+    ? (
+        await db.person.findMany({
+          where: { workspaceId, mergedIntoId: null },
+          orderBy: { createdAt: 'desc' },
+          take: 500,
+          select: { id: true, firstName: true, lastName: true, email: true },
+        })
+      )
+        .filter((p) => !affiliatedIds.has(p.id))
+        .map((p) => ({ id: p.id, label: personDisplay(p).label }))
+    : [];
+
   return (
     <div className="px-6 pb-16 pt-8 sm:px-10 lg:px-14 xl:px-20">
       <div className="w-full">
@@ -56,6 +83,17 @@ export default async function OrganizationDetailPage({
             { href: '/operator/organizations', label: 'Organizations' },
             { label: organization.name },
           ]}
+        />
+
+        <EditOrganizationFields
+          organizationId={organization.id}
+          name={organization.name}
+          kind={organization.kind}
+          domain={organization.domain}
+          website={organization.website}
+          notes={organization.notes}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
 
         {organization.website || organization.notes ? (
@@ -113,14 +151,22 @@ export default async function OrganizationDetailPage({
                         {display.label}
                       </span>
                     </Link>
-                    <span className="shrink-0 text-[13px] text-text-secondary">
+                    <span className="flex shrink-0 items-center gap-2 text-[13px] text-text-secondary">
                       {affiliation.role ?? (affiliation.isPrimary ? 'Primary contact' : '—')}
+                      {canEdit ? <RemoveAffiliationButton affiliationId={affiliation.id} /> : null}
                     </span>
                   </li>
                 );
               })}
             </ul>
           )}
+          {canEdit ? (
+            <AddAffiliationForm
+              organizationId={organization.id}
+              options={personOptions}
+              pickLabel="Pick a person…"
+            />
+          ) : null}
         </section>
       </div>
     </div>

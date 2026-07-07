@@ -9,12 +9,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — Phase 2A (Person spine) built on `feat/crm-person-spine`, unmerged; awaiting Adam's SQL + review |
+| **State** | 🟡 In progress — Phase 2A LIVE in prod; Phase 2B Campaign 1 (merge queue + spine hardening + People/Org CRUD) built on `feat/crm-merge-queue`, unmerged, ZERO DDL |
 | **V1 item** | — (post-V1, CRM substrate) |
 | **Last updated** | 2026-07-06 |
 | **Owner** | Adam |
-| **Blocked on** | Adam: run NEON Block 1 (additive DDL) → merge/deploy `feat/crm-person-spine` → run NEON Block 2 (backfill) → verification. SQL blocks live in the Gate 2 report (session 2026-07-06); nothing may touch the DB except Adam. |
-| **Next** | Adam reviews the Gate 2 report + branch, runs Block 1 in Neon, deploys, runs Block 2, then walks the verification queries + `/operator/people` checks. After cutover: Phase 2B (Deal objects, Person merge queue, Person-level consent — needs explicit unfreeze). |
+| **Blocked on** | Adam: review + merge `feat/crm-merge-queue` (8 commits incl. the sponsor-narrative security fix). Also: `feat/apply-new-six` still carries the accidental People-CRUD commit `3fb2fdb` — restore its tip to `a2acfb3` once that stream pauses (content is cherry-picked onto this branch as `d034cbf`). |
+| **Next** | Adam merges Campaign 1, deploys, walks the verification checks (merge queue on the flagged pair, delete of the John Doe junk row, People search/filters, org edit/affiliations). Then Phase 2B Campaign 2 (Deal objects, Person-level consent — needs explicit unfreeze). |
 
 ## Phase 2A — what shipped on `feat/crm-person-spine` (2026-07-06)
 
@@ -46,6 +46,32 @@
   `sponsor_audience_member` view untouched; `tests/unit/sponsor-firewall.test.ts`
   extended to bar Person-spine reads from sponsor surfaces.
 
+## Phase 2B Campaign 1 — what shipped on `feat/crm-merge-queue` (2026-07-06, zero DDL)
+
+- **Merge queue:** `lib/crm/person-merge.ts` (`executePersonMerge` — one interactive
+  $transaction; collision rows stay on the loser tombstone; clerkUserId transfer
+  frees the unique slot first; hard refusals: both-have-members, two different real
+  clerk ids), `findDuplicatePairs` (flags + read-time email/phone matches, 500-row
+  window, dismissals persisted as `person.duplicate_dismissed` audit events),
+  `/operator/people/merge` (STAFF view/dismiss, ADMIN executes).
+- **People CRUD:** Add Person (STAFF, through `resolvePerson` — not a new mint path;
+  duplicate flag surfaced), inline edit (STAFF, firstName/lastName/phone only),
+  hard delete (ADMIN; refuses Members, Applications, and both sides of a merge;
+  person-only engagement events cleaned in the delete transaction).
+- **List tooling:** URL-driven server-side search / source / verified / membership
+  filters + name/added sort on `/operator/people`.
+- **Apply draft (D4):** the membership draft mints a Person, NOT a guest Member —
+  Members are earned at submit (Door 1) or approval. Every downstream reader
+  verified null-safe at Gate 1.
+- **Webhook guard:** `lib/clerk-webhook.ts` `isSyntheticClerkUser` — dashboard test
+  events (no email + no external account, or Clerk's example user id) skip the mint.
+- **Organizations write path:** PATCH (STAFF, domain-normalized, P2002→409) +
+  DELETE (ADMIN, refuses while affiliated) + affiliation add/remove from both
+  details via `/api/operator/affiliations`; inline edit mirrors the Person pattern.
+- **Security (priority insertion):** sponsor narrative server actions
+  (`app/operator/intelligence/sponsor/actions.ts`) were ungated and accepted a
+  client workspaceId — now `requireRole(ADMIN)`-gated, workspaceId server-derived.
+
 ## Environment variables
 
 - `CLERK_WEBHOOK_SECRET` — Clerk webhook signing secret (endpoint: `/api/webhooks/clerk`,
@@ -65,6 +91,12 @@
   `app/api/operator/organizations/route.ts`, `app/operator/operator-nav.tsx`
 - `lib/engagement-labels.ts` (two new enum labels)
 - `tests/unit/crm/resolve-person.test.ts`, `tests/unit/sponsor-firewall.test.ts`
+- Campaign 1: `lib/crm/person-merge.ts`, `lib/clerk-webhook.ts`,
+  `app/api/operator/people/*` (create/edit/delete/merge/dismiss),
+  `app/api/operator/affiliations/route.ts`, `app/api/operator/organizations/[id]/route.ts`,
+  `app/operator/people/merge/*`, People/Org `_components/*` (AddPersonSheet,
+  EditPersonFields, PeopleToolbar, EditOrganizationFields, AffiliationControls),
+  `tests/unit/crm/person-merge.test.ts`, `tests/unit/clerk-webhook-guard.test.ts`
 - `prisma/schema.prisma` (Person/Organization/PersonOrganization + personId columns)
 - Pre-existing stage docs: `OPERATOR-CRM-ROADMAP.md`, `INFLUENCE-MODEL.md`,
   `PR2-PR3-BUILD-BRIEF.md`, `REPORTING-DASHBOARD-CONTRACT.md`, `SEED-MODULE-PLAN.md`,

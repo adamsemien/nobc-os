@@ -1,8 +1,12 @@
 import Link from 'next/link';
 import { auth } from '@clerk/nextjs/server';
-import { BookUser } from 'lucide-react';
+import { ContactSourceSystem, type Prisma } from '@prisma/client';
+import { BookUser, GitMerge } from 'lucide-react';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
+import { isStaff } from '@/lib/operator-role';
+import { AddPersonSheet } from './_components/AddPersonSheet';
+import { PeopleToolbar } from './_components/PeopleToolbar';
 import {
   Avatar,
   DataTableBody,
@@ -19,7 +23,15 @@ import {
 import { CONTACT_SOURCE_LABELS } from '@/lib/crm/labels';
 import { MEMBER_STATUS_LABELS, personDisplay, formatCrmDate } from './person-display';
 
-export default async function PeoplePage() {
+function param(value: string | string[] | undefined): string {
+  return typeof value === 'string' ? value : '';
+}
+
+export default async function PeoplePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { userId } = await auth();
   const workspaceId = await getMemberWorkspaceId(userId);
   if (!workspaceId) {
@@ -30,9 +42,47 @@ export default async function PeoplePage() {
     );
   }
 
+  const canAdd = await isStaff(userId, workspaceId);
+
+  // Server-side list controls (workspace-scoped, same 500-row cap). Params are
+  // validated here — an unknown source or sort silently falls back to default.
+  const params = await searchParams;
+  const q = param(params.q).trim();
+  const source = (Object.values(ContactSourceSystem) as string[]).includes(param(params.source))
+    ? (param(params.source) as ContactSourceSystem)
+    : '';
+  const verified = ['verified', 'unverified'].includes(param(params.verified))
+    ? param(params.verified)
+    : '';
+  const membership = ['member', 'none'].includes(param(params.membership))
+    ? param(params.membership)
+    : '';
+  const sort = param(params.sort) === 'name' ? 'name' : '';
+  const filtersActive = Boolean(q || source || verified || membership);
+
+  const where: Prisma.PersonWhereInput = { workspaceId, mergedIntoId: null };
+  if (q) {
+    where.OR = [
+      { firstName: { contains: q, mode: 'insensitive' } },
+      { lastName: { contains: q, mode: 'insensitive' } },
+      { email: { contains: q, mode: 'insensitive' } },
+    ];
+  }
+  if (source) where.contactSources = { some: { source } };
+  if (verified === 'verified') where.emailVerified = true;
+  if (verified === 'unverified') {
+    where.emailVerified = false;
+    where.email = { not: null };
+  }
+  if (membership === 'member') where.members = { some: { mergedIntoId: null } };
+  if (membership === 'none') where.members = { none: { mergedIntoId: null } };
+
   const people = await db.person.findMany({
-    where: { workspaceId, mergedIntoId: null },
-    orderBy: { createdAt: 'desc' },
+    where,
+    orderBy:
+      sort === 'name'
+        ? [{ firstName: { sort: 'asc', nulls: 'last' } }, { lastName: { sort: 'asc', nulls: 'last' } }]
+        : { createdAt: 'desc' },
     take: 500,
     include: {
       contactSources: { select: { source: true } },
@@ -49,13 +99,40 @@ export default async function PeoplePage() {
         <PageHeader
           title="People"
           subtitle={`Every human the platform has touched — ${people.length} ${people.length === 1 ? 'person' : 'people'}.`}
+          action={
+            <>
+              <Link
+                href="/operator/people/merge"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3.5 text-sm font-medium text-text-secondary hover:text-text-primary"
+              >
+                <GitMerge className="h-4 w-4" />
+                Merge queue
+              </Link>
+              {canAdd ? <AddPersonSheet /> : null}
+            </>
+          }
+        />
+        <PeopleToolbar
+          filters={{ q, source, verified, membership, sort }}
+          sourceOptions={Object.entries(CONTACT_SOURCE_LABELS).map(([value, label]) => ({
+            value,
+            label,
+          }))}
         />
         {people.length === 0 ? (
-          <EmptyState
-            icon={BookUser}
-            title="No people yet"
-            subtitle="People appear here from their first touch — an application started, an account created, or an operator adding them."
-          />
+          filtersActive ? (
+            <EmptyState
+              icon={BookUser}
+              title="No people match"
+              subtitle="Try a different search or clear the filters."
+            />
+          ) : (
+            <EmptyState
+              icon={BookUser}
+              title="No people yet"
+              subtitle="People appear here from their first touch — an application started, an account created, or an operator adding them."
+            />
+          )
         ) : (
           <DataTableShell>
             <DataTableHead>
