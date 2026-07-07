@@ -17,6 +17,11 @@ import {
   type SubField,
 } from '../_lib/questions';
 import { PREVIEW_ANSWERS, PREVIEW_REVEAL } from '../_lib/preview-fixture';
+import InARoomTapGrid from './InARoomTapGrid';
+import InARoomMostLeast from './InARoomMostLeast';
+
+/** DB option (id + label) for an In-A-Room question, loaded per draft. */
+type InARoomOption = { id: string; label: string; order: number };
 
 const FroggerGame = dynamic(() => import('./FroggerGame'), { ssr: false });
 
@@ -227,11 +232,15 @@ const CHAPTER_PAGE_IDS: string[][] = [
   // language) kept together on Page 2. Photos close the identity page - the
   // natural end of "tell us who you are", per Adam's placement call.
   ['firstName', 'lastName', 'email', 'cell', 'homeAddress', 'cities', 'birthInfo', 'gender', 'dietary', 'links', 'photos'],
-  ['whatYouDo', 'characteristicsGoodAtJob', 'creativePursuits', 'referrals', 'enneagram', 'mbti', 'loveLanguage', 'otherTests'],
+  ['whatYouDo', 'characteristicsGoodAtJob', 'creativePursuits', 'referrals', 'enneagram', 'mbti', 'loveLanguage', 'otherTests', 'personalityUpload'],
   // Section 02 - How You Move Through the World
   ['obsessedWith', 'recommendForPay', 'comeToYouFor', 'walkIntoRoom'],
   ['unplannedFun', 'meetPeople', 'workout'],
   ['goodCompany', 'connectionCreated', 'loyalCommunity'],
+  // In a Room - tactile self-placement, paced across two short pages (3 + 3).
+  // Q4 perfectFriday + Q5 skipFriday share the same option list, so they sit together.
+  ['roomPosition', 'giftMaking', 'partyJudge'],
+  ['perfectFriday', 'skipFriday', 'bestSelf'],
   // Section 03 - What You're Here For
   ['nominate'],
 ];
@@ -519,6 +528,12 @@ export default function MembershipForm({
   const [showFrogger, setShowFrogger] = useState(false);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  // In-A-Room option point maps (ids + labels), loaded per draft from the DB so the
+  // tap-grid / most-least components submit the real QuestionOption ids the scorer reads.
+  const [inARoomOptions, setInARoomOptions] = useState<Record<string, InARoomOption[]>>({});
+  // Optional personality-test upload (reuses the /apply photo-upload R2 path).
+  const [personalityUploading, setPersonalityUploading] = useState(false);
+  const [personalityUploadError, setPersonalityUploadError] = useState('');
   // Picker-local validation message (wrong type / too large / over the cap) -
   // separate from the page-level `error` so it renders beside the previews.
   const [photoError, setPhotoError] = useState('');
@@ -669,6 +684,30 @@ export default function MembershipForm({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Load the six In-A-Room questions' option point maps (ids + labels) for this
+  // draft's template, so the tap-grid / most-least components render the DB options
+  // and submit their ids. Non-PII; a failure leaves the section in a loading state.
+  useEffect(() => {
+    if (previewMode || !applicationId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/apply/membership/${applicationId}/in-a-room`);
+        if (!res.ok) return;
+        const { inARoom } = await res.json();
+        if (cancelled || !Array.isArray(inARoom)) return;
+        const byKey: Record<string, InARoomOption[]> = {};
+        for (const q of inARoom) byKey[q.stableKey] = Array.isArray(q.options) ? q.options : [];
+        setInARoomOptions(byKey);
+      } catch {
+        /* leave empty; the components show a brief loading state */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applicationId, previewMode]);
 
   useEffect(() => {
     const id = searchParams.get('id');
@@ -1310,6 +1349,38 @@ export default function MembershipForm({
 
   // ----- Generic question rendering -----
 
+  // Optional personality-test upload. Reuses the /apply photo-upload R2 path
+  // (kind=document → also accepts PDF); stores the returned private key as the
+  // question's answer. No DAM foldering / People linking (parked).
+  async function uploadPersonalityFile(key: string, file: File) {
+    setPersonalityUploadError('');
+    if (file.size > APPLY_PHOTO_MAX_BYTES) {
+      setPersonalityUploadError('That file is over 10MB. Please upload a smaller screenshot or PDF.');
+      return;
+    }
+    setPersonalityUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('kind', 'document');
+      const r = await fetch('/api/apply/membership/upload', { method: 'POST', body: fd });
+      if (!r.ok) {
+        const detail = await r.json().catch(() => null);
+        throw new Error(detail?.error || `Upload failed (${r.status}).`);
+      }
+      const { key: r2key } = await r.json();
+      if (!r2key) throw new Error('Upload failed.');
+      setAnswer(key, r2key);
+    } catch (e) {
+      console.error('[apply/personality-upload]', e);
+      setPersonalityUploadError(
+        e instanceof Error && e.message ? e.message : 'Upload failed. Please try again.',
+      );
+    } finally {
+      setPersonalityUploading(false);
+    }
+  }
+
   function renderSimpleInput(q: Question, key: string, showHint = false) {
     const value = answers[key] ?? '';
     if (q.type === 'photo') {
@@ -1485,6 +1556,108 @@ export default function MembershipForm({
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
+      );
+    }
+    if (q.type === 'tap_grid') {
+      const opts = inARoomOptions[q.id] ?? [];
+      if (opts.length === 0) {
+        return (
+          <p style={{ fontFamily: bodyFont, fontSize: 13, color: theme.muted }}>Loading…</p>
+        );
+      }
+      return (
+        <InARoomTapGrid
+          options={opts}
+          value={value}
+          onChange={(optionId) => setAnswer(key, optionId)}
+          ariaLabel={q.label}
+        />
+      );
+    }
+    if (q.type === 'most_least') {
+      const opts = inARoomOptions[q.id] ?? [];
+      if (opts.length === 0) {
+        return (
+          <p style={{ fontFamily: bodyFont, fontSize: 13, color: theme.muted }}>Loading…</p>
+        );
+      }
+      return (
+        <InARoomMostLeast
+          options={opts}
+          value={value}
+          onChange={(serialized) => setAnswer(key, serialized)}
+          ariaLabel={q.label}
+        />
+      );
+    }
+    if (q.type === 'file') {
+      const attached = !!value;
+      return (
+        <div>
+          {attached ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: bodyFont, fontSize: 14, color: theme.text }}>
+                File attached
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setAnswer(key, '');
+                  setPersonalityUploadError('');
+                }}
+                style={{
+                  font: 'inherit',
+                  fontSize: 13,
+                  color: theme.accent,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  padding: 0,
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 10,
+                cursor: personalityUploading ? 'default' : 'pointer',
+                padding: '10px 16px',
+                borderRadius: 10,
+                border: `1px solid ${theme.border}`,
+                background: theme.bg,
+                fontFamily: bodyFont,
+                fontSize: 14,
+                color: theme.text,
+              }}
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,application/pdf"
+                disabled={personalityUploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadPersonalityFile(key, f);
+                  e.target.value = '';
+                }}
+                style={{ display: 'none' }}
+              />
+              {personalityUploading ? 'Uploading…' : 'Choose file'}
+            </label>
+          )}
+          {personalityUploadError && (
+            <p
+              role="alert"
+              style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, margin: '10px 0 0 0' }}
+            >
+              {personalityUploadError}
+            </p>
+          )}
+        </div>
       );
     }
     const inputType =

@@ -135,6 +135,7 @@ function isSystemKey(key: string): boolean {
  *  and must never leak into the Q&A answers list as raw JSON/booleans. */
 const HIDDEN_ANSWER_KEYS = new Set([
   'photos.urls',
+  'personalityUpload',
   'basics.referrers',
   'consentMembershipRead',
   'consentPhotos',
@@ -156,6 +157,16 @@ function readPhotos(answers: Record<string, string>): string[] {
   } catch {
     return [];
   }
+}
+
+/** The optional personality-test upload (image or PDF): a private R2 key served
+ *  through the presign proxy. null when absent or not a workspace ref. */
+function readPersonalityFile(
+  answers: Record<string, string>,
+): { href: string; isPdf: boolean } | null {
+  const raw = answers['personalityUpload'];
+  if (!raw || !isPortraitRef(raw)) return null;
+  return { href: portraitSrc(raw), isPdf: raw.toLowerCase().endsWith('.pdf') };
 }
 
 function parseReferrer(v: string): string {
@@ -833,6 +844,7 @@ function DetailPanel({
     ([k]) => !isSystemKey(k) && !HIDDEN_ANSWER_KEYS.has(k),
   );
   const photos = readPhotos(app.answers);
+  const personalityFile = readPersonalityFile(app.answers);
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [eggVisible, setEggVisible] = useState(false);
@@ -1134,6 +1146,36 @@ function DetailPanel({
                 style={{ border: '1px solid var(--border)' }}
               />
             ))}
+          </div>
+        </section>
+      )}
+
+      {personalityFile && (
+        <section className="mt-6 border-t border-border pt-6">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+            Personality test
+          </h3>
+          <div className="mt-3">
+            {personalityFile.isPdf ? (
+              <a
+                href={personalityFile.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-text-primary underline underline-offset-2"
+              >
+                View PDF →
+              </a>
+            ) : (
+              <a href={personalityFile.href} target="_blank" rel="noopener noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={personalityFile.href}
+                  alt={`${app.fullName} personality test`}
+                  className="h-28 w-28 rounded-md object-cover @xl:h-36 @xl:w-36"
+                  style={{ border: '1px solid var(--border)' }}
+                />
+              </a>
+            )}
           </div>
         </section>
       )}

@@ -28,7 +28,10 @@ export type FieldType =
   | 'url'
   | 'number'
   | 'group'
-  | 'photo';
+  | 'photo'
+  | 'tap_grid'
+  | 'most_least'
+  | 'file';
 
 export interface SubField {
   id: string;
@@ -70,7 +73,7 @@ export interface Question {
   allowNone?: boolean;
 }
 
-export type SectionId = 'who-you-are' | 'how-you-move' | 'what-youre-here-for';
+export type SectionId = 'who-you-are' | 'how-you-move' | 'in-a-room' | 'what-youre-here-for';
 
 export interface Section {
   id: SectionId;
@@ -90,6 +93,10 @@ export const SECTIONS: Section[] = [
     title: 'How You Move Through the World',
     eyebrow: 'SECTION 02',
   },
+  // A tactile interstitial, not a numbered Q&A section — deliberately NON-numbered
+  // eyebrow so the three text sections keep SECTION 01/02/03. `index` is unused by
+  // the form (progress is step-driven), so the value here is cosmetic only.
+  { id: 'in-a-room', index: 2, title: 'In a Room', eyebrow: 'IN A ROOM' },
   { id: 'what-youre-here-for', index: 3, title: "What You're Here For", eyebrow: 'SECTION 03' },
 ];
 
@@ -307,6 +314,14 @@ export const QUESTIONS: Question[] = [
     required: false,
     help: "Anything else: StrengthsFinder, DISC, Human Design, whatever you've got.",
   },
+  {
+    id: 'personalityUpload',
+    section: 'who-you-are',
+    label: 'Have a personality-test result to share?',
+    type: 'file',
+    required: false,
+    help: "Optional. Upload a screenshot or PDF — enneagram, Human Design, Myers-Briggs, whatever you've got.",
+  },
 
   // ---- Section 02 - How You Move Through the World ----
   {
@@ -329,8 +344,7 @@ export const QUESTIONS: Question[] = [
     label: 'What do people consistently come to you for?',
     type: 'textarea',
     required: true,
-    help:
-      'A good tax guy, a margarita recipe, cooking advice - whatever people keep coming back to you for.',
+    help: 'do you have a good tax guy? margarita recipe? cooking advice?',
   },
   {
     id: 'walkIntoRoom',
@@ -338,8 +352,7 @@ export const QUESTIONS: Question[] = [
     label: "You walk into a room where you don't know anyone. What do you actually do?",
     type: 'textarea',
     required: true,
-    help:
-      'This is how we make the room comfortable for you. Do you find someone to talk to, or hang back and read the room first?',
+    help: 'be honest and specific, this helps us design a comfortable room for you.',
   },
   {
     id: 'unplannedFun',
@@ -379,6 +392,57 @@ export const QUESTIONS: Question[] = [
     section: 'how-you-move',
     label: "Tell us about a group or community you've stayed loyal to - and what keeps you there?",
     type: 'textarea',
+    required: true,
+  },
+
+  // ---- In a Room - tactile self-placement (tap-grid + most/least). Scored by the
+  //      deterministic In-A-Room tally; option point maps + ids live in the DB
+  //      (QuestionOption), loaded via /api/apply/membership/[id]/in-a-room. These
+  //      ids MUST match the seed's stableKeys. required:true is enforced in the form
+  //      even though the DB flag is false (the tally needs all six). ----
+  {
+    id: 'roomPosition',
+    section: 'in-a-room',
+    label:
+      "It's 8pm at a dinner party in full swing. Where are we most likely to find you? Be honest, not aspirational. There's no wrong room position.",
+    type: 'tap_grid',
+    required: true,
+  },
+  {
+    id: 'giftMaking',
+    section: 'in-a-room',
+    label:
+      "In a room, your gift is making... Pick the one that's MOST you, and the one that's LEAST you. The least matters as much as the most.",
+    type: 'most_least',
+    required: true,
+  },
+  {
+    id: 'partyJudge',
+    section: 'in-a-room',
+    label: "What do you secretly judge a party for? Again: one MOST, one LEAST. We won't tell.",
+    type: 'most_least',
+    required: true,
+  },
+  {
+    id: 'perfectFriday',
+    section: 'in-a-room',
+    label: 'Pick your perfect Friday night.',
+    type: 'tap_grid',
+    required: true,
+  },
+  {
+    id: 'skipFriday',
+    section: 'in-a-room',
+    label:
+      "Now the one you'd politely skip. Same list. What you'd pass on says as much as what you'd pick.",
+    type: 'tap_grid',
+    required: true,
+  },
+  {
+    id: 'bestSelf',
+    section: 'in-a-room',
+    label: 'At your absolute best in a room, people would say you were...',
+    type: 'tap_grid',
     required: true,
   },
 

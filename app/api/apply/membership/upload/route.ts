@@ -3,6 +3,7 @@ import { resolveDefaultApplyWorkspace } from '@/lib/apply-workspace';
 import { isStorageConfigured, uploadObject } from '@/lib/dam/storage';
 import { applicationPhotoKey } from '@/lib/apply-photo';
 import { isAllowedImageBytes, type SniffedImageType } from '@/lib/image-magic-bytes';
+import { isHeic, convertHeicToJpeg } from '@/lib/dam/heic';
 import sharp from 'sharp';
 import { publicRateLimit } from '@/lib/public-rate-limit';
 
@@ -36,7 +37,14 @@ export async function POST(req: NextRequest) {
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: 'file field required' }, { status: 400 });
   }
-  if (!ALLOWED.has(file.type)) {
+  // `kind=document` (the optional personality-test upload) additionally accepts PDF
+  // and HEIC/HEIF (iPhone screenshots). The default photo path is image-only and
+  // byte-for-byte unchanged. HEIC is detected by extension too — iPhone uploads
+  // often carry an empty file.type.
+  const isDocument = form?.get('kind') === 'document';
+  const isPdf = isDocument && file.type === 'application/pdf';
+  const isHeicDoc = isDocument && isHeic(file.type, file.name);
+  if (!ALLOWED.has(file.type) && !isPdf && !isHeicDoc) {
     return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
@@ -57,8 +65,41 @@ export async function POST(req: NextRequest) {
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
-  // Don't trust client-declared MIME — verify real image bytes (defense-in-depth).
-  if (!isAllowedImageBytes(buf, ALLOWED_BYTES)) {
+
+  // PDF documents (kind=document only): verify the %PDF- magic bytes, then store
+  // as-is. sharp is image-only, so PDFs skip it. Same private-R2 prefix + opaque-key
+  // contract as photos; read back through the same operator-gated presign proxy.
+  if (isPdf) {
+    if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      console.warn('[apply/upload] rejected document with mismatched magic bytes', {
+        declaredType: file.type,
+        size: buf.length,
+      });
+      return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
+    }
+    const pdfKey = applicationPhotoKey(workspace.id, 'pdf');
+    await uploadObject(pdfKey, buf, 'application/pdf');
+    return NextResponse.json({ key: pdfKey });
+  }
+
+  // HEIC/HEIF documents (kind=document only): sharp can't decode HEIC on Vercel,
+  // so convert to JPEG first (reuses the DAM libheif path), then fall through to the
+  // shared image pipeline (magic-byte check on the decoded JPEG + EXIF strip).
+  let imageBuf: Buffer = buf;
+  if (isHeicDoc) {
+    try {
+      imageBuf = await convertHeicToJpeg(buf);
+    } catch (e) {
+      console.warn('[apply/upload] HEIC decode failed', {
+        declaredType: file.type,
+        err: e instanceof Error ? e.message : String(e),
+      });
+      return NextResponse.json({ error: 'Could not process image' }, { status: 400 });
+    }
+  }
+
+  // Image path (photos AND image documents): verify real image bytes (defense-in-depth).
+  if (!isAllowedImageBytes(imageBuf, ALLOWED_BYTES)) {
     console.warn('[apply/upload] rejected file with mismatched magic bytes', {
       declaredType: file.type,
       size: buf.length,
@@ -74,7 +115,7 @@ export async function POST(req: NextRequest) {
   // bytes already validated) reject so we never fall back to storing raw EXIF.
   let processed: Buffer;
   try {
-    processed = await sharp(buf, { failOn: 'none' }).rotate().toBuffer();
+    processed = await sharp(imageBuf, { failOn: 'none' }).rotate().toBuffer();
   } catch (e) {
     console.warn('[apply/upload] image processing failed', {
       declaredType: file.type,
@@ -83,9 +124,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not process image' }, { status: 400 });
   }
 
-  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+  const ext = isHeicDoc
+    ? 'jpg'
+    : file.type === 'image/png'
+      ? 'png'
+      : file.type === 'image/webp'
+        ? 'webp'
+        : 'jpg';
+  const contentType = isHeicDoc ? 'image/jpeg' : file.type;
   const key = applicationPhotoKey(workspace.id, ext);
-  await uploadObject(key, processed, file.type);
+  await uploadObject(key, processed, contentType);
 
   return NextResponse.json({ key });
 }
