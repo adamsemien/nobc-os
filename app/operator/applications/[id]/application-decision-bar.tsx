@@ -8,7 +8,7 @@ import { logQAAction } from '@/lib/dev/qa-action-log';
 
 type Props = {
   applicationId: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HOLD';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HOLD' | 'WAITLISTED' | 'DECLINED';
   reviewedAt: string | null;
 };
 
@@ -18,7 +18,9 @@ export function ApplicationDecisionBar({
   reviewedAt,
 }: Props) {
   const router = useRouter();
-  const actionable = status === 'PENDING' || status === 'HOLD';
+  // A waitlisted application is still a live decision — it can be approved
+  // (promoted) or rejected, same as pending/hold.
+  const actionable = status === 'PENDING' || status === 'HOLD' || status === 'WAITLISTED';
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
@@ -86,6 +88,12 @@ export function ApplicationDecisionBar({
           {status === 'REJECTED' && (
             <p className="text-center text-sm" style={{ color: 'var(--text-primary)' }}>
               Rejected
+              {reviewedLabel ? ` on ${reviewedLabel}` : ''}.
+            </p>
+          )}
+          {status !== 'APPROVED' && status !== 'REJECTED' && (
+            <p className="text-center text-sm" style={{ color: 'var(--text-primary)' }}>
+              Declined
               {reviewedLabel ? ` on ${reviewedLabel}` : ''}.
             </p>
           )}

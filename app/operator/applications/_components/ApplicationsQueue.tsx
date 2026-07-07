@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowLeft, Check, Clock, Loader2, Mail, MapPin, Phone, Search, X, XCircle } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Loader2, Mail, MapPin, PauseCircle, Phone, Search, X, XCircle } from 'lucide-react';
 import { APPLY_QUESTIONS } from '@/lib/apply-config';
 import { LEGACY_ANSWER_LABELS } from '@/lib/legacy-answer-labels';
 import { DEFAULT_TIER_NAMES, type TierNames } from '@/lib/score-display';
@@ -279,6 +279,9 @@ export function ApplicationsQueue({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingBulkAction, setPendingBulkAction] = useState<string | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<'reject' | null>(null);
+  // Single-reject confirm — holds the application id awaiting confirmation.
+  // Reject sends an email; it must never fire from one keystroke or click.
+  const [confirmReject, setConfirmReject] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState('');
 
   const searchRef = useRef<HTMLInputElement>(null);
@@ -452,7 +455,7 @@ export function ApplicationsQueue({
       else if (e.key === 'k') { const p = apps[Math.max(idx - 1, 0)]; if (p) setSelectedId(p.id); }
       else if (e.key === 'a' && cur) postActionRef.current(cur, 'approve');
       else if (e.key === 'h' && cur) postActionRef.current(cur, 'hold');
-      else if (e.key === 'r' && cur) postActionRef.current(cur, 'reject');
+      else if (e.key === 'r' && cur) setConfirmReject(cur);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -564,6 +567,11 @@ export function ApplicationsQueue({
           </div>
 
           <ul className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pb-4 pr-0.5">
+            {visibleApps.length === 0 ? (
+              <li className="px-3 py-8 text-center text-sm text-text-secondary">
+                No applications match “{search}”.
+              </li>
+            ) : null}
             {visibleApps.map(app => {
               const active = app.id === selectedId;
               const badge = recommendationBadgeVars(app.aiRecommendation);
@@ -698,7 +706,7 @@ export function ApplicationsQueue({
               reviewNote={reviewNote}
               onNoteChange={setReviewNote}
               onApprove={() => postAction(selected.id, 'approve')}
-              onReject={() => postAction(selected.id, 'reject')}
+              onReject={() => setConfirmReject(selected.id)}
               onWaitlist={() => postAction(selected.id, 'waitlist')}
               onHold={() => postAction(selected.id, 'hold')}
               tierNames={tierNames}
@@ -718,6 +726,22 @@ export function ApplicationsQueue({
           onConfirm={async () => {
             setConfirmBulk(null);
             await bulkAction('reject');
+          }}
+        />
+      ) : null}
+
+      {confirmReject ? (
+        <ConfirmModal
+          title={`Reject ${applications.find(a => a.id === confirmReject)?.fullName ?? 'this application'}?`}
+          subtitle="This sends a rejection email and cannot be undone."
+          confirmLabel="Reject"
+          confirmTone="danger"
+          busy={pendingAction === 'reject'}
+          onCancel={() => setConfirmReject(null)}
+          onConfirm={() => {
+            const id = confirmReject;
+            setConfirmReject(null);
+            if (id) void postAction(id, 'reject');
           }}
         />
       ) : null}
@@ -757,7 +781,7 @@ export function ApplicationsQueue({
               reviewNote={reviewNote}
               onNoteChange={setReviewNote}
               onApprove={() => postAction(selected.id, 'approve')}
-              onReject={() => postAction(selected.id, 'reject')}
+              onReject={() => setConfirmReject(selected.id)}
               onWaitlist={() => postAction(selected.id, 'waitlist')}
               onHold={() => postAction(selected.id, 'hold')}
               tierNames={tierNames}
@@ -1268,6 +1292,20 @@ function DetailPanel({
             <Clock className="h-5 w-5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
           )}
           <span className="text-center leading-tight">Waitlist</span>
+        </button>
+        <button
+          type="button"
+          onClick={onHold}
+          disabled={pendingAction !== null}
+          className="inline-flex min-h-[3.25rem] flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-base font-semibold text-text-secondary shadow-sm transition-colors hover:bg-surface-elevated disabled:opacity-50"
+          style={{ borderRadius: '6px' }}
+        >
+          {pendingAction === 'hold' ? (
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+          ) : (
+            <PauseCircle className="h-5 w-5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+          )}
+          <span className="text-center leading-tight">Hold</span>
         </button>
         <button
           type="button"

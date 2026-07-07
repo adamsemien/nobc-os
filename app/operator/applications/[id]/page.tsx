@@ -46,7 +46,7 @@ type DetailPayload = {
     email: string;
     phone: string | null;
     city: string | null;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HOLD';
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HOLD' | 'WAITLISTED' | 'DECLINED';
     createdAt: string;
     reviewedAt: string | null;
     rejectionReason: string | null;

@@ -11,7 +11,7 @@ import {
   type ApplicationsQueueItem,
 } from './_components/ApplicationsQueue';
 
-type StatusTab = 'pending' | 'approved' | 'rejected' | 'hold' | 'all';
+type StatusTab = 'pending' | 'approved' | 'rejected' | 'hold' | 'waitlisted' | 'all';
 
 type ApiApplication = {
   id: string;
@@ -38,11 +38,12 @@ type StatusCounts = {
   approved: number;
   rejected: number;
   hold: number;
+  waitlisted: number;
 };
 
 function tabFromSearch(status: string | undefined): StatusTab {
   const s = (status ?? 'pending').toLowerCase();
-  if (s === 'approved' || s === 'rejected' || s === 'all' || s === 'hold') return s;
+  if (s === 'approved' || s === 'rejected' || s === 'all' || s === 'hold' || s === 'waitlisted') return s;
   return 'pending';
 }
 
@@ -73,6 +74,7 @@ function toQueueItem(row: ApiApplication): ApplicationsQueueItem {
 const TABS: { label: string; value: StatusTab }[] = [
   { label: 'Pending', value: 'pending' },
   { label: 'Hold', value: 'hold' },
+  { label: 'Waitlisted', value: 'waitlisted' },
   { label: 'Approved', value: 'approved' },
   { label: 'Rejected', value: 'rejected' },
   { label: 'All', value: 'all' },
@@ -83,6 +85,7 @@ function tabCount(tab: StatusTab, counts: StatusCounts): number | null {
   if (tab === 'approved') return counts.approved;
   if (tab === 'rejected') return counts.rejected;
   if (tab === 'hold') return counts.hold;
+  if (tab === 'waitlisted') return counts.waitlisted;
   return null;
 }
 
@@ -180,6 +183,8 @@ export default async function OperatorApplicationsPage({
                       <LiveCount path="applications.approved" fallback={count} />
                     ) : value === 'rejected' ? (
                       <LiveCount path="applications.rejected" fallback={count} />
+                    ) : value === 'waitlisted' ? (
+                      <LiveCount path="applications.waitlisted" fallback={count} />
                     ) : (
                       count
                     )}

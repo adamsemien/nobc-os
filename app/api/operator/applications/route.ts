@@ -17,6 +17,7 @@ function parseStatus(param: string | null): ApplicationStatus[] | 'ALL' {
   if (s === 'approved') return ['APPROVED'];
   if (s === 'rejected') return ['REJECTED'];
   if (s === 'hold') return ['HOLD'];
+  if (s === 'waitlisted') return ['WAITLISTED'];
   if (s === 'pending') return ['PENDING'];
   return ['PENDING'];
 }
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
       ? { workspaceId }
       : { workspaceId, status: { in: filter } };
 
-  const [rows, pendingCount, approvedCount, rejectedCount, holdCount] = await Promise.all([
+  const [rows, pendingCount, approvedCount, rejectedCount, holdCount, waitlistedCount] = await Promise.all([
     db.application.findMany({
       where,
       include: { answers: true },
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
     db.application.count({ where: { workspaceId, status: 'APPROVED' } }),
     db.application.count({ where: { workspaceId, status: 'REJECTED' } }),
     db.application.count({ where: { workspaceId, status: 'HOLD' } }),
+    db.application.count({ where: { workspaceId, status: 'WAITLISTED' } }),
   ]);
 
   const applications = rows.map(app => ({
@@ -80,6 +82,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     applications,
     pendingCount,
-    counts: { pending: pendingCount, approved: approvedCount, rejected: rejectedCount, hold: holdCount },
+    counts: { pending: pendingCount, approved: approvedCount, rejected: rejectedCount, hold: holdCount, waitlisted: waitlistedCount },
   });
 }
