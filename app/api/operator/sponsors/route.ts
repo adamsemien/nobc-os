@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/emit-event';
 import { requireRole } from '@/lib/operator-role';
 import { OperatorRole, Prisma } from '@prisma/client';
 
@@ -35,7 +36,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const gate = await requireRole(OperatorRole.ADMIN);
   if (!gate.ok) return gate.response;
-  const { workspaceId } = gate;
+  const { userId, workspaceId } = gate;
 
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Bad request' }, { status: 400 }); }
@@ -58,6 +59,14 @@ export async function POST(req: NextRequest) {
       rightsFeeCents: d.rightsFeeCents ?? null,
       icp: d.icp ?? null,
     },
+  });
+  await emitEvent({
+    workspaceId,
+    actorId: userId,
+    action: 'sponsor.created',
+    entityType: 'SPONSOR',
+    entityId: sponsor.id,
+    metadata: { name: sponsor.name },
   });
   return NextResponse.json(sponsor, { status: 201 });
 }

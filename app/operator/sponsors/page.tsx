@@ -1,10 +1,12 @@
 import { OperatorRole } from '@prisma/client';
-import { requireRolePage } from '@/lib/operator-role';
+import { requireRolePage, roleAtLeast } from '@/lib/operator-role';
 import { db } from '@/lib/db';
 import { SponsorsView, type SponsorRow } from './_components/SponsorsView';
 
 export default async function SponsorsPage() {
-  const { workspaceId } = await requireRolePage(OperatorRole.STAFF);
+  const { workspaceId, role } = await requireRolePage(OperatorRole.STAFF);
+  // Sponsor writes are ADMIN at the API — hide the affordances STAFF would 403 on.
+  const canManage = roleAtLeast(role, OperatorRole.ADMIN);
 
   const sponsors = await db.sponsorBrandProfile.findMany({
     where: { workspaceId },
@@ -22,7 +24,7 @@ export default async function SponsorsPage() {
 
   return (
     <div className="px-6 py-6 sm:px-10 lg:px-14 xl:px-20">
-      <SponsorsView initialSponsors={rows} />
+      <SponsorsView initialSponsors={rows} canManage={canManage} />
     </div>
   );
 }

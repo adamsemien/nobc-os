@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/emit-event';
 import { requireRole } from '@/lib/operator-role';
 import { OperatorRole, Prisma } from '@prisma/client';
 
@@ -33,7 +34,7 @@ export async function PATCH(
 ) {
   const gate = await requireRole(OperatorRole.ADMIN);
   if (!gate.ok) return gate.response;
-  const { workspaceId } = gate;
+  const { userId, workspaceId } = gate;
   const { id } = await params;
 
   const existing = await db.sponsorBrandProfile.findFirst({ where: { id, workspaceId }, select: { id: true } });
@@ -62,6 +63,14 @@ export async function PATCH(
   }
 
   const updated = await db.sponsorBrandProfile.update({ where: { id }, data });
+  await emitEvent({
+    workspaceId,
+    actorId: userId,
+    action: 'sponsor.updated',
+    entityType: 'SPONSOR',
+    entityId: updated.id,
+    metadata: { fields: Object.keys(data).join(',') },
+  });
   return NextResponse.json(updated);
 }
 
@@ -71,7 +80,7 @@ export async function DELETE(
 ) {
   const gate = await requireRole(OperatorRole.ADMIN);
   if (!gate.ok) return gate.response;
-  const { workspaceId } = gate;
+  const { userId, workspaceId } = gate;
   const { id } = await params;
 
   // Guarded hard delete (no soft-delete column on this model). Refuse if the
@@ -82,6 +91,7 @@ export async function DELETE(
     where: { id, workspaceId },
     select: {
       id: true,
+      name: true,
       _count: {
         select: {
           generatedAssets: true,
@@ -109,5 +119,13 @@ export async function DELETE(
   }
 
   await db.sponsorBrandProfile.delete({ where: { id } });
+  await emitEvent({
+    workspaceId,
+    actorId: userId,
+    action: 'sponsor.deleted',
+    entityType: 'SPONSOR',
+    entityId: id,
+    metadata: { name: sponsor.name },
+  });
   return NextResponse.json({ ok: true });
 }
