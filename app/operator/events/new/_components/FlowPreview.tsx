@@ -246,7 +246,7 @@ function ConfirmScreen({ title }: { title: string }) {
     <div className="flex flex-col gap-2.5">
       <ScreenTitle>You&rsquo;re in</ScreenTitle>
       <p className="text-[9px] text-[var(--apply-muted)] font-[family-name:var(--font-dm-sans)]">Confirm your spot at {title}.</p>
-      <MockButton>Confirm RSVP</MockButton>
+      <MockButton>Reserve My Spot</MockButton>
     </div>
   );
 }

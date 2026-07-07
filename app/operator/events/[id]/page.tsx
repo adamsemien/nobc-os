@@ -212,7 +212,8 @@ export default async function OperatorEventDetailPage({
             className="rounded px-2 py-0.5 text-xs font-medium"
             style={statusBadgeStyle(event.status)}
           >
-            {event.status.toLowerCase()}
+            {{ DRAFT: 'Draft', PUBLISHED: 'Published', CANCELLED: 'Cancelled' }[event.status] ??
+              event.status.toLowerCase()}
           </span>
         </p>
 

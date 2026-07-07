@@ -500,7 +500,9 @@ export function SeriesPanel({ initialSeries }: { initialSeries: SeriesRow[] }) {
                             <span
                               className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${statusCls(inst.status)}`}
                             >
-                              {inst.status.toLowerCase()}
+                              {{ DRAFT: 'Draft', PUBLISHED: 'Published', CANCELLED: 'Cancelled' }[
+                                inst.status
+                              ] ?? inst.status.toLowerCase()}
                             </span>
                           </li>
                         ))}

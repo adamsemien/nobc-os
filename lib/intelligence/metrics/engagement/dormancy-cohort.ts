@@ -104,7 +104,7 @@ const metric: Metric = {
   id: 'engagement.dormancy-cohort',
   name: 'Dormancy Cohort',
   category: 'engagement',
-  description: 'Approved members with no RSVP in over 90 days, grouped by approval month.',
+  description: 'Approved members with no event access in over 90 days, grouped by approval month.',
   businessQuestion: 'Who joined and went quiet? These are re-engagement targets and a signal of community health.',
   resultType: 'cohort',
   viz: 'table',

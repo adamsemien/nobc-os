@@ -268,8 +268,11 @@ export function HousePhonePanel() {
     );
   }
 
+  // Display-only rename: 'RSVP Help' is the stored SmsMessage.category value
+  // (renaming it server-side would fork historical rows into two buckets), but
+  // the terminology law bans "RSVP" in operator copy — so map at render.
   const categorySegments = topics.categories.map((c) => ({
-    label: c.label,
+    label: c.label === 'RSVP Help' ? 'Access Help' : c.label,
     value: c.value,
     color: CATEGORY_COLORS[c.label] ?? 'var(--accent)',
   }));

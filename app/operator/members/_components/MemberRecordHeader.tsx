@@ -77,7 +77,13 @@ export function MemberRecordHeader({ record }: { record: MemberRecord }) {
         <Stat
           label="Enrichment"
           value={
-            <span className="capitalize">{m.enrichmentStatus.toLowerCase()}</span>
+            {
+              NONE: 'Not run',
+              PENDING: 'Pending',
+              PARTIAL: 'Partial',
+              COMPLETE: 'Complete',
+              STALE: 'Stale',
+            }[m.enrichmentStatus] ?? m.enrichmentStatus.toLowerCase()
           }
         />
       </div>

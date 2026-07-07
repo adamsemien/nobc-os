@@ -62,7 +62,7 @@ const CARDS: Array<{
   {
     key: 'editorial',
     title: 'Editorial',
-    blurb: 'Full-bleed hero, magazine-style copy, sticky RSVP card.',
+    blurb: 'Full-bleed hero, magazine-style copy, sticky access card.',
     bestFor: 'Best for: parties, cultural moments, food.',
     Thumb: EditorialThumb,
   },

@@ -90,7 +90,9 @@ export default function BugReportsPage() {
                   </DataTableCell>
                   <DataTableCell className="text-sm">{b.operatorName}</DataTableCell>
                   <DataTableCell className="text-xs text-text-secondary">
-                    {b.missionType.replace('_', ' ')}
+                    <span className="capitalize">
+                      {b.missionType.replace(/_/g, ' ').toLowerCase()}
+                    </span>
                   </DataTableCell>
                   <DataTableCell className="text-xs font-mono text-text-secondary">
                     {b.location}

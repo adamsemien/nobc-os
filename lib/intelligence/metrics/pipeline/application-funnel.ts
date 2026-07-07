@@ -5,7 +5,7 @@ import { DEMO_FUNNEL } from '@/lib/intelligence/demo-data';
 
 function insightFor(approved: number, firstRsvp: number): string {
   const rate = approved > 0 ? Math.round((firstRsvp / approved) * 100) : 0;
-  return `${rate}% of approved applicants RSVP within the period; the gap between approval and first event is your activation problem if this is under 60%.`;
+  return `${rate}% of approved applicants confirm access within the period; the gap between approval and first event is your activation problem if this is under 60%.`;
 }
 
 async function query(ctx: MetricContext): Promise<MetricResult> {
@@ -15,7 +15,7 @@ async function query(ctx: MetricContext): Promise<MetricResult> {
       value: [
         { label: 'Submitted', value: f.submitted },
         { label: 'Approved', value: f.approved },
-        { label: 'First RSVP', value: f.firstRsvp },
+        { label: 'First Event Access', value: f.firstRsvp },
         { label: 'Repeat (2+)', value: f.repeat },
       ],
       format: 'number',
@@ -58,7 +58,7 @@ async function query(ctx: MetricContext): Promise<MetricResult> {
     value: [
       { label: 'Submitted', value: submitted },
       { label: 'Approved', value: approved },
-      { label: 'First RSVP', value: firstRsvp },
+      { label: 'First Event Access', value: firstRsvp },
       { label: 'Repeat (2+)', value: repeat },
     ],
     format: 'number',
@@ -70,9 +70,9 @@ async function query(ctx: MetricContext): Promise<MetricResult> {
 async function drillDown(ctx: MetricContext): Promise<DrillDownRecord[]> {
   if (ctx.demoMode) {
     return [
-      { member: 'Wesley Kim', stage: 'Approved — no RSVP', approved: 'Aug 2025' },
-      { member: 'Margot Devereux', stage: 'Approved — no RSVP', approved: 'Aug 2025' },
-      { member: 'Levi Steinberg', stage: 'Approved — no RSVP', approved: 'Sep 2025' },
+      { member: 'Wesley Kim', stage: 'Approved — no event access yet', approved: 'Aug 2025' },
+      { member: 'Margot Devereux', stage: 'Approved — no event access yet', approved: 'Aug 2025' },
+      { member: 'Levi Steinberg', stage: 'Approved — no event access yet', approved: 'Sep 2025' },
     ];
   }
   const stalled = await db.member.findMany({
@@ -84,7 +84,7 @@ async function drillDown(ctx: MetricContext): Promise<DrillDownRecord[]> {
   return stalled.map((m) => ({
     member: `${m.firstName} ${m.lastName}`.trim(),
     email: m.email,
-    stage: 'Approved — no RSVP',
+    stage: 'Approved — no event access yet',
     approved: m.approvedAt ? m.approvedAt.toISOString().slice(0, 10) : '',
   }));
 }
@@ -93,7 +93,7 @@ const metric: Metric = {
   id: 'pipeline.application-funnel',
   name: 'Application Funnel',
   category: 'pipeline',
-  description: 'Conversion through submitted → approved → first RSVP → repeat attender.',
+  description: 'Conversion through submitted → approved → first event access → repeat attender.',
   businessQuestion: 'Where do applicants drop off between submission and becoming an active member?',
   resultType: 'cohort',
   viz: 'funnel',

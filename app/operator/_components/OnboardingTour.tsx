@@ -15,7 +15,7 @@ const STEPS = [
   },
   {
     title: 'Create events here.',
-    body: "Events live under Events. When you create one, you'll pick a Workflow — who can RSVP, who pays, who gets approved.",
+    body: "Events live under Events. When you create one, you'll pick a Workflow — who gets access, who pays, who gets approved.",
   },
   {
     title: 'On event day, The Room is your live ops screen.',

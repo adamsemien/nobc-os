@@ -305,7 +305,7 @@ function RetentionPanel({ data }: { data: Retention }) {
 
         <div className="grid grid-cols-3 gap-8 lg:col-span-7">
           <Stat label="Avg events / active member" value={avgEvents} />
-          <Stat label="Avg RSVP lead time" value={avgLead} />
+          <Stat label="Avg access lead time" value={avgLead} />
           <Stat label="Active in last 30 days" value={String(data.activeLast30)} />
         </div>
       </div>
