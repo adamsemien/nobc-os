@@ -18,7 +18,29 @@ import { Activity } from 'lucide-react';
 const PAGE_SIZE = 50;
 
 function formatAction(action: string): string {
-  return action.replace(/\./g, ' › ').replace(/_/g, ' ');
+  // Internal action keys use the rsvp.* namespace; operator display copy is
+  // "access" per the terminology law (Access, never RSVP).
+  return action
+    .replace(/^rsvp\./, 'access.')
+    .replace(/\./g, ' › ')
+    .replace(/_/g, ' ');
+}
+
+/** Display labels for AuditEvent.entityType. Writers are inconsistent on case
+ *  ('APPLICATION' vs 'Application'), so match on the lowercased value. */
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  application: 'Application',
+  member: 'Member',
+  event: 'Event',
+  rsvp: 'Access',
+  person: 'Person',
+  organization: 'Organization',
+  workspace: 'Workspace',
+  workspacemember: 'Team member',
+};
+
+function formatEntityType(entityType: string): string {
+  return ENTITY_TYPE_LABELS[entityType.toLowerCase()] ?? entityType.toLowerCase();
 }
 
 function formatActorType(t: 'OPERATOR' | 'AGENT' | 'MEMBER' | 'SYSTEM'): string {
@@ -93,8 +115,10 @@ async function buildEntityIndex(
 ): Promise<Map<string, string>> {
   const byId = new Map<string, string>();
 
+  // Emitters write entityType in mixed case ('APPLICATION', 'Application') —
+  // match case-insensitively or nothing ever resolves.
   const appIds = events
-    .filter((e) => e.entityType === 'application')
+    .filter((e) => e.entityType.toLowerCase() === 'application')
     .map((e) => e.entityId);
   if (appIds.length > 0) {
     const apps = await db.application.findMany({
@@ -105,7 +129,7 @@ async function buildEntityIndex(
   }
 
   const memberIds = events
-    .filter((e) => e.entityType === 'member')
+    .filter((e) => e.entityType.toLowerCase() === 'member')
     .map((e) => e.entityId);
   if (memberIds.length > 0) {
     const mbs = await db.member.findMany({
@@ -115,6 +139,17 @@ async function buildEntityIndex(
     for (const m of mbs) {
       byId.set(m.id, `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim() || m.email);
     }
+  }
+
+  const eventIds = events
+    .filter((e) => e.entityType.toLowerCase() === 'event')
+    .map((e) => e.entityId);
+  if (eventIds.length > 0) {
+    const evs = await db.event.findMany({
+      where: { id: { in: eventIds }, workspaceId },
+      select: { id: true, title: true },
+    });
+    for (const ev of evs) byId.set(ev.id, ev.title);
   }
 
   return byId;
@@ -183,7 +218,7 @@ export default async function AuditPage({
       <div className="w-full">
         <PageHeader
           title="Activity"
-          subtitle="Everything that happened — operator decisions, member RSVPs, agent actions."
+          subtitle="Everything that happened — operator decisions, member access, agent actions."
           action={
             <span className="text-sm text-text-muted tabular-nums">
               {total.toLocaleString()} events
@@ -222,8 +257,8 @@ export default async function AuditPage({
                     </span>
                   </DataTableCell>
                   <DataTableCell tone="secondary">
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs capitalize">
-                      {e.entityType}
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                      {formatEntityType(e.entityType)}
                     </span>{' '}
                     {entityIndex.has(e.entityId) ? (
                       <span className="text-xs text-text-secondary font-medium">
