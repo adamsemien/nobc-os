@@ -59,21 +59,22 @@ export interface PreviewReveal {
 
 /**
  * Fabricated reveal, computed entirely client-side. This is NEVER the output
- * of scoreApplication or any Anthropic call — the archetype copy (oneLiner and
- * the who-you-are / the-cost / how-you-move beats) is real production copy from
+ * of scoreApplication or any Anthropic call - the archetype copy (oneLiner and
+ * the essence / habitat / peak-edge beats) is real production copy from
  * config/archetypes.ts (that's what operators need to review), but the scores,
  * tags, and personal note are hardcoded and unmistakably fake. A Sage top with a
- * Connector runner-up so operators see the reveal AND the blend line.
+ * Connector runner-up so operators see the reveal, the blend line, AND the blend
+ * meter (top-two normalized within-person to 60% Sage / 40% Connector).
  */
 export const PREVIEW_REVEAL: PreviewReveal = {
   archetype: 'Sage',
   archetypeScores: {
     Sage: 84,
-    Connector: 66,
-    Host: 52,
-    Builder: 44,
-    Patron: 38,
-    Spark: 30,
+    Connector: 56,
+    Host: 40,
+    Builder: 34,
+    Patron: 28,
+    Spark: 22,
   },
   tags: ['preview fixture', 'not a real applicant'],
   personalNote:

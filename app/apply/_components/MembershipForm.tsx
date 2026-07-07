@@ -81,6 +81,69 @@ function topTwoBlend(
   return { top: topArchetype, second: ranked.length ? ranked[0][0] : null };
 }
 
+/** Per-archetype segment color, keyed by STORED enum (lowercased) to the existing
+ *  --archetype-* CSS tokens. */
+function archetypeColorVar(name: string): string {
+  return `var(--archetype-${name.toLowerCase()})`;
+}
+
+/** Blend meter — the member's OWN top-two archetype mix, normalized within-person
+ *  to 100 (e.g. 56% Sage / 44% Connector). This is NOT population rarity (none
+ *  exists — do not add). One horizontal bar, two segments, colored by the
+ *  per-archetype CSS tokens, labeled with displayNames + percentages. Renders
+ *  nothing when there is no distinct second archetype or the top two sum to 0. */
+function BlendMeter({
+  scores,
+  topArchetype,
+}: {
+  scores: Record<string, number>;
+  topArchetype: string;
+}) {
+  const { top, second } = topTwoBlend(scores, topArchetype);
+  if (!second) return null;
+  const topScore = Math.max(0, scores[top] ?? 0);
+  const secondScore = Math.max(0, scores[second] ?? 0);
+  const sum = topScore + secondScore;
+  if (sum <= 0) return null;
+  const topPct = Math.round((topScore / sum) * 100);
+  const secondPct = 100 - topPct;
+  const topColor = archetypeColorVar(top);
+  const secondColor = archetypeColorVar(second);
+  const labelStyle: React.CSSProperties = {
+    fontFamily: bodyFont,
+    fontSize: 13,
+    color: THEME.night.text,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+  };
+  const dot = (color: string): React.CSSProperties => ({
+    display: 'inline-block',
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    background: color,
+  });
+  return (
+    <div style={{ marginTop: 20, maxWidth: 520, animation: 'fadeInUp 500ms ease 2400ms forwards', opacity: 0 }}>
+      <div style={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{ width: `${topPct}%`, background: topColor }} />
+        <div style={{ width: `${secondPct}%`, background: secondColor }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
+        <span style={labelStyle}>
+          <span style={dot(topColor)} />
+          {archetypeDisplayName(top)} {topPct}%
+        </span>
+        <span style={labelStyle}>
+          {archetypeDisplayName(second)} {secondPct}%
+          <span style={dot(secondColor)} />
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // Door 1 reveal QR — mirrors the Door 2 confirmation QR treatment (qrcode -> SVG,
 // light code on a white field so it scans against the dark reveal background). The
 // code is the applicant's permanent member QR (always minted; QR law). The label
@@ -1223,6 +1286,27 @@ export default function MembershipForm({
   // Blend line from the top two archetype scores, rendered as displayNames.
   const blend = submitResult ? topTwoBlend(submitResult.archetypeScores, submitResult.archetype) : null;
   const blendSecondName = blend?.second ? archetypeDisplayName(blend.second) : '';
+  // Shared reveal beat styles (label eyebrow + italic body) reused across the
+  // essence / habitat / peak-edge / personalNote blocks.
+  const revealBeatLabel: React.CSSProperties = {
+    fontFamily: bodyFont,
+    fontSize: 11,
+    fontWeight: 500,
+    color: THEME.night.accent,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    display: 'block',
+    marginBottom: 12,
+  };
+  const revealBeatBody: React.CSSProperties = {
+    fontFamily: displayFont,
+    fontSize: 20,
+    fontStyle: 'italic',
+    lineHeight: 1.8,
+    color: THEME.night.text,
+    maxWidth: 520,
+    margin: 0,
+  };
 
   // ----- Generic question rendering -----
 
@@ -2140,38 +2224,65 @@ export default function MembershipForm({
 
                 <div style={{ height: 48 }} />
 
-                {/* Copy beats from config/archetypes.ts. `theCost` is intentionally
-                    not rendered here (the field is retained in config). */}
-                {([
-                  { label: 'Who you are', text: archetypeData?.whoYouAre ?? '' },
-                  { label: 'How you move through a room', text: archetypeData?.howYouMove ?? '' },
-                ] as const).map((beat, bi) => beat.text ? (
-                  <div key={beat.label} style={{
-                    marginBottom: 32,
-                    animation: `fadeInUp 500ms ease ${800 + bi * 400}ms forwards`,
+                {/* (4) essence — short identity beat under the oneLiner. The
+                    deprecated whoYouAre / theCost / howYouMove beats are no longer
+                    rendered (fields retained in config/archetypes.ts). */}
+                {archetypeData?.essence && (
+                  <div style={{
+                    marginBottom: 44,
+                    animation: 'fadeInUp 500ms ease 800ms forwards',
                     opacity: 0,
                   }}>
-                    <span style={{
-                      fontFamily: bodyFont,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: THEME.night.accent,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      display: 'block',
-                      marginBottom: 12,
-                    }}>{beat.label}</span>
                     <p style={{
                       fontFamily: displayFont,
-                      fontSize: 20,
+                      fontSize: 22,
                       fontStyle: 'italic',
-                      lineHeight: 1.8,
+                      lineHeight: 1.7,
                       color: THEME.night.text,
-                      maxWidth: 520,
+                      maxWidth: 560,
                       margin: 0,
-                    }}>{beat.text}</p>
+                    }}>{archetypeData.essence}</p>
                   </div>
-                ) : null)}
+                )}
+
+                {/* (5) habitat — two short blocks, fixed member-facing labels. */}
+                {(archetypeData?.habitatThrive || archetypeData?.habitatDim) && (
+                  <div style={{
+                    marginBottom: 40,
+                    animation: 'fadeInUp 500ms ease 1100ms forwards',
+                    opacity: 0,
+                  }}>
+                    {archetypeData?.habitatThrive && (
+                      <div style={{ marginBottom: 24 }}>
+                        <span style={revealBeatLabel}>The rooms that bring out your best</span>
+                        <p style={revealBeatBody}>{archetypeData.habitatThrive}</p>
+                      </div>
+                    )}
+                    {archetypeData?.habitatDim && (
+                      <div>
+                        <span style={revealBeatLabel}>The rooms where you can&apos;t show up as yourself</span>
+                        <p style={revealBeatBody}>{archetypeData.habitatDim}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* (6) peak + edge — two short lines under one small header. */}
+                {(archetypeData?.peak || archetypeData?.edge) && (
+                  <div style={{
+                    marginBottom: 32,
+                    animation: 'fadeInUp 500ms ease 1400ms forwards',
+                    opacity: 0,
+                  }}>
+                    <span style={revealBeatLabel}>At your peak / at your edge</span>
+                    {archetypeData?.peak && (
+                      <p style={{ ...revealBeatBody, marginBottom: 12 }}>{archetypeData.peak}</p>
+                    )}
+                    {archetypeData?.edge && (
+                      <p style={revealBeatBody}>{archetypeData.edge}</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Why we called you this — the personalized note. Omitted when
                     generation failed or fell back to empty. */}
@@ -2217,6 +2328,15 @@ export default function MembershipForm({
                 }}>
                   {revealDisplayName}, with a {blendSecondName} streak.
                 </p>
+                )}
+
+                {/* Blend meter — the member's own top-two mix, normalized to 100.
+                    Sits directly under the blend line. */}
+                {submitResult && (
+                  <BlendMeter
+                    scores={submitResult.archetypeScores}
+                    topArchetype={submitResult.archetype}
+                  />
                 )}
 
                 {!isDemo && !previewMode && (

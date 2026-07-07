@@ -280,13 +280,23 @@ export default async function OperatorApplicationDetailPage({
                     </div>
                   )}
                 </div>
-                {app.archetype && ARCHETYPES[app.archetype as ArchetypeName]?.dayStory && (
-                  <p
-                    className="mt-3 text-sm leading-relaxed"
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    {ARCHETYPES[app.archetype as ArchetypeName].dayStory}
-                  </p>
+                {/* Host notes — OPERATOR-ONLY seating / hosting guidance from
+                    config/archetypes.ts. Never member-facing or sponsor-facing. */}
+                {app.archetype && ARCHETYPES[app.archetype as ArchetypeName]?.hostNotes && (
+                  <div className="mt-3">
+                    <p
+                      className="text-[10px] uppercase tracking-[0.18em]"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      Host notes
+                    </p>
+                    <p
+                      className="mt-1 text-sm leading-relaxed"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {ARCHETYPES[app.archetype as ArchetypeName].hostNotes}
+                    </p>
+                  </div>
                 )}
                 {app.aiReasoning && (
                   <p

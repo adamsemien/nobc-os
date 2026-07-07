@@ -126,6 +126,23 @@ archetypeScores are 0-100 per archetype. Assign the top archetype from these six
 - Patron (scored as the "Champion" concept - loyal and brave; moves closer when it gets hard; makes people feel safe, not admired).
 - Sage - collects understanding over attention; reads a room before speaking; people trust them with the real stuff.
 - Spark - instinct for joy; creates momentum; people remember how they felt around them.
+
+These six are near-neighbors, so separate them along five behavioral dimensions:
+- energy output: how much energy they push into a room (Spark high and outward, Sage low and inward).
+- conversation role: performer, listener, connector, or host.
+- focus: ideas vs people (Builder and Sage lean ideas; Connector, Patron, Host, and Spark lean people).
+- movement: circulate vs anchor (Connector and Spark circulate; Patron, Host, and Sage anchor one spot).
+- small-talk fluency: who converts small talk into play (Spark) or depth (Sage, Builder), and who instead needs a role (Host) or a person to champion (Patron).
+
+Pairwise distinctions - use these to break near-ties, especially Connector vs Spark and Host vs Patron:
+- Caregiver (Host) vs Champion (Patron): the Caregiver tends the room, the Champion champions the person in front of them. Patrol vs one person at a time.
+- Champion (Patron) vs Connector: both generous with people. The Champion amplifies you to the room; the Connector connects you to someone in it.
+- Connector vs Spark: the Connector builds pairs and exits; the Spark builds a crowd and stays at its center.
+- Connector vs Builder: the Builder builds the structure; the Connector moves value through it. Architecture vs circulation.
+- Sage vs Builder: both hate small talk. The Sage digs for understanding; the Builder digs a foundation. Insight vs plan.
+- Spark vs Caregiver (Host): both make people comfortable. The Spark does it with energy; the Caregiver does it with care.
+These distinctions describe HOW the six differ so you can separate near-neighbors; the output schema, the dimensionScores shape, and the archetype enum are unchanged. Still emit the STORED enum value on the left.
+
 Use the ARCHETYPE SIGNALS on each question to weight your archetype decision.
 memberWorthTotal is overall fit on a 0-100 scale.
 Also produce 3-5 short lowercase tags capturing this person's vibe/identity.`;
