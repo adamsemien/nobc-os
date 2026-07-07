@@ -11,21 +11,28 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const q = url.searchParams.get('q')?.trim().toLowerCase() ?? '';
 
+  const where = {
+    workspaceId,
+    status: { not: 'GUEST' as const },
+    mergedIntoId: null,
+    ...(q
+      ? {
+          OR: [
+            { firstName: { contains: q, mode: 'insensitive' as const } },
+            { lastName: { contains: q, mode: 'insensitive' as const } },
+            { email: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
+
+  const total = await db.member.count({ where });
+
   const members = await db.member.findMany({
-    where: {
-      workspaceId,
-      status: { not: 'GUEST' },
-      mergedIntoId: null,
-      ...(q
-        ? {
-            OR: [
-              { firstName: { contains: q, mode: 'insensitive' } },
-              { lastName: { contains: q, mode: 'insensitive' } },
-              { email: { contains: q, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
-    },
+    where,
+    // Bounded: the roster ships the 1000 most recent rows to the client-side
+    // filter/sort layer; `total` lets the UI say when it is truncated.
+    take: 1000,
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
@@ -93,5 +100,6 @@ export async function GET(req: NextRequest) {
         isBlocked: blockedSet.has(key),
       };
     }),
+    total,
   });
 }

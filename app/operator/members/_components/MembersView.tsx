@@ -11,10 +11,13 @@ export function MembersView({
   initialMembers,
   canAddMembers,
   canBulk,
+  total,
 }: {
   initialMembers: MembersBulkMember[];
   canAddMembers: boolean;
   canBulk: boolean;
+  /** Matching rows in the workspace — may exceed the loaded (1000-row) slice. */
+  total: number;
 }) {
   const [members, setMembers] = useState<MembersBulkMember[]>(initialMembers);
   const [toast, setToast] = useState<string | null>(null);
@@ -26,6 +29,13 @@ export function MembersView({
   }, [toast]);
 
   function handleCreated(m: CreatedMember) {
+    // The roster deliberately excludes GUEST rows (Guest / Comp Access land as
+    // GUEST) — don't prepend a row that vanishes on the next load; say where
+    // it went instead.
+    if (m.status === 'GUEST') {
+      setToast(`${m.fullName} added with guest access — guests don't appear in this roster.`);
+      return;
+    }
     // Optimistically prepend (the list is sorted by most recently added).
     setMembers((prev) => [
       {
@@ -50,7 +60,11 @@ export function MembersView({
     <>
       <PageHeader
         title="Members"
-        subtitle={`${members.length} ${members.length === 1 ? 'person' : 'people'} · search, filter, and sort below`}
+        subtitle={
+          total > members.length
+            ? `Showing the ${members.length.toLocaleString()} most recently added of ${total.toLocaleString()} people · search, filter, and sort below`
+            : `${members.length} ${members.length === 1 ? 'person' : 'people'} · search, filter, and sort below`
+        }
         action={
           <div className="flex items-center gap-3">
             <Link

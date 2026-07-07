@@ -38,7 +38,7 @@ export default async function MembersPage() {
       </div>
     );
   }
-  const { members } = (await res.json()) as { members: MemberRow[] };
+  const { members, total } = (await res.json()) as { members: MemberRow[]; total: number };
 
   return (
     <div className="px-6 pb-16 pt-8 sm:px-10 lg:px-14 xl:px-20">
@@ -46,6 +46,7 @@ export default async function MembersPage() {
         <MembersView
           canAddMembers={canAddMembers}
           canBulk={canBulk}
+          total={total}
           initialMembers={members.map((m) => ({
             id: m.id,
             fullName: m.fullName,
