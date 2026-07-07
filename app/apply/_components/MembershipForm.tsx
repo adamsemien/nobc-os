@@ -1219,7 +1219,7 @@ export default function MembershipForm({
 
     const safeName = data.fullName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'member';
     const link = document.createElement('a');
-    link.download = `my-archetype-${safeName}.png`;
+    link.download = `my-nature-${safeName}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   }
@@ -1875,7 +1875,7 @@ export default function MembershipForm({
           borderRadius: 0,
           pointerEvents: 'none',
         }}>
-          Preview — not a real applicant
+          Preview - not a real applicant
         </div>
       )}
 
@@ -2471,7 +2471,7 @@ export default function MembershipForm({
                     textTransform: 'uppercase',
                     width: '100%',
                   }} onClick={generateShareCard}>
-                    share your archetype
+                    share your nature
                   </button>
                   <button style={{
                     background: 'transparent',
