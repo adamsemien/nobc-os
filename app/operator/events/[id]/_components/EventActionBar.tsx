@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil, ScanLine, MonitorPlay } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 export function EventActionBar({
   eventId,
@@ -17,6 +18,7 @@ export function EventActionBar({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   async function setStatus(next: 'PUBLISHED' | 'CANCELLED' | 'DRAFT') {
     setError(null);
@@ -73,12 +75,28 @@ export function EventActionBar({
       {showCancel ? (
         <button
           type="button"
-          onClick={() => setStatus('CANCELLED')}
+          onClick={() => setConfirmingCancel(true)}
           disabled={pending}
           className="inline-flex items-center gap-1.5 rounded-md border border-danger/40 bg-danger-soft px-3 py-1.5 text-xs font-semibold text-danger transition-colors hover:bg-danger/15 disabled:opacity-50"
         >
           {pending ? 'Working…' : 'Cancel event'}
         </button>
+      ) : null}
+
+      {confirmingCancel ? (
+        <ConfirmModal
+          title="Cancel this event?"
+          subtitle="The event page comes down and every confirmed attendee is emailed a cancellation notice. This cannot be undone from here."
+          confirmLabel="Cancel event"
+          cancelLabel="Keep event"
+          confirmTone="danger"
+          busy={pending}
+          onConfirm={() => {
+            setConfirmingCancel(false);
+            void setStatus('CANCELLED');
+          }}
+          onCancel={() => setConfirmingCancel(false)}
+        />
       ) : null}
 
       <Link

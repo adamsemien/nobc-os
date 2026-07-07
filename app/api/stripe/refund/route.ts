@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { requirePermission } from '@/lib/operator-role';
 import { refundRsvp } from '@/lib/commerce/refund';
 
-/** Operator single refund - ADMIN. The state machine (full + partial,
+/** Operator single refund - requirePermission('payment.refund') (OWNER under
+ *  the current matrix in lib/auth/can.ts). The state machine (full + partial,
  *  cumulative idempotency keys, refund-revokes-proof) lives in
  *  lib/commerce/refund.ts and is shared with the mass-refund route
  *  (Event Builder Rebuild, Phase C - Decision 4). */
