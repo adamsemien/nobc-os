@@ -155,6 +155,7 @@ export function RoomDashboard({
   const [muted, setMuted] = useState(false);
   const [vibe, setVibe] = useState<string | null>(null);
   const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
   const [arrivalLog, setArrivalLog] = useState<ArrivalEntry[]>(() =>
     initial.recentArrivals.map((a) => ({ ...a, firstSeenAt: Date.now() })),
   );
@@ -282,6 +283,7 @@ export function RoomDashboard({
   const handlePromote = useCallback(async () => {
     if (!data.nextOnWaitlist || promoting) return;
     setPromoting(true);
+    setPromoteError(null);
     try {
       const res = await fetch(`/api/operator/events/${eventId}/promote-waitlist`, {
         method: 'POST',
@@ -289,9 +291,15 @@ export function RoomDashboard({
       if (res.ok) {
         logQAAction('promoted from waitlist');
         await fetchRoom();
+      } else {
+        // A rejected promote (capacity, empty waitlist, 403) must be visible
+        // on a screen that runs all night — never a silent no-op.
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        setPromoteError(payload.error ?? 'Promote failed — try again.');
       }
     } catch (err) {
       console.error('[Room] promote failed:', err);
+      setPromoteError('Network error — promote did not go through.');
     } finally {
       setPromoting(false);
     }
@@ -460,6 +468,11 @@ export function RoomDashboard({
             ) : (
               <div className="mt-3 text-xs italic text-white/35">no one waiting.</div>
             )}
+            {promoteError ? (
+              <p role="alert" className="mt-2 text-xs text-red-300">
+                {promoteError}
+              </p>
+            ) : null}
           </section>
 
           {/* Recent arrivals */}

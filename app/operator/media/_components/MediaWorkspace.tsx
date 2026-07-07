@@ -27,6 +27,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
   const [loading, setLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isDegraded, setIsDegraded] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -79,6 +80,7 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
     setAssets([]);
     setNextCursor(null);
     setIsDegraded(false);
+    setFetchError(false);
 
     const q = sp.get('q') ?? '';
 
@@ -92,7 +94,12 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
         })
         .catch((e) => {
           console.error('[MediaWorkspace] assets fetch failed', e);
-          if (active) setAssets([]);
+          if (active) {
+            setAssets([]);
+            // An empty grid after a failed fetch must not read as an empty
+            // library — flag it so the UI can say what happened.
+            setFetchError(true);
+          }
         })
         .finally(() => {
           if (active) setLoading(false);
@@ -345,6 +352,22 @@ export function MediaWorkspace({ options }: { options: FilterOptions }) {
               style={{ color: 'var(--text-muted)' }}
             >
               Showing keyword results — visual search is temporarily unavailable.
+            </p>
+          )}
+          {fetchError && (
+            <p
+              role="alert"
+              className="mb-2 rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-[13px]"
+              style={{ color: 'var(--danger)' }}
+            >
+              Could not load the library.{' '}
+              <button
+                type="button"
+                className="underline underline-offset-2"
+                onClick={() => setReloadKey((k) => k + 1)}
+              >
+                Retry
+              </button>
             </p>
           )}
           {effectiveViewMode === 'list' ? (

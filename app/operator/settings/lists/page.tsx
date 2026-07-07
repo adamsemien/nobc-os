@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 type ListType = 'PURPLE' | 'BLOCKED';
 
@@ -54,6 +55,8 @@ export default function ListsPage() {
 
   // Removal
   const [removing, setRemoving] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,9 +110,18 @@ export default function ListsPage() {
 
   async function handleRemove(id: string) {
     setRemoving(id);
+    setRemoveError(null);
     try {
-      await fetch(`/api/operator/lists/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/operator/lists/${id}`, { method: 'DELETE' });
+      // Only drop the row on a confirmed delete — an optimistic removal on a
+      // 403/404 silently reappears on reload and lies to the operator.
+      if (!res.ok) {
+        setRemoveError('Could not remove the entry. Try again.');
+        return;
+      }
       setEntries(prev => prev.filter(e => e.id !== id));
+    } catch {
+      setRemoveError('Network error. The entry was not removed.');
     } finally {
       setRemoving(null);
     }
@@ -325,7 +337,7 @@ export default function ListsPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => handleRemove(entry.id)}
+                        onClick={() => setConfirmRemove(entry.id)}
                         disabled={removing === entry.id}
                         className="rounded p-1 transition-opacity hover:opacity-70 disabled:opacity-30"
                         title="Remove"
@@ -340,6 +352,30 @@ export default function ListsPage() {
             </table>
           </div>
         )}
+        {removeError ? (
+          <p role="alert" className="mt-3 text-sm" style={{ color: 'var(--danger)' }}>
+            {removeError}
+          </p>
+        ) : null}
+        {confirmRemove ? (
+          <ConfirmModal
+            title={activeTab === 'BLOCKED' ? 'Remove this blocked entry?' : 'Remove this purple list entry?'}
+            subtitle={
+              activeTab === 'BLOCKED'
+                ? 'Matching applicants will no longer be auto-rejected.'
+                : 'Matching applicants will no longer be auto-approved.'
+            }
+            confirmLabel="Remove"
+            confirmTone="danger"
+            busy={removing === confirmRemove}
+            onConfirm={() => {
+              const id = confirmRemove;
+              setConfirmRemove(null);
+              if (id) void handleRemove(id);
+            }}
+            onCancel={() => setConfirmRemove(null)}
+          />
+        ) : null}
       </div>
     </div>
   );
