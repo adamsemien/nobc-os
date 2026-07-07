@@ -6,7 +6,7 @@
  * - Event selection
  * - Text overlay customization (event name, day counter)
  * - Live preview
- * - Generate and schedule buttons
+ * - Generate + download (auto-publish is not built; post manually)
  *
  * Placed at: app/operator/media/_components/StoryGeneratorPanel.tsx
  */
@@ -49,9 +49,8 @@ export function StoryGeneratorPanel({
   const [title, setTitle] = useState<string>('');
 
   // UI state
-  const [step, setStep] = useState<'config' | 'preview' | 'schedule'>('config');
+  const [step, setStep] = useState<'config' | 'preview'>('config');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isScheduling, setIsScheduling] = useState(false);
   const [generatedStory, setGeneratedStory] = useState<{
     storyId: string;
     storyImageUrl: string;
@@ -103,53 +102,10 @@ export function StoryGeneratorPanel({
     }
   }, [selectedAssetId, selectedEventId, eventName, dayCounter, title, onStoryGenerated]);
 
-  const handleScheduleStory = useCallback(async () => {
-    if (!generatedStory) {
-      setError('No story generated');
-      return;
-    }
-
-    setError('');
-    setIsScheduling(true);
-
-    try {
-      const res = await fetch('/api/stories/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storyIds: [generatedStory.storyId],
-          startDate: new Date().toISOString(),
-          publishInterval: 1,
-          batchName: title || 'Story Batch',
-          eventId: selectedEventId || null,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to schedule story');
-      }
-
-      setSuccess('Story scheduled for publishing!');
-      setStep('schedule');
-
-      // Reset form after a delay
-      setTimeout(() => {
-        setStep('config');
-        setSelectedAssetId('');
-        setSelectedEventId('');
-        setEventName('');
-        setDayCounter('');
-        setTitle('');
-        setGeneratedStory(null);
-        onClose();
-      }, 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Scheduling failed');
-    } finally {
-      setIsScheduling(false);
-    }
-  }, [generatedStory, selectedEventId, title, onClose]);
+  // Scheduling/auto-publish was removed: generate persists no InstagramStory
+  // rows, so /api/stories/schedule always 404'd, and the cron publisher it
+  // promises does not exist. Until that pipeline is built end-to-end, the
+  // honest flow is generate → download → post manually.
 
   // All hooks above are now called unconditionally; safe to bail out here.
   if (!isOpen || !workspaceId) return null;
@@ -217,7 +173,11 @@ export function StoryGeneratorPanel({
               </div>
             )}
 
-            {/* Actions */}
+            {/* Actions — auto-publish isn't live; the honest path is download + manual post. */}
+            <p className="text-xs text-gray-500">
+              Automatic Instagram publishing isn&apos;t live yet — download the story and post
+              it manually. The link is good for 24 hours.
+            </p>
             <div className="flex gap-3 justify-end pt-4">
               <button
                 onClick={() => setStep('config')}
@@ -225,43 +185,19 @@ export function StoryGeneratorPanel({
               >
                 Back
               </button>
-              <button
-                onClick={handleScheduleStory}
-                disabled={isScheduling}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {isScheduling && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isScheduling ? 'Scheduling...' : 'Schedule & Publish'}
-              </button>
+              {generatedStory ? (
+                <a
+                  href={generatedStory.storyImageUrl}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                >
+                  Download story
+                </a>
+              ) : null}
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 'schedule') {
-    return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <Check className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-          <h2 className="text-lg font-semibold">Story Scheduled!</h2>
-          <p className="text-gray-600 text-sm">
-            Your story is queued for publishing and will go live within 24 hours.
-          </p>
-          <button
-            onClick={() => {
-              setStep('config');
-              onClose();
-            }}
-            className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
-          >
-            Done
-          </button>
         </div>
       </div>
     );

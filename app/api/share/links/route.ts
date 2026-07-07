@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { OperatorRole, ShareLinkMode, MediaFolderType } from '@prisma/client';
 import { requireRole } from '@/lib/operator-role';
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/emit-event';
 import { hashPassword } from '@/lib/share/password';
 import { mintShareToken, shareUrlPath, shareAbsoluteUrl } from '@/lib/share/token';
 
@@ -46,7 +47,7 @@ function autoFolderName(count: number): string {
 export async function POST(req: NextRequest) {
   const gate = await requireRole(OperatorRole.STAFF);
   if (!gate.ok) return gate.response;
-  const { workspaceId } = gate;
+  const { userId, workspaceId } = gate;
 
   const body = (await req.json().catch(() => null)) as CreateBody | null;
   if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
@@ -134,6 +135,21 @@ export async function POST(req: NextRequest) {
       expiresAt,
     },
     select: { id: true, token: true, mode: true, createdAt: true },
+  });
+
+  await emitEvent({
+    workspaceId,
+    actorId: userId,
+    action: 'share.created',
+    entityType: 'SHARE_LINK',
+    entityId: link.id,
+    metadata: {
+      mode: link.mode,
+      folderId,
+      passwordProtected: passwordHash != null,
+      watermark: watermark ?? false,
+      allowedDownloads: allowedDownloads ?? null,
+    },
   });
 
   return NextResponse.json({

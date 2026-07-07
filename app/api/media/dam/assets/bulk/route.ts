@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { OperatorRole } from '@prisma/client';
 import { requireRole } from '@/lib/operator-role';
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/emit-event';
 import { deleteObject } from '@/lib/dam/storage';
 import { parseBulkAction } from '@/lib/dam/bulk';
 
@@ -16,7 +17,7 @@ export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   const gate = await requireRole(OperatorRole.STAFF);
   if (!gate.ok) return gate.response;
-  const { workspaceId } = gate;
+  const { userId, workspaceId } = gate;
 
   const parsed = parseBulkAction(await req.json().catch(() => null));
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
@@ -98,6 +99,25 @@ export async function POST(req: NextRequest) {
         data: { sponsorName: parsed.payload.sponsor || null },
       });
       break;
+  }
+
+  // Lifecycle mutations leave one batch-level audit row (item #20 posture —
+  // the rest of the operator API audits its writes; DAM's did not).
+  const lifecycleAudit: Record<string, string> = {
+    softDelete: 'asset.trashed',
+    restore: 'asset.restored',
+    permanentDelete: 'asset.purged',
+  };
+  const auditAction = lifecycleAudit[parsed.action];
+  if (auditAction) {
+    await emitEvent({
+      workspaceId,
+      actorId: userId,
+      action: auditAction,
+      entityType: 'ASSET',
+      entityId: assetIds[0],
+      metadata: { count: assetIds.length, assetIds: assetIds.slice(0, 50).join(',') },
+    });
   }
 
   return NextResponse.json({ ok: true, count: assetIds.length });

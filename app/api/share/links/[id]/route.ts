@@ -10,13 +10,14 @@ import { NextResponse } from 'next/server';
 import { OperatorRole } from '@prisma/client';
 import { requireRole } from '@/lib/operator-role';
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/emit-event';
 
 export const runtime = 'nodejs';
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const gate = await requireRole(OperatorRole.STAFF);
   if (!gate.ok) return gate.response;
-  const { workspaceId } = gate;
+  const { userId, workspaceId } = gate;
 
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
@@ -31,6 +32,14 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     db.assetDownload.updateMany({ where: { shareLinkId: id }, data: { shareLinkId: null } }),
     db.shareLink.delete({ where: { id } }),
   ]);
+
+  await emitEvent({
+    workspaceId,
+    actorId: userId,
+    action: 'share.revoked',
+    entityType: 'SHARE_LINK',
+    entityId: id,
+  });
 
   return NextResponse.json({ success: true });
 }
