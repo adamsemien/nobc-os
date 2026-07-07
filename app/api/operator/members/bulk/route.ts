@@ -154,12 +154,28 @@ export async function POST(req: NextRequest) {
           where: { id: m.id },
           data: { tags: next },
         });
+        await emitEvent({
+          workspaceId,
+          actorId: userId,
+          action: 'member.tagged',
+          entityType: 'MEMBER',
+          entityId: m.id,
+          metadata: { bulk: true, tag: tag ?? null },
+        });
         succeeded++;
       } else if (action === 'untag') {
         const next = m.tags.filter((t) => t !== tag);
         await db.member.update({
           where: { id: m.id },
           data: { tags: next },
+        });
+        await emitEvent({
+          workspaceId,
+          actorId: userId,
+          action: 'member.untagged',
+          entityType: 'MEMBER',
+          entityId: m.id,
+          metadata: { bulk: true, tag: tag ?? null },
         });
         succeeded++;
       }

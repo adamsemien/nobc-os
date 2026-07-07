@@ -227,6 +227,9 @@ export function MembersBulkActions({
   const count = selected.size;
   const allCount = members.length;
   const sort: SortState = { key: sortKey, dir: sortDir, onSort };
+  // Reversal affordances appear only when the selection needs them.
+  const anyBlockedSelected = members.some((m) => selected.has(m.id) && m.isBlocked);
+  const anyVipSelected = members.some((m) => selected.has(m.id) && m.isVip);
 
   return (
     <div className="relative">
@@ -261,6 +264,16 @@ export function MembersBulkActions({
             >
               ✦ Add to Purple list
             </button>
+            {anyVipSelected ? (
+              <button
+                type="button"
+                disabled={!!pending}
+                onClick={() => run('unpurple')}
+                className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:bg-muted disabled:opacity-50"
+              >
+                Remove from Purple list
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={!!pending}
@@ -269,6 +282,16 @@ export function MembersBulkActions({
             >
               Block
             </button>
+            {anyBlockedSelected ? (
+              <button
+                type="button"
+                disabled={!!pending}
+                onClick={() => run('unblock')}
+                className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:bg-muted disabled:opacity-50"
+              >
+                Unblock
+              </button>
+            ) : null}
             <div className="flex items-center gap-1">
               <input
                 type="text"
@@ -435,7 +458,7 @@ export function MembersBulkActions({
       {confirm ? (
         <ConfirmModal
           title={`${ACTION_LABEL[confirm]} ${count} member${count === 1 ? '' : 's'}?`}
-          subtitle="You can reverse this from the member detail page."
+          subtitle="Reverse it any time: filter by Blocked, select them, and choose Unblock."
           confirmLabel={ACTION_LABEL[confirm]}
           confirmTone="danger"
           onConfirm={() => run(confirm)}
