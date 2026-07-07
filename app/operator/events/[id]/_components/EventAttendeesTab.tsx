@@ -51,7 +51,10 @@ function TicketStatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; label: string }> = {
     confirmed: { bg: 'var(--success-soft)', color: 'var(--success)', label: 'Confirmed' },
     pending_approval: { bg: 'var(--warning-soft)', color: 'var(--warning)', label: 'Pending' },
-    held: { bg: 'var(--muted)', color: 'var(--text-secondary)', label: 'Waitlisted' },
+    // 'held' is a paid authorize-hold, NOT a waitlist entry — labeling it
+    // "Waitlisted" made operators reach for Approve (which 409s on held).
+    // The valid action for a held row is Capture.
+    held: { bg: 'var(--muted)', color: 'var(--text-secondary)', label: 'Hold' },
     rejected: { bg: 'var(--danger-soft)', color: 'var(--danger)', label: 'Rejected' },
     refunded: { bg: 'var(--muted)', color: 'var(--text-muted)', label: 'Refunded' },
     cancelled: { bg: 'var(--muted)', color: 'var(--text-muted)', label: 'Cancelled' },
@@ -464,7 +467,7 @@ export function EventAttendeesTab({ rsvps, eventId, priceInCents }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        {isPending(rsvp) && (
+                        {rsvp.ticketStatus === 'pending_approval' && (
                           <button
                             type="button"
                             disabled={promoteLoading[rsvp.id]}
