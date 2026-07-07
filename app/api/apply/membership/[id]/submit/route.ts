@@ -417,7 +417,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({
     archetype: result.archetype,
     archetypeScores: result.archetypeScores,
-    dimensionScores: result.dimensionScores,
     memberWorthTotal: result.memberWorthTotal,
     tags: result.tags,
     personalNote: personalNote ?? '',

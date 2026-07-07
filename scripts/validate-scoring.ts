@@ -156,7 +156,6 @@ async function main() {
     const line =
       `${hit ? '✓' : '✗'} intended ${p.intended.padEnd(10)} → got ${String(r.archetype).padEnd(10)}` +
       `  worth ${r.memberWorthTotal}` +
-      `  dims[inf ${r.dimensionScores.influence} con ${r.dimensionScores.contribution} act ${r.dimensionScores.activation} tas ${r.dimensionScores.taste}]` +
       `${fallback ? '  ⚠️ FALLBACK (scoring did not run)' : ''}\n    top: ${topArchetypes(r.archetypeScores)}` +
       `\n    tags: ${r.tags.join(', ')}`;
     results.push({ intended: p.intended, got: String(r.archetype), hit, fallback, line });

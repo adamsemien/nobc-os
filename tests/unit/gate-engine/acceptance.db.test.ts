@@ -44,7 +44,6 @@ let fakeIntents: Record<string, StripeIntentSnapshot>;
 const yesScore = (): ScoringResult => ({
   archetype: "Connector",
   archetypeScores: { Connector: 82, Host: 40, Builder: 40, Patron: 40, Sage: 40, Spark: 40 },
-  dimensionScores: { influence: 8, contribution: 8, activation: 8, taste: 8 },
   memberWorthTotal: 82,
   aiRecommendation: "yes",
   aiReasoning: "Acceptance fixture: strong fit.",

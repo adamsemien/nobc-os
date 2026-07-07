@@ -144,7 +144,6 @@ describe("ANSWER_QUESTIONS verifier", () => {
   const scoring = (overrides: Partial<ScoringResult> = {}): ScoringResult => ({
     archetype: "Connector",
     archetypeScores: { Connector: 80, Host: 10, Builder: 10, Patron: 10, Sage: 10, Spark: 10 },
-    dimensionScores: { influence: 7, contribution: 7, activation: 7, taste: 7 },
     memberWorthTotal: 82,
     aiRecommendation: "yes",
     aiReasoning: "Strong fit.",

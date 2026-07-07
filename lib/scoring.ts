@@ -1,18 +1,35 @@
-/** Question-agnostic AI scoring for membership applications.
+/** Membership application scoring (Apply Scoring v2 — inverted, Phase 3).
  *
- *  The scoring prompt references no hardcoded question names. It loads the
- *  active QuestionDefinitions for the application's ApplicationTemplate and
- *  scores each answer against that question's own scoringLogic and weight.
- *  Adding a question automatically includes it; removing or renaming one
- *  never breaks scoring. */
-import { anthropic } from '@ai-sdk/anthropic';
-import { generateObject } from 'ai';
+ *  CLASSIFICATION is deterministic: the six In-A-Room tap questions feed the pure
+ *  tally in `lib/scoring/inRoomTally.ts`, which decides the nature. FIT stays AI:
+ *  one temperature-0 Sonnet call (`gradeTypedAnswers`) judges memberWorthTotal /
+ *  aiRecommendation / aiReasoning / tags on the typed questions, independent of the
+ *  archetype, and also emits per-question typed awards that break genuine tap ties.
+ *
+ *  The normalized `archetypeScores` keep the same 0-100-per-archetype scale the
+ *  legacy LLM emitted (see `normalizeArchetypeScores`), so `lib/intelligence/worth.ts`
+ *  derives the same 0-30 worth and charter/standard/waitlist tiers are unchanged.
+ *
+ *  SEQUENCING: the tally needs In-A-Room answers, which the Phase-4 input components
+ *  collect. Until Phase 4 ships and applicants answer the six, live applications have
+ *  no in-room answers and the tally degenerates to its alphabetical fallback — so this
+ *  swap is dev-verified only and must NOT be flipped live before Phase 4. */
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { resolveAnswer } from '@/lib/question-key-map';
-import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
-
-const SCORING_MODEL = JUDGMENT_MODEL;
+import {
+  computeInRoomTally,
+  zeroArchetypeScores,
+  STORED_ARCHETYPES,
+  type OptionsById,
+  type InRoomAnswers,
+  type MostLeastAnswer,
+} from '@/lib/scoring/inRoomTally';
+import { normalizeArchetypeScores } from '@/lib/scoring/normalizeArchetypeScores';
+import {
+  gradeTypedAnswers,
+  aggregateTypedScores,
+  type TypedQuestionInput,
+} from '@/lib/scoring/gradeTypedAnswers';
 
 export const ScoringResultSchema = z.object({
   archetype: z.enum(['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark']),
@@ -24,12 +41,6 @@ export const ScoringResultSchema = z.object({
     Sage: z.number(),
     Spark: z.number(),
   }),
-  dimensionScores: z.object({
-    influence: z.number(),
-    contribution: z.number(),
-    activation: z.number(),
-    taste: z.number(),
-  }),
   memberWorthTotal: z.number(),
   aiRecommendation: z.enum(['strong_yes', 'yes', 'unclear', 'no', 'strong_no']),
   aiReasoning: z.string(),
@@ -38,10 +49,11 @@ export const ScoringResultSchema = z.object({
 
 export type ScoringResult = z.infer<typeof ScoringResultSchema>;
 
+/** Catastrophic fallback (unexpected error mid-scoring). The grader owns its own
+ *  fit fallback; this only fires if classification itself throws. */
 const FALLBACK: ScoringResult = {
   archetype: 'Connector',
   archetypeScores: { Connector: 50, Host: 50, Builder: 50, Patron: 50, Sage: 50, Spark: 50 },
-  dimensionScores: { influence: 5, contribution: 5, activation: 5, taste: 5 },
   memberWorthTotal: 50,
   aiRecommendation: 'unclear',
   aiReasoning: 'Automated scoring was unavailable for this application.',
@@ -77,6 +89,58 @@ async function resolveTemplate(workspaceId: string, templateId: string | null) {
   );
 }
 
+type InRoomQuestion = { id: string; stableKey: string; type: string };
+
+/** Parse a stored most_least answer ('{"mostId":"…","leastId":"…"}'). Phase-4 input
+ *  contract: tap answers store the QuestionOption id; most_least stores this JSON. */
+function parseMostLeast(raw: string): MostLeastAnswer | null {
+  try {
+    const o = JSON.parse(raw) as { mostId?: unknown; leastId?: unknown };
+    if (typeof o.mostId === 'string' && typeof o.leastId === 'string') {
+      return { mostId: o.mostId, leastId: o.leastId };
+    }
+  } catch {
+    /* not JSON → treated as unanswered by the tally */
+  }
+  return null;
+}
+
+/** Load the QuestionOption rows for the six In-A-Room questions and shape the
+ *  member's answers into the tally's input types. */
+async function buildInRoomInputs(
+  inRoomQuestions: InRoomQuestion[],
+  answersByKey: Record<string, string>,
+): Promise<{ optionsById: OptionsById; inRoomAnswers: InRoomAnswers }> {
+  if (inRoomQuestions.length === 0) return { optionsById: {}, inRoomAnswers: {} };
+
+  const qById = new Map(inRoomQuestions.map((q) => [q.id, q]));
+  const options = await db.questionOption.findMany({
+    where: { questionId: { in: inRoomQuestions.map((q) => q.id) } },
+    select: { id: true, questionId: true, archetype: true, points: true, openerPhrase: true },
+  });
+
+  const optionsById: OptionsById = {};
+  for (const o of options) {
+    const q = qById.get(o.questionId);
+    if (!q) continue;
+    optionsById[o.id] = {
+      archetype: o.archetype,
+      points: o.points,
+      openerPhrase: o.openerPhrase,
+      stableKey: q.stableKey,
+    };
+  }
+
+  const inRoomAnswers: InRoomAnswers = {};
+  for (const q of inRoomQuestions) {
+    const raw = answersByKey[q.stableKey];
+    if (!raw) continue;
+    inRoomAnswers[q.stableKey] = q.type === 'most_least' ? parseMostLeast(raw) : raw;
+  }
+
+  return { optionsById, inRoomAnswers };
+}
+
 export async function scoreApplication(applicationId: string): Promise<ScoringResult> {
   const application = await db.application.findUnique({
     where: { id: applicationId },
@@ -84,81 +148,58 @@ export async function scoreApplication(applicationId: string): Promise<ScoringRe
   });
   if (!application) throw new Error(`Application not found: ${applicationId}`);
 
-  const template = await resolveTemplate(application.workspaceId, application.templateId);
-
-  const questions = (template?.questions ?? [])
-    .filter((q) => q.isActive)
-    .sort((a, b) => a.order - b.order);
-
-  const answersByKey: Record<string, string> = {};
-  for (const a of application.answers) answersByKey[a.questionKey] = a.answer;
-
-  const scored = questions.filter((q) => q.scoringDimension);
-
-  const questionBlock = scored
-    .map((q) => {
-      const answer = (resolveAnswer(q.stableKey, answersByKey) ?? '').trim();
-      const signals = q.archetypeSignals.length
-        ? `\nARCHETYPE SIGNALS: ${q.archetypeSignals.join(', ')}`
-        : '';
-      return `QUESTION: ${q.insightLabel} (${q.scoringDimension}, weight: ${q.scoringWeight})
-SCORING LOGIC: ${q.scoringLogic}${signals}
-ANSWER: ${answer || 'no answer provided'}`;
-    })
-    .join('\n\n');
-
-  const prompt = `You are scoring a membership application for No Bad Company, a premium curated members club in Austin TX.
-
-${template?.scoringInstructions ?? 'Score the applicant on genuine fit. Reward specificity and substance over polish.'}
-
-Applicant: ${application.fullName}
-City: ${application.city?.trim() || '(not provided)'}
-
-Questions and answers:
-${questionBlock || '(no scored questions answered)'}
-
-Score each dimension (influence, contribution, activation, taste) on a scale of 1-10.
-Weight each question's contribution by its stated weight (0 = ignore, 1 = primary).
-archetypeScores are 0-100 per archetype. Assign the top archetype from these six (score and emit the STORED enum value on the left; the name in parentheses is the concept it represents):
-- Connector - gives before asking; makes introductions; two steps ahead for everyone around them.
-- Host (scored as the "Caregiver" concept - notices what people need and quietly handles it; makes people feel held, not hosted).
-- Builder - makes things from nothing; pulls others into the making; a blank page is just Tuesday.
-- Patron (scored as the "Champion" concept - loyal and brave; moves closer when it gets hard; makes people feel safe, not admired).
-- Sage - collects understanding over attention; reads a room before speaking; people trust them with the real stuff.
-- Spark - instinct for joy; creates momentum; people remember how they felt around them.
-
-These six are near-neighbors, so separate them along five behavioral dimensions:
-- energy output: how much energy they push into a room (Spark high and outward, Sage low and inward).
-- conversation role: performer, listener, connector, or host.
-- focus: ideas vs people (Builder and Sage lean ideas; Connector, Patron, Host, and Spark lean people).
-- movement: circulate vs anchor (Connector and Spark circulate; Patron, Host, and Sage anchor one spot).
-- small-talk fluency: who converts small talk into play (Spark) or depth (Sage, Builder), and who instead needs a role (Host) or a person to champion (Patron).
-
-Pairwise distinctions - use these to break near-ties, especially Connector vs Spark and Host vs Patron:
-- Caregiver (Host) vs Champion (Patron): the Caregiver tends the room, the Champion champions the person in front of them. Patrol vs one person at a time.
-- Champion (Patron) vs Connector: both generous with people. The Champion amplifies you to the room; the Connector connects you to someone in it.
-- Connector vs Spark: the Connector builds pairs and exits; the Spark builds a crowd and stays at its center.
-- Connector vs Builder: the Builder builds the structure; the Connector moves value through it. Architecture vs circulation.
-- Sage vs Builder: both hate small talk. The Sage digs for understanding; the Builder digs a foundation. Insight vs plan.
-- Spark vs Caregiver (Host): both make people comfortable. The Spark does it with energy; the Caregiver does it with care.
-These distinctions describe HOW the six differ so you can separate near-neighbors; the output schema, the dimensionScores shape, and the archetype enum are unchanged. Still emit the STORED enum value on the left.
-
-Use the ARCHETYPE SIGNALS on each question to weight your archetype decision.
-memberWorthTotal is overall fit on a 0-100 scale.
-Also produce 3-5 short lowercase tags capturing this person's vibe/identity.`;
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('[scoreApplication] ANTHROPIC_API_KEY not set; returning fallback score.');
-    return FALLBACK;
-  }
-
   try {
-    const { object } = await generateObject({
-      model: anthropic(SCORING_MODEL),
-      schema: ScoringResultSchema,
-      prompt,
+    const template = await resolveTemplate(application.workspaceId, application.templateId);
+
+    const questions = (template?.questions ?? [])
+      .filter((q) => q.isActive)
+      .sort((a, b) => a.order - b.order);
+
+    const answersByKey: Record<string, string> = {};
+    for (const a of application.answers) answersByKey[a.questionKey] = a.answer;
+
+    // (A) Deterministic classification over the six In-A-Room questions.
+    const inRoomQuestions: InRoomQuestion[] = questions
+      .filter((q) => q.section === 'in-a-room')
+      .map((q) => ({ id: q.id, stableKey: q.stableKey, type: q.type }));
+    const { optionsById, inRoomAnswers } = await buildInRoomInputs(inRoomQuestions, answersByKey);
+
+    // (B) One temp-0 grader call over the typed scored questions: fit + typed awards.
+    const typedQuestions: TypedQuestionInput[] = questions
+      .filter((q) => q.scoringDimension)
+      .map((q) => ({
+        stableKey: q.stableKey,
+        insightLabel: q.insightLabel,
+        scoringDimension: q.scoringDimension,
+        scoringWeight: q.scoringWeight,
+        scoringLogic: q.scoringLogic,
+        archetypeSignals: q.archetypeSignals,
+      }));
+    const grade = await gradeTypedAnswers(typedQuestions, answersByKey, {
+      scoringInstructions: template?.scoringInstructions ?? null,
+      applicantName: application.fullName,
+      applicantCity: application.city ?? undefined,
     });
-    return object;
+    const typedScores = aggregateTypedScores(grade.typedGrades);
+
+    // (C) Tally with the typed seam; (D) combined = tap + typed.
+    const tally = computeInRoomTally(inRoomAnswers, optionsById, typedScores);
+    const combined = zeroArchetypeScores();
+    for (const arch of STORED_ARCHETYPES) {
+      combined[arch] = tally.tapScores[arch] + typedScores[arch];
+    }
+
+    // (E) Normalize → 0-100 vector; magnitude from fit, primary pinned to the top slot.
+    const archetypeScores = normalizeArchetypeScores(combined, tally.primary, grade.memberWorthTotal);
+
+    return {
+      archetype: tally.primary,
+      archetypeScores,
+      memberWorthTotal: grade.memberWorthTotal,
+      aiRecommendation: grade.aiRecommendation,
+      aiReasoning: grade.aiReasoning,
+      tags: grade.tags,
+    };
   } catch (e) {
     console.error('[scoreApplication] scoring failed:', e);
     return FALLBACK;

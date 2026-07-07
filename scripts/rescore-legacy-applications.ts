@@ -83,11 +83,6 @@ async function main() {
         const mark = a === result.archetype ? ' ◀ top' : '';
         console.log(`     ${a.padEnd(10)} ${String(score).padStart(3)}${mark}`);
       }
-      const d = result.dimensionScores;
-      console.log(
-        `   dimensions  influence ${d.influence}  contribution ${d.contribution}` +
-          `  activation ${d.activation}  taste ${d.taste}`,
-      );
       console.log(`   tags        ${result.tags.join(', ') || '—'}`);
 
       if (WRITE) {
