@@ -1112,10 +1112,30 @@ model QuestionDefinition {
 
   workspace Workspace           @relation(fields: [workspaceId], references: [id])
   template  ApplicationTemplate @relation(fields: [templateId], references: [id])
+  options   QuestionOption[]
 
   @@index([workspaceId])
   @@index([templateId])
   @@index([stableKey])
+}
+
+/// Per-option point map for tap-to-answer question types (`tap_grid`, `most_least`).
+/// Additive deterministic backbone for Apply Scoring v2 (In-A-Room tally). Each row
+/// maps one member-facing option to a STORED archetype enum value and a point award.
+/// `openerPhrase` is set only on the Q6 "best self" question and carries the reveal
+/// opening line. The member never sees `archetype` or `points`.
+model QuestionOption {
+  id           String  @id @default(cuid())
+  questionId   String
+  order        Int
+  label        String
+  archetype    String
+  points       Int
+  openerPhrase String?
+
+  question QuestionDefinition @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
 }
 
 model ApplicationTemplate {
