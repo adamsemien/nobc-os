@@ -7,9 +7,20 @@ import {
   type SeriesRow,
 } from './_components/EventsPageTabs';
 
-export default async function OperatorEventsPage() {
+export default async function OperatorEventsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string; when?: string; sort?: string; page?: string }>;
+}) {
+  const params = await searchParams;
+  const listQuery = new URLSearchParams();
+  for (const key of ['q', 'status', 'when', 'sort', 'page'] as const) {
+    if (params[key]) listQuery.set(key, params[key]!);
+  }
+  const qs = listQuery.toString();
+
   const [eventsRes, seriesRes] = await Promise.all([
-    operatorServerFetch('/api/operator/events'),
+    operatorServerFetch(`/api/operator/events${qs ? `?${qs}` : ''}`),
     operatorServerFetch('/api/operator/series'),
   ]);
 
@@ -21,7 +32,13 @@ export default async function OperatorEventsPage() {
     );
   }
 
-  const { events } = (await eventsRes.json()) as { events: EventRow[] };
+  const { events, total, page, pageSize } = (await eventsRes.json()) as {
+    events: EventRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
+  const filtered = Boolean(params.q || params.status || params.when);
   const series: SeriesRow[] = seriesRes.ok
     ? ((await seriesRes.json()) as { series: SeriesRow[] }).series
     : [];
@@ -42,7 +59,14 @@ export default async function OperatorEventsPage() {
           }
         />
 
-        <EventsPageTabs events={events} series={series} />
+        <EventsPageTabs
+          events={events}
+          series={series}
+          total={total}
+          page={page}
+          pageSize={pageSize}
+          filtered={filtered}
+        />
       </div>
     </div>
   );

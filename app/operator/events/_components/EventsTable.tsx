@@ -28,9 +28,15 @@ function statusBadgeCls(status: string, startAt: string): string {
   return 'bg-muted text-text-muted'; // DRAFT
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Draft',
+  PUBLISHED: 'Published',
+  CANCELLED: 'Cancelled',
+};
+
 function statusLabel(status: string, startAt: string): string {
-  if (status === 'PUBLISHED' && new Date(startAt) < new Date()) return 'past';
-  return status.toLowerCase();
+  if (status === 'PUBLISHED' && new Date(startAt) < new Date()) return 'Past';
+  return STATUS_LABELS[status] ?? status.toLowerCase();
 }
 
 export function EventsTable({ events }: { events: EventRow[] }) {
@@ -197,7 +203,7 @@ export function EventsTable({ events }: { events: EventRow[] }) {
             <h2 className="text-lg font-semibold text-text-primary">Delete events?</h2>
             <p className="mt-2 text-sm text-text-secondary">
               This will permanently delete {selected.size} event{selected.size > 1 ? 's' : ''} and
-              all their RSVPs. This cannot be undone.
+              all their access records. Events with live payments are refused. This cannot be undone.
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button

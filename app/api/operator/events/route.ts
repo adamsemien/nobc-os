@@ -11,31 +11,75 @@ import { notifyProducer } from '@/lib/producer-webhook';
 import { buildPathsFromTemplate } from '@/lib/workflows/templates';
 import type { WorkflowTemplateKey } from '@/lib/workflows/types';
 
-export async function GET() {
+const LIST_PAGE_SIZE = 50;
+const LIST_STATUSES = new Set(['DRAFT', 'PUBLISHED', 'CANCELLED']);
+
+export async function GET(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const workspaceId = await requireWorkspaceId(userId);
 
-  const events = await db.event.findMany({
-    where: { workspaceId },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      startAt: true,
-      location: true,
-      status: true,
-      accessMode: true,
-      capacity: true,
-      priceInCents: true,
-      rsvps: {
-        where: { ticketStatus: { in: ['confirmed', 'held'] } },
-        select: { ticketStatus: true, stripePaymentIntentId: true, refundAmountCents: true },
+  const sp = req.nextUrl.searchParams;
+  const q = sp.get('q')?.trim() || undefined;
+  const statusRaw = sp.get('status')?.toUpperCase();
+  const status = statusRaw && LIST_STATUSES.has(statusRaw) ? statusRaw : undefined;
+  const when = sp.get('when'); // 'upcoming' | 'past'
+  const sort = sp.get('sort'); // 'start_desc' (default) | 'start_asc' | 'title'
+  const page = Math.max(1, Number(sp.get('page') ?? 1) || 1);
+
+  const where = {
+    workspaceId,
+    ...(q
+      ? {
+          OR: [
+            { title: { contains: q, mode: 'insensitive' as const } },
+            { slug: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+    ...(status ? { status: status as 'DRAFT' | 'PUBLISHED' | 'CANCELLED' } : {}),
+    ...(when === 'upcoming'
+      ? { startAt: { gte: new Date() } }
+      : when === 'past'
+        ? { startAt: { lt: new Date() } }
+        : {}),
+  };
+
+  const orderBy =
+    sort === 'start_asc'
+      ? ({ startAt: 'asc' } as const)
+      : sort === 'title'
+        ? ({ title: 'asc' } as const)
+        : ({ startAt: 'desc' } as const);
+
+  // The RSVP sub-select is bounded by the page slice (50 events), not the
+  // whole workspace history — the old unpaginated query pulled every
+  // confirmed/held access row of every event on each load.
+  const [events, total] = await Promise.all([
+    db.event.findMany({
+      where,
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        startAt: true,
+        location: true,
+        status: true,
+        accessMode: true,
+        capacity: true,
+        priceInCents: true,
+        rsvps: {
+          where: { ticketStatus: { in: ['confirmed', 'held'] } },
+          select: { ticketStatus: true, stripePaymentIntentId: true, refundAmountCents: true },
+        },
       },
-    },
-    orderBy: { startAt: 'desc' },
-  });
+      orderBy,
+      skip: (page - 1) * LIST_PAGE_SIZE,
+      take: LIST_PAGE_SIZE,
+    }),
+    db.event.count({ where }),
+  ]);
 
   const result = events.map(({ rsvps, ...ev }) => {
     const capacityUsed = rsvps.length;
@@ -45,7 +89,7 @@ export async function GET() {
     return { ...ev, capacityUsed, revenueCents };
   });
 
-  return NextResponse.json({ events: result });
+  return NextResponse.json({ events: result, total, page, pageSize: LIST_PAGE_SIZE });
 }
 
 const CustomQuestionInput = z.object({

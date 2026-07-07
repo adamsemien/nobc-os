@@ -4,6 +4,7 @@
  *  panel live side by side as tabs (no separate route). */
 import { useState } from 'react';
 import { EventsTable } from './EventsTable';
+import { EventsToolbar } from './EventsToolbar';
 import { SeriesPanel } from './SeriesPanel';
 import { EmptyState } from '../../_components/EmptyState';
 
@@ -40,9 +41,19 @@ export type SeriesRow = {
 export function EventsPageTabs({
   events,
   series,
+  total,
+  page,
+  pageSize,
+  filtered,
 }: {
   events: EventRow[];
   series: SeriesRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  /** True when any search/filter param is active — switches the empty state
+   *  from "create your first event" to "no matches". */
+  filtered: boolean;
 }) {
   const [tab, setTab] = useState<'events' | 'series'>('events');
 
@@ -65,15 +76,24 @@ export function EventsPageTabs({
       </div>
 
       {tab === 'events' ? (
-        events.length === 0 ? (
-          <EmptyState
-            icon="event"
-            title="Nothing here yet."
-            action={{ label: 'Create your first event →', href: '/operator/events/new' }}
-          />
-        ) : (
-          <EventsTable events={events} />
-        )
+        <>
+          <EventsToolbar total={total} page={page} pageSize={pageSize} />
+          {events.length === 0 ? (
+            filtered ? (
+              <p className="px-3 py-10 text-center text-sm text-text-secondary">
+                No events match these filters.
+              </p>
+            ) : (
+              <EmptyState
+                icon="event"
+                title="Nothing here yet."
+                action={{ label: 'Create your first event →', href: '/operator/events/new' }}
+              />
+            )
+          ) : (
+            <EventsTable events={events} />
+          )}
+        </>
       ) : (
         <SeriesPanel initialSeries={series} />
       )}
