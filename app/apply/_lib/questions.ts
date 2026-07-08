@@ -332,19 +332,12 @@ export const QUESTIONS: Question[] = [
     required: true,
   },
   {
-    id: 'recommendForPay',
-    section: 'how-you-move',
-    label: "What do you recommend to everyone like you're getting paid for it?",
-    type: 'textarea',
-    required: true,
-  },
-  {
     id: 'comeToYouFor',
     section: 'how-you-move',
     label: 'What do people consistently come to you for?',
     type: 'textarea',
     required: true,
-    help: 'do you have a good tax guy? margarita recipe? cooking advice?',
+    help: 'A good tax guy, a margarita recipe, cooking advice - whatever people keep coming back to you for.',
   },
   {
     id: 'walkIntoRoom',
@@ -352,7 +345,7 @@ export const QUESTIONS: Question[] = [
     label: "You walk into a room where you don't know anyone. What do you actually do?",
     type: 'textarea',
     required: true,
-    help: 'be honest and specific, this helps us design a comfortable room for you.',
+    help: 'This is how we make the room comfortable for you. Do you find someone to talk to, or hang back and read the room first?',
   },
   {
     id: 'unplannedFun',

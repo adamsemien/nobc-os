@@ -247,7 +247,7 @@ const CHAPTER_PAGE_IDS: string[][] = [
   ['firstName', 'lastName', 'email', 'cell', 'homeAddress', 'cities', 'birthInfo', 'gender', 'dietary', 'links', 'photos'],
   ['whatYouDo', 'characteristicsGoodAtJob', 'creativePursuits', 'referrals', 'enneagram', 'mbti', 'loveLanguage', 'otherTests', 'personalityUpload'],
   // Section 02 - How You Move Through the World
-  ['obsessedWith', 'recommendForPay', 'comeToYouFor', 'walkIntoRoom'],
+  ['obsessedWith', 'comeToYouFor', 'walkIntoRoom'],
   ['unplannedFun', 'meetPeople', 'workout'],
   ['goodCompany', 'connectionCreated', 'loyalCommunity'],
   // In a Room - tactile self-placement, paced across two short pages (3 + 3).

@@ -36,7 +36,6 @@ export const PREVIEW_ANSWERS: Record<string, string> = {
   mbti: 'INTJ',
   loveLanguage: 'Quality Time',
   obsessedWith: '[PREVIEW FIXTURE] Example answer for operator review.',
-  recommendForPay: '[PREVIEW FIXTURE] Example answer for operator review.',
   comeToYouFor: '[PREVIEW FIXTURE] Example answer for operator review.',
   // Written realistically (still invented) so the reveal note preview quotes a
   // specific, real-sounding answer instead of placeholder text.
