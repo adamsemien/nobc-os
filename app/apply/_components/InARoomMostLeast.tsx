@@ -4,17 +4,25 @@
  * most-least — one list of six; pick exactly one MOST and one LEAST, mutually
  * exclusive (Apply Scoring v2, Phase 4; Q2 giftMaking, Q3 partyJudge).
  *
- * CONTRACT (the #1 correctness gate): the answer VALUE is a JSON string with the
- * EXACT keys `mostId` and `leastId`, each a DB `QuestionOption.id`:
+ * CONTRACT (the #1 correctness gate): the answer VALUE pushed to the parent is a
+ * JSON string with the EXACT keys `mostId` and `leastId`, each a DB
+ * `QuestionOption.id`:
  *   {"mostId":"<id>","leastId":"<id>"}
- * This is what `lib/scoring.ts` parseMostLeast reads. It is written ONLY when both
- * are set; an incomplete pick writes '' so the form's required-validation blocks it.
+ * This is what `lib/scoring.ts` parseMostLeast reads. It is written up to the
+ * parent ONLY when BOTH are set; an incomplete pick writes '' so the form's
+ * required-validation blocks it.
  *
- * Controlled by `value` (parsed each render), so resume rehydrates from the stored
- * JSON. Colors are design tokens (no hex).
+ * Because the parent answer stays '' until complete, a partial pick (most-only or
+ * least-only) cannot round-trip through the controlled `value` — it would be
+ * discarded on the next render. So the in-progress selection lives in LOCAL state
+ * (seeded from `value`), which is the render source; only a complete
+ * {mostId,leastId} (else '') is pushed to `onChange`. A useEffect rehydrates from
+ * `value` ONLY when it is a COMPLETE answer (draft/resume) — never on ''/partial,
+ * so the partial-commit round-trip can't wipe an in-progress pick. Colors are
+ * design tokens (no hex).
  */
 
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 
 export interface MostLeastOption {
   id: string;
@@ -46,9 +54,23 @@ export default function InARoomMostLeast({
   onChange: (serialized: string) => void;
   ariaLabel: string;
 }) {
-  const { mostId, leastId } = parseValue(value);
+  // In-progress selection lives here (not in the round-tripped `value`), so a
+  // single pick renders selected immediately even though the parent answer stays
+  // '' until both are set.
+  const [sel, setSel] = useState(() => parseValue(value));
 
-  function commit(nextMost: string | null, nextLeast: string | null) {
+  // Rehydrate from a COMPLETE persisted answer (draft/resume). Never sync from
+  // ''/partial: every incomplete pick sets the parent to '' , and syncing that
+  // back would wipe the in-progress selection. Only a both-set value updates us.
+  useEffect(() => {
+    const parsed = parseValue(value);
+    if (parsed.mostId && parsed.leastId) setSel(parsed);
+  }, [value]);
+
+  const { mostId, leastId } = sel;
+
+  function apply(nextMost: string | null, nextLeast: string | null) {
+    setSel({ mostId: nextMost, leastId: nextLeast });
     // Only a complete most+least is a valid answer; otherwise clear it so the
     // required-validation treats the question as unanswered.
     onChange(nextMost && nextLeast ? JSON.stringify({ mostId: nextMost, leastId: nextLeast }) : '');
@@ -57,25 +79,22 @@ export default function InARoomMostLeast({
   function pickMost(id: string) {
     const nextMost = mostId === id ? null : id; // toggle off if re-tapped
     const nextLeast = leastId === id ? null : leastId; // most and least can't be the same row
-    commit(nextMost, nextLeast);
+    apply(nextMost, nextLeast);
   }
 
   function pickLeast(id: string) {
     const nextLeast = leastId === id ? null : id;
     const nextMost = mostId === id ? null : mostId;
-    commit(nextMost, nextLeast);
+    apply(nextMost, nextLeast);
   }
 
   return (
     <div role="group" aria-label={ariaLabel}>
-      <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-secondary)' }}>
-        Pick the one that&rsquo;s <strong>most</strong> you and the one that&rsquo;s{' '}
-        <strong>least</strong>.
-      </p>
       <div style={{ display: 'grid', gap: 10 }}>
         {options.map((o) => {
           const isMost = mostId === o.id;
           const isLeast = leastId === o.id;
+          const selected = isMost || isLeast;
           return (
             <div
               key={o.id}
@@ -87,15 +106,12 @@ export default function InARoomMostLeast({
                 flexWrap: 'wrap',
                 padding: '10px 14px',
                 borderRadius: 10,
-                border: isMost
-                  ? '2px solid var(--primary)'
-                  : isLeast
-                    ? '1px solid var(--border)'
-                    : '1px solid var(--border)',
-                background: isMost ? 'var(--primary-soft)' : 'var(--bg)',
+                // Both Most- and Least-selected rows use the tap grid's selected
+                // treatment (2px NBC red + soft fill); the lit pill says which.
+                border: selected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                background: selected ? 'var(--primary-soft)' : 'var(--bg)',
                 color: 'var(--text-primary)',
-                opacity: isLeast ? 0.6 : 1,
-                transition: 'border-color 120ms ease, background-color 120ms ease, opacity 120ms ease',
+                transition: 'border-color 120ms ease, background-color 120ms ease',
               }}
             >
               <span style={{ flex: '1 1 160px', fontSize: 15, lineHeight: 1.35 }}>{o.label}</span>
@@ -105,7 +121,7 @@ export default function InARoomMostLeast({
                   aria-pressed={isMost}
                   aria-label={`Mark "${o.label}" as most you`}
                   onClick={() => pickMost(o.id)}
-                  style={pillStyle(isMost, 'most')}
+                  style={pillStyle(isMost)}
                 >
                   Most
                 </button>
@@ -114,7 +130,7 @@ export default function InARoomMostLeast({
                   aria-pressed={isLeast}
                   aria-label={`Mark "${o.label}" as least you`}
                   onClick={() => pickLeast(o.id)}
-                  style={pillStyle(isLeast, 'least')}
+                  style={pillStyle(isLeast)}
                 >
                   Least
                 </button>
@@ -127,7 +143,9 @@ export default function InARoomMostLeast({
   );
 }
 
-function pillStyle(active: boolean, kind: 'most' | 'least'): CSSProperties {
+// Both Most and Least active pills fill NBC red — matching the tap grid's
+// selected treatment. Which is which is carried by the pill label, not colour.
+function pillStyle(active: boolean): CSSProperties {
   const base: CSSProperties = {
     minHeight: 40,
     minWidth: 64,
@@ -140,13 +158,7 @@ function pillStyle(active: boolean, kind: 'most' | 'least'): CSSProperties {
     letterSpacing: '0.02em',
     transition: 'all 120ms ease',
   };
-  if (kind === 'most') {
-    return active
-      ? { ...base, border: '1px solid var(--primary)', background: 'var(--primary)', color: 'var(--bg)' }
-      : { ...base, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)' };
-  }
-  // least
   return active
-    ? { ...base, border: '1px solid var(--text-tertiary)', background: 'var(--text-tertiary)', color: 'var(--bg)' }
+    ? { ...base, border: '1px solid var(--primary)', background: 'var(--primary)', color: 'var(--bg)' }
     : { ...base, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)' };
 }

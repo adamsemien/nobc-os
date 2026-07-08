@@ -397,22 +397,23 @@ export const QUESTIONS: Question[] = [
     id: 'roomPosition',
     section: 'in-a-room',
     label:
-      "It's 8pm at a dinner party in full swing. Where are we most likely to find you? Be honest, not aspirational. There's no wrong room position.",
+      "It's 8pm at a dinner party in full swing. Where are we most likely to find you? Be honest. There's no wrong room position.",
     type: 'tap_grid',
     required: true,
   },
   {
     id: 'giftMaking',
     section: 'in-a-room',
-    label:
-      "In a room, your gift is making... Pick the one that's MOST you, and the one that's LEAST you. The least matters as much as the most.",
+    label: 'In a room, your gift is making…',
+    help: "Pick the one that's MOST you, and the one that's LEAST you - the least matters as much as the most.",
     type: 'most_least',
     required: true,
   },
   {
     id: 'partyJudge',
     section: 'in-a-room',
-    label: "What do you secretly judge a party for? Again: one MOST, one LEAST. We won't tell.",
+    label: 'What do you secretly judge a party for?',
+    help: "One MOST, one LEAST. We won't tell.",
     type: 'most_least',
     required: true,
   },

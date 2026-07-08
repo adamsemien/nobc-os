@@ -146,37 +146,6 @@ export default function ApplyAccountGate() {
     color: 'var(--text-secondary)',
     margin: '0 0 18px 0',
   };
-  // "Before you start" reuses the hero "Membership" eyebrow's typography, but muted
-  // (text-secondary) so it reads as a quiet sub-label instead of a second brand-red
-  // eyebrow competing with the hero.
-  const eyebrowMutedStyle: CSSProperties = {
-    display: 'block',
-    fontFamily: bodyFont,
-    fontSize: 11,
-    fontWeight: 500,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase',
-    color: 'var(--text-secondary)',
-    margin: '0 0 12px 0',
-  };
-  const tipListStyle: CSSProperties = {
-    listStyle: 'none',
-    padding: 0,
-    margin: '0 0 28px 0',
-  };
-  const tipStyle: CSSProperties = {
-    display: 'flex',
-    gap: 10,
-    fontFamily: bodyFont,
-    fontSize: 15,
-    lineHeight: 1.6,
-    color: 'var(--text-secondary)',
-    margin: '0 0 12px 0',
-  };
-  const dashStyle: CSSProperties = { flexShrink: 0, color: 'var(--text-tertiary)' };
-  // Only the lead phrase is emphasized, and only by weight - 500 is the emphasis
-  // weight used elsewhere in this file (eyebrow, CTA, sign-in link).
-  const leadStyle: CSSProperties = { fontWeight: 500 };
   // Confirm-view mic keeps the original treatment so the signed-in view stays
   // byte-identical.
   const micIconStyle: CSSProperties = { verticalAlign: '-0.15em', marginRight: 6 };
@@ -223,34 +192,24 @@ export default function ApplyAccountGate() {
         Apply to No Bad Company
       </h1>
       <p style={{ ...sellStyle, color: bodyColor }}>
-        Membership is by application, and by invitation. The room is small on purpose - built from
-        people worth spending an evening with, chosen one at a time.
+        Think of this as a profile, not an application. The better we know you, the better we can
+        introduce you to the right people and put you in the right rooms at the right time.
       </p>
-      <span style={eyebrowMutedStyle}>Before you start</span>
-      <ul style={tipListStyle}>
-        <li style={{ ...tipStyle, color: bodyColor }}>
-          <span aria-hidden="true" style={dashStyle}>-</span>
-          <span>
-            <strong style={leadStyle}>Set aside about 30 minutes.</strong> This is a real
-            application - most questions ask you to write a few sentences, not tick a box.
-          </span>
-        </li>
-        <li style={{ ...tipStyle, color: bodyColor }}>
-          <span aria-hidden="true" style={dashStyle}>-</span>
-          <span>
-            <Mic size={micSize} strokeWidth={1.75} aria-hidden="true" style={micStyle} />
-            <strong style={leadStyle}>Use your voice.</strong> Tap the mic and just talk - the
-            application was built for it. Don&apos;t overthink your answers.
-          </span>
-        </li>
-        <li style={{ ...tipStyle, color: bodyColor }}>
-          <span aria-hidden="true" style={dashStyle}>-</span>
-          <span>
-            <strong style={leadStyle}>Create an account first</strong> so your progress saves and
-            you can pick up from any device.
-          </span>
-        </li>
-      </ul>
+      <p style={{ ...sellStyle, color: bodyColor }}>
+        A few of these play more like a conversation than a form - what you&apos;re into, who you
+        gather, how you like to spend a night. Part of it plays like a game, and at the end
+        you&apos;ll land on how you show up in a room. Maybe it tells you something new. Maybe it
+        just confirms exactly who you already are. Either way, that&apos;s the fun part.
+      </p>
+      <p style={{ ...sellStyle, color: bodyColor }}>
+        Works best on a laptop if you&apos;ve got one - and there are no wrong answers, so take your
+        time and answer in your own voice. You can even{' '}
+        <Mic size={micSize} strokeWidth={1.75} aria-hidden="true" style={micStyle} />
+        tap the mic and just talk.
+      </p>
+      <p style={{ ...sellStyle, color: bodyColor }}>
+        Create an account first so your progress saves and you can pick up from any device.
+      </p>
     </>
   );
 
@@ -279,7 +238,7 @@ export default function ApplyAccountGate() {
             <div className="apply-door-marker">
               <div className="apply-door-rule" />
               <span style={markerEyebrowStyle}>To begin</span>
-              <p style={markerLineStyle}>Create your account to start your application.</p>
+              <p style={markerLineStyle}>Create your account to start your profile.</p>
               <ChevronDown size={16} aria-hidden="true" className="apply-door-chevron" />
             </div>
           </div>
@@ -332,7 +291,7 @@ export default function ApplyAccountGate() {
                 transition: 'opacity 150ms ease',
               }}
             >
-              {submitting ? '...' : 'begin application'}
+              {submitting ? '...' : 'Start your profile'}
             </button>
           </div>
         )}
