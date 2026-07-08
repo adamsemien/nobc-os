@@ -84,6 +84,9 @@ function archetypeArtSrc(archetype: string): string {
   return `/archetypes/${archetype.toLowerCase()}.png`;
 }
 
+// flip true when transparent-sepia archetype art lands in public/archetypes/
+const REVEAL_ART_ENABLED = false;
+
 /** Per-archetype segment color, keyed by STORED enum (lowercased) to the existing
  *  --archetype-* CSS tokens. */
 function archetypeColorVar(name: string): string {
@@ -2398,21 +2401,25 @@ export default function MembershipForm({
                     stored enum → /public/archetypes/{enum}.png (see the README there).
                     Rendered at normal blend (art-agnostic — do not assume a cream
                     plate that needs multiplying out). Hides itself if the file is
-                    missing. */}
-                {/* eslint-disable-next-line @next/next/no-img-element -- static per-nature art from /public, not a remote asset */}
-                <img
-                  src={archetypeArtSrc(submitResult.archetype)}
-                  alt=""
-                  aria-hidden="true"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                  style={{
-                    width: 'clamp(120px, 20vw, 200px)',
-                    height: 'auto',
-                    marginBottom: 24,
-                    animation: 'fadeInUp 500ms ease 0ms forwards',
-                    opacity: 0,
-                  }}
-                />
+                    missing. GATED OFF: the current PNGs are opaque black-on-cream and
+                    render as a cream plate on the dark reveal, so the slot is hidden
+                    until transparent-sepia art lands (flip REVEAL_ART_ENABLED). */}
+                {REVEAL_ART_ENABLED && (
+                  /* eslint-disable-next-line @next/next/no-img-element -- static per-nature art from /public, not a remote asset */
+                  <img
+                    src={archetypeArtSrc(submitResult.archetype)}
+                    alt=""
+                    aria-hidden="true"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    style={{
+                      width: 'clamp(120px, 20vw, 200px)',
+                      height: 'auto',
+                      marginBottom: 24,
+                      animation: 'fadeInUp 500ms ease 0ms forwards',
+                      opacity: 0,
+                    }}
+                  />
+                )}
 
                 {openerPhrase ? (
                   <>
