@@ -8,7 +8,6 @@ import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName, archetypeDisplayName } from
 import { CONSENT_DISCLOSURES, TERMS_VERSION } from '@/lib/apply-consent';
 import dynamic from 'next/dynamic';
 import { Mic } from 'lucide-react';
-import QRCode from 'qrcode';
 import {
   QUESTIONS,
   SECTIONS,
@@ -72,6 +71,9 @@ interface SubmitResult {
   openerPhrase?: string | null;
   habitatThrive?: string | null;
   habitatDim?: string | null;
+  // B2: AI blend subline, additive + not persisted — present only on the fresh
+  // post-submit reveal (absent on cached/replay + legacy rows).
+  subline?: string | null;
   rsvpId?: string | null;
   memberQrCode?: string | null;
 }
@@ -92,6 +94,12 @@ function archetypeColorVar(name: string): string {
  *  mid-sentence in the templated habitat copy ("...look like a house party..."). */
 function lcFirst(s: string): string {
   return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
+/** Uppercase the first character — used on the reveal opener clause once the
+ *  nature name is the hero and the clause stands on its own sentence. */
+function ucFirst(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
 /** Reveal B, layer 1: the per-nature clause that explains the member's own Q6
@@ -158,69 +166,6 @@ function BlendMeter({
           <span style={dot(secondColor)} />
         </span>
       </div>
-    </div>
-  );
-}
-
-// Door 1 reveal QR — mirrors the Door 2 confirmation QR treatment (qrcode -> SVG,
-// light code on a white field so it scans against the dark reveal background). The
-// code is the applicant's permanent member QR (always minted; QR law). The label
-// intentionally does NOT imply event approval — the comp may still be pending review.
-function QrReveal({ code }: { code: string }) {
-  const [svg, setSvg] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    QRCode.toString(code, {
-      type: 'svg',
-      width: 180,
-      margin: 2,
-      color: { dark: '#1C1008', light: '#FFFFFF' },
-    })
-      .then((s) => {
-        if (!cancelled) setSvg(s);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [code]);
-
-  return (
-    <div style={{ marginTop: 48, animation: 'fadeInUp 500ms ease 2000ms forwards', opacity: 0 }}>
-      <span
-        style={{
-          fontFamily: bodyFont,
-          fontSize: 11,
-          fontWeight: 500,
-          color: THEME.night.muted,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          display: 'block',
-          marginBottom: 16,
-        }}
-      >
-        YOUR MEMBER QR
-      </span>
-      {svg ? (
-        <div
-          style={{ display: 'inline-block', lineHeight: 0, borderRadius: 8, overflow: 'hidden' }}
-          dangerouslySetInnerHTML={{ __html: svg }}
-        />
-      ) : (
-        <div style={{ width: 180, height: 180, borderRadius: 8, background: THEME.night.border }} />
-      )}
-      <p
-        style={{
-          fontFamily: bodyFont,
-          fontSize: 13,
-          color: THEME.night.muted,
-          marginTop: 16,
-          marginBottom: 0,
-          letterSpacing: '0.04em',
-        }}
-      >
-        We&apos;ll be in touch shortly.
-      </p>
     </div>
   );
 }
@@ -353,6 +298,22 @@ function keysForPage(page: Question[]): string[] {
     }
   }
   return keys;
+}
+
+/** Persisted photo R2 keys, read from the fixed `photos.urls` answer (a JSON array
+ *  of private object keys). This answer is the source of truth for photos — written
+ *  on pick, autosaved with the rest of the draft, and rehydrated on resume — so
+ *  photos survive back-nav and a full reload the same way the personality upload
+ *  does (which stores its key in its own answer). */
+function parsePhotoKeys(answers: Record<string, string>): string[] {
+  const raw = answers['photos.urls'];
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((k): k is string => typeof k === 'string' && k.length > 0) : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Furthest page index containing any answered key, capped at LEGAL_STEP. */
@@ -539,8 +500,13 @@ export default function MembershipForm({
   const [error, setError] = useState('');
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
   const [showFrogger, setShowFrogger] = useState(false);
-  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  // Photos persist like the personality PDF: each is uploaded on pick and its
+  // private R2 key stored in answers['photos.urls'] (the source of truth, autosaved
+  // with the draft), so they survive back-nav AND a full reload. photoPreviews maps
+  // key -> a session-local blob URL for an immediate thumbnail; a reloaded photo has
+  // a persisted key but no preview, so it renders a "saved" placeholder tile.
+  const [photoPreviews, setPhotoPreviews] = useState<Record<string, string>>({});
+  const [photosUploading, setPhotosUploading] = useState(false);
   // In-A-Room option point maps (ids + labels), loaded per draft from the DB so the
   // tap-grid / most-least components submit the real QuestionOption ids the scorer reads.
   const [inARoomOptions, setInARoomOptions] = useState<Record<string, InARoomOption[]>>({});
@@ -776,22 +742,24 @@ export default function MembershipForm({
   }, [showResumeBanner]);
 
   // Revoke preview object URLs on unmount only. Removal revokes its own URL at
-  // the call site (removePhoto); revoking on every array change would kill URLs
-  // that survive into the next array when a photo is added or removed.
-  const photoPreviewUrlsRef = useRef<string[]>([]);
-  photoPreviewUrlsRef.current = photoPreviewUrls;
+  // the call site (removePhoto); revoking on every change would kill URLs that
+  // survive when a photo is added or removed.
+  const photoPreviewsRef = useRef<Record<string, string>>({});
+  photoPreviewsRef.current = photoPreviews;
   useEffect(() => {
-    return () => { photoPreviewUrlsRef.current.forEach(u => URL.revokeObjectURL(u)); };
+    return () => { Object.values(photoPreviewsRef.current).forEach(u => URL.revokeObjectURL(u)); };
   }, []);
 
-  /** Validate + accept newly picked files, capped at MAX_APPLY_PHOTOS. */
-  function addPhotoFiles(list: FileList | null) {
-    if (!list || list.length === 0) return;
-    const accepted: File[] = [];
-    const urls: string[] = [];
+  /** Validate + upload newly picked files on the spot, capped at MAX_APPLY_PHOTOS,
+   *  then persist their R2 keys into answers['photos.urls'] (autosaved with the
+   *  draft, so they survive reload). Mirrors the personality-upload path. */
+  async function addPhotoFiles(files: File[]) {
+    if (files.length === 0) return;
+    const existing = parsePhotoKeys(answers).length;
+    const toUpload: File[] = [];
     let problem = '';
-    for (const file of Array.from(list)) {
-      if (photoFiles.length + accepted.length >= MAX_APPLY_PHOTOS) {
+    for (const file of files) {
+      if (existing + toUpload.length >= MAX_APPLY_PHOTOS) {
         problem = `You can share up to ${MAX_APPLY_PHOTOS} photos.`;
         break;
       }
@@ -803,21 +771,63 @@ export default function MembershipForm({
         problem = `"${file.name}" is over 10MB - please pick a smaller version.`;
         continue;
       }
-      accepted.push(file);
-      urls.push(URL.createObjectURL(file));
-    }
-    if (accepted.length > 0) {
-      setPhotoFiles(prev => [...prev, ...accepted]);
-      setPhotoPreviewUrls(prev => [...prev, ...urls]);
+      toUpload.push(file);
     }
     setPhotoError(problem);
+    if (toUpload.length === 0) return;
+
+    // Upload each accepted photo now (same R2 route the PDF uses) and collect the
+    // returned private keys + a local preview. A failed upload is surfaced, never
+    // swallowed — losing a photo the applicant chose to share is a data-loss bug.
+    setPhotosUploading(true);
+    const added: { key: string; url: string }[] = [];
+    let uploadProblem = '';
+    for (const file of toUpload) {
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const r = await fetch('/api/apply/membership/upload', { method: 'POST', body: fd });
+        if (!r.ok) {
+          const detail = await r.json().catch(() => null);
+          throw new Error(detail?.error || `Photo upload failed (${r.status}).`);
+        }
+        const { key } = await r.json();
+        if (!key) throw new Error('Photo upload failed.');
+        added.push({ key, url: URL.createObjectURL(file) });
+      } catch (uploadErr) {
+        console.error('[apply/photo-upload]', uploadErr);
+        uploadProblem = 'One of your photos could not be uploaded. Please try again.';
+      }
+    }
+    setPhotosUploading(false);
+    if (added.length > 0) {
+      setPhotoPreviews(prev => {
+        const next = { ...prev };
+        for (const a of added) next[a.key] = a.url;
+        return next;
+      });
+      // Append to the persisted list functionally so concurrent/stale reads can't
+      // drop a key; capped defensively at MAX_APPLY_PHOTOS.
+      setAnswers(prev => {
+        const merged = [...parsePhotoKeys(prev), ...added.map(a => a.key)].slice(0, MAX_APPLY_PHOTOS);
+        return { ...prev, 'photos.urls': JSON.stringify(merged) };
+      });
+    }
+    if (uploadProblem) setPhotoError(uploadProblem);
   }
 
-  function removePhoto(index: number) {
-    const url = photoPreviewUrls[index];
-    if (url) URL.revokeObjectURL(url);
-    setPhotoFiles(prev => prev.filter((_, i) => i !== index));
-    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  function removePhoto(key: string) {
+    setAnswers(prev => {
+      const next = parsePhotoKeys(prev).filter(k => k !== key);
+      return { ...prev, 'photos.urls': JSON.stringify(next) };
+    });
+    setPhotoPreviews(prev => {
+      const url = prev[key];
+      if (url) URL.revokeObjectURL(url);
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
     setPhotoError('');
   }
 
@@ -1119,33 +1129,12 @@ export default function MembershipForm({
     setError('');
     setIsLoading(true);
     try {
-      // Upload returns a private R2 object key (not a public URL); the operator
-      // review surfaces resolve it through the role-gated presign proxy.
-      // A failed upload must NOT be silently swallowed — losing a photo the
-      // applicant chose to share is a data-loss bug. Surface it and block the
-      // submission so they can retry, rather than landing an empty photo key.
-      const uploadedUrls: string[] = [];
-      for (const file of photoFiles) {
-        try {
-          const fd = new FormData();
-          fd.append('file', file);
-          const r = await fetch('/api/apply/membership/upload', { method: 'POST', body: fd });
-          if (!r.ok) {
-            const detail = await r.json().catch(() => null);
-            throw new Error(detail?.error || `Photo upload failed (${r.status}).`);
-          }
-          const { key } = await r.json();
-          if (!key) throw new Error('Photo upload failed.');
-          uploadedUrls.push(key);
-        } catch (uploadErr) {
-          console.error('[apply/photo-upload]', uploadErr);
-          throw new Error(
-            uploadErr instanceof Error && uploadErr.message
-              ? `${uploadErr.message} Please try a different photo or remove it and resubmit.`
-              : 'One of your photos could not be uploaded. Please try a different photo or remove it and resubmit.',
-          );
-        }
-      }
+      // Photos were uploaded on pick and their private R2 keys persisted in
+      // answers['photos.urls'] (autosaved with the draft). Submit uses that already
+      // persisted list directly — no re-upload — so a resumed/reloaded draft submits
+      // the exact photos it saved. The keys are private object keys (not public
+      // URLs); operator review resolves them through the role-gated presign proxy.
+      const uploadedUrls = parsePhotoKeys(answers);
 
       const patchRes = await fetch(`/api/apply/membership/${applicationId}`, {
         method: 'PATCH',
@@ -1185,11 +1174,11 @@ export default function MembershipForm({
   // resolves either way and finally clears the ref (a successful submit unmounts this
   // page, making the reset a harmless no-op).
   async function guardedSubmit() {
-    // Photo backstop: a resumed draft can land directly on House Rules with the
-    // picker empty (File objects never survive a reload). Send the applicant
-    // back to the photo page instead of submitting a photo-less application.
+    // Photo backstop: only a genuinely photo-less draft is sent back to the photo
+    // page. Photos now persist in answers['photos.urls'] (uploaded on pick), so a
+    // resumed/reloaded draft that already has photos passes this check.
     // Demo mode keeps its no-validation walkthrough. handleSubmit is unchanged.
-    if (!isDemo && !previewMode && PHOTO_REQUIRED && photoFiles.length === 0) {
+    if (!isDemo && !previewMode && PHOTO_REQUIRED && parsePhotoKeys(answers).length === 0) {
       setError('Please add at least one photo to finish your application.');
       advance(PHOTO_PAGE_INDEX);
       return;
@@ -1341,6 +1330,12 @@ export default function MembershipForm({
   const openerPhrase = (submitResult?.openerPhrase ?? '').trim();
   const openerClause = submitResult ? natureOpenerClause(submitResult.archetype) : '';
 
+  // Reveal B2: the AI-written blend subline, shown beneath the nature hero ONLY
+  // when the top two natures are close (server gates it on BLEND_CLOSE_THRESHOLD
+  // and sends '' when the gap is wide). Additive, not persisted — present only on
+  // the fresh post-submit reveal, absent on legacy rows.
+  const revealSubline = (submitResult?.subline ?? '').trim();
+
   // DECISIVE blend + secondary from the persisted tally (never recomputed from the
   // flattened archetypeScores). Absent on legacy rows → the blend line + meter hide.
   const revealBlend = submitResult?.blend ?? null;
@@ -1411,52 +1406,80 @@ export default function MembershipForm({
   function renderSimpleInput(q: Question, key: string, showHint = false) {
     const value = answers[key] ?? '';
     if (q.type === 'photo') {
-      const atCapacity = photoFiles.length >= MAX_APPLY_PHOTOS;
+      const photoKeys = parsePhotoKeys(answers);
+      const atCapacity = photoKeys.length >= MAX_APPLY_PHOTOS;
       return (
         <div>
-          {photoPreviewUrls.length > 0 && (
+          {photoKeys.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
-              {photoPreviewUrls.map((url, i) => (
-                <div key={url} style={{ position: 'relative', width: 96, height: 96 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview, not a remote asset */}
-                  <img
-                    src={url}
-                    alt={`Your photo ${i + 1}`}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      display: 'block',
-                      border: `1px solid ${theme.border}`,
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(i)}
-                    aria-label={`Remove photo ${i + 1}`}
-                    style={{
-                      position: 'absolute',
-                      top: -10,
-                      right: -10,
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      background: theme.text,
-                      color: theme.bg,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 15,
-                      lineHeight: 1,
-                      fontFamily: bodyFont,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))}
+              {photoKeys.map((photoKey, i) => {
+                const preview = photoPreviews[photoKey];
+                return (
+                  <div key={photoKey} style={{ position: 'relative', width: 96, height: 96 }}>
+                    {preview ? (
+                      /* eslint-disable-next-line @next/next/no-img-element -- local blob preview, not a remote asset */
+                      <img
+                        src={preview}
+                        alt={`Your photo ${i + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block',
+                          border: `1px solid ${theme.border}`,
+                        }}
+                      />
+                    ) : (
+                      /* Reloaded photo: the R2 key is private, so we show a saved
+                         placeholder rather than fetching the image back. */
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: `1px solid ${theme.border}`,
+                          background: theme.bg,
+                          fontFamily: bodyFont,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          color: theme.muted,
+                        }}
+                      >
+                        Saved
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(photoKey)}
+                      aria-label={`Remove photo ${i + 1}`}
+                      style={{
+                        position: 'absolute',
+                        top: -10,
+                        right: -10,
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        background: theme.text,
+                        color: theme.bg,
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 15,
+                        lineHeight: 1,
+                        fontFamily: bodyFont,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
           <input
@@ -1465,18 +1488,22 @@ export default function MembershipForm({
             accept="image/jpeg,image/png,image/webp"
             multiple
             style={{ display: 'none' }}
-            onChange={e => { addPhotoFiles(e.target.files); e.currentTarget.value = ''; }}
+            onChange={e => {
+              const picked = e.target.files ? Array.from(e.target.files) : [];
+              e.currentTarget.value = '';
+              void addPhotoFiles(picked);
+            }}
           />
           <button
             type="button"
             id={key}
             onClick={() => document.getElementById(`${key}-input`)?.click()}
-            disabled={atCapacity}
+            disabled={atCapacity || photosUploading}
             onFocus={() => setFocusedField(key)}
             onBlur={() => setFocusedField(null)}
             style={{
               background: 'transparent',
-              color: atCapacity ? theme.muted : theme.text,
+              color: atCapacity || photosUploading ? theme.muted : theme.text,
               border: `1.5px solid ${focusedField === key ? theme.accent : theme.border}`,
               borderRadius: 0,
               padding: '0 24px',
@@ -1486,14 +1513,20 @@ export default function MembershipForm({
               fontWeight: 500,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              cursor: atCapacity ? 'not-allowed' : 'pointer',
+              cursor: atCapacity || photosUploading ? 'not-allowed' : 'pointer',
               transition: 'border-color 200ms ease, color 200ms ease',
             }}
           >
-            {atCapacity ? 'photo limit reached' : photoFiles.length > 0 ? '+ add another photo' : '+ add photos'}
+            {photosUploading
+              ? 'uploading...'
+              : atCapacity
+                ? 'photo limit reached'
+                : photoKeys.length > 0
+                  ? '+ add another photo'
+                  : '+ add photos'}
           </button>
           <p style={{ fontFamily: bodyFont, fontSize: 12, color: theme.muted, margin: '10px 0 0 0', letterSpacing: '0.04em' }}>
-            {photoFiles.length} of {MAX_APPLY_PHOTOS} added
+            {photoKeys.length} of {MAX_APPLY_PHOTOS} added
           </p>
           {photoError && (
             <p role="alert" style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, margin: '10px 0 0 0' }}>
@@ -1824,8 +1857,8 @@ export default function MembershipForm({
           }
         }
       } else if (q.type === 'photo') {
-        // Photos are Files in state, not answers - required means at least one.
-        if (q.required && photoFiles.length === 0) {
+        // Photos persist under answers['photos.urls'] - required means at least one.
+        if (q.required && parsePhotoKeys(answers).length === 0) {
           missing.push({ key: q.id, label: q.label });
         }
       } else if (q.required) {
@@ -2133,12 +2166,15 @@ export default function MembershipForm({
         </div>
       )}
 
-      {/* Header */}
+      {/* Header. On the reveal step the sticky bar is forced to the reveal's own
+          dark surface so it doesn't render as a white/cream strip above the dark
+          reveal in day mode — scoped to REVEAL_STEP only, so day/night on every
+          other step is unchanged (no leak). */}
       <nav style={{
         position: 'sticky', top: 0, left: 0, right: 0, zIndex: 50,
         height: 56, padding: '0 24px', paddingTop: 'env(safe-area-inset-top)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: theme.bg,
+        background: step === REVEAL_STEP ? 'var(--bg-reveal)' : theme.bg,
       }}>
         <Link href="/" style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 400, fontStyle: 'italic', color: theme.accent, textDecoration: 'none', letterSpacing: '0.02em' }}>The No Bad Company</Link>
         <button onClick={() => setIsNight(n => !n)} style={{
@@ -2360,9 +2396,9 @@ export default function MembershipForm({
               }}>
                 {/* Nature art — the primary nature's line illustration, mapped by
                     stored enum → /public/archetypes/{enum}.png (see the README there).
-                    The art is black linework on cream; mix-blend-mode: multiply drops
-                    the cream optically against the reveal background (never recolor or
-                    knock out the file). Hides itself until the art is dropped in. */}
+                    Rendered at normal blend (art-agnostic — do not assume a cream
+                    plate that needs multiplying out). Hides itself if the file is
+                    missing. */}
                 {/* eslint-disable-next-line @next/next/no-img-element -- static per-nature art from /public, not a remote asset */}
                 <img
                   src={archetypeArtSrc(submitResult.archetype)}
@@ -2373,7 +2409,6 @@ export default function MembershipForm({
                     width: 'clamp(120px, 20vw, 200px)',
                     height: 'auto',
                     marginBottom: 24,
-                    mixBlendMode: 'multiply',
                     animation: 'fadeInUp 500ms ease 0ms forwards',
                     opacity: 0,
                   }}
@@ -2381,9 +2416,11 @@ export default function MembershipForm({
 
                 {openerPhrase ? (
                   <>
-                    {/* Reveal B layer 1 — opens on the member's OWN Q6 self-image phrase
-                        (honored verbatim, never contradicted), then names + explains the
-                        nature through it. Phrase-first, not label-first. */}
+                    {/* Reveal B layer 1 (B1) — the NATURE is the hero. The member's own
+                        Q6 self-image phrase (honored verbatim) demotes to the supporting
+                        eyebrow; the nature display-name is the largest word on the screen
+                        (display-name only, never the stored enum). The per-nature clause
+                        then explains it, standing on its own sentence. */}
                     <span style={{
                       fontFamily: bodyFont,
                       fontSize: 11,
@@ -2391,27 +2428,28 @@ export default function MembershipForm({
                       color: THEME.night.muted,
                       letterSpacing: '0.12em',
                       textTransform: 'uppercase',
+                      lineHeight: 1.5,
                       marginBottom: 16,
                       display: 'block',
                       animation: 'fadeInUp 500ms ease 0ms forwards',
                       opacity: 0,
                     }}>
-                      AT YOUR BEST, YOU&apos;RE
+                      AT YOUR BEST, YOU&apos;RE {openerPhrase}
                     </span>
 
                     <h1 style={{
                       fontFamily: displayFont,
-                      fontSize: 'clamp(40px, 6vw, 84px)',
+                      fontSize: 'clamp(56px, 9vw, 128px)',
                       fontWeight: 400,
                       fontStyle: 'italic',
                       color: THEME.night.text,
-                      lineHeight: 1.02,
+                      lineHeight: 0.95,
                       margin: '0 0 24px 0',
                       overflowWrap: 'break-word',
                       animation: 'fadeInUp 500ms ease 0ms forwards',
                       opacity: 0,
                     }}>
-                      {openerPhrase}
+                      {revealDisplayName}
                     </h1>
 
                     <p style={{
@@ -2426,8 +2464,7 @@ export default function MembershipForm({
                       animation: 'fadeInUp 500ms ease 400ms forwards',
                       opacity: 0,
                     }}>
-                      And because you&apos;re a{' '}
-                      <span style={{ color: THEME.night.accent }}>{revealDisplayName}</span>, {openerClause}.
+                      {ucFirst(openerClause)}.
                     </p>
                   </>
                 ) : (
@@ -2464,6 +2501,25 @@ export default function MembershipForm({
                       {revealDisplayName}
                     </h1>
                   </>
+                )}
+
+                {/* B2 — AI blend subline, beneath the hero. Only present when the
+                    server judged the top two natures close (empty otherwise). */}
+                {revealSubline && (
+                  <p style={{
+                    fontFamily: displayFont,
+                    fontSize: 'clamp(18px, 2.2vw, 24px)',
+                    fontWeight: 400,
+                    fontStyle: 'italic',
+                    color: THEME.night.muted,
+                    maxWidth: 560,
+                    margin: '0 0 20px 0',
+                    lineHeight: 1.45,
+                    animation: 'fadeInUp 500ms ease 200ms forwards',
+                    opacity: 0,
+                  }}>
+                    {revealSubline}
+                  </p>
                 )}
 
                 {/* oneLiner pulled out as the identity line. */}
@@ -2629,11 +2685,10 @@ export default function MembershipForm({
                     animation: 'fadeInUp 500ms ease 1900ms forwards',
                     opacity: 0,
                   }}>
-                    Your application is in. We read every one. We&apos;ll be in touch. &#x1F5A4;
+                    Your profile is in. We read every one. We&apos;ll be in touch. &#x1F5A4;
                   </p>
                 )}
 
-                {submitResult.memberQrCode && <QrReveal code={submitResult.memberQrCode} />}
               </div>
 
               {/* Right Column — 42%, sticky on desktop */}

@@ -439,6 +439,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     openerPhrase: result.openerPhrase,
     habitatThrive: result.habitatThrive,
     habitatDim: result.habitatDim,
+    // B2: the blend subline. Additive + NOT persisted (no column) — present only on
+    // this fresh post-submit reveal; the cached/replay paths above omit it, and a
+    // re-visit routes to "Application received" (never the full reveal).
+    subline: result.subline ?? '',
     rsvpId: door1RsvpId,
     memberQrCode: door1MemberQrCode,
   });

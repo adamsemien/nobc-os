@@ -54,6 +54,7 @@ const yesScore = (): ScoringResult => ({
   habitatThrive: null,
   habitatDim: null,
   personalNote: null,
+  subline: null,
 });
 
 describeDb("Gate Engine M1 acceptance (real rows on ep-sweet-term)", () => {

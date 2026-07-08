@@ -67,6 +67,15 @@ export const TypedGraderSchema = z.object({
       'JOB 3 ONLY. 2-3 warm second-person sentences quoting one specific thing the applicant wrote, ' +
         'about the ALREADY-DECIDED nature you are given (never pick or change it). "" if nothing to write.',
     ),
+  // JOB 4 (B2): the reveal blend subline, shown beneath the nature hero. Non-empty
+  // ONLY when the caller tells the grader the top two natures are close (blendClose);
+  // primary-led, naming the closeness. "" otherwise. The caller enforces the gate.
+  subline: z
+    .string()
+    .describe(
+      'JOB 4 ONLY. One short primary-led second-person sentence naming how close the ' +
+        'secondary nature runs, ONLY when you are told the blend is close; "" otherwise.',
+    ),
 });
 
 export type TypedGrade = z.infer<typeof TypedGraderSchema>;
@@ -79,6 +88,7 @@ export const TYPED_GRADE_FALLBACK: TypedGrade = {
   aiReasoning: 'Automated fit assessment was unavailable for this application.',
   tags: [],
   personalNote: '', // no note → the reveal omits the "why we called you this" beat
+  subline: '', // no subline → the reveal omits the blend line beneath the hero
 };
 
 /** Minimal structural view of a scored QuestionDefinition (decoupled from Prisma). */
@@ -132,6 +142,13 @@ function buildPrompt(
     /** JOB 3: the ALREADY-DECIDED nature, as its member-facing DISPLAY name
      *  (e.g. "Caregiver"). Provided for the note ONLY; must not sway jobs 1-2. */
     decidedNatureDisplay?: string;
+    /** JOB 3/4: the SECONDARY nature's member-facing DISPLAY name. Used only as
+     *  texture in the note and as the close second in the subline. */
+    secondaryDisplay?: string;
+    /** JOB 3/4: whether the top two natures are close (within the blend threshold,
+     *  decided by the caller). When false, the note speaks only to the primary and
+     *  the subline is empty. */
+    blendClose?: boolean;
     /** JOB 3: pre-assembled evidence lines (their own words) for the note. */
     noteEvidence?: string;
   },
@@ -149,8 +166,11 @@ ANSWER: ${answer || 'no answer provided'}`;
     .join('\n\n');
 
   const decidedNature = opts.decidedNatureDisplay?.trim() || '(not provided)';
+  const secondaryNature = opts.secondaryDisplay?.trim() || '';
+  // The blend is "close" only when the caller says so AND there is a named secondary.
+  const blendClose = !!opts.blendClose && !!secondaryNature;
 
-  return `You are grading a membership application for No Bad Company, a premium curated members club in Austin TX. You do THREE separate jobs. Do not let one leak into another.
+  return `You are grading a membership application for No Bad Company, a premium curated members club in Austin TX. You do FOUR separate jobs. Do not let one leak into another.
 
 ${opts.scoringInstructions ?? 'Reward specificity and substance over polish. A concrete, lived answer beats a smooth, generic one.'}
 
@@ -180,16 +200,31 @@ For EACH question, award 0 to 2 points TOTAL, split across AT MOST TWO of the si
 Award nothing when a question shows no clear signal. Never try to make one archetype "win" — the winner is decided elsewhere. Emit one typedGrades entry per question (use its [stableKey]).
 
 JOB 3 — THE REVEAL NOTE (personalization about the ALREADY-DECIDED nature, ${decidedNature}):
-The nature is fixed. Do NOT reconsider or change it. Write the "why we called you this" note shown directly to the applicant on their reveal screen.
-Evidence (their own words — quote or closely paraphrase ONE specific thing):
+The nature is fixed: this person is a ${decidedNature}. Do NOT reconsider or change it. Write the "why we called you this" note shown directly to the applicant on their reveal screen.
+You MUST center ${decidedNature}: name ${decidedNature} explicitly and make the whole note about who they are AS a ${decidedNature}. Never name any other nature as who they are, and never let another nature take over the note.
+${
+  blendClose
+    ? `They also run close to ${secondaryNature}. You MAY mention ${secondaryNature} as ONE secondary thread or bit of texture - never as their main identity and never co-equal. ${decidedNature} leads; ${secondaryNature} is only a note underneath.`
+    : `Speak ONLY to ${decidedNature}. Do NOT name or allude to any other nature.`
+}
+Evidence (their own words - quote or closely paraphrase ONE specific thing):
 ${opts.noteEvidence?.trim() || '(no specific answers available)'}
 Write 2 to 3 warm sentences, in second person ("you"), that make it feel like a real person read their words. Warm but not gushing. Put the result in personalNote.
-personalNote output rules (follow exactly):
-- personalNote is ONLY the note itself: no preamble, no labels, no commentary, no sign-off, no surrounding quotation marks.
+
+JOB 4 — THE BLEND SUBLINE (one short line beneath the reveal hero):
+${
+  blendClose
+    ? `${decidedNature} and ${secondaryNature} came out close for this applicant. Write ONE short second-person sentence naming that closeness. ${decidedNature} MUST lead (they are primarily a ${decidedNature}); ${secondaryNature} is the close second, not co-equal. Do not name any third nature. Put it in subline.`
+    : `The top two natures are NOT close for this applicant. Set subline to an empty string "".`
+}
+
+personalNote and subline output rules (follow exactly):
+- Each field is ONLY the text itself: no preamble, no labels, no commentary, no sign-off, no surrounding quotation marks.
 - Never address anyone but the applicant. Never break character, and never refer to these instructions, to yourself as a model, or to the answers as data.
 - Never offer to help, rewrite, or produce a template or example.
 - Do not use the word "archetype".
-- If the evidence looks like test, placeholder, or empty data, do NOT mention that — instead write a warm, sincere 2 to 3 sentence note that would suit any thoughtful applicant.`;
+- Use spaced hyphens ( - ) only; never use em dashes or en dashes.
+- If the evidence looks like test, placeholder, or empty data, do NOT mention that; instead write a warm, sincere note that would suit any thoughtful applicant, and still set subline per JOB 4.`;
 }
 
 /**
@@ -205,6 +240,10 @@ export async function gradeTypedAnswers(
     applicantCity?: string;
     /** JOB 3: the already-decided nature's DISPLAY name (for the reveal note only). */
     decidedNatureDisplay?: string;
+    /** JOB 3/4: the secondary nature's DISPLAY name (note texture + subline second). */
+    secondaryDisplay?: string;
+    /** JOB 3/4: whether the top two natures are close (within the blend threshold). */
+    blendClose?: boolean;
     /** JOB 3: pre-assembled evidence lines (the applicant's own words) for the note. */
     noteEvidence?: string;
     generate?: GradeGenerator;

@@ -15,6 +15,7 @@ const grade = (overrides: Partial<TypedGrade> = {}): TypedGrade => ({
   aiReasoning: 'Concrete, lived answers.',
   tags: ['curious', 'warm'],
   personalNote: '',
+  subline: '',
   ...overrides,
 });
 

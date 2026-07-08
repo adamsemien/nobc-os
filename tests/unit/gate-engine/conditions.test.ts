@@ -154,6 +154,7 @@ describe("ANSWER_QUESTIONS verifier", () => {
     habitatThrive: null,
     habitatDim: null,
     personalNote: null,
+    subline: null,
     ...overrides,
   });
 

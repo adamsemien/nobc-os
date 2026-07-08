@@ -4,7 +4,7 @@ import { useState, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { SignUp, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import { Mic, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 const displayFont = "'PP Editorial New', Georgia, serif";
 const bodyFont = "'Neue Haas Grotesk Display Pro', 'Helvetica Neue', Arial, sans-serif";
@@ -146,18 +146,6 @@ export default function ApplyAccountGate() {
     color: 'var(--text-secondary)',
     margin: '0 0 18px 0',
   };
-  // Confirm-view mic keeps the original treatment so the signed-in view stays
-  // byte-identical.
-  const micIconStyle: CSSProperties = { verticalAlign: '-0.15em', marginRight: 6 };
-  // Door mic is inlined and baseline-aligned so it reads as part of the sentence,
-  // not orphaned above it - Tailwind preflight sets svg { display: block }, so the
-  // inline-block override is load-bearing here.
-  const doorMicStyle: CSSProperties = {
-    display: 'inline-block',
-    verticalAlign: '-0.15em',
-    marginRight: 6,
-    color: 'var(--text-tertiary)',
-  };
   // "To begin" marker eyebrow — same token/treatment as the hero "Membership"
   // eyebrow (red, 11px, 500, uppercase, 0.12em), reused as the action marker.
   const markerEyebrowStyle: CSSProperties = {
@@ -181,15 +169,15 @@ export default function ApplyAccountGate() {
   const beginDisabled = !verifiedEmail || submitting;
 
   // The editorial sell copy — one source of truth, reused by both the signed-out
-  // door (near-black body + inline mic) and the signed-in confirm view (original
-  // muted body + original mic, kept byte-identical). Copy is verbatim.
-  const renderCopy = (bodyColor: string, micStyle: CSSProperties, micSize: number) => (
+  // door (near-black body) and the signed-in confirm view (muted body). Copy is
+  // verbatim.
+  const renderCopy = (bodyColor: string) => (
     <>
       <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 500, color: 'var(--primary)', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
         Membership
       </span>
       <h1 style={{ fontFamily: displayFont, fontSize: 'clamp(34px, 5vw, 52px)', fontStyle: 'italic', lineHeight: 1.1, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>
-        Apply to No Bad Company
+        Join No Bad Company
       </h1>
       <p style={{ ...sellStyle, color: bodyColor }}>
         Think of this as a profile, not an application. The better we know you, the better we can
@@ -203,9 +191,7 @@ export default function ApplyAccountGate() {
       </p>
       <p style={{ ...sellStyle, color: bodyColor }}>
         Works best on a laptop if you&apos;ve got one - and there are no wrong answers, so take your
-        time and answer in your own voice. You can even{' '}
-        <Mic size={micSize} strokeWidth={1.75} aria-hidden="true" style={micStyle} />
-        tap the mic and just talk.
+        time and answer in your own voice. You can even talk your answers instead of typing.
       </p>
       <p style={{ ...sellStyle, color: bodyColor }}>
         Create an account first so your progress saves and you can pick up from any device.
@@ -223,7 +209,7 @@ export default function ApplyAccountGate() {
         <style>{doorCss}</style>
         <div className="apply-door">
           <div className="apply-door-read">
-            {renderCopy('var(--text-primary)', doorMicStyle, 16)}
+            {renderCopy('var(--text-primary)')}
 
             {/* A quiet way back for someone who already applied. */}
             <p style={{ fontFamily: bodyFont, fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 32px 0' }}>
@@ -260,7 +246,7 @@ export default function ApplyAccountGate() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: 'clamp(48px, 8vw, 96px) 24px' }}>
       <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
-        {renderCopy('var(--text-secondary)', micIconStyle, 15)}
+        {renderCopy('var(--text-secondary)')}
 
         {isLoaded && isSignedIn && (
           <div>

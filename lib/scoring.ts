@@ -44,6 +44,18 @@ import {
 import { archetypeDisplayName } from '@/config/archetypes';
 import { assembleNoteEvidence, sanitizeNote } from '@/lib/applications/personal-note';
 
+// B2/B3: the top two natures count as a "close blend" when their decisive tally
+// percentages are within this many points. Single source of truth for both the
+// blend-aware reveal note (grader JOB 3) and the blend subline (JOB 4).
+const BLEND_CLOSE_THRESHOLD = 15;
+
+/** B7: normalize em/en dashes to spaced hyphens in member-facing AI text — a
+ *  belt-and-suspenders pass alongside the grader prompt constraint (models still
+ *  emit dashes). Member copy law is spaced hyphens, never em dashes. */
+function toSpacedHyphens(s: string): string {
+  return s.replace(/\s*[—–]\s*/g, ' - ');
+}
+
 const STORED_ARCHETYPE_ENUM = z.enum(['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark']);
 
 export const ScoringResultSchema = z.object({
@@ -73,6 +85,10 @@ export const ScoringResultSchema = z.object({
   habitatDim: z.string().nullable(),
   /** Folded reveal note (grader JOB 3), sanitized; null → reveal omits the beat. */
   personalNote: z.string().nullable(),
+  /** B2 blend subline (grader JOB 4), shown beneath the reveal hero. Non-empty only
+   *  when the top two natures are within BLEND_CLOSE_THRESHOLD; null/"" → omitted.
+   *  Additive + NOT persisted — present on the fresh post-submit reveal only. */
+  subline: z.string().nullable(),
 });
 
 export type ScoringResult = z.infer<typeof ScoringResultSchema>;
@@ -92,6 +108,7 @@ const FALLBACK: ScoringResult = {
   habitatThrive: null,
   habitatDim: null,
   personalNote: null,
+  subline: null,
 };
 
 /** Resolve which ApplicationTemplate (and its questions) governs an application. */
@@ -215,6 +232,10 @@ export async function scoreApplication(applicationId: string): Promise<ScoringRe
     // nature equals the FINAL primary in every floor-locked case.
     const tapTally = computeInRoomTally(inRoomAnswers, optionsById);
     const decidedNature = tapTally.primary;
+    // B2/B3: is the top-two blend close enough to earn a blend-aware note + subline?
+    // Read from the TAP tally (grader-time; the note + subline are written about the
+    // tap-decided nature — the Phase-5 invariant), against the single threshold.
+    const blendClose = tapTally.blend.primary - tapTally.blend.secondary <= BLEND_CLOSE_THRESHOLD;
 
     // (C) ONE temp-0 grader call: FIT + typed awards + the FOLDED reveal note about the
     // already-decided nature. The nature enters the prompt for the note (JOB 3) only.
@@ -233,12 +254,21 @@ export async function scoreApplication(applicationId: string): Promise<ScoringRe
       applicantName: application.fullName,
       applicantCity: application.city ?? undefined,
       decidedNatureDisplay: archetypeDisplayName(decidedNature),
+      secondaryDisplay: archetypeDisplayName(tapTally.secondary),
+      blendClose,
       noteEvidence: assembleNoteEvidence(decidedNature, answersByKey),
     });
     const typedScores = aggregateTypedScores(grade.typedGrades);
     // Guard the folded note as the standalone writer did: strip model meta-commentary,
-    // empty → null so the reveal omits the "why we called you this" beat gracefully.
-    const personalNote = sanitizeNote(grade.personalNote ?? '');
+    // empty → the reveal omits the "why we called you this" beat gracefully. B7:
+    // normalize any em dashes the model still emits to spaced hyphens.
+    const sanitizedNote = sanitizeNote(grade.personalNote ?? '');
+    const personalNote = sanitizedNote ? toSpacedHyphens(sanitizedNote) : sanitizedNote;
+    // B2: the blend subline. Belt-and-suspenders — force '' unless the blend is close
+    // (even if the model emitted one anyway), strip any wrapping quotes, normalize dashes.
+    const subline = blendClose
+      ? toSpacedHyphens((grade.subline ?? '').trim().replace(/^["']+|["']+$/g, ''))
+      : '';
 
     // (D) FINAL tally with the typed seam; (E) combined = tap + typed.
     const tally = computeInRoomTally(inRoomAnswers, optionsById, typedScores);
@@ -272,6 +302,7 @@ export async function scoreApplication(applicationId: string): Promise<ScoringRe
       habitatThrive,
       habitatDim,
       personalNote,
+      subline,
     };
   } catch (e) {
     console.error('[scoreApplication] scoring failed:', e);
