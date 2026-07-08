@@ -2,8 +2,6 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { render } from '@react-email/render';
 import { db } from '@/lib/db';
 import { resend } from '@/lib/resend';
-import { anthropic } from '@ai-sdk/anthropic';
-import { generateText } from 'ai';
 import { scoreApplication } from '@/lib/scoring';
 import { checkDuplicate, checkWatchList } from '@/lib/watchlist';
 import { resolveMember, promoteMemberToApproved } from '@/lib/member-identity';
@@ -15,10 +13,31 @@ import { auth } from '@clerk/nextjs/server';
 import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
 import { isApplicationAccountOwner } from '@/lib/apply-account-link';
-import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
-import { buildPersonalNote } from '@/lib/applications/personal-note';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 import { sendGuestAccessConfirmation } from '@/emails/GuestAccessConfirmation';
+
+/** Shape the persisted Reveal B columns into the reveal payload. Nullable on legacy
+ *  rows scored before Phase 5 — the reveal degrades gracefully (opener/habitat
+ *  omitted, blend meter hidden) rather than falling back to the flattened vector. */
+function revealFieldsFromRow(row: {
+  revealSecondary: string | null;
+  revealBlendPrimary: number | null;
+  revealBlendSecondary: number | null;
+  revealOpenerPhrase: string | null;
+  revealHabitatThrive: string | null;
+  revealHabitatDim: string | null;
+}) {
+  return {
+    secondary: row.revealSecondary,
+    blend:
+      row.revealBlendPrimary != null
+        ? { primary: row.revealBlendPrimary, secondary: row.revealBlendSecondary ?? 0 }
+        : null,
+    openerPhrase: row.revealOpenerPhrase,
+    habitatThrive: row.revealHabitatThrive,
+    habitatDim: row.revealHabitatDim,
+  };
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Abuse protection: cap submit floods before any DB / Anthropic / Resend work.
@@ -68,6 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       archetypeScores: (application.archetypeScores ?? {}) as Record<string, number>,
       tags: application.aiTags,
       personalNote: application.personalNote ?? application.personalizedCopy ?? '',
+      ...revealFieldsFromRow(application),
     });
   }
   // A terminal status with no score means the BLOCKED auto-reject path already
@@ -111,6 +131,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       aiTags: true,
       personalNote: true,
       personalizedCopy: true,
+      revealSecondary: true,
+      revealBlendPrimary: true,
+      revealBlendSecondary: true,
+      revealOpenerPhrase: true,
+      revealHabitatThrive: true,
+      revealHabitatDim: true,
     },
   });
   if (locked && locked.aiScore !== null) {
@@ -120,6 +146,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       archetypeScores: (locked.archetypeScores ?? {}) as Record<string, number>,
       tags: locked.aiTags,
       personalNote: locked.personalNote ?? locked.personalizedCopy ?? '',
+      ...revealFieldsFromRow(locked),
     });
   }
   if (locked && locked.status === 'REJECTED') {
@@ -215,33 +242,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Question-agnostic AI scoring — driven by the template's QuestionDefinitions.
+  // Phase 5: scoreApplication now ALSO returns the reveal-note (folded into the
+  // grader, no second AI call) and the decisive tally output (secondary, blend,
+  // Q6 openerPhrase, templated Q4/Q5 habitat labels) that the reveal reads verbatim.
   const result = await scoreApplication(id);
-
-  // Build the answer lookup once: bare keys for simple fields, dotted keys for
-  // group sub-fields (referrals.referral1First, ...). resolveAnswer joins the
-  // referrals sub-fields back into one string.
-  const answersByKey: Record<string, string> = {};
-  for (const a of application.answers) answersByKey[a.questionKey] = a.answer;
-
-  // Reveal "Why we called you this" note. buildPersonalNote assembles the only
-  // evidence the note quotes from (what people come to them for, what they do
-  // walking into a room, and the single highest-signal answer for their top
-  // archetype), calls the model once, and guards the draft: it is shown verbatim
-  // on the reveal, so any model preamble is stripped and any failure yields null
-  // (the reveal omits the beat gracefully). The LOCKED JUDGMENT_MODEL wiring
-  // stays here at the call site; the deterministic logic lives in the helper.
-  const personalNote = await buildPersonalNote({
-    archetype: result.archetype,
-    answersByKey,
-    generate: async (prompt) => {
-      const { text } = await generateText({
-        model: anthropic(JUDGMENT_MODEL),
-        prompt,
-        maxOutputTokens: 220,
-      });
-      return text;
-    },
-  });
+  const personalNote = result.personalNote;
 
   await db.application.update({
     where: { id },
@@ -257,6 +262,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // The six-archetype reveal writes personalNote; personalizedCopy is no
       // longer written for new applications (legacy rows keep theirs).
       personalNote,
+      // Reveal B (Phase 5): persist the decisive tally output the reveal reads.
+      // (primary nature = archetype above.)
+      revealSecondary: result.secondary,
+      revealBlendPrimary: result.blend.primary,
+      revealBlendSecondary: result.blend.secondary,
+      revealOpenerPhrase: result.openerPhrase,
+      revealHabitatThrive: result.habitatThrive,
+      revealHabitatDim: result.habitatDim,
     },
   });
 
@@ -420,6 +433,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     memberWorthTotal: result.memberWorthTotal,
     tags: result.tags,
     personalNote: personalNote ?? '',
+    // Reveal B (Phase 5): the decisive tally output the reveal reads verbatim.
+    secondary: result.secondary,
+    blend: result.blend,
+    openerPhrase: result.openerPhrase,
+    habitatThrive: result.habitatThrive,
+    habitatDim: result.habitatDim,
     rsvpId: door1RsvpId,
     memberQrCode: door1MemberQrCode,
   });

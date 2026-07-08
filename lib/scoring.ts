@@ -1,10 +1,18 @@
-/** Membership application scoring (Apply Scoring v2 — inverted, Phase 3).
+/** Membership application scoring (Apply Scoring v2 — inverted, Phase 3; Reveal B, Phase 5).
  *
  *  CLASSIFICATION is deterministic: the six In-A-Room tap questions feed the pure
  *  tally in `lib/scoring/inRoomTally.ts`, which decides the nature. FIT stays AI:
  *  one temperature-0 Sonnet call (`gradeTypedAnswers`) judges memberWorthTotal /
- *  aiRecommendation / aiReasoning / tags on the typed questions, independent of the
- *  archetype, and also emits per-question typed awards that break genuine tap ties.
+ *  aiRecommendation / aiReasoning / tags on the typed questions, emits per-question
+ *  typed awards that break genuine tap ties, AND (Phase 5) writes the reveal note
+ *  about the already-decided nature it is given — folding the former second AI call
+ *  in, so scoring is still ONE model call. See gradeTypedAnswers for the independence
+ *  note (the nature is passed for the note only).
+ *
+ *  REVEAL B (Phase 5): scoreApplication also returns + the submit route persists the
+ *  decisive tally output the reveal reads verbatim — secondary, the decisive `blend`
+ *  (from raw combined points, NOT the normalized vector), the Q6 openerPhrase, the
+ *  templated Q4/Q5 habitat labels, and the folded personalNote.
  *
  *  The normalized `archetypeScores` keep the same 0-100-per-archetype scale the
  *  legacy LLM emitted (see `normalizeArchetypeScores`), so `lib/intelligence/worth.ts`
@@ -30,9 +38,16 @@ import {
   aggregateTypedScores,
   type TypedQuestionInput,
 } from '@/lib/scoring/gradeTypedAnswers';
+// Read-only references (frozen modules): the display-name map and the shared
+// note-evidence assembler + meta-commentary guard. Phase 5 folds the reveal note
+// into the grader, so the note evidence is assembled here and passed in.
+import { archetypeDisplayName } from '@/config/archetypes';
+import { assembleNoteEvidence, sanitizeNote } from '@/lib/applications/personal-note';
+
+const STORED_ARCHETYPE_ENUM = z.enum(['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark']);
 
 export const ScoringResultSchema = z.object({
-  archetype: z.enum(['Connector', 'Host', 'Builder', 'Patron', 'Sage', 'Spark']),
+  archetype: STORED_ARCHETYPE_ENUM,
   archetypeScores: z.object({
     Connector: z.number(),
     Host: z.number(),
@@ -45,6 +60,19 @@ export const ScoringResultSchema = z.object({
   aiRecommendation: z.enum(['strong_yes', 'yes', 'unclear', 'no', 'strong_no']),
   aiReasoning: z.string(),
   tags: z.array(z.string()).describe('3-5 short lowercase vibe/identity tags'),
+  // ── Reveal B (Phase 5): the persisted tally output the reveal reads verbatim. ──
+  // `archetype` above is the primary nature; these are the rest of the decision.
+  secondary: STORED_ARCHETYPE_ENUM,
+  /** DECISIVE blend from raw combined tally points (NOT the normalized vector). */
+  blend: z.object({ primary: z.number(), secondary: z.number() }),
+  /** Q6 (bestSelf) openerPhrase — opens the reveal, never contradicted. */
+  openerPhrase: z.string().nullable(),
+  /** Q4 (perfectFriday) picked option label — "your best rooms". */
+  habitatThrive: z.string().nullable(),
+  /** Q5 (skipFriday) picked option label — "rooms that don't deserve you". */
+  habitatDim: z.string().nullable(),
+  /** Folded reveal note (grader JOB 3), sanitized; null → reveal omits the beat. */
+  personalNote: z.string().nullable(),
 });
 
 export type ScoringResult = z.infer<typeof ScoringResultSchema>;
@@ -58,6 +86,12 @@ const FALLBACK: ScoringResult = {
   aiRecommendation: 'unclear',
   aiReasoning: 'Automated scoring was unavailable for this application.',
   tags: [],
+  secondary: 'Sage',
+  blend: { primary: 50, secondary: 50 },
+  openerPhrase: null,
+  habitatThrive: null,
+  habitatDim: null,
+  personalNote: null,
 };
 
 /** Resolve which ApplicationTemplate (and its questions) governs an application. */
@@ -110,16 +144,23 @@ function parseMostLeast(raw: string): MostLeastAnswer | null {
 async function buildInRoomInputs(
   inRoomQuestions: InRoomQuestion[],
   answersByKey: Record<string, string>,
-): Promise<{ optionsById: OptionsById; inRoomAnswers: InRoomAnswers }> {
-  if (inRoomQuestions.length === 0) return { optionsById: {}, inRoomAnswers: {} };
+): Promise<{
+  optionsById: OptionsById;
+  inRoomAnswers: InRoomAnswers;
+  /** id → member-facing option LABEL. Used to build the templated habitat copy
+   *  from the picked Q4/Q5 options (Reveal B, Phase 5). */
+  labelsById: Record<string, string>;
+}> {
+  if (inRoomQuestions.length === 0) return { optionsById: {}, inRoomAnswers: {}, labelsById: {} };
 
   const qById = new Map(inRoomQuestions.map((q) => [q.id, q]));
   const options = await db.questionOption.findMany({
     where: { questionId: { in: inRoomQuestions.map((q) => q.id) } },
-    select: { id: true, questionId: true, archetype: true, points: true, openerPhrase: true },
+    select: { id: true, questionId: true, archetype: true, points: true, openerPhrase: true, label: true },
   });
 
   const optionsById: OptionsById = {};
+  const labelsById: Record<string, string> = {};
   for (const o of options) {
     const q = qById.get(o.questionId);
     if (!q) continue;
@@ -129,6 +170,7 @@ async function buildInRoomInputs(
       openerPhrase: o.openerPhrase,
       stableKey: q.stableKey,
     };
+    labelsById[o.id] = o.label;
   }
 
   const inRoomAnswers: InRoomAnswers = {};
@@ -138,7 +180,7 @@ async function buildInRoomInputs(
     inRoomAnswers[q.stableKey] = q.type === 'most_least' ? parseMostLeast(raw) : raw;
   }
 
-  return { optionsById, inRoomAnswers };
+  return { optionsById, inRoomAnswers, labelsById };
 }
 
 export async function scoreApplication(applicationId: string): Promise<ScoringResult> {
@@ -158,13 +200,24 @@ export async function scoreApplication(applicationId: string): Promise<ScoringRe
     const answersByKey: Record<string, string> = {};
     for (const a of application.answers) answersByKey[a.questionKey] = a.answer;
 
-    // (A) Deterministic classification over the six In-A-Room questions.
+    // (A) Load the six In-A-Room questions + their options (+ labels for habitat).
     const inRoomQuestions: InRoomQuestion[] = questions
       .filter((q) => q.section === 'in-a-room')
       .map((q) => ({ id: q.id, stableKey: q.stableKey, type: q.type }));
-    const { optionsById, inRoomAnswers } = await buildInRoomInputs(inRoomQuestions, answersByKey);
+    const { optionsById, inRoomAnswers, labelsById } = await buildInRoomInputs(
+      inRoomQuestions,
+      answersByKey,
+    );
 
-    // (B) One temp-0 grader call over the typed scored questions: fit + typed awards.
+    // (B) TAP-ONLY tally FIRST → the deterministic nature the grader writes the reveal
+    // note about. Typed grades are NOT consulted here; per §3.3 they can only move the
+    // primary in a genuine near-tie (the floor locks clear tap winners), so the note's
+    // nature equals the FINAL primary in every floor-locked case.
+    const tapTally = computeInRoomTally(inRoomAnswers, optionsById);
+    const decidedNature = tapTally.primary;
+
+    // (C) ONE temp-0 grader call: FIT + typed awards + the FOLDED reveal note about the
+    // already-decided nature. The nature enters the prompt for the note (JOB 3) only.
     const typedQuestions: TypedQuestionInput[] = questions
       .filter((q) => q.scoringDimension)
       .map((q) => ({
@@ -179,18 +232,32 @@ export async function scoreApplication(applicationId: string): Promise<ScoringRe
       scoringInstructions: template?.scoringInstructions ?? null,
       applicantName: application.fullName,
       applicantCity: application.city ?? undefined,
+      decidedNatureDisplay: archetypeDisplayName(decidedNature),
+      noteEvidence: assembleNoteEvidence(decidedNature, answersByKey),
     });
     const typedScores = aggregateTypedScores(grade.typedGrades);
+    // Guard the folded note as the standalone writer did: strip model meta-commentary,
+    // empty → null so the reveal omits the "why we called you this" beat gracefully.
+    const personalNote = sanitizeNote(grade.personalNote ?? '');
 
-    // (C) Tally with the typed seam; (D) combined = tap + typed.
+    // (D) FINAL tally with the typed seam; (E) combined = tap + typed.
     const tally = computeInRoomTally(inRoomAnswers, optionsById, typedScores);
     const combined = zeroArchetypeScores();
     for (const arch of STORED_ARCHETYPES) {
       combined[arch] = tally.tapScores[arch] + typedScores[arch];
     }
 
-    // (E) Normalize → 0-100 vector; magnitude from fit, primary pinned to the top slot.
+    // (F) Normalize → 0-100 vector for operator/worth surfaces + the reveal spectrum.
+    // The reveal BLEND does NOT read this vector (it flattens the top two toward
+    // ~55/45); it reads the DECISIVE tally.blend persisted below.
     const archetypeScores = normalizeArchetypeScores(combined, tally.primary, grade.memberWorthTotal);
+
+    // (G) Templated habitat from the member's LITERAL Q4 (perfectFriday) / Q5
+    // (skipFriday) picks — tap answer is the picked option id → its member-facing label.
+    const q4Id = inRoomAnswers['perfectFriday'];
+    const q5Id = inRoomAnswers['skipFriday'];
+    const habitatThrive = typeof q4Id === 'string' ? labelsById[q4Id] ?? null : null;
+    const habitatDim = typeof q5Id === 'string' ? labelsById[q5Id] ?? null : null;
 
     return {
       archetype: tally.primary,
@@ -199,6 +266,12 @@ export async function scoreApplication(applicationId: string): Promise<ScoringRe
       aiRecommendation: grade.aiRecommendation,
       aiReasoning: grade.aiReasoning,
       tags: grade.tags,
+      secondary: tally.secondary,
+      blend: tally.blend,
+      openerPhrase: tally.openerPhrase,
+      habitatThrive,
+      habitatDim,
+      personalNote,
     };
   } catch (e) {
     console.error('[scoreApplication] scoring failed:', e);

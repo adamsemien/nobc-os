@@ -48,6 +48,12 @@ const yesScore = (): ScoringResult => ({
   aiRecommendation: "yes",
   aiReasoning: "Acceptance fixture: strong fit.",
   tags: ["acceptance"],
+  secondary: "Host",
+  blend: { primary: 78, secondary: 22 },
+  openerPhrase: null,
+  habitatThrive: null,
+  habitatDim: null,
+  personalNote: null,
 });
 
 describeDb("Gate Engine M1 acceptance (real rows on ep-sweet-term)", () => {

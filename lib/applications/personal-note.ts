@@ -59,6 +59,26 @@ export function sanitizeNote(draft: string): string | null {
   return looksLikeMetaCommentary ? NOTE_FALLBACK : trimmed;
 }
 
+/** Assemble the three evidence lines the reveal note quotes from: what people come
+ *  to them for, what they do walking into a room, and the single highest-signal
+ *  answer for their nature. Newline-joined; empties dropped. Shared by the folded
+ *  grader note (Phase 5) and the legacy standalone note path below. */
+export function assembleNoteEvidence(
+  archetype: string,
+  answersByKey: Record<string, string>,
+): string {
+  const comeToYouForAnswer = (resolveAnswer('comeToYouFor', answersByKey) ?? '').trim();
+  const walkIntoRoomAnswer = (resolveAnswer('walkIntoRoom', answersByKey) ?? '').trim();
+  const { key: topSignalKey, answer: topSignalAnswer } = pickTopSignal(archetype, answersByKey);
+  return [
+    comeToYouForAnswer && `What people come to them for: ${comeToYouForAnswer}`,
+    walkIntoRoomAnswer && `Walking into a room of strangers, they: ${walkIntoRoomAnswer}`,
+    topSignalAnswer && `${topSignalKey}: ${topSignalAnswer}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 /** Build the reveal note prompt from the (already newline-joined) evidence. */
 export function buildNotePrompt(evidence: string): string {
   return `You are writing a brief "why we called you this" note shown directly to a new NoBC (No Bad Company) member applicant on their reveal screen, just under the name of who they are to us.
@@ -86,17 +106,9 @@ export async function buildPersonalNote(input: {
   generate: (prompt: string) => Promise<string>;
 }): Promise<string | null> {
   const { archetype, answersByKey, generate } = input;
-  const comeToYouForAnswer = (resolveAnswer('comeToYouFor', answersByKey) ?? '').trim();
-  const walkIntoRoomAnswer = (resolveAnswer('walkIntoRoom', answersByKey) ?? '').trim();
-  const { key: topSignalKey, answer: topSignalAnswer } = pickTopSignal(archetype, answersByKey);
 
   try {
-    const evidence = [
-      comeToYouForAnswer && `What people come to them for: ${comeToYouForAnswer}`,
-      walkIntoRoomAnswer && `Walking into a room of strangers, they: ${walkIntoRoomAnswer}`,
-      topSignalAnswer && `${topSignalKey}: ${topSignalAnswer}`,
-    ].filter(Boolean).join('\n');
-
+    const evidence = assembleNoteEvidence(archetype, answersByKey);
     const text = await generate(buildNotePrompt(evidence));
     return sanitizeNote(text);
   } catch (e) {

@@ -14,6 +14,7 @@ const grade = (overrides: Partial<TypedGrade> = {}): TypedGrade => ({
   aiRecommendation: 'yes',
   aiReasoning: 'Concrete, lived answers.',
   tags: ['curious', 'warm'],
+  personalNote: '',
   ...overrides,
 });
 
@@ -95,5 +96,43 @@ describe('gradeTypedAnswers', () => {
     expect(out).toEqual(TYPED_GRADE_FALLBACK);
     expect(out.aiRecommendation).toBe('unclear');
     expect(out.memberWorthTotal).toBe(50);
+  });
+
+  it('the fit fallback carries an empty note (reveal omits the beat)', () => {
+    expect(TYPED_GRADE_FALLBACK.personalNote).toBe('');
+  });
+});
+
+// JOB 3 — the reveal note folded into this single call (Phase 5). It RECEIVES the
+// already-decided nature and writes about it; it never picks or changes one.
+describe('gradeTypedAnswers — folded reveal note (JOB 3)', () => {
+  it('receives the decided nature + evidence in the prompt and returns the note', async () => {
+    let seen = '';
+    const out = await gradeTypedAnswers(Q, { whyHere: 'x' }, {
+      decidedNatureDisplay: 'Caregiver',
+      noteEvidence: 'What people come to them for: steady, unflashy advice',
+      generate: async (prompt) => {
+        seen = prompt;
+        return grade({ personalNote: 'You are the one people lean on.' });
+      },
+    });
+    expect(seen).toContain('Caregiver'); // the decided nature (display name, never the enum)
+    expect(seen).toContain('steady, unflashy advice'); // the evidence to quote
+    expect(seen).toContain('JOB 3');
+    expect(out.personalNote).toBe('You are the one people lean on.');
+  });
+
+  it('instructs the model NOT to reclassify — the nature is already decided and must not sway fit/awards', async () => {
+    let seen = '';
+    await gradeTypedAnswers(Q, {}, {
+      decidedNatureDisplay: 'Sage',
+      noteEvidence: 'y',
+      generate: async (prompt) => {
+        seen = prompt;
+        return grade();
+      },
+    });
+    expect(seen).toMatch(/already been decided/i); // the grader never picks the nature
+    expect(seen).toMatch(/MUST NOT influence JOB 1 or JOB 2/i); // fit/awards stay independent
   });
 });

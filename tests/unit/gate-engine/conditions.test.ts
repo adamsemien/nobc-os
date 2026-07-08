@@ -148,6 +148,12 @@ describe("ANSWER_QUESTIONS verifier", () => {
     aiRecommendation: "yes",
     aiReasoning: "Strong fit.",
     tags: ["warm"],
+    secondary: "Host",
+    blend: { primary: 78, secondary: 22 },
+    openerPhrase: null,
+    habitatThrive: null,
+    habitatDim: null,
+    personalNote: null,
     ...overrides,
   });
 

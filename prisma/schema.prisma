@@ -588,6 +588,17 @@ model Application {
   // Reveal "Why we called you this" note (six-archetype recut, 2026-07). Written
   // fresh for new applications; legacy rows keep personalizedCopy. Additive-only.
   personalNote            String?
+  // Apply Scoring v2 — Reveal B persisted tally output (additive, 2026-07-07). The
+  // deterministic tally decides these at scoring time; the reveal reads them
+  // VERBATIM and never recomputes the blend from the normalized archetypeScores
+  // (that normalized vector is fit-centered and flattens the top-two to ~55/45).
+  // The primary nature is the existing `archetype` column above.
+  revealSecondary         String? // secondary nature (STORED enum; map to displayName in UI)
+  revealBlendPrimary      Int? // decisive blend %, primary (from raw combined points)
+  revealBlendSecondary    Int? // decisive blend %, secondary
+  revealOpenerPhrase      String? // Q6 (bestSelf) openerPhrase — opens the reveal, never contradicted
+  revealHabitatThrive     String? // Q4 (perfectFriday) picked option label — "your best rooms"
+  revealHabitatDim        String? // Q5 (skipFriday) picked option label — "rooms that don't deserve you"
   templateId              String?
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt

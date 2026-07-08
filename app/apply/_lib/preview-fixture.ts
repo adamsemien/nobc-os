@@ -59,6 +59,12 @@ export interface PreviewReveal {
   archetypeScores: Record<string, number>;
   tags: string[];
   personalNote: string;
+  // Reveal B (Phase 5): the persisted decisive tally output the reveal reads.
+  secondary?: string | null;
+  blend?: { primary: number; secondary: number } | null;
+  openerPhrase?: string | null;
+  habitatThrive?: string | null;
+  habitatDim?: string | null;
   rsvpId?: string | null;
   memberQrCode?: string | null;
 }
@@ -70,8 +76,10 @@ export interface PreviewReveal {
  * config/archetypes.ts (that's what operators need to review), the personalNote
  * is written to read exactly like a real generated note (quoting the fixture
  * walkIntoRoom answer), and only the scores + tags are obviously synthetic. A
- * Sage top with a Connector runner-up, weighted so the blend meter reads a clear
- * 75% Sage / 25% Connector (top two normalized within-person).
+ * Sage top with a Connector runner-up. Reveal B (Phase 5): opens on the member's
+ * Q6 phrase (openerPhrase), the blend meter reads the DECISIVE persisted 78/22
+ * (never the flattened archetypeScores), and the habitat is templated from the
+ * Q4/Q5 picks (habitatThrive/habitatDim).
  */
 export const PREVIEW_REVEAL: PreviewReveal = {
   archetype: 'Sage',
@@ -86,6 +94,12 @@ export const PREVIEW_REVEAL: PreviewReveal = {
   tags: ['preview fixture', 'not a real applicant'],
   personalNote:
     "You told us that when you walk into a room, you \"read the room\" first - who's performing, who's actually listening - before you find the one person worth a real conversation. That's not shyness, it's discernment, and it's the whole reason people end up trusting you with what they don't say out loud. The room feels understood by you, even when it never quite realizes you were the one paying attention.",
+  // Reveal B fields (invented, matching a Sage reveal):
+  secondary: 'Connector',
+  blend: { primary: 78, secondary: 22 },
+  openerPhrase: 'The best conversation there',
+  habitatThrive: 'A long dinner that becomes the only conversation you remember',
+  habitatDim: 'A loud standing room with thirty first introductions',
   rsvpId: null,
   memberQrCode: 'PREVIEW-FIXTURE-NOT-A-REAL-MEMBER-QR',
 };

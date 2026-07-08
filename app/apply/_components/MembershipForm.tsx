@@ -64,6 +64,14 @@ interface SubmitResult {
   archetypeScores: Record<string, number>;
   tags: string[];
   personalNote: string;
+  // Reveal B (Phase 5): the persisted decisive tally output. Read verbatim — the
+  // reveal NEVER recomputes the blend from archetypeScores (that flattens to ~55/45).
+  // Optional/nullable so legacy rows (scored pre-Phase-5) degrade gracefully.
+  secondary?: string | null;
+  blend?: { primary: number; secondary: number } | null;
+  openerPhrase?: string | null;
+  habitatThrive?: string | null;
+  habitatDim?: string | null;
   rsvpId?: string | null;
   memberQrCode?: string | null;
 }
@@ -74,46 +82,51 @@ function archetypeArtSrc(archetype: string): string {
   return `/archetypes/${archetype.toLowerCase()}.png`;
 }
 
-/** Top-two blend from the archetype scores, as { top, second } stored enums.
- *  `top` is the assigned archetype; `second` is the next-highest scorer. */
-function topTwoBlend(
-  scores: Record<string, number>,
-  topArchetype: string,
-): { top: string; second: string | null } {
-  const ranked = Object.entries(scores)
-    .filter(([name]) => name !== topArchetype)
-    .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
-  return { top: topArchetype, second: ranked.length ? ranked[0][0] : null };
-}
-
 /** Per-archetype segment color, keyed by STORED enum (lowercased) to the existing
  *  --archetype-* CSS tokens. */
 function archetypeColorVar(name: string): string {
   return `var(--archetype-${name.toLowerCase()})`;
 }
 
-/** Blend meter — the member's OWN top-two archetype mix, normalized within-person
- *  to 100 (e.g. 56% Sage / 44% Connector). This is NOT population rarity (none
- *  exists — do not add). One horizontal bar, two segments, colored by the
- *  per-archetype CSS tokens, labeled with displayNames + percentages. Renders
- *  nothing when there is no distinct second archetype or the top two sum to 0. */
+/** Lowercase the first character — for embedding a capitalized option label
+ *  mid-sentence in the templated habitat copy ("...look like a house party..."). */
+function lcFirst(s: string): string {
+  return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
+/** Reveal B, layer 1: the per-nature clause that explains the member's own Q6
+ *  self-image phrase THROUGH their decided nature. Keyed by STORED enum; the enum is
+ *  never shown — the nature is named via archetypeDisplayName in the JSX. */
+const NATURE_OPENER_CLAUSE: Record<string, string> = {
+  Sage: 'that comes from how you listen - you leave every conversation knowing more, and so does the person across from you',
+  Spark: 'that comes from the joy you carry into a room - people remember how they felt around you long after the night ends',
+  Patron: 'that comes from how completely you show up - whoever you are with gets all of you, no half-attention',
+  Host: 'that comes from how you tend a room - you notice what people need before they do, and quietly handle it',
+  Builder: 'that comes from what you make - you see what a room could become and start moving it there',
+  Connector: 'that comes from the threads you see between people - your instinct is never "what do you do" but "who should you meet"',
+};
+function natureOpenerClause(archetype: string): string {
+  return NATURE_OPENER_CLAUSE[archetype] ?? 'that is exactly who you are to us';
+}
+
+/** Blend meter — the member's DECISIVE top-two mix, straight from the deterministic
+ *  tally (persisted; e.g. 78% Sage / 22% Connector). It is NOT recomputed from the
+ *  normalized archetypeScores — that vector is fit-centered and flattens the top two
+ *  toward ~55/45. This is NOT population rarity (none exists — do not add). One
+ *  horizontal bar, two segments, labeled with displayNames + persisted percentages. */
 function BlendMeter({
-  scores,
-  topArchetype,
+  primary,
+  secondary,
+  primaryPct,
+  secondaryPct,
 }: {
-  scores: Record<string, number>;
-  topArchetype: string;
+  primary: string;
+  secondary: string;
+  primaryPct: number;
+  secondaryPct: number;
 }) {
-  const { top, second } = topTwoBlend(scores, topArchetype);
-  if (!second) return null;
-  const topScore = Math.max(0, scores[top] ?? 0);
-  const secondScore = Math.max(0, scores[second] ?? 0);
-  const sum = topScore + secondScore;
-  if (sum <= 0) return null;
-  const topPct = Math.round((topScore / sum) * 100);
-  const secondPct = 100 - topPct;
-  const topColor = archetypeColorVar(top);
-  const secondColor = archetypeColorVar(second);
+  const topColor = archetypeColorVar(primary);
+  const secondColor = archetypeColorVar(secondary);
   const labelStyle: React.CSSProperties = {
     fontFamily: bodyFont,
     fontSize: 13,
@@ -132,16 +145,16 @@ function BlendMeter({
   return (
     <div style={{ marginTop: 20, maxWidth: 520, animation: 'fadeInUp 500ms ease 2400ms forwards', opacity: 0 }}>
       <div style={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ width: `${topPct}%`, background: topColor }} />
-        <div style={{ width: `${secondPct}%`, background: secondColor }} />
+        <div style={{ width: `${primaryPct}%`, background: topColor }} />
+        <div style={{ width: `${secondaryPct}%`, background: secondColor }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
         <span style={labelStyle}>
           <span style={dot(topColor)} />
-          {archetypeDisplayName(top)} {topPct}%
+          {archetypeDisplayName(primary)} {primaryPct}%
         </span>
         <span style={labelStyle}>
-          {archetypeDisplayName(second)} {secondPct}%
+          {archetypeDisplayName(secondary)} {secondaryPct}%
           <span style={dot(secondColor)} />
         </span>
       </div>
@@ -1322,9 +1335,23 @@ export default function MembershipForm({
   // The AI reveal note (empty when scoring/generation fell back). Rendered as
   // "Why we called you this"; the beat is omitted when empty.
   const personalNote = (submitResult?.personalNote ?? '').trim();
-  // Blend line from the top two archetype scores, rendered as displayNames.
-  const blend = submitResult ? topTwoBlend(submitResult.archetypeScores, submitResult.archetype) : null;
-  const blendSecondName = blend?.second ? archetypeDisplayName(blend.second) : '';
+
+  // Reveal B, layer 1: the member's own Q6 self-image phrase opens the reveal,
+  // explained through the decided nature. Absent on legacy rows → old label-first open.
+  const openerPhrase = (submitResult?.openerPhrase ?? '').trim();
+  const openerClause = submitResult ? natureOpenerClause(submitResult.archetype) : '';
+
+  // DECISIVE blend + secondary from the persisted tally (never recomputed from the
+  // flattened archetypeScores). Absent on legacy rows → the blend line + meter hide.
+  const revealBlend = submitResult?.blend ?? null;
+  const revealSecondary = submitResult?.secondary ?? null;
+  const blendSecondName = revealSecondary ? archetypeDisplayName(revealSecondary) : '';
+
+  // Reveal B, layer 2: templated habitat from the member's LITERAL Q4 / Q5 picks.
+  // Present on Phase-5 rows; legacy rows fall back to the per-nature config habitat.
+  const habitatThriveLabel = (submitResult?.habitatThrive ?? '').trim();
+  const habitatDimLabel = (submitResult?.habitatDim ?? '').trim();
+  const hasTemplatedHabitat = Boolean(habitatThriveLabel && habitatDimLabel);
   // Shared reveal beat styles (label eyebrow + italic body) reused across the
   // essence / habitat / peak-edge / personalNote blocks.
   const revealBeatLabel: React.CSSProperties = {
@@ -2331,9 +2358,12 @@ export default function MembershipForm({
                 flexDirection: 'column',
                 justifyContent: 'flex-start',
               }}>
-                {/* Animal art — placeholder path per archetype; hides itself if
-                    the final art has not been dropped into /public/archetypes yet. */}
-                {/* eslint-disable-next-line @next/next/no-img-element -- static per-archetype art from /public, not a remote asset */}
+                {/* Nature art — the primary nature's line illustration, mapped by
+                    stored enum → /public/archetypes/{enum}.png (see the README there).
+                    The art is black linework on cream; mix-blend-mode: multiply drops
+                    the cream optically against the reveal background (never recolor or
+                    knock out the file). Hides itself until the art is dropped in. */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- static per-nature art from /public, not a remote asset */}
                 <img
                   src={archetypeArtSrc(submitResult.archetype)}
                   alt=""
@@ -2343,40 +2373,98 @@ export default function MembershipForm({
                     width: 'clamp(120px, 20vw, 200px)',
                     height: 'auto',
                     marginBottom: 24,
+                    mixBlendMode: 'multiply',
                     animation: 'fadeInUp 500ms ease 0ms forwards',
                     opacity: 0,
                   }}
                 />
 
-                <span style={{
-                  fontFamily: bodyFont,
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: THEME.night.muted,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  marginBottom: 16,
-                  display: 'block',
-                  animation: 'fadeInUp 500ms ease 0ms forwards',
-                  opacity: 0,
-                }}>
-                  YOU&apos;RE THE
-                </span>
+                {openerPhrase ? (
+                  <>
+                    {/* Reveal B layer 1 — opens on the member's OWN Q6 self-image phrase
+                        (honored verbatim, never contradicted), then names + explains the
+                        nature through it. Phrase-first, not label-first. */}
+                    <span style={{
+                      fontFamily: bodyFont,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: THEME.night.muted,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      marginBottom: 16,
+                      display: 'block',
+                      animation: 'fadeInUp 500ms ease 0ms forwards',
+                      opacity: 0,
+                    }}>
+                      AT YOUR BEST, YOU&apos;RE
+                    </span>
 
-                <h1 style={{
-                  fontFamily: displayFont,
-                  fontSize: 'clamp(72px, 10vw, 140px)',
-                  fontWeight: 400,
-                  fontStyle: 'italic',
-                  color: THEME.night.text,
-                  lineHeight: 0.95,
-                  margin: '0 0 24px 0',
-                  overflowWrap: 'break-word',
-                  animation: 'fadeInUp 500ms ease 0ms forwards',
-                  opacity: 0,
-                }}>
-                  {revealDisplayName}
-                </h1>
+                    <h1 style={{
+                      fontFamily: displayFont,
+                      fontSize: 'clamp(40px, 6vw, 84px)',
+                      fontWeight: 400,
+                      fontStyle: 'italic',
+                      color: THEME.night.text,
+                      lineHeight: 1.02,
+                      margin: '0 0 24px 0',
+                      overflowWrap: 'break-word',
+                      animation: 'fadeInUp 500ms ease 0ms forwards',
+                      opacity: 0,
+                    }}>
+                      {openerPhrase}
+                    </h1>
+
+                    <p style={{
+                      fontFamily: displayFont,
+                      fontSize: 'clamp(20px, 2.6vw, 28px)',
+                      fontWeight: 400,
+                      fontStyle: 'italic',
+                      color: THEME.night.text,
+                      maxWidth: 560,
+                      margin: 0,
+                      lineHeight: 1.45,
+                      animation: 'fadeInUp 500ms ease 400ms forwards',
+                      opacity: 0,
+                    }}>
+                      And because you&apos;re a{' '}
+                      <span style={{ color: THEME.night.accent }}>{revealDisplayName}</span>, {openerClause}.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    {/* Legacy / degenerate rows with no captured Q6 phrase: keep the
+                        original label-first open so those reveals still render. */}
+                    <span style={{
+                      fontFamily: bodyFont,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: THEME.night.muted,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      marginBottom: 16,
+                      display: 'block',
+                      animation: 'fadeInUp 500ms ease 0ms forwards',
+                      opacity: 0,
+                    }}>
+                      YOU&apos;RE THE
+                    </span>
+
+                    <h1 style={{
+                      fontFamily: displayFont,
+                      fontSize: 'clamp(72px, 10vw, 140px)',
+                      fontWeight: 400,
+                      fontStyle: 'italic',
+                      color: THEME.night.text,
+                      lineHeight: 0.95,
+                      margin: '0 0 24px 0',
+                      overflowWrap: 'break-word',
+                      animation: 'fadeInUp 500ms ease 0ms forwards',
+                      opacity: 0,
+                    }}>
+                      {revealDisplayName}
+                    </h1>
+                  </>
+                )}
 
                 {/* oneLiner pulled out as the identity line. */}
                 <p style={{
@@ -2418,26 +2506,42 @@ export default function MembershipForm({
                   </div>
                 )}
 
-                {/* (5) habitat — two short blocks, fixed member-facing labels. */}
-                {(archetypeData?.habitatThrive || archetypeData?.habitatDim) && (
+                {/* (5) Reveal B layer 2 — habitat. Templated from the member's LITERAL
+                    Q4 (thrive) / Q5 (dim) picks when captured; else the per-nature config
+                    habitat copy (legacy rows). Shadow stays environmental — the room is
+                    wrong, never the person. */}
+                {hasTemplatedHabitat ? (
                   <div style={{
                     marginBottom: 40,
                     animation: 'fadeInUp 500ms ease 1100ms forwards',
                     opacity: 0,
                   }}>
-                    {archetypeData?.habitatThrive && (
-                      <div style={{ marginBottom: 24 }}>
-                        <span style={revealBeatLabel}>The rooms that bring out your best</span>
-                        <p style={revealBeatBody}>{archetypeData.habitatThrive}</p>
-                      </div>
-                    )}
-                    {archetypeData?.habitatDim && (
-                      <div>
-                        <span style={revealBeatLabel}>The rooms where you can&apos;t show up as yourself</span>
-                        <p style={revealBeatBody}>{archetypeData.habitatDim}</p>
-                      </div>
-                    )}
+                    <span style={revealBeatLabel}>Your rooms</span>
+                    <p style={revealBeatBody}>
+                      Your best rooms look like {lcFirst(habitatThriveLabel)}. The rooms that don&apos;t deserve you look like {lcFirst(habitatDimLabel)}.
+                    </p>
                   </div>
+                ) : (
+                  (archetypeData?.habitatThrive || archetypeData?.habitatDim) && (
+                    <div style={{
+                      marginBottom: 40,
+                      animation: 'fadeInUp 500ms ease 1100ms forwards',
+                      opacity: 0,
+                    }}>
+                      {archetypeData?.habitatThrive && (
+                        <div style={{ marginBottom: 24 }}>
+                          <span style={revealBeatLabel}>The rooms that bring out your best</span>
+                          <p style={revealBeatBody}>{archetypeData.habitatThrive}</p>
+                        </div>
+                      )}
+                      {archetypeData?.habitatDim && (
+                        <div>
+                          <span style={revealBeatLabel}>The rooms where you can&apos;t show up as yourself</span>
+                          <p style={revealBeatBody}>{archetypeData.habitatDim}</p>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
 
                 {/* (6) peak + edge — two short lines under one small header. */}
@@ -2487,7 +2591,7 @@ export default function MembershipForm({
                 </div>
                 )}
 
-                {/* Blend line from the top two archetype scores. */}
+                {/* Blend line from the persisted decisive tally (secondary nature). */}
                 {blendSecondName && (
                 <p style={{
                   fontFamily: bodyFont,
@@ -2503,12 +2607,14 @@ export default function MembershipForm({
                 </p>
                 )}
 
-                {/* Blend meter — the member's own top-two mix, normalized to 100.
-                    Sits directly under the blend line. */}
-                {submitResult && (
+                {/* Blend meter — the DECISIVE persisted tally blend (NOT the flattened
+                    archetypeScores). Hidden on legacy rows with no persisted blend. */}
+                {revealBlend && revealSecondary && (
                   <BlendMeter
-                    scores={submitResult.archetypeScores}
-                    topArchetype={submitResult.archetype}
+                    primary={submitResult.archetype}
+                    secondary={revealSecondary}
+                    primaryPct={revealBlend.primary}
+                    secondaryPct={revealBlend.secondary}
                   />
                 )}
 
