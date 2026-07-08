@@ -6,6 +6,10 @@ import { getMemberWorkspaceId } from '@/lib/auth';
 import { isStaff, isAdmin } from '@/lib/operator-role';
 import { Avatar, EmptyState, PageHeader, StatusBadge, memberTone } from '@/components/ui';
 import { EditPersonFields } from '../_components/EditPersonFields';
+import {
+  AddAffiliationForm,
+  RemoveAffiliationButton,
+} from '../../organizations/_components/AffiliationControls';
 import { engagementMeta } from '@/lib/engagement-labels';
 import {
   CONTACT_ROLE_LABELS,
@@ -64,6 +68,22 @@ export default async function PersonDetailPage({
     isStaff(userId, workspaceId),
     isAdmin(userId, workspaceId),
   ]);
+
+  // Picker options for a new affiliation: workspace organizations not already
+  // affiliated (the API still 409s duplicates as the backstop).
+  const affiliatedOrgIds = new Set(person.organizations.map((a) => a.organization.id));
+  const organizationOptions = canEdit
+    ? (
+        await db.organization.findMany({
+          where: { workspaceId },
+          orderBy: { name: 'asc' },
+          take: 500,
+          select: { id: true, name: true },
+        })
+      )
+        .filter((o) => !affiliatedOrgIds.has(o.id))
+        .map((o) => ({ id: o.id, label: o.name }))
+    : [];
 
   const memberIds = person.members.map((m) => m.id);
   const activity = await db.memberEngagementEvent.findMany({
@@ -133,8 +153,11 @@ export default async function PersonDetailPage({
             >
               {personDisplay(person.potentialDuplicateOf).label}
             </Link>{' '}
-            — this record was created from an unverified email that matches theirs. Merge review
-            arrives with the merge queue.
+            — this record was created from an unverified email that matches theirs.{' '}
+            <Link href="/operator/people/merge" className="font-medium underline">
+              Review it in the merge queue
+            </Link>
+            .
           </div>
         ) : null}
 
@@ -241,14 +264,24 @@ export default async function PersonDetailPage({
                     >
                       {affiliation.organization.name}
                     </Link>
-                    <span className="text-text-secondary">
+                    <span className="flex items-center gap-2 text-text-secondary">
                       {affiliation.role ??
                         ORGANIZATION_KIND_LABELS[affiliation.organization.kind]}
+                      {canEdit && !person.mergedIntoId ? (
+                        <RemoveAffiliationButton affiliationId={affiliation.id} />
+                      ) : null}
                     </span>
                   </li>
                 ))}
               </ul>
             )}
+            {canEdit && !person.mergedIntoId ? (
+              <AddAffiliationForm
+                personId={person.id}
+                options={organizationOptions}
+                pickLabel="Pick an organization…"
+              />
+            ) : null}
           </SectionCard>
         </div>
 

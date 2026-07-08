@@ -20,23 +20,7 @@ import { Webhook } from 'svix';
 import { db } from '@/lib/db';
 import { resolvePerson } from '@/lib/crm/resolve-person';
 import { logEngagementEvent } from '@/lib/engagement';
-
-type ClerkEmailAddress = {
-  id: string;
-  email_address: string;
-  verification?: { status?: string } | null;
-};
-
-type ClerkUserCreatedEvent = {
-  type: string;
-  data: {
-    id: string;
-    first_name?: string | null;
-    last_name?: string | null;
-    primary_email_address_id?: string | null;
-    email_addresses?: ClerkEmailAddress[];
-  };
-};
+import { isSyntheticClerkUser, type ClerkUserCreatedEvent } from '@/lib/clerk-webhook';
 
 export async function POST(req: NextRequest) {
   const secret = process.env.CLERK_WEBHOOK_SECRET;
@@ -68,6 +52,13 @@ export async function POST(req: NextRequest) {
 
   if (event.type !== 'user.created') {
     return NextResponse.json({ received: true });
+  }
+
+  // Synthetic/test events (the dashboard "send example" John Doe fixture) must
+  // never mint a Person. Logged skip; 200 so Clerk does not retry-storm.
+  if (isSyntheticClerkUser(event.data)) {
+    console.warn('[clerk-webhook] synthetic/test event skipped (user=%s)', event.data.id);
+    return NextResponse.json({ received: true, skipped: 'synthetic_test_event' });
   }
 
   const workspaceId = process.env.APPLY_DEFAULT_WORKSPACE_ID;

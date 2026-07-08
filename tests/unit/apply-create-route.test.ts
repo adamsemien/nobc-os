@@ -25,11 +25,11 @@ const m = vi.hoisted(() => ({
   answerFindFirst: vi.fn(),
   answerCreate: vi.fn(),
   answerUpdate: vi.fn(),
-  resolveMember: vi.fn(),
+  resolvePerson: vi.fn(),
 }));
 
 vi.mock('@/lib/public-rate-limit', () => ({ publicRateLimit: m.rateLimit }));
-vi.mock('@/lib/member-identity', () => ({ resolveMember: m.resolveMember }));
+vi.mock('@/lib/crm/resolve-person', () => ({ resolvePerson: m.resolvePerson }));
 vi.mock('@/lib/db', () => ({
   db: {
     workspace: { findUnique: m.wsFindUnique, findMany: m.wsFindMany },
@@ -52,7 +52,7 @@ beforeEach(() => {
   m.rateLimit.mockReturnValue({ allowed: true, retryAfterSecs: 0 });
   m.wsFindMany.mockResolvedValue([{ id: 'w1' }]);
   m.appFindFirst.mockResolvedValue(null);
-  m.resolveMember.mockResolvedValue({ id: 'mem1' });
+  m.resolvePerson.mockResolvedValue({ id: 'p1', potentialDuplicateOfId: null });
   m.appCreate.mockResolvedValue({ id: 'app_new' });
   m.answerFindFirst.mockResolvedValue(null);
   m.answerCreate.mockResolvedValue({});
@@ -75,7 +75,7 @@ describe('apply create: idempotency (BLOCKER 5)', () => {
     const body = await res.json();
     expect(body.id).toBe('app_existing');
     expect(m.appCreate).not.toHaveBeenCalled();
-    expect(m.resolveMember).not.toHaveBeenCalled(); // short-circuits before mint
+    expect(m.resolvePerson).not.toHaveBeenCalled(); // short-circuits before mint
   });
 
   it('creates a fresh application when no PENDING row exists', async () => {
