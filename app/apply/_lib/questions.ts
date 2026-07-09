@@ -458,7 +458,7 @@ export const QUESTIONS: Question[] = [
     label: "Who's someone you think we should meet?",
     type: 'textarea',
     required: false,
-    help: 'Applications are reviewed personally. We will be in touch.',
+    help: 'Profiles are reviewed personally. We will be in touch.',
   },
 ];
 

@@ -1356,7 +1356,7 @@ export default function MembershipForm({
     // resumed/reloaded draft that already has photos passes this check.
     // Demo mode keeps its no-validation walkthrough. handleSubmit is unchanged.
     if (!isDemo && !previewMode && PHOTO_REQUIRED && parsePhotoKeys(answers).length === 0) {
-      setError('Please add at least one photo to finish your application.');
+      setError('Please add at least one photo to finish your profile.');
       advance(PHOTO_PAGE_INDEX);
       return;
     }
@@ -2393,7 +2393,7 @@ export default function MembershipForm({
             boxShadow: '0 8px 28px rgba(0,0,0,0.14)', padding: '12px 16px',
           }}>
             <span style={{ fontFamily: bodyFont, fontSize: 13, color: theme.text, lineHeight: 1.4 }}>
-              Welcome back - resume your application?
+              Welcome back - resume your profile?
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <button onClick={startFresh} style={{
@@ -2634,12 +2634,12 @@ export default function MembershipForm({
                   marginBottom: 0,
                 }}
               >
-                Once you submit, your application is final - you won&apos;t be able to change your
+                Once you submit, your profile is final - you won&apos;t be able to change your
                 answers. Take a moment to make sure it reads the way you want.
               </p>
 
               {error && <p style={{ color: theme.accent, fontFamily: bodyFont, fontSize: 13, marginBottom: 16 }}>{error}</p>}
-              {navBlock(guardedSubmit, 'submit my application', !data.agreedToTerms)}
+              {navBlock(guardedSubmit, 'submit my profile', !data.agreedToTerms)}
             </div>
           );
         })()}
@@ -3139,7 +3139,7 @@ export default function MembershipForm({
 
         {step === REVEAL_STEP && !submitResult && (
           <div style={{ textAlign: 'center', paddingTop: 80, minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-            <p style={{ fontFamily: bodyFont, fontSize: 16, color: theme.muted }}>Reading your application...</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 16, color: theme.muted }}>Reading your profile...</p>
           </div>
         )}
 

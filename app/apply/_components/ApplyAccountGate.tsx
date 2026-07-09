@@ -127,7 +127,7 @@ export default function ApplyAccountGate({
       router.push(`/apply?id=${id}`);
     } catch {
       setSubmitting(false);
-      setError("We couldn't start your application. Please try again.");
+      setError("We couldn't start your profile. Please try again.");
     }
   }
 
