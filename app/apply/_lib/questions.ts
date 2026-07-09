@@ -308,6 +308,11 @@ export const QUESTIONS: Question[] = [
     type: 'select',
     required: false,
     options: MBTI_OPTIONS,
+    tooltip: {
+      text: "Sixteen types built from four core preferences - how you take in the world and make decisions. Knowing yours helps us read you right and build rooms that fit. Optional. Don't know yours? Take a free test and tell us your type.",
+      linkLabel: 'Take a free test',
+      href: 'https://www.truity.com/test/type-finder-personality-test-new',
+    },
   },
   {
     id: 'loveLanguage',
@@ -316,6 +321,11 @@ export const QUESTIONS: Question[] = [
     type: 'select',
     required: false,
     options: LOVE_LANGUAGE_OPTIONS,
+    tooltip: {
+      text: "Five ways people give and receive love - words, time, gifts, acts of service, touch. Knowing yours helps us read you right and build rooms that fit. Optional. Don't know yours? Take a free test and tell us your language.",
+      linkLabel: 'Take a free test',
+      href: 'https://www.5lovelanguages.com/quizzes/love-language',
+    },
   },
   {
     id: 'otherTests',
