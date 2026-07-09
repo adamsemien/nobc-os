@@ -71,6 +71,8 @@ export interface Question {
   row?: string;
   /** This field may legitimately be answered "none". */
   allowNone?: boolean;
+  /** Optional inline tooltip: text body + a single labelled link. Non-scoring metadata. */
+  tooltip?: { text: string; linkLabel: string; href: string };
 }
 
 export type SectionId = 'who-you-are' | 'how-you-move' | 'in-a-room' | 'what-youre-here-for';
@@ -83,6 +85,8 @@ export interface Section {
   title: string;
   /** Section eyebrow, e.g. "SECTION 01". */
   eyebrow: string;
+  /** One-line subtitle shown beneath the section title in the interstitial. */
+  subtitle?: string;
 }
 
 export const SECTIONS: Section[] = [
@@ -92,12 +96,13 @@ export const SECTIONS: Section[] = [
     index: 2,
     title: 'How You Move Through the World',
     eyebrow: 'SECTION 02',
+    subtitle: 'The texture of your life between the big moments.',
   },
   // A tactile interstitial, not a numbered Q&A section — deliberately NON-numbered
   // eyebrow so the three text sections keep SECTION 01/02/03. `index` is unused by
   // the form (progress is step-driven), so the value here is cosmetic only.
-  { id: 'in-a-room', index: 2, title: 'In a Room', eyebrow: 'IN A ROOM' },
-  { id: 'what-youre-here-for', index: 3, title: "What You're Here For", eyebrow: 'SECTION 03' },
+  { id: 'in-a-room', index: 2, title: 'In a Room', eyebrow: 'IN A ROOM', subtitle: "Tap how you'd show up." },
+  { id: 'what-youre-here-for', index: 3, title: "Who You'd Bring In", eyebrow: 'SECTION 03', subtitle: "Someone whose taste you trust." },
 ];
 
 /** Editorial intro copy rendered above Section 01. */
@@ -289,6 +294,11 @@ export const QUESTIONS: Question[] = [
     type: 'select',
     required: false,
     options: ENNEAGRAM_OPTIONS,
+    tooltip: {
+      text: "Nine types, each built around a core motivation - the why underneath how you act. Knowing yours helps us read you right and build rooms that fit. Optional. Don't know yours? Take a free test and tell us your type.",
+      linkLabel: 'Take a free test',
+      href: 'https://www.truity.com/test/enneagram-personality-test',
+    },
   },
   {
     id: 'mbti',

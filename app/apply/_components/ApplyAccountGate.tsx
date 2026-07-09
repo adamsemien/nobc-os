@@ -177,24 +177,24 @@ export default function ApplyAccountGate() {
         Membership
       </span>
       <h1 style={{ fontFamily: displayFont, fontSize: 'clamp(34px, 5vw, 52px)', fontStyle: 'italic', lineHeight: 1.1, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>
-        Join No Bad Company
+        Create your No Bad Company profile
       </h1>
       <p style={{ ...sellStyle, color: bodyColor }}>
-        Think of this as a profile, not an application. The better we know you, the better we can
-        introduce you to the right people and put you in the right rooms at the right time.
+        The better we know you, the better the introductions get. The right dinner. The right seat.
+        The introduction you didn&apos;t see coming and didn&apos;t know you needed.
       </p>
       <p style={{ ...sellStyle, color: bodyColor }}>
-        A few of these play more like a conversation than a form - what you&apos;re into, who you
-        gather, how you like to spend a night. Part of it plays like a game, and at the end
-        you&apos;ll land on how you show up in a room. Maybe it tells you something new. Maybe it
-        just confirms exactly who you already are. Either way, that&apos;s the fun part.
+        We made this fun on purpose. Part conversation, part game. At the end, you&apos;ll get your
+        archetype: how you show up as your best, most authentic self in a room, so every room we
+        put you in is built to bring that out of you.
       </p>
       <p style={{ ...sellStyle, color: bodyColor }}>
-        Works best on a laptop if you&apos;ve got one - and there are no wrong answers, so take your
-        time and answer in your own voice. You can even talk your answers instead of typing.
+        Set aside 20 to 30 minutes, pour something good, and answer in your own voice. No wrong
+        answers. The person we meet here is the person we build rooms around, so the more honest
+        you are, the more the rooms will feel like they were made for you.
       </p>
       <p style={{ ...sellStyle, color: bodyColor }}>
-        Create an account first so your progress saves and you can pick up from any device.
+        Best done on a laptop.
       </p>
     </>
   );

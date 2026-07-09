@@ -52,6 +52,64 @@ export const PREVIEW_ANSWERS: Record<string, string> = {
   // Photos are files, not answers — the picker simply stays empty in preview.
 };
 
+/**
+ * Fixture In-A-Room options for preview mode. Shape matches `InARoomOption` in
+ * MembershipForm.tsx (`{ id, label, order }`). These are invented labels —
+ * operators reviewing the preview see representative tap-grid/most-least UI
+ * rather than "Loading…". The ids need not match scorer QuestionOption ids;
+ * preview never scores.
+ */
+export const PREVIEW_IN_A_ROOM: Record<string, { id: string; label: string; order: number }[]> = {
+  roomPosition: [
+    { id: 'rp-1', label: 'At the table, holding court', order: 1 },
+    { id: 'rp-2', label: 'Near the drinks, meeting everyone', order: 2 },
+    { id: 'rp-3', label: 'On the couch with the one interesting person', order: 3 },
+    { id: 'rp-4', label: 'Circling, connecting people to each other', order: 4 },
+    { id: 'rp-5', label: 'Outside, getting some air', order: 5 },
+    { id: 'rp-6', label: 'In the kitchen, helping', order: 6 },
+  ],
+  giftMaking: [
+    { id: 'gm-1', label: 'People feel seen', order: 1 },
+    { id: 'gm-2', label: 'Ideas collide', order: 2 },
+    { id: 'gm-3', label: 'Things happen', order: 3 },
+    { id: 'gm-4', label: 'Everyone feels welcome', order: 4 },
+    { id: 'gm-5', label: 'The vibe lifts', order: 5 },
+    { id: 'gm-6', label: 'Decisions get made', order: 6 },
+  ],
+  partyJudge: [
+    { id: 'pj-1', label: 'No good music', order: 1 },
+    { id: 'pj-2', label: 'Bad food', order: 2 },
+    { id: 'pj-3', label: 'No real conversations', order: 3 },
+    { id: 'pj-4', label: 'Wrong crowd', order: 4 },
+    { id: 'pj-5', label: 'Hosts not paying attention', order: 5 },
+    { id: 'pj-6', label: 'Nothing spontaneous', order: 6 },
+  ],
+  perfectFriday: [
+    { id: 'pf-1', label: 'A long dinner that becomes the only conversation you remember', order: 1 },
+    { id: 'pf-2', label: 'A live set somewhere small and loud', order: 2 },
+    { id: 'pf-3', label: 'A house party that goes too late', order: 3 },
+    { id: 'pf-4', label: 'Drinks with two people who should know each other', order: 4 },
+    { id: 'pf-5', label: 'Something outside that turns into an adventure', order: 5 },
+    { id: 'pf-6', label: 'A quiet night that stays that way', order: 6 },
+  ],
+  skipFriday: [
+    { id: 'sf-1', label: 'A long dinner that becomes the only conversation you remember', order: 1 },
+    { id: 'sf-2', label: 'A live set somewhere small and loud', order: 2 },
+    { id: 'sf-3', label: 'A house party that goes too late', order: 3 },
+    { id: 'sf-4', label: 'Drinks with two people who should know each other', order: 4 },
+    { id: 'sf-5', label: 'Something outside that turns into an adventure', order: 5 },
+    { id: 'sf-6', label: 'A quiet night that stays that way', order: 6 },
+  ],
+  bestSelf: [
+    { id: 'bs-1', label: 'The best conversation there', order: 1 },
+    { id: 'bs-2', label: 'The connector everyone was waiting for', order: 2 },
+    { id: 'bs-3', label: 'The one who made it feel safe to be honest', order: 3 },
+    { id: 'bs-4', label: 'The person who kept things moving', order: 4 },
+    { id: 'bs-5', label: 'The one who brought everyone together', order: 5 },
+    { id: 'bs-6', label: 'The energy the room needed', order: 6 },
+  ],
+};
+
 /** Shape mirrors `SubmitResult` in MembershipForm.tsx without importing it. */
 export interface PreviewReveal {
   archetype: string;
