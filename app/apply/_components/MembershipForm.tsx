@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { ARCHETYPES, ARCHETYPE_ORDER, ArchetypeName, archetypeDisplayName } from '@/config/archetypes';
 import { CONSENT_DISCLOSURES, TERMS_VERSION } from '@/lib/apply-consent';
 import dynamic from 'next/dynamic';
@@ -15,7 +16,7 @@ import {
   type Question,
   type SubField,
 } from '../_lib/questions';
-import { PREVIEW_ANSWERS, PREVIEW_REVEAL } from '../_lib/preview-fixture';
+import { PREVIEW_ANSWERS, PREVIEW_REVEAL, PREVIEW_IN_A_ROOM } from '../_lib/preview-fixture';
 import InARoomTapGrid from './InARoomTapGrid';
 import InARoomMostLeast from './InARoomMostLeast';
 
@@ -319,6 +320,50 @@ function parsePhotoKeys(answers: Record<string, string>): string[] {
   }
 }
 
+/** Formats a US phone number as the applicant types: digits only, capped at 10,
+ *  grouped XXX-XXX-XXXX. Matches the existing dev/demo cell fixture pattern
+ *  ("512-555-XXXX") rather than introducing a new phone display convention. */
+function formatUSPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+/** Trims and title-cases a city name (e.g. "  austin" -> "Austin", "new york" ->
+ *  "New York"). Applied on blur, not on every keystroke, so mid-typing casing
+ *  isn't fought. */
+function titleCaseCity(raw: string): string {
+  return raw.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
+/** LinkedIn/Instagram sub-fields render as a fixed domain prefix + bare-handle
+ *  input (so applicants type "johndoe", not a full URL) while still persisting
+ *  a real URL as the answer. `pathPrefix` covers LinkedIn's "/in/" segment. */
+const SOCIAL_LINK_CONFIG: Record<string, { host: string; prefix: string; pathPrefix?: string }> = {
+  linkedin: { host: 'linkedin.com', prefix: 'linkedin.com/in/', pathPrefix: 'in/' },
+  instagram: { host: 'instagram.com', prefix: 'instagram.com/' },
+};
+
+/** Normalizes typed OR pasted input (a bare handle, an @handle, or a full profile
+ *  URL with protocol/www/path) down to the bare handle, idempotently. */
+function socialHandleFromInput(raw: string, config: { host: string; pathPrefix?: string }): string {
+  let s = raw.trim();
+  if (!s) return '';
+  s = s.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+  const hostPattern = new RegExp(`^${config.host.replace(/\./g, '\\.')}\\/${config.pathPrefix ?? ''}`, 'i');
+  s = s.replace(hostPattern, '');
+  s = s.replace(/^@/, '');
+  s = s.split(/[?#]/)[0];
+  s = s.split('/')[0];
+  return s;
+}
+
+function socialUrlFromHandle(handle: string, config: { prefix: string }): string {
+  const clean = handle.trim();
+  return clean ? `https://www.${config.prefix}${clean}` : '';
+}
+
 /** Furthest page index containing any answered key, capped at LEGAL_STEP. */
 function stepFromAnswers(answers: Record<string, string>): number {
   let furthest = 0;
@@ -369,6 +414,7 @@ function sampleValue(q: Question, sub?: SubField): string {
 function SectionIntro({
   eyebrow,
   title,
+  subtitle,
   onDone,
   opening = false,
   lead,
@@ -378,6 +424,7 @@ function SectionIntro({
 }: {
   eyebrow: string;
   title: string;
+  subtitle?: string;
   onDone: () => void;
   opening?: boolean;
   lead?: string;
@@ -401,6 +448,11 @@ function SectionIntro({
       <h1 className="apply-interstitial-title font-display max-w-[14ch] text-4xl italic leading-tight text-text-primary sm:text-6xl">
         {title}
       </h1>
+      {subtitle && (
+        <p className="apply-interstitial-title mt-4 max-w-[32ch] text-sm leading-relaxed text-text-secondary sm:text-base">
+          {subtitle}
+        </p>
+      )}
       {opening && (
         <>
           {lead && (
@@ -483,6 +535,11 @@ export default function MembershipForm({
   // personal Clerk accounts (no org), so orgId is null for them and the fence
   // stays closed; operators carry the workspace org. See resolveApplyDevFlags.
   const { orgId } = useAuth();
+  // The Clerk profile, for the name-seed effect below (G) — applicants who came
+  // through the account-first door (ApplyAccountGate) already typed their name
+  // there, but it only wrote application.fullName, not this form's own
+  // firstName/lastName question answers.
+  const { user } = useUser();
   const { isDev, isDemo } = resolveApplyDevFlags(
     process.env.NODE_ENV,
     !!orgId,
@@ -499,6 +556,12 @@ export default function MembershipForm({
     previewMode ? PREVIEW_ANSWERS : {},
   );
   const [applicationId, setApplicationId] = useState<string | null>(null);
+  // True once we know whether this load is resuming a server draft (?id=). Only
+  // the id-resume path is genuinely async — demo/preview/no-id loads have nothing
+  // to wait for and start hydrated, so the loader never flashes for a fresh applicant.
+  const [hydrated, setHydrated] = useState(
+    () => !(searchParams.get('id') && !isDemo && !previewMode),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
@@ -529,7 +592,7 @@ export default function MembershipForm({
   const [devHovered, setDevHovered] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [bannerFading, setBannerFading] = useState(false);
-  const [interstitial, setInterstitial] = useState<{ eyebrow: string; title: string; opening?: boolean } | null>(null);
+  const [interstitial, setInterstitial] = useState<{ eyebrow: string; title: string; subtitle?: string; opening?: boolean } | null>(null);
   // First-load focus-pull on Section 01: the header settles as the focus, then the
   // fields rise. Plays once per tab-session and is suppressed under reduced-motion.
   const [openingPull, setOpeningPull] = useState(false);
@@ -540,9 +603,18 @@ export default function MembershipForm({
   const [micHintSeen, setMicHintSeen] = useState(false);
   // localStorage draft-resume prompt (logged-out applicants).
   const [draftPrompt, setDraftPrompt] = useState<{ answers: Record<string, string>; step: number; applicationId: string | null } | null>(null);
+  // Milestone progress nudge (M): a small one-time toast at ~25/50/75% and on
+  // entering the final section, tied to the SAME step/QUESTION_STEPS fraction
+  // that drives the nav progress bar (see the width calc below).
+  const [milestoneToast, setMilestoneToast] = useState<string | null>(null);
 
   const froggerBuffer = useRef('');
   const seenSections = useRef<Set<string>>(new Set());
+  const seenMilestones = useRef<Set<string>>(new Set());
+  // Baseline step for the milestone effect below; null until the first run after
+  // hydration, so a mid-form resume's landing step never retroactively fires
+  // every milestone it skipped past.
+  const prevMilestoneStepRef = useRef<number | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   // Synchronous double-tap guard for the House Rules submit button (see guardedSubmit).
@@ -671,7 +743,11 @@ export default function MembershipForm({
   // draft's template, so the tap-grid / most-least components render the DB options
   // and submit their ids. Non-PII; a failure leaves the section in a loading state.
   useEffect(() => {
-    if (previewMode || !applicationId) return;
+    if (previewMode) {
+      setInARoomOptions(PREVIEW_IN_A_ROOM);
+      return;
+    }
+    if (!applicationId) return;
     let cancelled = false;
     (async () => {
       try {
@@ -728,8 +804,29 @@ export default function MembershipForm({
         setStep(stepFromAnswers(ans));
         setShowResumeBanner(true);
       } catch { /* start fresh */ }
+      finally {
+        // Resume must win before anything that seeds fields from elsewhere (e.g.
+        // the Clerk name-seed effect) — this fires after `answers` is set above.
+        setHydrated(true);
+      }
     })();
   }, [searchParams, isDemo, previewMode]);
+
+  // G: seed empty firstName/lastName from the Clerk profile. Gated on `hydrated`
+  // so this always runs AFTER the resume effect above has applied any server draft
+  // — otherwise a Clerk-seeded value could be silently wiped by that effect's
+  // wholesale setAnswers(ans) landing afterward. Only fills fields the applicant
+  // hasn't already typed; never overwrites.
+  useEffect(() => {
+    if (!hydrated || isDemo || previewMode || !user) return;
+    setAnswers(prev => {
+      const next = { ...prev };
+      let changed = false;
+      if (!next.firstName?.trim() && user.firstName) { next.firstName = user.firstName; changed = true; }
+      if (!next.lastName?.trim() && user.lastName) { next.lastName = user.lastName; changed = true; }
+      return changed ? next : prev;
+    });
+  }, [hydrated, isDemo, previewMode, user]);
 
   useEffect(() => {
     if (!showResumeBanner) return;
@@ -859,13 +956,36 @@ export default function MembershipForm({
       }
     }
     seenSections.current.add(sectionId);
-    setInterstitial({ eyebrow: section.eyebrow, title: section.title, opening });
+    setInterstitial({ eyebrow: section.eyebrow, title: section.title, subtitle: section.subtitle, opening });
     // The opening manifesto (Section 01) stays until the applicant taps "Begin".
     // The later section title-cards still auto-dismiss after they settle.
     if (opening) return;
     const t = setTimeout(() => setInterstitial(null), 2200);
     return () => clearTimeout(t);
   }, [step]);
+
+  // Milestone progress nudge (M): fires once per threshold as the applicant
+  // advances forward — never on the initial landing step (gated on `hydrated`
+  // so F's resume settles first), and never twice for the same threshold.
+  useEffect(() => {
+    if (!hydrated || step >= LEGAL_STEP) return;
+    const prevStep = prevMilestoneStepRef.current;
+    prevMilestoneStepRef.current = step;
+    if (prevStep === null || step <= prevStep) return;
+    const isLastSection = PAGES[step][0].section === 'what-youre-here-for';
+    const fraction = (step + 1) / QUESTION_STEPS;
+    let key: string | null = null;
+    let message: string | null = null;
+    if (isLastSection) { key = 'last'; message = 'Last one.'; }
+    else if (fraction >= 0.75) { key = '75'; message = 'Almost there.'; }
+    else if (fraction >= 0.5) { key = '50'; message = 'Halfway. Still with us?'; }
+    else if (fraction >= 0.25) { key = '25'; message = "You're in it now."; }
+    if (!key || seenMilestones.current.has(key)) return;
+    seenMilestones.current.add(key);
+    setMilestoneToast(message);
+    const t = setTimeout(() => setMilestoneToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [step, hydrated]);
 
   // --- Speech-to-text (Web Speech API) ---------------------------------------
   // Feature-detect after mount (avoids any SSR/CSR divergence). Browsers without
@@ -1741,7 +1861,7 @@ export default function MembershipForm({
         onBlur={() => setFocusedField(null)}
         type={inputType}
         value={value}
-        onChange={e => setAnswer(key, e.target.value)}
+        onChange={e => setAnswer(key, inputType === 'tel' ? formatUSPhone(e.target.value) : e.target.value)}
       />
     );
   }
@@ -1749,6 +1869,25 @@ export default function MembershipForm({
   function renderSubInput(q: Question, sub: SubField) {
     const key = answerKey(q, sub);
     const value = answers[key] ?? '';
+    const socialConfig = q.id === 'links' ? SOCIAL_LINK_CONFIG[sub.id] : undefined;
+    if (socialConfig) {
+      const handle = socialHandleFromInput(value, socialConfig);
+      return (
+        <div style={{ ...getInputStyle(key), display: 'flex', alignItems: 'baseline', gap: 2 }}>
+          <span style={{ color: theme.muted, whiteSpace: 'nowrap', flexShrink: 0 }}>{socialConfig.prefix}</span>
+          <input
+            id={key}
+            style={{ background: 'transparent', border: 'none', outline: 'none', padding: 0, font: 'inherit', color: 'inherit', width: '100%', caretColor: theme.accent }}
+            onFocus={() => setFocusedField(key)}
+            onBlur={() => setFocusedField(null)}
+            type="text"
+            placeholder={sub.placeholder}
+            value={handle}
+            onChange={e => setAnswer(key, socialUrlFromHandle(socialHandleFromInput(e.target.value, socialConfig), socialConfig))}
+          />
+        </div>
+      );
+    }
     if (sub.type === 'select') {
       return (
         <select
@@ -1774,6 +1913,7 @@ export default function MembershipForm({
       : sub.type === 'date' ? 'date'
       : sub.type === 'time' ? 'time'
       : 'text';
+    const isCityField = q.id === 'homeAddress' && sub.id === 'city';
     return (
       <input
         id={key}
@@ -1781,7 +1921,10 @@ export default function MembershipForm({
           ? { ...getInputStyle(key), colorScheme: isNight ? 'dark' : 'light' }
           : getInputStyle(key)}
         onFocus={() => setFocusedField(key)}
-        onBlur={() => setFocusedField(null)}
+        onBlur={() => {
+          setFocusedField(null);
+          if (isCityField && value) setAnswer(key, titleCaseCity(value));
+        }}
         type={inputType}
         placeholder={sub.placeholder}
         value={value}
@@ -1838,6 +1981,19 @@ export default function MembershipForm({
       <div key={q.id} style={fieldGroup}>
         <label style={labelStyle}>{q.label}{q.required && <span style={{ color: theme.accent }}> *</span>}</label>
         {q.help && <p style={helpStyle}>{q.help}</p>}
+        {q.tooltip && (
+          <p style={helpStyle}>
+            {q.tooltip.text}{' '}
+            <a
+              href={q.tooltip.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: theme.accent, textDecoration: 'underline' }}
+            >
+              {q.tooltip.linkLabel}
+            </a>
+          </p>
+        )}
         {renderSimpleInput(q, key, hintKey === key)}
       </div>
     );
@@ -2050,11 +2206,42 @@ export default function MembershipForm({
         </div>
       )}
 
+      {/* Milestone progress nudge (M). Reuses the same draftToastIn primitive as
+          "Draft saved" above rather than a new animation; positioned near the top
+          (under the nav) so the two toasts never collide if both happen to fire. */}
+      {milestoneToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            top: 'calc(72px + env(safe-area-inset-top))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 50,
+            background: theme.text,
+            color: theme.bg,
+            fontFamily: bodyFont,
+            fontSize: 12,
+            fontWeight: 500,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            padding: '12px 22px',
+            borderRadius: 999,
+            pointerEvents: 'none',
+            animation: 'draftToastIn 220ms ease',
+          }}
+        >
+          {milestoneToast}
+        </div>
+      )}
+
       {/* Section interstitial */}
       {interstitial && step < REVEAL_STEP && (
         <SectionIntro
           eyebrow={interstitial.eyebrow}
           title={interstitial.title}
+          subtitle={interstitial.subtitle}
           onDone={() => {
             const playPull = interstitial?.opening === true && shouldPlayOpeningPull();
             setInterstitial(null);
@@ -2228,6 +2415,13 @@ export default function MembershipForm({
 
         {/* QUESTION PAGES */}
         {step < LEGAL_STEP && (() => {
+          if (!hydrated) {
+            return (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '120px 24px' }}>
+                <p style={{ fontFamily: bodyFont, fontSize: 13, color: theme.muted }}>Loading…</p>
+              </div>
+            );
+          }
           const page = PAGES[step];
           const section = SECTION_BY_ID[page[0].section];
           const isFirstPageOfSection = step === 0 || PAGES[step - 1][0].section !== page[0].section;
@@ -2331,6 +2525,24 @@ export default function MembershipForm({
                 />
                 <span>{disclosures.membershipTerms}</span>
               </label>
+
+              {/* UI-only divider - not part of the legal disclosures text above or
+                  below (those stay verbatim from CONSENT_DISCLOSURES). Just a signal
+                  that the required box is done and the remaining two are optional. */}
+              <p
+                style={{
+                  fontFamily: bodyFont,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: theme.muted,
+                  margin: '4px 0 14px 0',
+                }}
+              >
+                The next two are optional.
+              </p>
+
               <label style={consentRowStyle}>
                 <input
                   type="checkbox"
