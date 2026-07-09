@@ -49,6 +49,12 @@ const THEME = {
   primary: 'var(--primary)',
 };
 
+const SCORING_STATUS_LINES = [
+  'Reading your answers',
+  'Finding your nature',
+  'Deciding where you belong',
+];
+
 interface FormData {
   fullName: string;
   email: string;
@@ -570,6 +576,19 @@ export default function MembershipForm({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
+  const [scoringLineIndex, setScoringLineIndex] = useState(0);
+  // Cycles the scoring-loading status lines while the submit -> scoring call
+  // (handleSubmit) is in flight on the House Rules page. Pure UI timer - reads
+  // isLoading, never writes it. Resets and restarts whenever the overlay
+  // (re)activates; cleans up on unmount so nothing lingers after scoring returns.
+  useEffect(() => {
+    if (!(step === LEGAL_STEP && isLoading)) return;
+    setScoringLineIndex(0);
+    const id = setInterval(() => {
+      setScoringLineIndex(i => (i + 1) % SCORING_STATUS_LINES.length);
+    }, 1600);
+    return () => clearInterval(id);
+  }, [step, isLoading]);
   const [showFrogger, setShowFrogger] = useState(false);
   // Photos persist like the personality PDF: each is uploaded on pick and its
   // private R2 key stored in answers['photos.urls'] (the source of truth, autosaved
@@ -2260,6 +2279,9 @@ export default function MembershipForm({
             opacity: 1 !important;
             transform: none !important;
           }
+          .apply-scoring-line {
+            transition: none !important;
+          }
         }
         /* Suppress the browser-native autofill / contacts / credentials glyphs
            (the blue icons) inside the editorial inputs - OS/browser chrome we
@@ -2690,6 +2712,56 @@ export default function MembershipForm({
             </div>
           );
         })()}
+
+        {/* Submit -> scoring loading screen. Pure display layer: reads the existing
+            isLoading state (set inside frozen handleSubmit) while LEGAL_STEP is
+            current - this is the only step whose "next" action is guardedSubmit /
+            handleSubmit, so isLoading here means the scoring call is in flight, not a
+            normal per-page save. All three lines stay mounted and crossfade via a
+            plain opacity transition (no keyframe/remount), so the outgoing and
+            incoming lines animate simultaneously - never both near-zero at once.
+            Unmounts naturally when handleSubmit's batched setSubmitResult +
+            setStep(REVEAL_STEP) + setIsLoading(false) land together and the reveal
+            below takes over - no change to that transition. */}
+        {step === LEGAL_STEP && isLoading && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 120,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--bg-reveal)',
+            color: 'var(--text-night)',
+            fontFamily: bodyFont,
+            textAlign: 'center',
+            padding: 24,
+          }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: 360, minHeight: 26 }}>
+              {SCORING_STATUS_LINES.map((line, i) => (
+                <p
+                  key={line}
+                  className="apply-scoring-line"
+                  aria-hidden={scoringLineIndex !== i}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    margin: 0,
+                    fontSize: 17,
+                    letterSpacing: '0.02em',
+                    color: THEME.night.muted,
+                    opacity: scoringLineIndex === i ? 1 : 0,
+                    transition: 'opacity 700ms ease',
+                  }}
+                >
+                  {line}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* SCREEN 8: Reveal */}
         {step === REVEAL_STEP && submitResult && Object.keys(submitResult.archetypeScores ?? {}).length > 0 && (
