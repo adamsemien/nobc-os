@@ -973,12 +973,15 @@ export default function MembershipForm({
     // Returning applicants are dropped mid-form (resume via ?id= or a saved local
     // draft) and must NOT re-see the opening manifesto. Mark the section seen and
     // bail so it can't fire now or later this session. The later title-cards are
-    // unaffected.
+    // unaffected. Preview mode is structurally never "resuming" (no ?id=, no
+    // DRAFT_KEY - every effect that would set either bails on previewMode), but
+    // it's meant to mirror the logged-in draft-resume flow, not the brand-new
+    // one, so it bails here too.
     if (opening) {
       const resuming =
         !!searchParams.get('id') ||
         (typeof window !== 'undefined' && !!window.localStorage.getItem(DRAFT_KEY));
-      if (resuming) {
+      if (resuming || previewMode) {
         seenSections.current.add(sectionId);
         return;
       }
