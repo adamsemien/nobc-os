@@ -105,15 +105,16 @@ export const SECTIONS: Section[] = [
   { id: 'what-youre-here-for', index: 3, title: "Who You'd Bring In", eyebrow: 'SECTION 03', subtitle: "Someone whose taste you trust." },
 ];
 
-/** Editorial intro copy rendered above Section 01. */
+/** Editorial intro copy rendered above Section 01. Kept verbatim in sync with
+ *  ApplyAccountGate.tsx's renderCopy (item B) - same words, different surface. */
 export const INTRO = {
   lead:
-    'No Bad Company exists because the right introduction at the right moment changes everything. This application is how we make that happen with intention.',
+    "The better we know you, the better the introductions get. The right dinner. The right seat. The introduction you didn't see coming and didn't know you needed.",
   body: [
-    'Answer as specifically as you can. Not the polished version - the real one. The more honestly you show up here, the more precisely we can curate who walks into the same room as you.',
-    "Sometimes you'll know exactly who you need to meet. Sometimes you won't - and that's where we come in.",
+    "We made this fun on purpose. Part conversation, part game. At the end, you'll get your archetype: how you show up as your best, most authentic self in a room, so every room we put you in is built to bring that out of you.",
+    'Set aside 20 to 30 minutes, pour something good, and answer in your own voice. No wrong answers. The person we meet here is the person we build rooms around, so the more honest you are, the more the rooms will feel like they were made for you.',
   ],
-  bold: 'We read every application. Nothing goes unnoticed.',
+  bold: 'Best done on a laptop.',
 };
 
 /** US states + District of Columbia, full names, for the home-address select. */
