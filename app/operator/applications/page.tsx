@@ -28,6 +28,7 @@ type ApiApplication = {
   aiRecommendation: string | null;
   aiReasoning: string | null;
   answers: Record<string, string>;
+  answerLabels: Record<string, string>;
   archetype: string | null;
   archetypeScores: Record<string, number> | null;
   referredBy: string | null;
@@ -62,6 +63,7 @@ function toQueueItem(row: ApiApplication): ApplicationsQueueItem {
     aiScore: row.aiScore,
     aiReasoning: row.aiReasoning,
     answers: row.answers ?? {},
+    answerLabels: row.answerLabels ?? {},
     archetype: row.archetype ?? null,
     archetypeScores: row.archetypeScores ?? null,
     referredBy: row.referredBy ?? null,

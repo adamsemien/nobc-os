@@ -186,10 +186,17 @@ export default async function OperatorApplicationDetailPage({
               <div className="space-y-6">
                 {app.substantiveAnswers.map(row => {
                   const chip = urlChip(row.answer);
+                  // Tracked uppercase reads fine for short field names but gets
+                  // heavy once a header is a full question sentence (In-A-Room prompts).
+                  const isLongLabel = row.label.length > 28;
                   return (
                     <div key={row.questionKey}>
                       <p
-                        className="mb-1 text-xs font-semibold uppercase tracking-[0.18em]"
+                        className={
+                          isLongLabel
+                            ? 'mb-1 text-xs font-semibold'
+                            : 'mb-1 text-xs font-semibold uppercase tracking-[0.18em]'
+                        }
                         style={{ color: 'var(--text-secondary)' }}
                       >
                         {row.label}

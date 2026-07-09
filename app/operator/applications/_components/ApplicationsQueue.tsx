@@ -35,6 +35,7 @@ export type ApplicationsQueueItem = {
     | null;
   aiReasoning: string | null;
   answers: Record<string, string>;
+  answerLabels?: Record<string, string>;
   archetype: string | null;
   archetypeScores: Record<string, number> | null;
   referredBy: string | null;
@@ -1186,14 +1187,24 @@ function DetailPanel({
           {entries
             .filter(([, v]) => v.trim())
             .map(([key, value]) => {
+              const label = app.answerLabels?.[key] ?? labelForKey(key);
               const display = displayAnswerValue(value);
               // Long-form prose spans the full panel width; short fields (City,
               // Neighborhood, …) flow two-up so the wide panel isn't half-empty.
               const isLong = display.includes('\n') || display.length > 60;
+              // Tracked uppercase reads fine for short field names but gets heavy
+              // once a header is a full question sentence (In-A-Room prompts).
+              const isLongLabel = label.length > 28;
               return (
                 <div key={key} className={`min-w-0${isLong ? ' @xl:col-span-2' : ''}`}>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
-                    {labelForKey(key)}
+                  <p
+                    className={
+                      isLongLabel
+                        ? 'text-[11px] font-medium text-text-muted'
+                        : 'text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted'
+                    }
+                  >
+                    {label}
                   </p>
                   <p className="mt-2 whitespace-pre-wrap break-words text-[15px] font-medium leading-relaxed text-text-primary">
                     {display}

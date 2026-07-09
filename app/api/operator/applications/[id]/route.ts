@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { answerQuestions } from '@/lib/apply-config';
 import { referrerLines } from '@/lib/operator-application-display';
-import { resolveAnswerLabel } from '@/lib/legacy-answer-labels';
+import { buildAnswerResolver } from '@/lib/apply/resolve-application-answers';
 import { isPortraitRef, portraitSrc } from '@/lib/apply-photo';
 
 const QUESTION_ORDER = new Map(answerQuestions.map((q, i) => [q.key, i]));
@@ -38,6 +38,11 @@ export async function GET(
   // Anything underscore-prefixed is system metadata (e.g. `_photos`), not Q&A.
   const isSystemKey = (k: string) => k.startsWith('_');
 
+  // Resolve option-backed answers to their human labels, and show the real
+  // applicant-facing question prompt instead of the CRM stableKey. Scoped to
+  // this application's template when it has one, else workspace-wide (older rows).
+  const resolver = await buildAnswerResolver(workspaceId, app.templateId);
+
   // Render the answer rows that actually exist on this application, keyed by
   // each row's own questionKey — NOT a fixed allow-list. Matching against a
   // fixed key list dropped every row whose key didn't match (seed snake_case,
@@ -60,8 +65,8 @@ export async function GET(
     )
     .map(a => ({
       questionKey: a.questionKey,
-      label: resolveAnswerLabel(a.questionKey),
-      answer: a.answer,
+      label: resolver.label(a.questionKey),
+      answer: resolver.value(a.questionKey, a.answer),
     }));
 
   const consentAnswers = answerQuestions
