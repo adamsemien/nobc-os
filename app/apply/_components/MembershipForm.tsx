@@ -1175,6 +1175,55 @@ export default function MembershipForm({
     }, 400);
   }, [step]);
 
+  // Browser-back intercept: without this, pressing the physical/gesture back
+  // button exits the whole /apply flow instead of stepping back one section
+  // like the in-app "‹ back" button (below, unchanged) does. Armed only while
+  // there's a section to step back into - never at step 0, never once
+  // submitted, never before the preview "Start your profile" gate - so the
+  // browser's native back still works at every boundary.
+  //
+  // historyPrimedRef tracks whether an extra (same-URL) history entry is
+  // currently sitting on the stack. It's pushed once when the trap first
+  // activates (mount at step > 0, or a 0 -> 1 transition), then popped and
+  // re-pushed synchronously inside the handler on every intercepted back so a
+  // fast double-back can't escape it. If step reaches 0 (or the app submits)
+  // via the in-app button - which never touches history - the entry goes
+  // stale; the next physical back press passes it straight through (one more
+  // history.back()) so a single press still exits, instead of silently
+  // eating the first press.
+  const historyPrimedRef = useRef(false);
+  useEffect(() => {
+    const trapActive = step > 0 && !submitResult && (!previewMode || previewStarted);
+
+    if (trapActive && !historyPrimedRef.current) {
+      window.history.pushState(null, '', window.location.href);
+      historyPrimedRef.current = true;
+    }
+
+    function onPopState() {
+      if (trapActive) {
+        setIsTransitioning(true);
+        setTransitionDirection('backward');
+        setTimeout(() => {
+          setStep(s => Math.max(0, s - 1));
+          setIsTransitioning(false);
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        }, 400);
+        if (step - 1 > 0) {
+          window.history.pushState(null, '', window.location.href);
+        } else {
+          historyPrimedRef.current = false;
+        }
+      } else if (historyPrimedRef.current) {
+        historyPrimedRef.current = false;
+        window.history.back();
+      }
+    }
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [step, submitResult, previewMode, previewStarted]);
+
   const set = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
     setData(prev => ({ ...prev, [key]: value }));
   }, []);
