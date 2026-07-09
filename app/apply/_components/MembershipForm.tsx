@@ -19,6 +19,7 @@ import {
 import { PREVIEW_ANSWERS, PREVIEW_REVEAL, PREVIEW_IN_A_ROOM } from '../_lib/preview-fixture';
 import InARoomTapGrid from './InARoomTapGrid';
 import InARoomMostLeast from './InARoomMostLeast';
+import ApplyAccountGate from './ApplyAccountGate';
 
 /** DB option (id + label) for an In-A-Room question, loaded per draft. */
 type InARoomOption = { id: string; label: string; order: number };
@@ -548,6 +549,10 @@ export default function MembershipForm({
   );
 
   const [isNight, setIsNight] = useState(false);
+  // Preview parity: real /apply opens on ApplyAccountGate before the form.
+  // previewStarted gates that same screen in preview, so "Start your profile"
+  // simply reveals the form below — no draft is created, no Clerk call.
+  const [previewStarted, setPreviewStarted] = useState(false);
   const [step, setStep] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionDirection, setTransitionDirection] = useState<'forward' | 'backward'>('forward');
@@ -2072,6 +2077,10 @@ export default function MembershipForm({
       return;
     }
     patchAndAdvance(answersForPage(page), pageIndex + 1);
+  }
+
+  if (previewMode && !previewStarted) {
+    return <ApplyAccountGate previewMode onBegin={() => setPreviewStarted(true)} />;
   }
 
   return (

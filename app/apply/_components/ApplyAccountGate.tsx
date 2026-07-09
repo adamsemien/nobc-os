@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { SignUp, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
+import { PREVIEW_ANSWERS } from '../_lib/preview-fixture';
 
 const displayFont = "'PP Editorial New', Georgia, serif";
 const bodyFont = "'Neue Haas Grotesk Display Pro', 'Helvetica Neue', Arial, sans-serif";
@@ -70,29 +71,42 @@ const doorCss = `
  * later, at the House Rules step.
  */
 
-export default function ApplyAccountGate() {
+export default function ApplyAccountGate({
+  previewMode = false,
+  onBegin,
+}: { previewMode?: boolean; onBegin?: () => void } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(() =>
+    previewMode ? `${PREVIEW_ANSWERS.firstName} ${PREVIEW_ANSWERS.lastName}` : '',
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   // The verified Clerk email is the single source of truth for the account-linked
-  // application. Read-only in the UI; never typed.
-  const verifiedEmail =
-    user?.primaryEmailAddress?.verification?.status === 'verified'
+  // application. Read-only in the UI; never typed. Preview mode substitutes the
+  // fixture email — no real Clerk identity is read here.
+  const verifiedEmail = previewMode
+    ? PREVIEW_ANSWERS.email
+    : user?.primaryEmailAddress?.verification?.status === 'verified'
       ? user.primaryEmailAddress.emailAddress
       : '';
 
-  // Once signed in, pre-fill the editable name from the Clerk profile.
+  // Once signed in, pre-fill the editable name from the Clerk profile. Skipped in
+  // preview so the fixture name is never overwritten by the operator's own account.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (previewMode || !isLoaded || !isSignedIn) return;
     const full = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
     if (full) setName(full);
-  }, [isLoaded, isSignedIn, user]);
+  }, [previewMode, isLoaded, isSignedIn, user]);
 
   async function beginApplication() {
+    // Preview: advance into the form only — no draft is created, no Clerk call.
+    if (previewMode) {
+      onBegin?.();
+      return;
+    }
     if (!verifiedEmail || submitting) return;
     setSubmitting(true);
     setError('');
@@ -203,7 +217,7 @@ export default function ApplyAccountGate() {
   // (copy left, Clerk card right); single column with a "To begin" marker on mobile.
   // DOM order stays copy -> sign-in link -> marker -> card so the screen-reader
   // order matches the visual order on both breakpoints.
-  if (isLoaded && !isSignedIn) {
+  if (!previewMode && isLoaded && !isSignedIn) {
     return (
       <div className="apply-door-root">
         <style>{doorCss}</style>
@@ -241,14 +255,15 @@ export default function ApplyAccountGate() {
     );
   }
 
-  // Signed-in (or not-yet-loaded): the original single-column confirm view,
-  // unchanged — locked verified email + editable name + begin.
+  // Signed-in (or not-yet-loaded) — or preview mode, which always uses this
+  // branch: the original single-column confirm view, unchanged — locked
+  // verified email + editable name + begin.
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: 'clamp(48px, 8vw, 96px) 24px' }}>
       <div style={{ maxWidth: 560, width: '100%', margin: '0 auto' }}>
         {renderCopy('var(--text-secondary)')}
 
-        {isLoaded && isSignedIn && (
+        {(previewMode || (isLoaded && isSignedIn)) && (
           <div>
             <label style={labelStyle}>Name</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" style={{ ...fieldStyle, marginBottom: 24 }} />
