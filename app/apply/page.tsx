@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: 'apply - no bad company',
   openGraph: {
     title: 'apply - no bad company',
-    description: 'membership by application. ten minutes. we read every word.',
+    description: 'Good people welcome.',
     // PNG, not the source SVG - link unfurlers (iMessage/Slack/Twitter)
     // ignore SVG og:images. og-apply.png is rasterized from og-apply.svg.
     images: [{ url: '/og-apply.png', width: 1200, height: 630 }],
