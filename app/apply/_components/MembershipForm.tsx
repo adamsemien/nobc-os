@@ -1996,6 +1996,43 @@ export default function MembershipForm({
             {sub.label}{sub.required && <span style={{ color: theme.accent }}> *</span>}
           </label>
         ) : null;
+      if (q.id === 'referrals') {
+        // Referral-only layout: pairs First/Last per referral under a small
+        // "Referral N" heading instead of six same-weight fields in the default
+        // grid, so which two names belong together (and that only the first
+        // pair is required) reads clearly. Scoped to this question's id only -
+        // does not use the `row` field or groupSubFieldsByRow, which stay
+        // reserved for the home-address group. The shortened on-page label is
+        // derived here for display only; the stored sub.label (used by
+        // missingRequiredFields' validation banner) is untouched.
+        const pairs: SubField[][] = [];
+        for (let i = 0; i < fields.length; i += 2) pairs.push(fields.slice(i, i + 2));
+        return (
+          <div key={q.id} style={fieldGroup}>
+            <label style={labelStyle}>{q.label}</label>
+            {q.help && <p style={helpStyle}>{q.help}</p>}
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {pairs.map((pair, i) => (
+                <div key={i}>
+                  <p style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', color: theme.muted, marginBottom: 10 }}>
+                    Referral {i + 1}
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                    {pair.map(sub => (
+                      <div key={sub.id} style={{ flex: '1 1 140px', minWidth: 0 }}>
+                        <label style={{ ...labelStyle, fontSize: 12, fontWeight: 500, color: theme.muted }}>
+                          {sub.label?.replace(/^Referral \d - /, '')}{sub.required && <span style={{ color: theme.accent }}> *</span>}
+                        </label>
+                        {renderSubInput(q, sub)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
       const hasRows = fields.some(f => f.row);
       return (
         <div key={q.id} style={fieldGroup}>
