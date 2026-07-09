@@ -1202,6 +1202,16 @@ export default function MembershipForm({
 
     function onPopState() {
       if (trapActive) {
+        // Section interstitials (942-970) are a full-screen overlay decoupled
+        // from `step`, auto-dismissed by their own 2200ms timer. If a back
+        // press steps off the page that timer was set for before it fires,
+        // that effect's cleanup kills the timer but never clears the overlay
+        // (its re-run lands on a non-boundary step and returns early) - the
+        // card gets stuck on screen, masking every subsequent step change
+        // until the trap silently runs out and a later press exits natively.
+        // Clearing it here, unconditionally, closes that gap: a no-op when
+        // nothing is showing, a fix when something is.
+        setInterstitial(null);
         setIsTransitioning(true);
         setTransitionDirection('backward');
         setTimeout(() => {
