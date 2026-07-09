@@ -9,6 +9,7 @@ import {
   firstAnswerPreview,
   referrerCount,
 } from '@/lib/operator-application-display';
+import { buildAnswerResolver, type AnswerResolver } from '@/lib/apply/resolve-application-answers';
 import type { ApplicationStatus } from '@prisma/client';
 
 function parseStatus(param: string | null): ApplicationStatus[] | 'ALL' {
@@ -21,10 +22,17 @@ function parseStatus(param: string | null): ApplicationStatus[] | 'ALL' {
   return ['PENDING'];
 }
 
-function answersRecord(
+function resolveAnswers(
+  resolver: AnswerResolver,
   answers: { questionKey: string; answer: string }[],
-): Record<string, string> {
-  return Object.fromEntries(answers.map(a => [a.questionKey, a.answer]));
+): { answers: Record<string, string>; answerLabels: Record<string, string> } {
+  const answersOut: Record<string, string> = {};
+  const answerLabels: Record<string, string> = {};
+  for (const a of answers) {
+    answersOut[a.questionKey] = resolver.value(a.questionKey, a.answer);
+    answerLabels[a.questionKey] = resolver.label(a.questionKey);
+  }
+  return { answers: answersOut, answerLabels };
 }
 
 export async function GET(req: NextRequest) {
@@ -52,30 +60,47 @@ export async function GET(req: NextRequest) {
     db.application.count({ where: { workspaceId, status: 'HOLD' } }),
   ]);
 
-  const applications = rows.map(app => ({
-    id: app.id,
-    fullName: app.fullName,
-    email: app.email,
-    city: app.city,
-    phone: app.phone,
-    submittedAt: app.createdAt.toISOString(),
-    status: app.status,
-    // Phase C: the email opt-in now lives on `emailOptIn` (the member apply flow
-    // stopped writing legacy `consentEmail`); read it so the queue reflects the
-    // real opt-in. Transport key stays `consentEmail` (display unchanged).
-    consentEmail: app.emailOptIn,
-    consentSms: app.consentSms,
-    firstAnswerPreview: firstAnswerPreview(app.answers),
-    referrerCount: referrerCount(app.referredBy, app.answers),
-    aiTags: app.aiTags,
-    aiScore: app.aiScore,
-    aiRecommendation: app.aiRecommendation,
-    aiReasoning: app.aiReasoning,
-    archetype: app.archetype,
-    archetypeScores: app.archetypeScores as Record<string, number> | null,
-    referredBy: app.referredBy,
-    answers: answersRecord(app.answers),
-  }));
+  // Resolve option-backed answers to their human labels/values, same as the
+  // detail route. Applications can span several templates, so build one
+  // resolver per distinct templateId (instead of per application) to avoid
+  // an N+1 questionDefinition query per row.
+  const distinctTemplateIds = Array.from(new Set(rows.map(app => app.templateId)));
+  const resolverByTemplateId = new Map<string | null, AnswerResolver>();
+  await Promise.all(
+    distinctTemplateIds.map(async templateId => {
+      resolverByTemplateId.set(templateId, await buildAnswerResolver(workspaceId, templateId));
+    }),
+  );
+
+  const applications = rows.map(app => {
+    const resolver = resolverByTemplateId.get(app.templateId)!;
+    const { answers, answerLabels } = resolveAnswers(resolver, app.answers);
+    return {
+      id: app.id,
+      fullName: app.fullName,
+      email: app.email,
+      city: app.city,
+      phone: app.phone,
+      submittedAt: app.createdAt.toISOString(),
+      status: app.status,
+      // Phase C: the email opt-in now lives on `emailOptIn` (the member apply flow
+      // stopped writing legacy `consentEmail`); read it so the queue reflects the
+      // real opt-in. Transport key stays `consentEmail` (display unchanged).
+      consentEmail: app.emailOptIn,
+      consentSms: app.consentSms,
+      firstAnswerPreview: firstAnswerPreview(app.answers),
+      referrerCount: referrerCount(app.referredBy, app.answers),
+      aiTags: app.aiTags,
+      aiScore: app.aiScore,
+      aiRecommendation: app.aiRecommendation,
+      aiReasoning: app.aiReasoning,
+      archetype: app.archetype,
+      archetypeScores: app.archetypeScores as Record<string, number> | null,
+      referredBy: app.referredBy,
+      answers,
+      answerLabels,
+    };
+  });
 
   return NextResponse.json({
     applications,

@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { answerQuestions } from '@/lib/apply-config';
 import { referrerLines } from '@/lib/operator-application-display';
-import { resolveAnswerLabel } from '@/lib/legacy-answer-labels';
+import { buildAnswerResolver } from '@/lib/apply/resolve-application-answers';
 import { isPortraitRef, portraitSrc } from '@/lib/apply-photo';
 
 const QUESTION_ORDER = new Map(answerQuestions.map((q, i) => [q.key, i]));
@@ -39,54 +39,9 @@ export async function GET(
   const isSystemKey = (k: string) => k.startsWith('_');
 
   // Resolve option-backed answers to their human labels, and show the real
-  // applicant-facing question prompt instead of the CRM stableKey. In-A-Room
-  // questions store IDs, not text: a `tap_grid` answer is a single QuestionOption
-  // id; a `most_least` answer is JSON `{"mostId":"…","leastId":"…"}`. Both render
-  // as raw UUID/JSON without this. Display-only — storage is untouched. Scoped to
+  // applicant-facing question prompt instead of the CRM stableKey. Scoped to
   // this application's template when it has one, else workspace-wide (older rows).
-  const questionDefs = await db.questionDefinition.findMany({
-    where: {
-      workspaceId,
-      ...(app.templateId ? { templateId: app.templateId } : {}),
-    },
-    select: {
-      stableKey: true,
-      label: true,
-      type: true,
-      options: { select: { id: true, label: true } },
-    },
-  });
-  const questionTextByKey = new Map<string, string>();
-  const questionTypeByKey = new Map<string, string>();
-  const optionBackedKeys = new Set<string>();
-  const optionLabelById = new Map<string, string>();
-  for (const q of questionDefs) {
-    questionTextByKey.set(q.stableKey, q.label);
-    questionTypeByKey.set(q.stableKey, q.type);
-    if (q.options.length > 0) optionBackedKeys.add(q.stableKey);
-    for (const o of q.options) optionLabelById.set(o.id, o.label);
-  }
-
-  // Turn a stored answer into display text. Most/least → "Most: X · Least: Y"
-  // (labels only, no points). Single-select tap → the option's label. Free-text
-  // and any unknown/missing id fall back to the raw value — never blank, never throw.
-  const resolveAnswerValue = (questionKey: string, raw: string): string => {
-    if (questionTypeByKey.get(questionKey) === 'most_least') {
-      try {
-        const o = JSON.parse(raw) as { mostId?: unknown; leastId?: unknown };
-        if (typeof o.mostId === 'string' && typeof o.leastId === 'string') {
-          const most = optionLabelById.get(o.mostId) ?? o.mostId;
-          const least = optionLabelById.get(o.leastId) ?? o.leastId;
-          return `Most: ${most} · Least: ${least}`;
-        }
-      } catch {
-        /* not JSON → fall through to the raw value */
-      }
-      return raw;
-    }
-    if (optionBackedKeys.has(questionKey)) return optionLabelById.get(raw) ?? raw;
-    return raw;
-  };
+  const resolver = await buildAnswerResolver(workspaceId, app.templateId);
 
   // Render the answer rows that actually exist on this application, keyed by
   // each row's own questionKey — NOT a fixed allow-list. Matching against a
@@ -110,8 +65,8 @@ export async function GET(
     )
     .map(a => ({
       questionKey: a.questionKey,
-      label: questionTextByKey.get(a.questionKey) ?? resolveAnswerLabel(a.questionKey),
-      answer: resolveAnswerValue(a.questionKey, a.answer),
+      label: resolver.label(a.questionKey),
+      answer: resolver.value(a.questionKey, a.answer),
     }));
 
   const consentAnswers = answerQuestions
