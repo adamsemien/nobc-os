@@ -626,6 +626,10 @@ export default function MembershipForm({
   const submittingRef = useRef(false);
 
   const theme = isNight ? THEME.night : THEME.day;
+  // Progress across all pre-reveal screens, including LEGAL_STEP (+1) - a
+  // single-question page (e.g. the last chapter page) no longer reads as 100%
+  // one screen early; 100% is reserved for the actual last screen before submit.
+  const progressPercent = Math.round(((step + 1) / (QUESTION_STEPS + 1)) * 100);
 
   function setAnswer(key: string, value: string) {
     setAnswers(prev => ({ ...prev, [key]: value }));
@@ -2472,6 +2476,11 @@ export default function MembershipForm({
         background: step === REVEAL_STEP ? 'var(--bg-reveal)' : theme.bg,
       }}>
         <Link href="/" style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 400, fontStyle: 'italic', color: theme.accent, textDecoration: 'none', letterSpacing: '0.02em' }}>The No Bad Company</Link>
+        {step < REVEAL_STEP && (
+          <span style={{ fontFamily: bodyFont, fontSize: 13, fontWeight: 500, color: theme.muted, letterSpacing: '0.02em' }}>
+            {progressPercent}%
+          </span>
+        )}
         <button onClick={() => setIsNight(n => !n)} style={{
           background: 'none',
           border: `1px solid ${theme.border}`,
@@ -2491,7 +2500,10 @@ export default function MembershipForm({
           <span style={{ opacity: isNight ? 1 : 0.4, transition: 'opacity 200ms ease', fontSize: 13 }}>&#127769;</span>
         </button>
 
-        {/* Global progress bar - tracks the 6 chapter pages (Page 1 = 1/6 ... legal = full). */}
+        {/* Global progress bar - tracks all 8 chapter pages PLUS the legal/consent
+            step (progressPercent's +1 denominator, declared above with `theme`),
+            so 100% lands on the actual last screen before submit rather than one
+            page early on the final (single-question) chapter page. */}
         {step < REVEAL_STEP && (
           <div
             aria-hidden
@@ -2500,7 +2512,7 @@ export default function MembershipForm({
             <div
               style={{
                 height: '100%',
-                width: `${Math.round((step < QUESTION_STEPS ? (step + 1) / QUESTION_STEPS : 1) * 100)}%`,
+                width: `${progressPercent}%`,
                 background: theme.accent,
                 transition: 'width 450ms cubic-bezier(0.16, 1, 0.3, 1)',
               }}
