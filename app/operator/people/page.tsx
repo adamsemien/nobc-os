@@ -7,6 +7,7 @@ import { getMemberWorkspaceId } from '@/lib/auth';
 import { isStaff } from '@/lib/operator-role';
 import { AddPersonSheet } from './_components/AddPersonSheet';
 import { PeopleToolbar } from './_components/PeopleToolbar';
+import { SaveAsSegmentButton } from './_components/SaveAsSegmentButton';
 import {
   Avatar,
   DataTableBody,
@@ -122,13 +123,16 @@ export default async function PeoplePage({
             </>
           }
         />
-        <PeopleToolbar
-          filters={{ q, source, verified, membership, consent, sort }}
-          sourceOptions={Object.entries(CONTACT_SOURCE_LABELS).map(([value, label]) => ({
-            value,
-            label,
-          }))}
-        />
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <PeopleToolbar
+            filters={{ q, source, verified, membership, consent, sort }}
+            sourceOptions={Object.entries(CONTACT_SOURCE_LABELS).map(([value, label]) => ({
+              value,
+              label,
+            }))}
+          />
+          <SaveAsSegmentButton filters={{ q, source, verified, membership, consent }} />
+        </div>
         {people.length === 0 ? (
           filtersActive ? (
             <EmptyState

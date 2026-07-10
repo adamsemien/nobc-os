@@ -67,6 +67,11 @@ model Workspace {
   contactSources         ContactSource[]
   transactionalEmailLogs TransactionalEmailLog[]
 
+  // Slice 4 (Segments, saved views & the operator-action log). Relation fields
+  // only; no columns on Workspace.
+  segments        Segment[]
+  operatorActions OperatorAction[]
+
   // Digital Asset Manager (Stage 15)
   assets         Asset[]
   mediaFolders   MediaFolder[]
@@ -308,6 +313,11 @@ model Person {
   smsConversations     SmsConversation[]
   transactionalEmailLogs TransactionalEmailLog[]
 
+  // Slice 4 (Segments, saved views & the operator-action log). Relation fields
+  // only; no columns on Person.
+  segmentSnapshotMembers SegmentSnapshotMember[]
+  operatorActionTargets  OperatorActionTarget[]
+
   // clerkUserId stays unique when present (NULLs are distinct in Postgres).
   // email is a plain index - see emailVerified doc above.
   @@unique([workspaceId, clerkUserId])
@@ -481,6 +491,11 @@ model Member {
   // Slice 3 (Communicate + log it). Relation fields only; no columns on Member.
   smsConversations       SmsConversation[]
   transactionalEmailLogs TransactionalEmailLog[]
+
+  // Slice 4 (Segments, saved views & the operator-action log). Relation fields
+  // only; no columns on Member.
+  segmentSnapshotMembers SegmentSnapshotMember[]
+  operatorActionTargets  OperatorActionTarget[]
 
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
@@ -1023,6 +1038,56 @@ model AuditEvent {
   @@index([entityType, entityId])
 }
 
+/// Slice 4 (Segments, saved views & the operator-action log) — substrate for
+/// "remembers what the operator does" / attention-as-personalization. Distinct
+/// from AuditEvent: AuditEvent is always single-target (one entityType+entityId);
+/// an operator action may touch zero people (a query run), one (a one-off touch),
+/// or many (a message sent, a list built) — see OperatorActionTarget below,
+/// mirroring the Blast/BlastRecipient parent+child shape already in production.
+/// `actionType` is free text, like AuditEvent.action, so new action types never
+/// need a schema change. This slice wires exactly one write site: Segment
+/// creation emits actionType 'list_built'. message_sent/query_run/one_off_touch
+/// are named but NOT wired here — no real caller yet.
+model OperatorAction {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  actorId     String
+  actionType  String
+  summary     String?
+  metadata    Json?
+  targetCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  affected OperatorActionTarget[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, actorId])
+  @@index([workspaceId, actionType])
+  @@index([createdAt])
+}
+
+/// Dual-pointer (personId/memberId), matching the pattern already used on
+/// ChannelSubscription/SmsConversation/TransactionalEmailLog — so a future
+/// recurrence-detection layer ("I text this one person happy birthday every
+/// year") can cheaply query "every action that touched person X" by an indexed
+/// column, not a Json id-array scan. That layer is NOT built this slice — this
+/// is the seam, named not built.
+model OperatorActionTarget {
+  id        String         @id @default(cuid())
+  actionId  String
+  action    OperatorAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  personId  String?
+  person    Person?        @relation(fields: [personId], references: [id], onDelete: SetNull)
+  memberId  String?
+  member    Member?        @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  createdAt DateTime       @default(now())
+
+  @@index([actionId])
+  @@index([personId])
+  @@index([memberId])
+}
+
 /// A Cmd+K agent session. One per palette agent-mode entry (Phase 1 — no resumption).
 model AgentConversation {
   id          String   @id @default(cuid())
@@ -1231,6 +1296,66 @@ model SavedReport {
   lastRunAt   DateTime?
 
   @@index([workspaceId])
+}
+
+/// DYNAMIC = re-evaluated on read via lib/segments/evaluate.ts. STATIC = frozen
+/// at creation into SegmentSnapshotMember and never re-evaluated (no re-freeze
+/// action exists yet — later work).
+enum SegmentKind {
+  DYNAMIC
+  STATIC
+}
+
+/// Slice 4 (Segments, saved views & the operator-action log) — a reusable,
+/// named audience of people. Distinct from SavedReport (a saved dashboard
+/// metric query, no people-membership semantics) and from WatchList (a raw
+/// email/phone/instagram suppression match-list). A "saved view" is just a
+/// Segment with kind: DYNAMIC created from the lightweight People-list filter
+/// bar — one model, not two.
+///
+/// `definition` is the filter-AST (Json, NOT raw SQL) — see
+/// lib/segments/evaluate.ts for the v1 vocabulary. workspaceId is always
+/// hard-injected server-side by the evaluator; a definition can never carry
+/// its own workspaceId.
+///
+/// NO action-wiring this slice (no blast, tag, add-to-event, export target) —
+/// the object exists, resolves, and is visible. Actions are future work.
+model Segment {
+  id              String      @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id])
+  name            String
+  description     String?
+  definition      Json
+  kind            SegmentKind @default(DYNAMIC)
+  createdBy       String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  lastEvaluatedAt DateTime?
+  cachedCount     Int?
+
+  snapshotMembers SegmentSnapshotMember[]
+
+  @@index([workspaceId])
+}
+
+/// STATIC-segment frozen membership, persisted as a queryable child table (not a
+/// Json id-array on Segment) — a snapshot is a real population someone may
+/// later query by person/member, not dead storage. Dual-pointer, same rationale
+/// as OperatorActionTarget above.
+model SegmentSnapshotMember {
+  id        String   @id @default(cuid())
+  segmentId String
+  segment   Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  personId  String?
+  person    Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+  memberId  String?
+  member    Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([segmentId])
+  @@index([personId])
+  @@index([memberId])
 }
 
 // ============================================================================
