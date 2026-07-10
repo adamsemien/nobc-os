@@ -23,11 +23,16 @@ export default function InARoomTapGrid({
   value,
   onChange,
   ariaLabel,
+  excludeId,
 }: {
   options: TapOption[];
   value: string;
   onChange: (optionId: string) => void;
   ariaLabel: string;
+  /** An option id to render disabled/unselectable - e.g. skipFriday excludes
+   *  whatever was already picked in perfectFriday, since both draw from the
+   *  same scenario list and shouldn't be pickable as both a best and worst. */
+  excludeId?: string;
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const selectedIdx = options.findIndex((o) => o.id === value);
@@ -35,7 +40,10 @@ export default function InARoomTapGrid({
 
   function move(delta: number, from: number) {
     if (options.length === 0) return;
-    const next = (from + delta + options.length) % options.length;
+    let next = (from + delta + options.length) % options.length;
+    if (options[next].id === excludeId) {
+      next = (next + delta + options.length) % options.length;
+    }
     refs.current[next]?.focus();
     onChange(options[next].id); // radiogroup: moving focus moves the selection
   }
@@ -52,6 +60,7 @@ export default function InARoomTapGrid({
     >
       {options.map((o, idx) => {
         const selected = o.id === value;
+        const disabled = o.id === excludeId;
         return (
           <button
             key={o.id}
@@ -61,8 +70,12 @@ export default function InARoomTapGrid({
             type="button"
             role="radio"
             aria-checked={selected}
-            tabIndex={idx === focusIdx ? 0 : -1}
-            onClick={() => onChange(o.id)}
+            aria-disabled={disabled || undefined}
+            tabIndex={disabled ? -1 : idx === focusIdx ? 0 : -1}
+            onClick={() => {
+              if (disabled) return;
+              onChange(o.id);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
                 e.preventDefault();
@@ -79,7 +92,8 @@ export default function InARoomTapGrid({
               minHeight: 64,
               padding: '14px 16px',
               textAlign: 'left',
-              cursor: 'pointer',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.4 : 1,
               borderRadius: 10,
               border: selected ? '2px solid var(--primary)' : '1px solid var(--border)',
               background: selected ? 'var(--primary-soft)' : 'var(--bg)',
@@ -102,7 +116,14 @@ export default function InARoomTapGrid({
                 transition: 'border 120ms ease',
               }}
             />
-            <span>{o.label}</span>
+            <span>
+              {o.label}
+              {disabled && (
+                <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                  already picked
+                </span>
+              )}
+            </span>
           </button>
         );
       })}
