@@ -1,11 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
+import { TagEntityType } from '@prisma/client';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { isStaff, isAdmin } from '@/lib/operator-role';
 import { Avatar, EmptyState, PageHeader, StatusBadge, memberTone } from '@/components/ui';
 import { EditPersonFields } from '../_components/EditPersonFields';
+import { PersonConsentPanel } from '../_components/PersonConsentPanel';
+import { PersonFields } from '../_components/PersonFields';
+import { PersonTags } from '../_components/PersonTags';
 import {
   AddAffiliationForm,
   RemoveAffiliationButton,
@@ -95,6 +99,27 @@ export default async function PersonDetailPage({
     take: 50,
     select: { id: true, eventType: true, occurredAt: true },
   });
+
+  // CRM spine Slice 0: consent, custom fields, and tags for a Person with no
+  // Member. FieldDefinition stays scoped to section: 'member' (shared catalog
+  // — see the Slice 0 plan); ChannelSubscription is filtered to memberId: null
+  // so a promoted Person's member-keyed rows never show here.
+  const [fieldDefs, consentSubscriptions, personTags] = await Promise.all([
+    db.fieldDefinition.findMany({
+      where: { workspaceId, section: 'member', isActive: true },
+      orderBy: { order: 'asc' },
+      select: { stableKey: true, name: true, type: true, options: true },
+    }),
+    db.channelSubscription.findMany({
+      where: { workspaceId, personId: person.id, memberId: null },
+      select: { channel: true, status: true },
+    }),
+    db.entityTag.findMany({
+      where: { workspaceId, entityType: TagEntityType.person, entityId: person.id },
+      include: { tag: { select: { id: true, name: true, color: true } } },
+      orderBy: { appliedAt: 'desc' },
+    }),
+  ]);
 
   const display = personDisplay(person);
 
@@ -282,6 +307,34 @@ export default async function PersonDetailPage({
                 pickLabel="Pick an organization…"
               />
             ) : null}
+          </SectionCard>
+
+          <SectionCard title="Consent">
+            <PersonConsentPanel
+              personId={person.id}
+              subscriptions={consentSubscriptions}
+              canEdit={canEdit && !person.mergedIntoId}
+            />
+          </SectionCard>
+
+          <SectionCard title="Fields">
+            <PersonFields
+              personId={person.id}
+              fieldDefs={fieldDefs}
+              customFields={(person.customFields as Record<string, unknown> | null) ?? {}}
+              fieldProvenance={
+                (person.fieldProvenance as Record<string, { source?: string } | undefined> | null) ?? {}
+              }
+              canEdit={canEdit && !person.mergedIntoId}
+            />
+          </SectionCard>
+
+          <SectionCard title="Tags">
+            <PersonTags
+              personId={person.id}
+              tags={personTags.map((et) => et.tag)}
+              canEdit={canEdit && !person.mergedIntoId}
+            />
           </SectionCard>
         </div>
 

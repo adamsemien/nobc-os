@@ -228,6 +228,8 @@ All colors are CSS variables. Semantic tokens only: `bg-primary`, `text-text-pri
 ### Schema changes: never `prisma db push`
 `prisma db push` is forbidden on this repo, full stop. It will attempt to drop **`Asset_searchVector_idx`** — the GIN index that powers DAM full-text search. That index lives only in the production database, created out-of-band by `prisma/sql/dam-search-vector.sql`; it is NOT in `schema.prisma` because Prisma cannot represent a GIN index on its `Unsupported("tsvector")` type. A `db push` run treats the index as drift and removes it, breaking `/operator/media` search until someone re-runs the SQL by hand. Producer also shares this Postgres instance — a `db push` is doubly destructive.
 
+The same landmine applies to **`ChannelSubscription_person_channel_stream_key`** (CRM spine Slice 0) — a partial unique index on `ChannelSubscription("workspaceId", "personId", "channel", "stream") WHERE "memberId" IS NULL AND "personId" IS NOT NULL`, applied out-of-band because Prisma's `@@unique` cannot express a `WHERE` clause. It enforces uniqueness for person-only (no Member) consent rows. A `db push` would see it as drift and drop it, silently reopening the door to duplicate person-keyed consent rows.
+
 The required workflow for any additive schema change:
 
 1. Edit `prisma/schema.prisma`.

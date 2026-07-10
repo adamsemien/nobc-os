@@ -289,6 +289,13 @@ model Person {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Slice 0: CRM spine generalization. Mirrors Member.customFields/fieldProvenance
+  // exactly - keyed by FieldDefinition.stableKey. FieldDefinition rows stay scoped to
+  // section: 'member' for this slice (shared catalog with Member, accepted debt - see
+  // _context/_audit for a possible future split into a 'person' section).
+  customFields    Json?
+  fieldProvenance Json?
+
   members              Member[]
   applications         Application[]
   contactSources       ContactSource[]
@@ -2450,7 +2457,12 @@ enum SuppressionReason {
 model ChannelSubscription {
   id            String               @id @default(cuid())
   workspaceId   String
-  memberId      String
+  // Slice 0: nullable to allow person-only (no Member) consent rows. Member-keyed
+  // rows are unaffected — Postgres treats NULL as distinct in the existing unique
+  // constraint below, so it keeps enforcing uniqueness for memberId-set rows exactly
+  // as before. Person-only uniqueness is enforced by a separate partial unique index
+  // (ChannelSubscription_person_channel_stream_key, raw SQL — see CLAUDE.md db push note).
+  memberId      String?
   // Phase 2A: parallel Person pointer, written alongside memberId (scoped unfreeze).
   personId      String?
   channel       CommChannel
@@ -2466,7 +2478,7 @@ model ChannelSubscription {
   syncedAt      DateTime?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
-  member        Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  member        Member?              @relation(fields: [memberId], references: [id], onDelete: Cascade)
   person        Person?              @relation(fields: [personId], references: [id])
   workspace     Workspace            @relation(fields: [workspaceId], references: [id])
 
