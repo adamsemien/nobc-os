@@ -5,6 +5,10 @@
       "schedule": "0 15 * * *"
     },
     {
+      "path": "/api/cron/post-event-followup",
+      "schedule": "0 16 * * *"
+    },
+    {
       "path": "/api/cron/capture-payments",
       "schedule": "0 12 * * *"
     },

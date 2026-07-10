@@ -53,14 +53,49 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     bodyHtml:
       `<p>{{member.firstName}},</p>` +
       `<p>You're confirmed for <strong>{{event.title}}</strong>.</p>` +
-      `<p>{{event.dateFormatted}}<br/>{{event.location}}</p>` +
-      `<p>We'll send a reminder the day of. If anything changes, you can update your access at <a href="{{event.url}}">{{event.url}}</a>.</p>` +
+      `<p>{{event.dateFormatted}}<br/>{{event.timeFormatted}}<br/>{{event.location}}</p>` +
+      `<p>Your ticket and QR code are at the link below. Show it at the door and staff will scan you in.</p>` +
+      `<p><a href="{{ticket.url}}">{{ticket.url}}</a></p>` +
+      `<p>We'll send a reminder the day of.</p>` +
       SIG,
     bodyText:
       `{{member.firstName}},\n\nYou're confirmed for {{event.title}}.\n\n` +
-      `{{event.dateFormatted}}\n{{event.location}}\n\n` +
-      `We'll send a reminder day-of. Update your access: {{event.url}}\n\nNo Bad Company`,
-    variables: ['member.firstName', 'event.title', 'event.dateFormatted', 'event.location', 'event.url'],
+      `{{event.dateFormatted}}\n{{event.timeFormatted}}\n{{event.location}}\n\n` +
+      `Your ticket and QR code: {{ticket.url}}\n\n` +
+      `We'll send a reminder the day of.\n\nNo Bad Company`,
+    variables: [
+      'member.firstName',
+      'event.title',
+      'event.dateFormatted',
+      'event.timeFormatted',
+      'event.location',
+      'ticket.url',
+    ],
+    enabled: true,
+  },
+  {
+    key: 'event.reminder_upcoming',
+    name: 'Upcoming-event reminder',
+    description:
+      'Sent N days before an event to confirmed RSVPs. Off until reminder.pre_event.enabled is turned on.',
+    subject: 'Coming up: {{event.title}}',
+    bodyHtml:
+      `<p>{{member.firstName}},</p>` +
+      `<p><strong>{{event.title}}</strong> is coming up.</p>` +
+      `<p>{{event.dateFormatted}}<br/>{{event.timeFormatted}}<br/>{{event.location}}</p>` +
+      `<p>We'll send one more reminder the day of. See you there.</p>` +
+      SIG,
+    bodyText:
+      `{{member.firstName}},\n\n{{event.title}} is coming up.\n\n` +
+      `{{event.dateFormatted}}\n{{event.timeFormatted}}\n{{event.location}}\n\n` +
+      `We'll send one more reminder the day of. See you there.\n\nNo Bad Company`,
+    variables: [
+      'member.firstName',
+      'event.title',
+      'event.dateFormatted',
+      'event.timeFormatted',
+      'event.location',
+    ],
     enabled: true,
   },
   {
@@ -112,6 +147,23 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     enabled: false,
   },
   {
+    key: 'event.followup',
+    name: 'Post-event thank you',
+    description:
+      'Sent the day after an event to checked-in attendees. Off until followup.enabled is turned on.',
+    subject: 'Good to see you at {{event.title}}',
+    bodyHtml:
+      `<p>{{member.firstName}},</p>` +
+      `<p>Thank you for being part of <strong>{{event.title}}</strong>. Rooms like that only happen because of who shows up.</p>` +
+      `<p>We'll be in touch about what comes next.</p>` +
+      SIG,
+    bodyText:
+      `{{member.firstName}},\n\nThank you for being part of {{event.title}}. Rooms like that only happen because of who shows up.\n\n` +
+      `We'll be in touch about what comes next.\n\nNo Bad Company`,
+    variables: ['member.firstName', 'event.title'],
+    enabled: true,
+  },
+  {
     key: 'walkin.welcome',
     name: 'Walk-in welcome',
     description: 'Sent when an operator checks in a walk-in guest.',
@@ -156,4 +208,7 @@ export const DEFAULT_PLATFORM_SETTINGS: DefaultSetting[] = [
   { key: 'reminder.enabled', value: 'true', type: 'boolean', description: 'Master switch for day-of reminders.' },
   { key: 'event.notify_on_publish', value: 'true', type: 'boolean', description: 'Email approved members when an event publishes.' },
   { key: 'rsvp.send_confirmation', value: 'true', type: 'boolean', description: 'Send a confirmation email on RSVP.' },
+  { key: 'reminder.pre_event.enabled', value: 'false', type: 'boolean', description: 'Send an upcoming-event reminder N days before each event.' },
+  { key: 'reminder.pre_event.days_before', value: '3', type: 'text', description: 'How many days before an event the upcoming reminder sends (1-30).' },
+  { key: 'followup.enabled', value: 'false', type: 'boolean', description: 'Send a post-event thank-you to checked-in attendees the day after an event.' },
 ];

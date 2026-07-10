@@ -916,6 +916,11 @@ model RSVP {
   // Day-of reminder dedupe
   reminderSentAt DateTime?
 
+  // Event-comms lifecycle dedupe (columns applied out-of-band via
+  // prisma/sql/event-comms-rsvp-columns.sql — additive, never db push)
+  preEventReminderSentAt  DateTime?
+  postEventFollowupSentAt DateTime?
+
   // Plus-one capture (Task 10)
   plusOneName      String?
   plusOneInstagram String?

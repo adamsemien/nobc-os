@@ -2,6 +2,8 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { getOrCreateMemberFromClerk, type ClerkMemberRow } from '@/lib/clerk-member';
 import { logEngagementEvent } from '@/lib/engagement';
+import { sendTemplatedEmail, getPlatformBool } from '@/lib/email';
+import { gateLifecycleEmail } from '@/lib/comms/lifecycle-gate';
 
 export type RsvpSubmitBody = {
   eventId: string;
@@ -211,22 +213,49 @@ export async function submitMemberRsvp(
     });
   }
 
-  if (ticketStatus === 'confirmed' && process.env.RESEND_API_KEY) {
-    const eventRecord = await db.event.findUnique({
-      where: { id: eventId },
-      select: { title: true, slug: true, startAt: true, location: true },
-    });
-    if (eventRecord) {
-      const { resend } = await import('./resend');
-      const { rsvpConfirmedEmail } = await import('./email-templates');
-      const clerkUserForEmail = await (await clerkClient()).users.getUser(clerkUserId);
-      const emailAddress = clerkUserForEmail.emailAddresses[0]?.emailAddress;
-      if (emailAddress) {
-        resend.emails.send({
-          from: 'The No Bad Company <team@thenobadcompany.com>',
-          to: emailAddress,
-          ...rsvpConfirmedEmail(memberName, eventRecord.title, eventRecord.startAt, eventRecord.location, eventRecord.slug, rsvp.id),
-        }).catch(err => console.error('[rsvp] confirmation email failed:', err));
+  if (ticketStatus === 'confirmed') {
+    const confirmationEnabled = await getPlatformBool(workspaceId, 'rsvp.send_confirmation', true);
+    if (confirmationEnabled) {
+      const eventRecord = await db.event.findUnique({
+        where: { id: eventId },
+        select: { title: true, startAt: true, location: true },
+      });
+      if (eventRecord) {
+        // memberEmail comes from the red-list Clerk lookup above — same user,
+        // no second Clerk fetch. Suppression floor is checked before every
+        // lifecycle send and fails closed (lib/comms/lifecycle-gate.ts).
+        const gate = await gateLifecycleEmail({
+          workspaceId,
+          email: memberEmail,
+          memberId: member.id,
+          site: 'rsvp.confirmation',
+        });
+        if (gate.send) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.thenobadcompany.com';
+          sendTemplatedEmail(
+            workspaceId,
+            'rsvp.confirmation',
+            gate.email,
+            {
+              member: { firstName: member.firstName, lastName: member.lastName },
+              event: {
+                title: eventRecord.title,
+                dateFormatted: eventRecord.startAt.toLocaleDateString('en-US', {
+                  weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+                  timeZone: 'America/Chicago',
+                }),
+                timeFormatted: eventRecord.startAt.toLocaleTimeString('en-US', {
+                  hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago',
+                }),
+                location: eventRecord.location ?? '',
+              },
+              ticket: { url: `${appUrl}/ticket/${rsvp.id}` },
+            },
+            [{ memberId: member.id }],
+          ).catch(err => console.error('[rsvp] confirmation email failed:', err));
+        } else {
+          console.info(`[rsvp] confirmation email skipped for rsvp=${rsvp.id}: ${gate.reason}`);
+        }
       }
     }
   }
