@@ -1844,6 +1844,9 @@ export default function MembershipForm({
           value={value}
           onChange={(optionId) => setAnswer(key, optionId)}
           ariaLabel={q.label}
+          // skipFriday draws from the same scenario list as perfectFriday -
+          // block picking the same tile as both a best and worst Friday.
+          excludeId={q.id === 'skipFriday' ? answers['perfectFriday'] : undefined}
         />
       );
     }
