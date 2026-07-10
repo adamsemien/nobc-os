@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/operator-role';
 import { emitEvent } from '@/lib/emit-event';
 import {
   activeCampaignClientFromEnv,
+  activeCampaignImportListIdsFromEnv,
   ActiveCampaignClientError,
 } from '@/lib/connectors/activecampaign/client';
 import { contactToNormalizedContact } from '@/lib/connectors/activecampaign/transform';
@@ -15,12 +16,15 @@ import {
 } from '@/lib/connectors/ingest/run';
 
 /**
- * ActiveCampaign contact ingestion. Pulls every contact (offset-paged), maps each to a
+ * ActiveCampaign contact ingestion. Pulls the NoBC-slice allowlist only — the Network,
+ * Industry Partner, and Sphere lists (offset-paged, unioned, deduped) — maps each to a
  * NormalizedContact (subscriber role), and runs the same resolve → plan → persist
  * pipeline as the other imports.
  *
- * STAFF+, workspace-scoped. Disabled (400) until the connector env is set; gated on the
- * Contact-spine schema window (503) until the DB is migrated.
+ * STAFF+, workspace-scoped. Disabled (400) until the connector env AND the three list-id
+ * env vars are set — deliberately no fallback to an unscoped pull (that would re-open
+ * the Realtors list; see NoBadOS__spec__activecampaign-import-and-suppression-corrected__2026-06-18.md §3).
+ * Gated on the Contact-spine schema window (503) until the DB is migrated.
  */
 export async function POST() {
   const gate = await requireRole(OperatorRole.STAFF);
@@ -38,9 +42,26 @@ export async function POST() {
     );
   }
 
+  const listIds = activeCampaignImportListIdsFromEnv();
+  if (!listIds) {
+    return NextResponse.json(
+      {
+        error:
+          'ActiveCampaign list scoping is not configured. Set ACTIVECAMPAIGN_LIST_ID_NETWORK, ' +
+          'ACTIVECAMPAIGN_LIST_ID_INDUSTRY_PARTNER, and ACTIVECAMPAIGN_LIST_ID_SPHERE — the realtor ' +
+          'firewall for this import is an explicit allowlist; there is no unscoped fallback.',
+      },
+      { status: 400 },
+    );
+  }
+
   let contacts;
   try {
-    const acContacts = await client.fetchAllContacts();
+    const acContacts = await client.fetchContactsForLists([
+      listIds.network,
+      listIds.industryPartner,
+      listIds.sphere,
+    ]);
     const fetchedAt = new Date();
     contacts = acContacts.map((c) => contactToNormalizedContact(c, fetchedAt));
   } catch (error) {

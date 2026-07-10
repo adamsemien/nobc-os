@@ -1,10 +1,10 @@
 import { db } from './db';
 
-function normalizePhone(phone: string): string {
+export function normalizePhone(phone: string): string {
   return phone.replace(/[\s\-().+]/g, '').replace(/^1(\d{10})$/, '$1');
 }
 
-function normalizeInstagram(handle: string): string {
+export function normalizeInstagram(handle: string): string {
   return handle.replace(/^@/, '').toLowerCase().trim();
 }
 
