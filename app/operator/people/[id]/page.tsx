@@ -5,6 +5,7 @@ import { TagEntityType } from '@prisma/client';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { isStaff, isAdmin } from '@/lib/operator-role';
+import { channelIdentifier } from '@/lib/comms/can-send';
 import { Avatar, EmptyState, PageHeader, StatusBadge, memberTone } from '@/components/ui';
 import { EditPersonFields } from '../_components/EditPersonFields';
 import { PersonConsentPanel } from '../_components/PersonConsentPanel';
@@ -104,7 +105,15 @@ export default async function PersonDetailPage({
   // Member. FieldDefinition stays scoped to section: 'member' (shared catalog
   // — see the Slice 0 plan); ChannelSubscription is filtered to memberId: null
   // so a promoted Person's member-keyed rows never show here.
-  const [fieldDefs, consentSubscriptions, personTags] = await Promise.all([
+  //
+  // Slice 1: suppression is looked up by identifier (email/phone), the same
+  // way canSend actually decides blocking — not by personId/memberId FK,
+  // which a suppression row may not carry (e.g. a carrier-level STOP or a
+  // bounce recorded before any Person/Member link existed).
+  const emailIdentifier = channelIdentifier(person, 'EMAIL');
+  const smsIdentifier = channelIdentifier(person, 'SMS');
+
+  const [fieldDefs, consentSubscriptions, consentSuppressions, personTags] = await Promise.all([
     db.fieldDefinition.findMany({
       where: { workspaceId, section: 'member', isActive: true },
       orderBy: { order: 'asc' },
@@ -112,8 +121,20 @@ export default async function PersonDetailPage({
     }),
     db.channelSubscription.findMany({
       where: { workspaceId, personId: person.id, memberId: null },
-      select: { channel: true, status: true },
+      select: { channel: true, status: true, consentBasis: true, consentSource: true },
     }),
+    emailIdentifier || smsIdentifier
+      ? db.suppressionEntry.findMany({
+          where: {
+            workspaceId,
+            OR: [
+              ...(emailIdentifier ? [{ channel: 'EMAIL' as const, identifier: emailIdentifier }] : []),
+              ...(smsIdentifier ? [{ channel: 'SMS' as const, identifier: smsIdentifier }] : []),
+            ],
+          },
+          select: { channel: true, reason: true },
+        })
+      : Promise.resolve([]),
     db.entityTag.findMany({
       where: { workspaceId, entityType: TagEntityType.person, entityId: person.id },
       include: { tag: { select: { id: true, name: true, color: true } } },
@@ -313,6 +334,7 @@ export default async function PersonDetailPage({
             <PersonConsentPanel
               personId={person.id}
               subscriptions={consentSubscriptions}
+              suppressions={consentSuppressions}
               canEdit={canEdit && !person.mergedIntoId}
             />
           </SectionCard>

@@ -9,6 +9,7 @@ export type PeopleFilters = {
   source: string;
   verified: string; // '' | 'verified' | 'unverified'
   membership: string; // '' | 'member' | 'none'
+  consent: string; // '' | 'subscribed' | 'none'
   sort: string; // '' (added, newest first) | 'name'
 };
 
@@ -33,6 +34,7 @@ export function PeopleToolbar({
     if (merged.source) params.set('source', merged.source);
     if (merged.verified) params.set('verified', merged.verified);
     if (merged.membership) params.set('membership', merged.membership);
+    if (merged.consent) params.set('consent', merged.consent);
     if (merged.sort) params.set('sort', merged.sort);
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -135,6 +137,16 @@ export function PeopleToolbar({
           active={filters.membership === 'none'}
           label="CRM only"
           onClick={() => apply({ membership: filters.membership === 'none' ? '' : 'none' })}
+        />
+        <Chip
+          active={filters.consent === 'subscribed'}
+          label="Subscribed"
+          onClick={() => apply({ consent: filters.consent === 'subscribed' ? '' : 'subscribed' })}
+        />
+        <Chip
+          active={filters.consent === 'none'}
+          label="No consent on file"
+          onClick={() => apply({ consent: filters.consent === 'none' ? '' : 'none' })}
         />
       </div>
 

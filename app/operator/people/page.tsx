@@ -57,8 +57,14 @@ export default async function PeoplePage({
   const membership = ['member', 'none'].includes(param(params.membership))
     ? param(params.membership)
     : '';
+  // Person-primary consent only (memberId: null) — matches what the Person
+  // detail page's own Consent panel shows, so a filtered result is never
+  // inconsistent with what an operator sees after clicking in.
+  const consent = ['subscribed', 'none'].includes(param(params.consent))
+    ? param(params.consent)
+    : '';
   const sort = param(params.sort) === 'name' ? 'name' : '';
-  const filtersActive = Boolean(q || source || verified || membership);
+  const filtersActive = Boolean(q || source || verified || membership || consent);
 
   const where: Prisma.PersonWhereInput = { workspaceId, mergedIntoId: null };
   if (q) {
@@ -76,6 +82,10 @@ export default async function PeoplePage({
   }
   if (membership === 'member') where.members = { some: { mergedIntoId: null } };
   if (membership === 'none') where.members = { none: { mergedIntoId: null } };
+  if (consent === 'subscribed') {
+    where.channelSubscriptions = { some: { memberId: null, status: 'SUBSCRIBED' } };
+  }
+  if (consent === 'none') where.channelSubscriptions = { none: { memberId: null } };
 
   const people = await db.person.findMany({
     where,
@@ -113,7 +123,7 @@ export default async function PeoplePage({
           }
         />
         <PeopleToolbar
-          filters={{ q, source, verified, membership, sort }}
+          filters={{ q, source, verified, membership, consent, sort }}
           sourceOptions={Object.entries(CONTACT_SOURCE_LABELS).map(([value, label]) => ({
             value,
             label,
