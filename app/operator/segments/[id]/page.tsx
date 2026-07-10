@@ -107,9 +107,17 @@ export default async function SegmentDetailPage({ params }: { params: Promise<{ 
           subtitle={segment.description ?? undefined}
           crumbs={[{ label: 'Segments', href: '/operator/segments' }]}
           action={
-            <StatusBadge tone={segment.kind === 'STATIC' ? 'neutral' : 'blue'}>
-              {segment.kind === 'STATIC' ? 'Static snapshot' : 'Dynamic — always current'}
-            </StatusBadge>
+            <div className="flex items-center gap-2">
+              <StatusBadge tone={segment.kind === 'STATIC' ? 'neutral' : 'blue'}>
+                {segment.kind === 'STATIC' ? 'Static snapshot' : 'Dynamic — always current'}
+              </StatusBadge>
+              <Link
+                href={`/operator/segments/${segment.id}/edit`}
+                className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-text-secondary hover:text-text-primary"
+              >
+                Edit
+              </Link>
+            </div>
           }
         />
 

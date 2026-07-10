@@ -15,6 +15,7 @@ import {
   Handshake,
   MessageSquare,
   Settings,
+  Layers,
 } from 'lucide-react';
 
 type NavItem = {
@@ -31,6 +32,7 @@ const PRIMARY_ITEMS: NavItem[] = [
   { href: '/operator/applications', label: 'Applications', match: '/operator/applications',              Icon: Inbox },
   { href: '/operator/members',      label: 'Members',      match: '/operator/members',                   Icon: Users },
   { href: '/operator/people',       label: 'People',       match: '/operator/people',                    Icon: BookUser },
+  { href: '/operator/segments',     label: 'Segments',     match: '/operator/segments',                  Icon: Layers },
   { href: '/operator/organizations',label: 'Organizations',match: '/operator/organizations',             Icon: Building2 },
   { href: '/operator/house-phone',  label: 'House Phone',  match: '/operator/house-phone',               Icon: MessageSquare },
   { href: '/operator/media',        label: 'Media',        match: '/operator/media',                     Icon: Images },

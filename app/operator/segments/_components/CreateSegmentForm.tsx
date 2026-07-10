@@ -20,35 +20,66 @@ const FIRMOGRAPHIC_FIELDS = [
   { value: 'companyName', label: 'Company name' },
 ] as const;
 
+type InitialDefinition = {
+  q?: string;
+  source?: string;
+  verified?: string;
+  membership?: string;
+  membershipStatus?: string;
+  consent?: string;
+  role?: string;
+  tagId?: string;
+  eventId?: string;
+  firmographic?: { field: string; value: string };
+  customField?: { stableKey: string; value: string };
+  createdAfter?: string;
+  createdBefore?: string;
+};
+
+/** Edit mode (segmentId set) PATCHes the existing segment instead of POSTing a
+ *  new one, and — since a STATIC list's membership is hand-curated, not
+ *  filter-based — hides the filter fieldsets and the kind picker entirely for
+ *  a STATIC segment; only name/description are editable there. */
 export function CreateSegmentForm({
   sourceOptions,
   tagOptions,
   eventOptions,
+  segmentId,
+  initialName,
+  initialDescription,
+  initialKind,
+  initialDefinition,
 }: {
   sourceOptions: Array<{ value: string; label: string }>;
   tagOptions: Array<{ value: string; label: string }>;
   eventOptions: Array<{ value: string; label: string }>;
+  segmentId?: string;
+  initialName?: string;
+  initialDescription?: string;
+  initialKind?: 'DYNAMIC' | 'STATIC';
+  initialDefinition?: InitialDefinition;
 }) {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [kind, setKind] = useState<'DYNAMIC' | 'STATIC'>('DYNAMIC');
+  const isEdit = Boolean(segmentId);
+  const [name, setName] = useState(initialName ?? '');
+  const [description, setDescription] = useState(initialDescription ?? '');
+  const [kind, setKind] = useState<'DYNAMIC' | 'STATIC'>(initialKind ?? 'DYNAMIC');
 
-  const [q, setQ] = useState('');
-  const [source, setSource] = useState('');
-  const [verified, setVerified] = useState('');
-  const [membership, setMembership] = useState('');
-  const [membershipStatus, setMembershipStatus] = useState('');
-  const [consent, setConsent] = useState('');
-  const [role, setRole] = useState('');
-  const [tagId, setTagId] = useState('');
-  const [eventId, setEventId] = useState('');
-  const [firmographicField, setFirmographicField] = useState('');
-  const [firmographicValue, setFirmographicValue] = useState('');
-  const [customFieldKey, setCustomFieldKey] = useState('');
-  const [customFieldValue, setCustomFieldValue] = useState('');
-  const [createdAfter, setCreatedAfter] = useState('');
-  const [createdBefore, setCreatedBefore] = useState('');
+  const [q, setQ] = useState(initialDefinition?.q ?? '');
+  const [source, setSource] = useState(initialDefinition?.source ?? '');
+  const [verified, setVerified] = useState(initialDefinition?.verified ?? '');
+  const [membership, setMembership] = useState(initialDefinition?.membership ?? '');
+  const [membershipStatus, setMembershipStatus] = useState(initialDefinition?.membershipStatus ?? '');
+  const [consent, setConsent] = useState(initialDefinition?.consent ?? '');
+  const [role, setRole] = useState(initialDefinition?.role ?? '');
+  const [tagId, setTagId] = useState(initialDefinition?.tagId ?? '');
+  const [eventId, setEventId] = useState(initialDefinition?.eventId ?? '');
+  const [firmographicField, setFirmographicField] = useState(initialDefinition?.firmographic?.field ?? '');
+  const [firmographicValue, setFirmographicValue] = useState(initialDefinition?.firmographic?.value ?? '');
+  const [customFieldKey, setCustomFieldKey] = useState(initialDefinition?.customField?.stableKey ?? '');
+  const [customFieldValue, setCustomFieldValue] = useState(initialDefinition?.customField?.value ?? '');
+  const [createdAfter, setCreatedAfter] = useState(initialDefinition?.createdAfter ?? '');
+  const [createdBefore, setCreatedBefore] = useState(initialDefinition?.createdBefore ?? '');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,19 +109,29 @@ export function CreateSegmentForm({
     if (createdBefore) definition.createdBefore = createdBefore;
 
     try {
-      const res = await fetch('/api/operator/segments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() || null, kind, definition }),
-      });
+      const res = isEdit
+        ? await fetch(`/api/operator/segments/${segmentId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: name.trim(),
+              description: description.trim() || null,
+              ...(kind === 'DYNAMIC' ? { definition } : {}),
+            }),
+          })
+        : await fetch('/api/operator/segments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim(), description: description.trim() || null, kind, definition }),
+          });
       const data = (await res.json().catch(() => null)) as { segment?: { id: string }; error?: unknown } | null;
       if (!res.ok || !data?.segment) {
-        setError('Could not build the segment. Check the filters and try again.');
+        setError(isEdit ? 'Could not save changes. Check the filters and try again.' : 'Could not build the segment. Check the filters and try again.');
         return;
       }
       router.push(`/operator/segments/${data.segment.id}`);
     } catch {
-      setError('Could not build the segment. Check the filters and try again.');
+      setError(isEdit ? 'Could not save changes. Check the filters and try again.' : 'Could not build the segment. Check the filters and try again.');
     } finally {
       setSaving(false);
     }
@@ -123,22 +164,36 @@ export function CreateSegmentForm({
 
       <div>
         <span className={labelClass}>Kind</span>
-        <div className="flex gap-4 text-sm text-text-primary">
-          <label className="flex items-center gap-1.5">
-            <input
-              type="radio"
-              checked={kind === 'DYNAMIC'}
-              onChange={() => setKind('DYNAMIC')}
-            />
-            Dynamic — always current
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="radio" checked={kind === 'STATIC'} onChange={() => setKind('STATIC')} />
-            Static — freeze today&apos;s membership
-          </label>
-        </div>
+        {isEdit ? (
+          <p className="text-sm text-text-primary">
+            {kind === 'STATIC' ? 'Static — hand-curated list' : 'Dynamic — always current'}
+            <span className="ml-2 text-xs text-text-tertiary">(fixed at creation)</span>
+          </p>
+        ) : (
+          <div className="flex gap-4 text-sm text-text-primary">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="radio"
+                checked={kind === 'DYNAMIC'}
+                onChange={() => setKind('DYNAMIC')}
+              />
+              Dynamic — always current
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="radio" checked={kind === 'STATIC'} onChange={() => setKind('STATIC')} />
+              Static — freeze today&apos;s membership
+            </label>
+          </div>
+        )}
       </div>
 
+      {isEdit && kind === 'STATIC' ? (
+        <p className="text-xs text-text-tertiary">
+          Membership on a static list is hand-curated from each person&apos;s record (&quot;Add to
+          list&quot;), not by a filter — there&apos;s nothing to edit here beyond the name.
+        </p>
+      ) : (
+      <>
       <fieldset className="rounded-md border border-border p-4">
         <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-text-tertiary">
           People-list filters
@@ -312,6 +367,8 @@ export function CreateSegmentForm({
           </p>
         ) : null}
       </fieldset>
+      </>
+      )}
 
       {error ? (
         <p className="text-xs" style={{ color: 'var(--danger)' }}>
@@ -327,7 +384,7 @@ export function CreateSegmentForm({
           className="inline-flex h-9 items-center rounded-md px-3.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           style={{ background: 'var(--primary)' }}
         >
-          {saving ? 'Building…' : 'Build segment'}
+          {saving ? (isEdit ? 'Saving…' : 'Building…') : isEdit ? 'Save changes' : 'Build segment'}
         </button>
       </div>
     </div>

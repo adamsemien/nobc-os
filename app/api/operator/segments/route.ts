@@ -1,11 +1,12 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ContactRole, ContactSourceSystem, MemberStatus, OperatorRole } from '@prisma/client';
+import { OperatorRole } from '@prisma/client';
 import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { requireRole } from '@/lib/operator-role';
 import { evaluateSegment, type SegmentFilterDefinition } from '@/lib/segments/evaluate';
+import { FilterDefinitionSchema } from '@/lib/segments/filter-schema';
 
 export async function GET() {
   const { userId } = await auth();
@@ -19,41 +20,6 @@ export async function GET() {
 
   return NextResponse.json({ segments });
 }
-
-// Every primitive here maps to real, queryable data as of Slices 0-3 (Slice 4
-// recon). `q`/`source`/`verified`/`membership`/`consent` mirror the
-// People-list's own filters exactly (app/operator/people/page.tsx).
-const FilterDefinitionSchema = z
-  .object({
-    q: z.string().max(200).optional(),
-    source: z.nativeEnum(ContactSourceSystem).optional(),
-    verified: z.enum(['verified', 'unverified']).optional(),
-    membership: z.enum(['member', 'none']).optional(),
-    consent: z.enum(['subscribed', 'none']).optional(),
-    role: z.nativeEnum(ContactRole).optional(),
-    organizationId: z.string().optional(),
-    membershipStatus: z.nativeEnum(MemberStatus).optional(),
-    tagId: z.string().optional(),
-    customField: z.object({ stableKey: z.string(), value: z.string() }).optional(),
-    firmographic: z
-      .object({
-        field: z.enum([
-          'industry',
-          'jobFunction',
-          'seniority',
-          'companySize',
-          'city',
-          'country',
-          'companyName',
-        ]),
-        value: z.string(),
-      })
-      .optional(),
-    eventId: z.string().optional(),
-    createdAfter: z.string().optional(),
-    createdBefore: z.string().optional(),
-  })
-  .strict();
 
 const CreateSegmentSchema = z.object({
   name: z.string().min(1).max(200),

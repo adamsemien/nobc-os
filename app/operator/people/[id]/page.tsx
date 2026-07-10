@@ -7,6 +7,7 @@ import { getMemberWorkspaceId } from '@/lib/auth';
 import { isStaff, isAdmin } from '@/lib/operator-role';
 import { channelIdentifier } from '@/lib/comms/can-send';
 import { Avatar, EmptyState, PageHeader, StatusBadge, memberTone } from '@/components/ui';
+import { AddToListButton } from '../_components/AddToListButton';
 import { EditPersonFields } from '../_components/EditPersonFields';
 import { MarkInvitedButton } from '../_components/MarkInvitedButton';
 import { PersonConsentPanel } from '../_components/PersonConsentPanel';
@@ -136,6 +137,27 @@ export default async function PersonDetailPage({
         select: { id: true, title: true },
       })
     : [];
+
+  // Segment UI build — "Add to list" targets STATIC segments only (a DYNAMIC
+  // segment's membership is computed, not hand-editable). currentLists reuses
+  // the same personId-OR-memberId dual-pointer shape as `activity` above, so it
+  // works identically for a bare lead and a promoted Person.
+  const [staticSegmentOptions, currentListMemberships] = await Promise.all([
+    canEdit
+      ? db.segment.findMany({
+          where: { workspaceId, kind: 'STATIC' },
+          orderBy: { name: 'asc' },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    db.segmentSnapshotMember.findMany({
+      where: { OR: [{ personId: person.id }, ...(memberIds.length ? [{ memberId: { in: memberIds } }] : [])] },
+      select: { segment: { select: { id: true, name: true } } },
+    }),
+  ]);
+  const currentLists = Array.from(
+    new Map(currentListMemberships.map((m) => [m.segment.id, m.segment])).values(),
+  );
 
   // CRM spine Slice 0: consent, custom fields, and tags for a Person with no
   // Member. FieldDefinition stays scoped to section: 'member' (shared catalog
@@ -393,6 +415,33 @@ export default async function PersonDetailPage({
               tags={personTags.map((et) => et.tag)}
               canEdit={canEdit && !person.mergedIntoId}
             />
+          </SectionCard>
+
+          <SectionCard title="Lists">
+            {currentLists.length === 0 ? (
+              <p className="py-1.5 text-[13px] text-text-secondary">Not on any static list.</p>
+            ) : (
+              <ul className="mb-1 flex flex-wrap gap-1.5">
+                {currentLists.map((list) => (
+                  <li key={list.id}>
+                    <Link
+                      href={`/operator/segments/${list.id}`}
+                      className="inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-text-secondary hover:text-text-primary"
+                    >
+                      {list.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {canEdit && !person.mergedIntoId ? (
+              <div className="mt-2">
+                <AddToListButton
+                  personId={person.id}
+                  staticSegments={staticSegmentOptions.map((s) => ({ id: s.id, name: s.name }))}
+                />
+              </div>
+            ) : null}
           </SectionCard>
         </div>
 
