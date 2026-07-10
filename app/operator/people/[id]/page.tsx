@@ -8,6 +8,7 @@ import { isStaff, isAdmin } from '@/lib/operator-role';
 import { channelIdentifier } from '@/lib/comms/can-send';
 import { Avatar, EmptyState, PageHeader, StatusBadge, memberTone } from '@/components/ui';
 import { EditPersonFields } from '../_components/EditPersonFields';
+import { MarkInvitedButton } from '../_components/MarkInvitedButton';
 import { PersonConsentPanel } from '../_components/PersonConsentPanel';
 import { PersonFields } from '../_components/PersonFields';
 import { PersonTags } from '../_components/PersonTags';
@@ -39,6 +40,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="flex items-baseline justify-between gap-4 py-1.5">
       <span className="shrink-0 text-[13px] text-text-secondary">{label}</span>
       <span className="min-w-0 text-right text-[13px] text-text-primary">{children}</span>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">{label}</span>
+      <span className="text-sm text-text-primary">{value}</span>
     </div>
   );
 }
@@ -98,8 +108,34 @@ export default async function PersonDetailPage({
     },
     orderBy: { occurredAt: 'desc' },
     take: 50,
-    select: { id: true, eventType: true, occurredAt: true },
+    select: { id: true, eventType: true, occurredAt: true, eventId: true },
   });
+
+  // Slice 5: event titles for the activity feed — the same OR-query above
+  // already surfaces attendance/invited rows for a bare lead (personId) and a
+  // promoted Person (memberId fallback) alike; this just joins in Event.title
+  // rather than leaving eventId unreadable. Counts drive the stat tiles below.
+  const activityEventIds = Array.from(
+    new Set(activity.map((a) => a.eventId).filter((v): v is string => Boolean(v))),
+  );
+  const activityEvents = activityEventIds.length
+    ? await db.event.findMany({
+        where: { id: { in: activityEventIds }, workspaceId },
+        select: { id: true, title: true },
+      })
+    : [];
+  const eventTitleById = new Map(activityEvents.map((e) => [e.id, e.title]));
+  const invitedCount = activity.filter((a) => a.eventType === 'invited').length;
+  const attendedCount = activity.filter((a) => a.eventType === 'checked_in').length;
+
+  const inviteEventOptions = canEdit
+    ? await db.event.findMany({
+        where: { workspaceId },
+        orderBy: { startAt: 'desc' },
+        take: 100,
+        select: { id: true, title: true },
+      })
+    : [];
 
   // CRM spine Slice 0: consent, custom fields, and tags for a Person with no
   // Member. FieldDefinition stays scoped to section: 'member' (shared catalog
@@ -362,15 +398,36 @@ export default async function PersonDetailPage({
 
         <div className="mt-4">
           <SectionCard title="Activity">
+            <div className="mb-4 grid grid-cols-2 gap-4 rounded-md border border-border bg-card px-4 py-3 sm:grid-cols-4">
+              <Stat label="Invited" value={invitedCount} />
+              <Stat label="Attended" value={attendedCount} />
+            </div>
+            {canEdit && !person.mergedIntoId ? (
+              <div className="mb-4">
+                <MarkInvitedButton
+                  personId={person.id}
+                  eventOptions={inviteEventOptions.map((e) => ({ id: e.id, title: e.title }))}
+                />
+              </div>
+            ) : null}
             {activity.length === 0 ? (
               <EmptyState compact title="No activity yet" />
             ) : (
               <ol className="space-y-2.5">
                 {activity.map((event) => {
                   const meta = engagementMeta(event.eventType);
+                  const eventTitle = event.eventId ? eventTitleById.get(event.eventId) : undefined;
                   return (
                     <li key={event.id} className="flex items-baseline justify-between gap-4">
-                      <span className="text-[13px] text-text-primary">{meta.label}</span>
+                      <span className="text-[13px] text-text-primary">
+                        {meta.label}
+                        {eventTitle ? (
+                          <span style={{ color: 'var(--text-tertiary, var(--text-muted))' }}>
+                            {' '}
+                            — {eventTitle}
+                          </span>
+                        ) : null}
+                      </span>
                       <span
                         className="shrink-0 text-[12px]"
                         style={{ color: 'var(--text-tertiary, var(--text-muted))' }}

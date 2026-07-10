@@ -2052,6 +2052,12 @@ enum MemberEngagementEventType {
   email_opened
   email_clicked
   email_bounced
+  // Slice 5 (Attendance on the Person record + invited state) — CRM-side
+  // annotation only, dual-pointer (personId always set; memberId when the
+  // Person has one). Deliberately NOT a new model (Option 1, see recon) — the
+  // engagement row itself is the invite record. Added to the DB via a
+  // standalone `ALTER TYPE ... ADD VALUE` (see prisma/sql/attendance-slice5-enum.sql).
+  invited
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

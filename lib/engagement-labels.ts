@@ -52,6 +52,8 @@ const ENGAGEMENT_META: Record<MemberEngagementEventType, EngagementMeta> = {
   email_opened: { label: 'Opened an email', tone: 'neutral' },
   email_clicked: { label: 'Clicked a link in an email', tone: 'positive' },
   email_bounced: { label: 'Email bounced', tone: 'negative' },
+  // Slice 5 (Attendance on the Person record + invited state).
+  invited: { label: 'Invited to an event', tone: 'info' },
 };
 
 /** Humanize an unrecognized token so the UI never shows a raw enum (e.g. new DB value). */
