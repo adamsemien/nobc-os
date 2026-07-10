@@ -47,6 +47,11 @@ const ENGAGEMENT_META: Record<MemberEngagementEventType, EngagementMeta> = {
   application_started: { label: 'Started an application', tone: 'info' },
   // Ways-In Phase A (Stage 17) — emitter lands with one-off links (Phase C).
   access_link_redeemed: { label: 'Used a private access link', tone: 'positive' },
+  // Slice 3 (Communicate + log it) — Resend webhook (POST /api/webhooks/resend).
+  email_delivered: { label: 'Email delivered', tone: 'neutral' },
+  email_opened: { label: 'Opened an email', tone: 'neutral' },
+  email_clicked: { label: 'Clicked a link in an email', tone: 'positive' },
+  email_bounced: { label: 'Email bounced', tone: 'negative' },
 };
 
 /** Humanize an unrecognized token so the UI never shows a raw enum (e.g. new DB value). */

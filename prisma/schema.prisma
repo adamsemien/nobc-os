@@ -65,6 +65,7 @@ model Workspace {
   workspaceMembers       WorkspaceMember[]
   memberEngagementEvents MemberEngagementEvent[]
   contactSources         ContactSource[]
+  transactionalEmailLogs TransactionalEmailLog[]
 
   // Digital Asset Manager (Stage 15)
   assets         Asset[]
@@ -304,6 +305,8 @@ model Person {
   organizations        PersonOrganization[]
   channelSubscriptions ChannelSubscription[]
   suppressionEntries   SuppressionEntry[]
+  smsConversations     SmsConversation[]
+  transactionalEmailLogs TransactionalEmailLog[]
 
   // clerkUserId stays unique when present (NULLs are distinct in Postgres).
   // email is a plain index - see emailVerified doc above.
@@ -474,6 +477,10 @@ model Member {
   // Consent floor (CRM substrate, Phase 1). Relation fields only; no columns on Member.
   channelSubscriptions ChannelSubscription[]
   suppressionEntries   SuppressionEntry[]
+
+  // Slice 3 (Communicate + log it). Relation fields only; no columns on Member.
+  smsConversations       SmsConversation[]
+  transactionalEmailLogs TransactionalEmailLog[]
 
   @@unique([workspaceId, clerkUserId])
   @@unique([workspaceId, email])
@@ -1775,10 +1782,23 @@ model SmsConversation {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // Slice 3 (Communicate + log it): identity link, dual-pointer per the Slice 0/1
+  // pattern. Nullable — House Phone (Railway) mints these rows for a bare phone
+  // number with no Person/Member resolution of its own; nobc-os fills these in via
+  // lazy resolve-on-read (GET /api/sms/conversations), never at write time. A Blast
+  // SMS send (lib/blast/run.ts's logSmsToInbox) is the one write-time exception —
+  // it already has a resolved memberId in hand and stamps it fill-if-empty.
+  memberId String?
+  member   Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  personId String?
+  person   Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+
   messages SmsMessage[]
 
   @@unique([workspaceId, phone])
   @@index([workspaceId])
+  @@index([memberId])
+  @@index([personId])
 }
 
 model SmsMessage {
@@ -1794,6 +1814,38 @@ model SmsMessage {
   createdAt      DateTime        @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+/// Per-recipient transactional (Resend) email log — Slice 3 "Communicate + log it".
+/// One row per recipient per sendTemplatedEmail() call (lib/email.ts). Not the
+/// Blast/marketing path (BlastRecipient already logs that, per-recipient, with its
+/// own providerId column). `status` starts at 'sent' or 'failed' and is advanced by
+/// the Resend webhook (POST /api/webhooks/resend) as delivery/open/click/bounce/
+/// complaint events arrive, matched by (providerId, to) — a single Resend send()
+/// call can cover multiple recipients under one shared providerId, so `to` is the
+/// tie-breaker for which row a given webhook event belongs to.
+model TransactionalEmailLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  templateKey String
+  to          String
+  memberId    String?
+  member      Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  personId    String?
+  person      Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  /// Resend's message id (send.data.id). Null on a failed send attempt.
+  providerId  String?
+  /// sent | failed | delivered | opened | clicked | bounced | complained
+  status      String    @default("sent")
+  sentAt      DateTime  @default(now())
+  openedAt    DateTime?
+  clickedAt   DateTime?
+
+  @@index([workspaceId])
+  @@index([memberId])
+  @@index([personId])
+  @@index([providerId])
 }
 
 // Append-only log of member engagement signals. Feeds network-capital scoring,
@@ -1856,6 +1908,15 @@ enum MemberEngagementEventType {
   // `ALTER TYPE ... ADD VALUE` (see prisma/sql/ways-in-phase-a.sql). No emitter
   // until the one-off-links phase (Phase C); the enum lands now so C needs no DDL.
   access_link_redeemed
+  // Slice 3 (Communicate + log it) — emitted by POST /api/webhooks/resend when a
+  // TransactionalEmailLog row has a known memberId/personId. Added to the DB via a
+  // standalone `ALTER TYPE ... ADD VALUE` (see prisma/sql/comms-log-enums.sql).
+  // newsletter_opened/sponsor_perk_clicked are pre-existing, unrelated values — left
+  // untouched, not reused (they're unwired display-label-only values today).
+  email_delivered
+  email_opened
+  email_clicked
+  email_bounced
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

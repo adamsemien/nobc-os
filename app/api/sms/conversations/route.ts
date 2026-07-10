@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getMemberWorkspaceId } from '@/lib/auth';
+import { resolveConversationIdentities } from '@/lib/sms-conversation-identity';
 
 // Shared multi-operator House Phone inbox feed. Authorized by Clerk org
 // membership: any member of the resolved workspace's Clerk org may read it (no
@@ -28,16 +29,24 @@ export async function GET() {
     },
   });
 
+  // Slice 3 (Communicate + log it) — lazy resolve-on-read. House Phone (Railway)
+  // never sets memberId/personId itself; this fills them in for whatever's still
+  // unresolved and persists the result so it isn't re-resolved on the next poll.
+  const justResolved = await resolveConversationIdentities(db, workspaceId, conversations);
+
   const shaped = conversations
     .map((c) => {
       const latest = c.messages[0] ?? null;
       const chronological = [...c.messages].reverse();
+      const identity = justResolved.get(c.id);
       return {
         id: c.id,
         phone: c.phone,
         name: c.name,
         eventId: c.eventId,
         event: c.event,
+        memberId: identity?.memberId ?? c.memberId,
+        personId: identity?.personId ?? c.personId,
         aiEnabled: c.aiEnabled,
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),

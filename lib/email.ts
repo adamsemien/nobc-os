@@ -17,6 +17,10 @@ export type SendResult =
   | { ok: true; messageId?: string }
   | { ok: false; reason: 'disabled' | 'template_missing' | 'send_failed' | 'no_resend_key'; error?: string };
 
+/** Per-recipient identity for TransactionalEmailLog (Slice 3). Optional and
+ *  additive — omitting it entirely preserves prior sendTemplatedEmail behavior. */
+export type EmailRecipientIdentity = { memberId?: string | null; personId?: string | null };
+
 const FROM = 'The No Bad Company <team@thenobadcompany.com>';
 
 /** One-off blast send (Stage 18) - the same locked FROM as every send in
@@ -103,6 +107,10 @@ export async function sendTemplatedEmail(
   templateKey: string,
   to: string | string[],
   variables: Record<string, unknown> = {},
+  // Slice 3 (Communicate + log it) — optional, parallel to the normalized recipient
+  // list (recipients[i] <-> identities[i]); missing/extra entries default to null.
+  // Existing callers that omit this keep working exactly as before.
+  identities?: (EmailRecipientIdentity | null)[],
 ): Promise<SendResult> {
   const tpl = await loadTemplate(workspaceId, templateKey);
   if (!tpl) return { ok: false, reason: 'template_missing' };
@@ -152,6 +160,7 @@ export async function sendTemplatedEmail(
         },
       },
     }).catch(() => {});
+    await logTransactionalEmail(workspaceId, templateKey, recipients, identities, send.data?.id ?? null, 'sent');
     return { ok: true, messageId: send.data?.id };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -164,7 +173,40 @@ export async function sendTemplatedEmail(
         metadata: { templateKey, recipientCount: recipients.length, error: message.slice(0, 200) },
       },
     }).catch(() => {});
+    await logTransactionalEmail(workspaceId, templateKey, recipients, identities, null, 'failed');
     return { ok: false, reason: 'send_failed', error: message };
+  }
+}
+
+/** One TransactionalEmailLog row per recipient, per actually-attempted Resend call
+ *  (Slice 3). Not written for the early-return paths above (disabled/template_missing/
+ *  no_resend_key) — those never reach Resend, so there is no providerId a later
+ *  webhook could ever match against; logging them would just be unmatchable noise
+ *  in a table whose whole point is open/click tracking. Fire-and-forget, never
+ *  throws — a lost log row must not turn an otherwise-successful send into a
+ *  reported failure. */
+async function logTransactionalEmail(
+  workspaceId: string,
+  templateKey: string,
+  recipients: string[],
+  identities: (EmailRecipientIdentity | null)[] | undefined,
+  providerId: string | null,
+  status: 'sent' | 'failed',
+): Promise<void> {
+  try {
+    await db.transactionalEmailLog.createMany({
+      data: recipients.map((to, i) => ({
+        workspaceId,
+        templateKey,
+        to,
+        memberId: identities?.[i]?.memberId ?? null,
+        personId: identities?.[i]?.personId ?? null,
+        providerId,
+        status,
+      })),
+    });
+  } catch (err) {
+    console.error(`[email] logTransactionalEmail failed (template=${templateKey} workspace=${workspaceId}):`, err);
   }
 }
 

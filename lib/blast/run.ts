@@ -195,6 +195,7 @@ export async function fireBlast(
           eventId: blast.eventId,
           phone: r.destination,
           body,
+          memberId: r.memberId,
         });
       } catch (err) {
         await markFailed(r.id, err);
@@ -249,7 +250,7 @@ export async function fireBlast(
  *  conversation for this phone, append the OUTBOUND message. */
 async function logSmsToInbox(
   db: PrismaClient,
-  args: { workspaceId: string; eventId: string; phone: string; body: string },
+  args: { workspaceId: string; eventId: string; phone: string; body: string; memberId: string | null },
 ): Promise<void> {
   const conversation = await db.smsConversation.upsert({
     where: {
@@ -259,9 +260,21 @@ async function logSmsToInbox(
       workspaceId: args.workspaceId,
       phone: args.phone,
       eventId: args.eventId,
+      memberId: args.memberId,
     },
     update: {},
   });
+  // Slice 3 (Communicate + log it) — the ONE authorized Blast exception: stamp the
+  // memberId Blast already resolved for this recipient, fill-if-empty (never
+  // downgrade/overwrite an already-linked identity — same no-downgrade spirit as
+  // lib/comms/consent-sync.ts). Post-send record-keeping only; does not touch
+  // canSend, consent checks, or anything upstream of the send decision above.
+  if (args.memberId && !conversation.memberId) {
+    await db.smsConversation.update({
+      where: { id: conversation.id },
+      data: { memberId: args.memberId },
+    });
+  }
   // LANDMINE (recon 2026-07-01): the live DB has an SmsMessage.twilioSid
   // column that is NOT in schema.prisma. Prisma writes leave it NULL, which
   // the unique index permits - do NOT add the column to the schema here.
