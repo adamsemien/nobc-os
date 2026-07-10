@@ -59,3 +59,4 @@ next-env.d.ts
 
 # nobc-house-phone is its own git repo (Railway standalone service) — never commit it into nobc-os
 /nobc-house-phone/
+.env*.local
