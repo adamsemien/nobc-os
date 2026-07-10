@@ -230,6 +230,8 @@ All colors are CSS variables. Semantic tokens only: `bg-primary`, `text-text-pri
 
 The same landmine applies to **`ChannelSubscription_person_channel_stream_key`** (CRM spine Slice 0) — a partial unique index on `ChannelSubscription("workspaceId", "personId", "channel", "stream") WHERE "memberId" IS NULL AND "personId" IS NOT NULL`, applied out-of-band because Prisma's `@@unique` cannot express a `WHERE` clause. It enforces uniqueness for person-only (no Member) consent rows. A `db push` would see it as drift and drop it, silently reopening the door to duplicate person-keyed consent rows.
 
+Same landmine again with **`SegmentSnapshotMember_segment_person_key`** and **`SegmentSnapshotMember_segment_member_key`** (Slice 4 — Segments, saved views & the operator-action log) — two partial unique indexes on `SegmentSnapshotMember("segmentId", "personId") WHERE "personId" IS NOT NULL` and `SegmentSnapshotMember("segmentId", "memberId") WHERE "memberId" IS NOT NULL`, applied out-of-band for the same reason: Prisma's `@@unique` can't express a `WHERE` clause, and the dual-pointer (`personId`/`memberId`, both nullable) shape means neither column alone is a plain-`@@unique` candidate the way `ChannelSubscription`'s `memberId`-based constraint was. They enforce that a STATIC segment's frozen snapshot can't carry a duplicate row for the same person or the same member. `SegmentSnapshotMember` intentionally carries no `@@unique` in `schema.prisma` at all — the uniqueness guarantee lives only in these two raw indexes. A `db push` would see them as drift and drop them, silently reopening the door to duplicate snapshot rows.
+
 The required workflow for any additive schema change:
 
 1. Edit `prisma/schema.prisma`.

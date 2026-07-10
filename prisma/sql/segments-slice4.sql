@@ -105,6 +105,21 @@ CREATE INDEX "SegmentSnapshotMember_personId_idx" ON "SegmentSnapshotMember"("pe
 -- CreateIndex
 CREATE INDEX "SegmentSnapshotMember_memberId_idx" ON "SegmentSnapshotMember"("memberId");
 
+-- Out-of-band partial unique indexes (NOT Prisma-generated — @@unique can't
+-- express a WHERE clause, same class as ChannelSubscription_person_channel_
+-- stream_key from Slice 0). Prevents a STATIC segment's frozen snapshot from
+-- carrying a duplicate row for the same person or the same member. This is
+-- the ONLY place SegmentSnapshotMember's uniqueness is enforced — there is no
+-- @@unique for it in schema.prisma. See CLAUDE.md's "Schema changes: never
+-- prisma db push" section — a db push would see these as drift and drop them.
+CREATE UNIQUE INDEX "SegmentSnapshotMember_segment_person_key"
+  ON "SegmentSnapshotMember"("segmentId", "personId")
+  WHERE "personId" IS NOT NULL;
+
+CREATE UNIQUE INDEX "SegmentSnapshotMember_segment_member_key"
+  ON "SegmentSnapshotMember"("segmentId", "memberId")
+  WHERE "memberId" IS NOT NULL;
+
 -- AddForeignKey
 ALTER TABLE "OperatorAction" ADD CONSTRAINT "OperatorAction_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 

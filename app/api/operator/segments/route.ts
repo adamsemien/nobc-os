@@ -96,8 +96,13 @@ export async function POST(req: NextRequest) {
   });
 
   if (kind === 'STATIC' && identities.length > 0) {
+    // skipDuplicates guards the rare case of one Person resolving to more than
+    // one non-merged Member (evaluateSegment then emits >1 pair sharing that
+    // personId) — the out-of-band partial unique indexes on SegmentSnapshotMember
+    // (see prisma/sql/segments-slice4.sql) would otherwise reject the insert.
     await db.segmentSnapshotMember.createMany({
       data: identities.map((i) => ({ segmentId: segment.id, personId: i.personId, memberId: i.memberId })),
+      skipDuplicates: true,
     });
   }
 

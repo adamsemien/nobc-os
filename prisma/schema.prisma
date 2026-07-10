@@ -1343,6 +1343,16 @@ model Segment {
 /// Json id-array on Segment) — a snapshot is a real population someone may
 /// later query by person/member, not dead storage. Dual-pointer, same rationale
 /// as OperatorActionTarget above.
+///
+/// NO @@unique here, on purpose — dedupe within a segment (no duplicate row for
+/// the same person or the same member) is enforced by two partial unique
+/// indexes applied out-of-band (raw SQL, not representable in Prisma's
+/// @@unique, which can't express a WHERE clause):
+///   SegmentSnapshotMember_segment_person_key on ("segmentId","personId") WHERE "personId" IS NOT NULL
+///   SegmentSnapshotMember_segment_member_key on ("segmentId","memberId") WHERE "memberId" IS NOT NULL
+/// Same landmine class as ChannelSubscription_person_channel_stream_key — see
+/// CLAUDE.md's "Schema changes: never prisma db push" section. A db push would
+/// see these as drift and drop them.
 model SegmentSnapshotMember {
   id        String   @id @default(cuid())
   segmentId String
