@@ -1,17 +1,17 @@
-# Stage 18 — Attendee Messaging (Blast)
+# Stage 18 — Attendee Messaging (Blast + lifecycle event-comms)
 
-> One-off operator blasts (email or SMS) to ONE event's confirmed attendees — consent-gated, suppressed, logged, dry-run-first. Post-purchase attendee messaging, deliberately NOT a marketing automation platform.
+> One-off operator blasts (email or SMS) to ONE event's confirmed attendees — consent-gated, suppressed, logged, dry-run-first. Post-purchase attendee messaging, deliberately NOT a marketing automation platform. Since 2026-07-10 this stage also holds the deterministic **lifecycle event-comms layer** (email-only): registration confirmation, pre-event reminder, day-of reminder, post-event follow-up.
 
 ## Status
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 Built on `feat/event-builder-rebuild` (Adam's 2026-07-02 directive, Phase 4) — unmerged like the rest of the branch |
+| **State** | 🟡 Blast layer is **merged to `main`** (the earlier "unmerged on `feat/event-builder-rebuild`" note was stale — confirmed by recon 2026-07-09). Lifecycle event-comms layer built + committed locally on the `event-comms` worktree branch (off `main`), NOT pushed/merged/deployed — Adam's review gates everything. |
 | **V1 item** | None — post-July-11 platform work |
-| **Last updated** | 2026-07-03 |
+| **Last updated** | 2026-07-11 |
 | **Owner** | Adam |
-| **Blocked on** | Adam's review + merge of the rebuild branch. SMS channel additionally needs `MARKETING_TWILIO_PHONE_NUMBER` (+ `TWILIO_*`) in Vercel — until then the SMS surface renders disabled with honest copy. |
-| **Next** | Adam reviews the branch; on merge, set `MARKETING_TWILIO_PHONE_NUMBER` to take SMS blasts live. Explicitly deferred (out of scope by directive): scheduled/recurring sends, segments beyond one event's attendees, a templates editor, two-way threading into blasts, No Bad Blast (personal iMessage — separate system). |
+| **Blocked on** | Adam: (1) review of the `event-comms` branch, (2) run `prisma/sql/event-comms-rsvp-columns.sql` in Neon Console BEFORE any deploy of the branch (the crons query the two new RSVP columns), (3) deploy. SMS channel (blast + any lifecycle fast-follow) still needs `MARKETING_TWILIO_PHONE_NUMBER` (+ `TWILIO_*`) in Vercel. |
+| **Next** | Adam reviews the `event-comms` branch, runs the additive SQL, merges + deploys himself; then per workspace flip `reminder.pre_event.enabled` / `followup.enabled` (both default OFF) in Settings → Communications. Explicitly deferred: SMS lifecycle sends (fast-follow, consent-gated via the blast pattern), anything agentic, segments beyond one event's lifecycle, template-editor expansion, enforcing canSend/ChannelSubscription (separate Phase-2 backfill/cutover). |
 
 ## Scope
 
@@ -30,6 +30,16 @@ lib/twilio.ts                                 ← marketingSmsConfigured + sendM
 app/api/operator/events/[id]/blast/           ← GET config, POST send; dry-run/ POST
 app/operator/events/[id]/_components/EventMessagesTab.tsx ← the compose surface (Messages tab)
 tests/unit/blast/blast.db.test.ts             ← acceptance on real rows
+
+# Lifecycle event-comms layer (2026-07-10, `event-comms` branch)
+lib/comms/lifecycle-gate.ts                   ← SuppressionEntry hard-block gate, fail-closed; shadow evaluateConsent probe (verdict discarded)
+lib/rsvp-submit.ts                            ← registration confirmation normalized onto sendTemplatedEmail (rsvp.confirmation, logged)
+lib/commerce/confirmation.ts                  ← paid/comp ticket confirmation normalized the same way (2026-07-11 fast-follow); QR buyers get rsvp.confirmation_paid, others rsvp.confirmation
+app/api/cron/event-reminders/route.ts         ← day-of now suppression-gated + new pre-event (N-days-before) section
+app/api/cron/post-event-followup/route.ts     ← new cron: post-event thank-you to checked-in attendees (endAt, fallback startAt+6h)
+lib/email-templates-defaults.ts               ← rsvp.confirmation rewritten (ticket link), rsvp.confirmation_paid (door QR) + event.reminder_upcoming + event.followup added; 3 new platform settings (new sends default OFF)
+prisma/sql/event-comms-rsvp-columns.sql       ← additive SQL for RSVP.preEventReminderSentAt + postEventFollowupSentAt — NOT applied, Adam runs it
+tests/unit/lifecycle-gate.test.ts             ← fail-closed guarantees pinned
 ```
 
 ## Inputs

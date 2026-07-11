@@ -7,15 +7,18 @@
  *  it - so this direct send is both required and double-send-safe. Comp
  *  admissions have no Stripe event at all.
  *
- *  Reuses the house rsvpConfirmedEmail template (event name, date, location,
- *  the ticket reference, and the link back to the event page where the
- *  ticket lives) and the locked from address. A send failure logs + alerts
- *  but never fails the purchase.
+ *  Normalized onto sendTemplatedEmail (event-comms): suppression-gated and
+ *  fail-closed via lib/comms/lifecycle-gate.ts, logged to
+ *  TransactionalEmailLog. Buyers with a member QR get `rsvp.confirmation_paid`
+ *  (inline door QR + ticket link); buyers without one get the standard
+ *  `rsvp.confirmation` (ticket link only) - the same two content branches the
+ *  legacy rsvpConfirmedEmail carried, now operator-editable. A send failure
+ *  logs + alerts but never fails the purchase.
  */
 import type { PrismaClient } from "@prisma/client";
 import { alert } from "@/lib/alerting";
-import { rsvpConfirmedEmail } from "@/lib/email-templates";
-import { resend } from "@/lib/resend";
+import { sendTemplatedEmail } from "@/lib/email";
+import { gateLifecycleEmail } from "@/lib/comms/lifecycle-gate";
 
 export async function sendTicketConfirmation(
   db: PrismaClient,
@@ -26,12 +29,11 @@ export async function sendTicketConfirmation(
     rsvpId: string;
   },
 ): Promise<void> {
-  if (!process.env.RESEND_API_KEY) return;
   try {
     const [event, member] = await Promise.all([
       db.event.findFirst({
         where: { id: args.eventId, workspaceId: args.workspaceId },
-        select: { title: true, slug: true, startAt: true, location: true },
+        select: { title: true, startAt: true, location: true },
       }),
       db.member.findFirst({
         where: { id: args.memberId, workspaceId: args.workspaceId },
@@ -40,21 +42,57 @@ export async function sendTicketConfirmation(
     ]);
     if (!event?.startAt || !member?.email) return;
 
-    const { subject, html } = rsvpConfirmedEmail(
-      member.firstName || "there",
-      event.title,
-      event.startAt,
-      event.location,
-      event.slug,
-      args.rsvpId,
-      Boolean(member.memberQrCode),
+    const gate = await gateLifecycleEmail(
+      {
+        workspaceId: args.workspaceId,
+        email: member.email,
+        memberId: args.memberId,
+        site: "ticket.confirmation",
+      },
+      db,
     );
-    await resend.emails.send({
-      from: "The No Bad Company <team@thenobadcompany.com>",
-      to: member.email,
-      subject,
-      html,
-    });
+    if (!gate.send) {
+      console.info(
+        `[confirmation] ticket confirmation skipped for rsvp=${args.rsvpId}: ${gate.reason}`,
+      );
+      return;
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.thenobadcompany.com";
+    const templateKey = member.memberQrCode ? "rsvp.confirmation_paid" : "rsvp.confirmation";
+    const result = await sendTemplatedEmail(
+      args.workspaceId,
+      templateKey,
+      gate.email,
+      {
+        member: { firstName: member.firstName || "there" },
+        event: {
+          title: event.title,
+          dateFormatted: event.startAt.toLocaleDateString("en-US", {
+            weekday: "long", month: "long", day: "numeric", year: "numeric",
+            timeZone: "America/Chicago",
+          }),
+          timeFormatted: event.startAt.toLocaleTimeString("en-US", {
+            hour: "numeric", minute: "2-digit", timeZone: "America/Chicago",
+          }),
+          location: event.location ?? "",
+        },
+        ticket: { url: `${appUrl}/ticket/${args.rsvpId}` },
+        qr: { url: `${appUrl}/api/qr/${encodeURIComponent(args.rsvpId)}` },
+      },
+      [{ memberId: args.memberId }],
+    );
+    if (!result.ok) {
+      if (result.reason === "send_failed") {
+        // Provider failure - the case the alert has always covered.
+        throw new Error(result.error ?? "send_failed");
+      }
+      // disabled / template_missing / no_resend_key: fail-soft by design,
+      // already audited inside sendTemplatedEmail.
+      console.info(
+        `[confirmation] ticket confirmation not sent for rsvp=${args.rsvpId}: ${result.reason}`,
+      );
+    }
   } catch (err) {
     console.error("[confirmation] ticket confirmation send failed", {
       workspaceId: args.workspaceId,

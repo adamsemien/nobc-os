@@ -28,12 +28,14 @@ const {
   getOrCreateFromClerk,
   logEngagement,
   resolveMemberMock,
+  platformSettingFindUnique,
 } = vi.hoisted(() => ({
   eventFindFirst: vi.fn(),
   eventFindUnique: vi.fn(),
   memberFindFirst: vi.fn(),
   rsvpFindFirst: vi.fn(),
   auditCreate: vi.fn(),
+  platformSettingFindUnique: vi.fn(),
   dbTransaction: vi.fn(),
   txQueryRaw: vi.fn(),
   txRsvpCount: vi.fn(),
@@ -52,6 +54,9 @@ vi.mock('@/lib/db', () => ({
     member: { findFirst: memberFindFirst },
     rSVP: { findFirst: rsvpFindFirst },
     auditEvent: { create: auditCreate },
+    // The confirmation-email path reads `rsvp.send_confirmation`; null falls
+    // back to the default (true), then exits at the unset event.findUnique.
+    platformSetting: { findUnique: platformSettingFindUnique },
     $transaction: dbTransaction,
   },
 }));
@@ -95,7 +100,10 @@ beforeEach(() => {
     eventFindFirst, eventFindUnique, memberFindFirst, rsvpFindFirst, auditCreate,
     dbTransaction, txQueryRaw, txRsvpCount, txRsvpCreate, txWaitlistAggregate,
     txWaitlistCreate, getUserMock, getOrCreateFromClerk, logEngagement, resolveMemberMock,
+    platformSettingFindUnique,
   ]) fn.mockReset();
+
+  platformSettingFindUnique.mockResolvedValue(null);
 
   dbTransaction.mockImplementation(async (cb: (t: typeof tx) => Promise<unknown>) => cb(tx));
   eventFindFirst.mockResolvedValue({ ...baseEvent });
