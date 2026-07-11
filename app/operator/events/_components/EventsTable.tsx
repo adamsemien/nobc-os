@@ -142,7 +142,7 @@ export function EventsTable({ events }: { events: EventRow[] }) {
                 </td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/operator/events/${event.id}`}
+                    href={`/operator/events/${event.id}/builder`}
                     className="font-medium text-text-primary underline-offset-2 hover:text-primary hover:underline"
                   >
                     {event.title}
@@ -179,7 +179,7 @@ export function EventsTable({ events }: { events: EventRow[] }) {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/operator/events/${event.id}`}
+                    href={`/operator/events/${event.id}/builder`}
                     className="text-xs font-medium text-primary underline-offset-4 hover:underline"
                   >
                     →

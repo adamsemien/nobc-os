@@ -310,11 +310,16 @@ function PayChipEditor({
           type="text"
           inputMode="decimal"
           value={priceText}
-          onChange={(e) => {
-            setPriceText(e.target.value);
-            const cents = Math.round(parseFloat(e.target.value) * 100);
+          onChange={(e) => setPriceText(e.target.value)}
+          onBlur={() => {
+            // Save on blur like every other text field in the rail - a
+            // per-keystroke save round-trips the server mid-typing.
+            const cents = Math.round(parseFloat(priceText) * 100);
             if (Number.isFinite(cents) && cents >= 0) {
-              onChange({ ...config, priceCents: cents });
+              if (cents !== price) onChange({ ...config, priceCents: cents });
+            } else {
+              // Unparseable input never saves - snap back to the saved price.
+              setPriceText((price / 100).toFixed(2));
             }
           }}
           className={`${fieldClass} w-28`}
@@ -817,15 +822,33 @@ export function BuilderShell({
                 <span className="text-xs text-text-tertiary">Saving…</span>
               ) : null}
             </div>
-            <p className="mt-2 text-sm italic text-text-primary" style={editorial}>
-              {sentence}
-            </p>
-            {draft.kind === "gated" ? (
-              <p className="mt-2 text-xs leading-relaxed text-text-tertiary">
-                This gate is the whole door - any legacy access settings on
-                this event stop applying while it exists.
-              </p>
-            ) : null}
+            {state.gate === null ? (
+              <>
+                {/* Honesty: with no gate, the guest page enforces the legacy
+                    access settings - never claim "Open" here. The summary
+                    resolves the same eventAccess the preview pane renders. */}
+                <p className="mt-2 text-sm italic text-text-primary" style={editorial}>
+                  No gate yet - this event&apos;s door is governed by legacy
+                  access: {state.legacyDoor ?? "see the preview"}
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-text-tertiary">
+                  Adding a requirement or picking a template below builds a
+                  gate that replaces those legacy settings.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm italic text-text-primary" style={editorial}>
+                  {sentence}
+                </p>
+                {draft.kind === "gated" ? (
+                  <p className="mt-2 text-xs leading-relaxed text-text-tertiary">
+                    This gate is the whole door - any legacy access settings on
+                    this event stop applying while it exists.
+                  </p>
+                ) : null}
+              </>
+            )}
 
             <div className="mt-4 flex flex-col gap-2">
               {draft.rootChips.map((chip) => (
@@ -995,6 +1018,20 @@ export function BuilderShell({
                 ))}
               </div>
             </div>
+
+            {/* Bridge until ticket tiers are ported into the Gate Engine - the
+                gate's PAY step knows one flat price; tiered pricing still lives
+                on the legacy settings surface. */}
+            <p className="mt-3 border-t border-border pt-3 text-xs text-text-tertiary">
+              Ticket tiers - managed in{" "}
+              <Link
+                href={`/operator/events/${event.id}?tab=settings#tiers`}
+                className="underline underline-offset-2"
+              >
+                legacy settings
+              </Link>{" "}
+              until they move into the gate.
+            </p>
           </section>
 
           {/* Advanced - revealed on demand, never blocks publish. */}

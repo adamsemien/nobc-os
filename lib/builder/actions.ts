@@ -30,6 +30,11 @@ import { openGateSpec, type GateNodeSpec } from "@/lib/gate-engine/types";
 import { validateGateSpec } from "@/lib/gate-engine/validate";
 import { getDefaultRegistry } from "@/lib/gate-engine";
 import { mintPreviewToken } from "@/lib/preview-token";
+import {
+  parseEventAccess,
+  resolveAccessForViewer,
+  resolveViewer,
+} from "@/lib/event-access";
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 
@@ -557,6 +562,13 @@ export type BuilderState = {
     serviceFeeFlatCents: number | null;
   };
   gate: { gateId: string; tree: unknown } | null;
+  /** Display honesty for gateless legacy events: when `gate` is null, the
+   *  live door is the legacy eventAccess flow (assembleAnonEventDTO only
+   *  routes to the gate walkthrough when a Gate row exists). This is that
+   *  door summarized for the anon guest the preview pane renders - so the
+   *  rail can never claim "Open" while the preview shows a different door.
+   *  Null whenever a gate governs the event. */
+  legacyDoor: string | null;
   compCodes: {
     id: string;
     code: string;
@@ -575,6 +587,29 @@ export type BuilderState = {
     active: boolean;
   }[];
 };
+
+/** Summarize the legacy eventAccess door as the anon guest preview resolves
+ *  it - READ-ONLY calls into lib/event-access (never edited, never migrated
+ *  from here; minting a gate stays an explicit operator action). Display
+ *  strings only, per copy law. */
+function legacyDoorSummary(rawEventAccess: unknown): string {
+  const resolved = resolveAccessForViewer(
+    parseEventAccess(rawEventAccess),
+    resolveViewer(null, null), // anon - the viewer the preview pane renders
+  );
+  if (resolved.kind === "closed") return resolved.reason;
+  const dollars = (resolved.priceCents / 100).toFixed(2).replace(/\.00$/, "");
+  const stepCopy: Record<string, string> = {
+    fields: "answer questions",
+    pay: `buy a ticket - $${dollars}`,
+    approval: "wait for approval",
+  };
+  const steps = resolved.flow
+    .map((s) => stepCopy[s])
+    .filter((s): s is string => Boolean(s));
+  if (steps.length === 0) return "Open - anyone can get in";
+  return `Guests ${steps.join(", then ")}`;
+}
 
 export async function getBuilderState(
   eventId: string,
@@ -601,6 +636,9 @@ export async function getBuilderState(
       serviceFeeMode: true,
       serviceFeePercentBps: true,
       serviceFeeFlatCents: true,
+      // Read-only: feeds legacyDoorSummary for gateless legacy events. The
+      // action layer still never WRITES eventAccess (acceptance 3).
+      eventAccess: true,
     },
   });
   if (!event) return { ok: false, error: "Event not found." };
@@ -679,6 +717,7 @@ export async function getBuilderState(
         serviceFeeFlatCents: event.serviceFeeFlatCents,
       },
       gate: loaded ? { gateId: loaded.gateId, tree: loaded.tree } : null,
+      legacyDoor: loaded ? null : legacyDoorSummary(event.eventAccess),
       compCodes: codes.map((c) => ({
         id: c.id,
         code: c.code,
