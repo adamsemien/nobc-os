@@ -318,6 +318,13 @@ model Person {
   segmentSnapshotMembers SegmentSnapshotMember[]
   operatorActionTargets  OperatorActionTarget[]
 
+  // Person-primary retrofit (Stage 17): dual-pointer seams on the gate layer.
+  // Relation fields only; no columns on Person.
+  gateProofs      GateProof[]
+  gateSessions    GateSession[]
+  growthEdgesFrom GrowthEdge[] @relation("GrowthEdgeFromPerson")
+  growthEdgesTo   GrowthEdge[] @relation("GrowthEdgeToPerson")
+
   // clerkUserId stays unique when present (NULLs are distinct in Postgres).
   // email is a plain index - see emailVerified doc above.
   @@unique([workspaceId, clerkUserId])
@@ -2448,14 +2455,25 @@ model GateNode {
 /// carry-forward query can match a member's prior proofs across gates and
 /// events; nodeId is SetNull on node deletion so proof history survives gate
 /// edits. sourceProofId records carry-forward lineage.
+///
+/// Person-primary retrofit: dual pointer (memberId?/personId?). The member
+/// side's uniqueness stays on @@unique([nodeId, memberId]) (NULLs distinct);
+/// the person side lives ONLY in the out-of-band partial unique
+/// GateProof_node_person_key (Prisma @@unique cannot express WHERE) - see
+/// prisma/sql/gate-engine-person-primary-retrofit.sql and the CLAUDE.md
+/// db-push landmine list.
 model GateProof {
   id            String           @id @default(cuid())
   workspaceId   String
   workspace     Workspace        @relation(fields: [workspaceId], references: [id])
   nodeId        String?
   node          GateNode?        @relation(fields: [nodeId], references: [id], onDelete: SetNull)
-  memberId      String
-  member        Member           @relation(fields: [memberId], references: [id])
+  // onDelete: Restrict pinned explicitly: Prisma's optional-relation default
+  // is SetNull, which would silently swap the shipped FK's RESTRICT semantics.
+  memberId      String?
+  member        Member?          @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  personId      String?
+  person        Person?          @relation(fields: [personId], references: [id])
   conditionType String
   status        GateProofStatus
   tier          VerificationTier
@@ -2470,21 +2488,39 @@ model GateProof {
   @@unique([nodeId, memberId])
   @@index([workspaceId, memberId, conditionType])
   @@index([memberId])
+  @@index([workspaceId, personId, conditionType])
+  @@index([personId])
 }
 
 /// A workspace-scoped edge in the growth graph. M1 writes REFERRAL edges when
 /// REFERRED_BY_MEMBER is satisfied. One edge per (type, from, to) pair per
 /// workspace. Shaped so per-workspace network aggregation is possible later;
 /// there are NO cross-tenant reads anywhere in the engine.
+///
+/// Person-primary retrofit: both endpoints are dual pointers
+/// (fromMemberId?/fromPersonId?, toMemberId?/toPersonId?). member->member
+/// uniqueness stays on the @@unique below (NULLs distinct); the three
+/// person-bearing combinations live ONLY in out-of-band partial uniques
+/// (GrowthEdge_ws_type_fromPerson_toPerson_key / _fromMember_toPerson_key /
+/// _fromPerson_toMember_key) - see prisma/sql/
+/// gate-engine-person-primary-retrofit.sql and the CLAUDE.md db-push landmine
+/// list. Live code writes member->member only (the REFERRED_BY_MEMBER
+/// verifier requires an approved-Member referrer); member->person is the
+/// first real new combination, the person-from pair is future-proofing.
 model GrowthEdge {
   id           String            @id @default(cuid())
   workspaceId  String
   workspace    Workspace         @relation(fields: [workspaceId], references: [id])
   type         GrowthEdgeType
-  fromMemberId String
-  fromMember   Member            @relation("GrowthEdgeFrom", fields: [fromMemberId], references: [id])
-  toMemberId   String
-  toMember     Member            @relation("GrowthEdgeTo", fields: [toMemberId], references: [id])
+  // onDelete: Restrict pinned on both member FKs - same reason as GateProof.
+  fromMemberId String?
+  fromMember   Member?           @relation("GrowthEdgeFrom", fields: [fromMemberId], references: [id], onDelete: Restrict)
+  toMemberId   String?
+  toMember     Member?           @relation("GrowthEdgeTo", fields: [toMemberId], references: [id], onDelete: Restrict)
+  fromPersonId String?
+  fromPerson   Person?           @relation("GrowthEdgeFromPerson", fields: [fromPersonId], references: [id])
+  toPersonId   String?
+  toPerson     Person?           @relation("GrowthEdgeToPerson", fields: [toPersonId], references: [id])
   resourceType GateResourceType?
   resourceId   String?
   proofId      String?
@@ -2493,6 +2529,8 @@ model GrowthEdge {
   @@unique([workspaceId, type, fromMemberId, toMemberId])
   @@index([workspaceId, toMemberId])
   @@index([workspaceId, fromMemberId])
+  @@index([workspaceId, toPersonId])
+  @@index([workspaceId, fromPersonId])
 }
 
 /// A single traversal of a gate by a member or anonymous guest. Deliberately
@@ -2507,6 +2545,11 @@ model GateSession {
   gate         Gate              @relation(fields: [gateId], references: [id], onDelete: Cascade)
   memberId     String?
   member       Member?           @relation(fields: [memberId], references: [id])
+  // Person-primary retrofit: person seam beside the member pointer. Sessions
+  // are deliberately many-per-visitor (every mint creates one) - NO unique
+  // indexes on either pointer, plain lookup indexes only.
+  personId     String?
+  person       Person?           @relation(fields: [personId], references: [id])
   token        String            @unique @default(cuid())
   status       GateSessionStatus @default(ACTIVE)
   lastDecision Json?
@@ -2516,6 +2559,7 @@ model GateSession {
 
   @@index([workspaceId])
   @@index([gateId, memberId])
+  @@index([gateId, personId])
 }
 
 // ─── Attendee messaging layer (Stage 18) ─────────────────────────────────────
