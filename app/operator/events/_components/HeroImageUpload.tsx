@@ -87,42 +87,35 @@ export function HeroImageUpload({ value, onChange, compact = false }: Props) {
       />
 
       {value ? (
-        <div className={`group relative w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card ${compact ? 'h-[180px]' : 'aspect-video'}`}>
+        <div className={`relative w-full overflow-hidden rounded-sm border border-[var(--apply-rule)] bg-card ${compact ? 'h-[180px]' : 'aspect-video'}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={getEventHeroDisplayUrl(value) ?? ''} alt="Hero preview" className="h-full w-full object-cover" />
 
-          {/* Always-visible affordance so it's obvious the photo can be changed —
-              the hover-only overlay below was too easy to miss. */}
-          <button
-            type="button"
-            onClick={handlePick}
-            disabled={uploading}
-            aria-label="Replace photo"
-            className="absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-[var(--nobc-red)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--apply-ink) 62%, transparent)' }}
-          >
-            <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden />
-            {uploading ? 'Replacing…' : 'Replace photo'}
-          </button>
-
-          <div
-            className="absolute inset-0 hidden items-center justify-center gap-3 group-hover:flex"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--apply-ink) 40%, transparent)' }}
-          >
+          {/* Exactly one always-visible control per action. A hover-revealed
+              full-bleed overlay must never return here: on touch, the first
+              tap triggers :hover and the overlay paints over these buttons,
+              forcing a second tap. */}
+          <div className="absolute right-2 top-2 flex items-center gap-1.5">
             <button
               type="button"
               onClick={handlePick}
               disabled={uploading}
-              className="rounded-sm border border-white/80 bg-transparent px-4 py-2 text-[11px] font-medium uppercase tracking-widest text-white transition-colors hover:border-[var(--nobc-red)] hover:bg-[var(--nobc-red)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
+              aria-label="Replace photo"
+              className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-[var(--nobc-red)] disabled:opacity-60 font-[family-name:var(--font-dm-sans)]"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--apply-ink) 62%, transparent)' }}
             >
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden />
               {uploading ? 'Replacing…' : 'Replace photo'}
             </button>
             <button
               type="button"
               onClick={handleRemove}
-              className="rounded-sm border border-white/80 bg-transparent px-4 py-2 text-[11px] font-medium uppercase tracking-widest text-white transition-colors hover:border-[var(--nobc-red)] hover:bg-[var(--nobc-red)] font-[family-name:var(--font-dm-sans)]"
+              disabled={uploading}
+              aria-label="Remove photo"
+              className="inline-flex items-center rounded-sm p-1.5 text-white shadow-sm transition-colors hover:bg-[var(--nobc-red)] disabled:opacity-60"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--apply-ink) 62%, transparent)' }}
             >
-              Remove
+              <X className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden />
             </button>
           </div>
         </div>

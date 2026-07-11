@@ -400,8 +400,10 @@ export function EventSettingsTab({ event }: Props) {
         />
       </div>
 
-      {/* Ticket tiers — pricing belongs with the access/gates config, not at the page bottom */}
-      <div className="border-t border-border pt-6">
+      {/* Ticket tiers — pricing belongs with the access/gates config, not at the page bottom.
+          id="tiers" is the landing anchor for the builder's bridge link until tiers move
+          into the Gate Engine. */}
+      <div id="tiers" className="border-t border-border pt-6">
         <TierManager eventId={event.id} />
       </div>
 
