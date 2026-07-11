@@ -22,9 +22,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
-import type { MemberEngagementEventType } from '@prisma/client';
+import type { MemberEngagementEventType, SuppressionReason } from '@prisma/client';
 import { db } from '@/lib/db';
 import { logEngagementEvent } from '@/lib/engagement';
+import { createSuppressionEntry } from '@/lib/comms/suppression';
 
 type ResendWebhookEvent = {
   type: string;
@@ -49,6 +50,16 @@ const STATUS_BY_TYPE: Record<string, StatusMapping> = {
   // No MemberEngagementEventType for complaints — access/suppression concept, not
   // an engagement signal; TransactionalEmailLog.status still records it.
   'email.complained': { status: 'complained' },
+};
+
+/** Consent reconciliation Phase 1: bounces and complaints finally get their
+ *  SuppressionEntry writer. Minted through the ONE sanctioned path
+ *  (createSuppressionEntry - normalizes the identifier the way canSend and
+ *  the lifecycle gate read it), so the hard block applies to every future
+ *  send, transactional included. */
+const SUPPRESSION_BY_TYPE: Record<string, SuppressionReason> = {
+  'email.bounced': 'HARD_BOUNCE',
+  'email.complained': 'SPAM_COMPLAINT',
 };
 
 export async function POST(req: NextRequest) {
@@ -118,6 +129,24 @@ export async function POST(req: NextRequest) {
         eventType: mapping.engagementType,
         metadata: { templateKey: row.templateKey, to: row.to, providerId: emailId },
       });
+    }
+
+    // Hard-block the address on bounce/complaint. Fail-soft: a suppression
+    // write failure is logged and never fails the webhook (Resend would
+    // retry the whole event otherwise).
+    const suppressionReason = SUPPRESSION_BY_TYPE[event.type];
+    if (suppressionReason) {
+      await createSuppressionEntry({
+        workspaceId: row.workspaceId,
+        channel: 'EMAIL',
+        identifier: row.to,
+        reason: suppressionReason,
+        source: 'resend_webhook',
+        memberId: row.memberId,
+        personId: row.personId,
+      }).catch((err) =>
+        console.error(`[resend-webhook] suppression write failed (log=${row.id}):`, err),
+      );
     }
   }
 

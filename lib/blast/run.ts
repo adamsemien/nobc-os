@@ -15,6 +15,7 @@
  *  (SmsConversation upsert + OUTBOUND SmsMessage, category 'marketing').
  */
 import type { Blast, PrismaClient } from "@prisma/client";
+import { createSuppressionEntry } from "@/lib/comms/suppression";
 import { sendBlastEmail } from "@/lib/email";
 import { sendMarketingSms } from "@/lib/twilio";
 import type { RecipientVerdict } from "./recipients";
@@ -221,6 +222,18 @@ export async function fireBlast(
               update: {},
             })
             .catch(() => {});
+          // Consent reconciliation Phase 1: dual-write the canonical
+          // CHANNEL-axis suppression alongside the blast-local ledger above
+          // (additive - nothing removed). canSend and the lifecycle gate read
+          // SuppressionEntry; the blast dry run keeps SuppressedContact.
+          await createSuppressionEntry({
+            workspaceId: blast.workspaceId,
+            channel: "SMS",
+            identifier: r.destination,
+            reason: "CARRIER_REJECT",
+            source: "twilio_21610",
+            memberId: r.memberId,
+          }).catch(() => {});
         }
       }
     }

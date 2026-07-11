@@ -2,6 +2,7 @@ import { clerkClient } from "@clerk/nextjs/server"
 import { Prisma } from "@prisma/client"
 import { db } from "./db"
 import { generateMemberQrCode } from "./member-qr"
+import { syncMemberChannelConsent } from "./comms/consent-sync"
 import {
   parseEventAccess,
   resolveAccessForViewer,
@@ -130,6 +131,9 @@ export async function findOrCreateGuestMember(
       },
       select: { id: true, email: true, firstName: true, lastName: true, memberQrCode: true },
     })
+    // Consent floor (reconciliation Phase 1): seed visible, fail-closed PENDING
+    // ChannelSubscription rows through the single writer. Fire-and-forget.
+    void syncMemberChannelConsent({ workspaceId, memberId: created.id, context: "guest_create" })
     return created
   } catch (err) {
     // Race: a concurrent/retried request (e.g. a buyer double-submitting their own
@@ -172,7 +176,7 @@ export async function findOrCreateOperatorMember(
     .toLowerCase()
 
   try {
-    return await db.member.create({
+    const created = await db.member.create({
       data: {
         workspaceId,
         clerkUserId,
@@ -185,6 +189,10 @@ export async function findOrCreateOperatorMember(
       },
       select: { id: true, memberQrCode: true },
     })
+    // Same PENDING seed as the guest path - operator preview members are
+    // visible in the consent tables, never sendable without a real signal.
+    void syncMemberChannelConsent({ workspaceId, memberId: created.id, context: "guest_create" })
+    return created
   } catch (err) {
     // Pre-existing identity: this operator already has a Member row under the same
     // (workspaceId, email) but a DIFFERENT clerkUserId (e.g. a `guest:email` row

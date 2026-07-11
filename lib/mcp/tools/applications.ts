@@ -1,9 +1,8 @@
 import { z } from 'zod';
-import { randomBytes } from 'crypto';
-import { MemberStatus, OperatorRole, type ApplicationStatus } from '@prisma/client';
+import { OperatorRole, type ApplicationStatus } from '@prisma/client';
 import { db } from '@/lib/db';
 import { emitEvent } from '@/lib/emit-event';
-import { resolvePerson } from '@/lib/crm/resolve-person';
+import { approveApplication as approveApplicationCanonical } from '@/lib/applications/approve';
 import type { McpContext, McpTool } from '../types';
 
 const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'HOLD', 'WAITLISTED', 'DECLINED'] as const;
@@ -35,105 +34,25 @@ const waitlistSchema = z.object({
   note: z.string().optional().describe('Optional internal review note'),
 });
 
-/** Shared approve path — also used by the legacy `approve_application` alias. */
+/** Thin MCP adapter over THE canonical approve path (lib/applications/approve.ts)
+ *  — also used by the legacy `approve_application` alias. The duplicated local
+ *  implementation is deleted: MCP now shares the exact code path the operator
+ *  API route and the agent tool run (member resolution + in-place promotion,
+ *  Person spine, consent sync, Door 1 comp confirm, wallet pass, welcome
+ *  email, audit events). */
 export async function approveApplication(ctx: McpContext, applicationId: string, note?: string) {
-  const app = await db.application.findFirst({
-    where: { id: applicationId, workspaceId: ctx.workspaceId },
-  });
-  if (!app) throw new Error('Application not found or not in this workspace');
-  if (app.status === 'APPROVED') throw new Error('Already approved');
-
-  const memberQrCode = randomBytes(8).toString('hex');
-  const now = new Date();
-  const [firstName, ...rest] = app.fullName.trim().split(' ');
-  const lastName = rest.join(' ') || '';
-
-  const existingMember = await db.member.findUnique({
-    where: { workspaceId_email: { workspaceId: ctx.workspaceId, email: app.email } },
-    select: { id: true },
-  });
-
-  const [updatedApp, member] = await db.$transaction([
-    db.application.update({
-      where: { id: applicationId },
-      data: { status: 'APPROVED', reviewedAt: now, reviewedBy: ctx.userId, reviewNote: note ?? null },
-    }),
-    db.member.upsert({
-      where: { workspaceId_email: { workspaceId: ctx.workspaceId, email: app.email } },
-      create: {
-        workspaceId: ctx.workspaceId,
-        clerkUserId: `mcp:${app.id}`,
-        email: app.email,
-        firstName,
-        lastName,
-        phone: app.phone ?? undefined,
-        status: MemberStatus.APPROVED,
-        approved: true,
-        approvedAt: now,
-        memberQrCode,
-      },
-      update: {
-        status: MemberStatus.APPROVED,
-        approved: true,
-        approvedAt: now,
-        memberQrCode: { set: memberQrCode },
-      },
-    }),
-  ]);
-
-  // Person spine (Phase 2A): attach the approved human to a Person. The typed
-  // application email is UNVERIFIED — resolvePerson never links it to an
-  // existing Person; a collision mints a flagged potential duplicate instead.
-  // Non-fatal: approval must never fail on spine bookkeeping.
-  try {
-    if (!member.personId) {
-      const person = await resolvePerson({
-        workspaceId: ctx.workspaceId,
-        email: app.email,
-        emailVerified: false,
-        phone: app.phone,
-        firstName,
-        lastName,
-        source: 'application',
-        sourceExternalId: app.id,
-      });
-      await db.member.update({ where: { id: member.id }, data: { personId: person.id } });
-      if (!app.personId) {
-        await db.application.update({ where: { id: app.id }, data: { personId: person.id } });
-      }
-    } else if (!app.personId) {
-      await db.application.update({
-        where: { id: app.id },
-        data: { personId: member.personId },
-      });
-    }
-  } catch (err) {
-    console.error('[mcp.approveApplication] person spine attach failed:', err);
-  }
-
-  await emitEvent({
+  const outcome = await approveApplicationCanonical({
+    applicationId,
     workspaceId: ctx.workspaceId,
     actorId: ctx.userId,
     actorType: 'AGENT',
-    action: 'application.approved',
-    entityType: 'APPLICATION',
-    entityId: applicationId,
-    metadata: { memberId: member.id, via: 'mcp', note: note ?? null },
+    reviewNote: note,
   });
-
-  if (!existingMember) {
-    await emitEvent({
-      workspaceId: ctx.workspaceId,
-      actorId: ctx.userId,
-      actorType: 'AGENT',
-      action: 'member.created',
-      entityType: 'MEMBER',
-      entityId: member.id,
-      metadata: { applicationId, email: app.email, via: 'mcp' },
-    });
+  if (!outcome.ok) {
+    if (outcome.error === 'already_approved') throw new Error('Already approved');
+    throw new Error('Application not found or not in this workspace');
   }
-
-  return { application: updatedApp, member };
+  return { application: outcome.application, member: outcome.member };
 }
 
 async function setApplicationStatus(

@@ -16,6 +16,7 @@ import {
   type ConsentSubscription,
   type ConsentSuppression,
 } from '../_components/ConsentPanel';
+import { channelIdentifier } from '@/lib/comms/can-send';
 
 // PR3 Slice 1+2 — record read experience (F1 identity/status, F2 timeline, F3 provenance) +
 // inline edit (F4) / custom fields (F5). Server shell: role-gates the page, assembles the
@@ -61,7 +62,7 @@ export default async function MemberRecordPage({
   const canEdit = roleAtLeast(role, OperatorRole.STAFF) && !m.mergedIntoId;
 
   // Consent floor (Phase 1) — read-only per-channel consent for the Consent panel.
-  const consent = await loadConsent(workspaceId, id);
+  const consent = await loadConsent(workspaceId, id, { email: m.email, phone: m.phone });
 
   // Identity descriptor — who this person is at a glance ("Founder at Stripe · Fintech"),
   // built from the firmographic dimensions already on the record. Degrades to whatever is set.
@@ -157,8 +158,16 @@ export default async function MemberRecordPage({
 async function loadConsent(
   workspaceId: string,
   memberId: string,
+  identity: { email?: string | null; phone?: string | null },
 ): Promise<{ subscriptions: ConsentSubscription[]; suppressions: ConsentSuppression[] }> {
   try {
+    // Suppression is looked up by normalized identifier (email/phone), the same
+    // way canSend and the lifecycle gate actually decide blocking — NOT by the
+    // memberId FK, which a suppression row may not carry (a carrier STOP or a
+    // bounce recorded before any Member link existed). Keeps this panel's
+    // verdict identical to the Person panel and to the send path.
+    const emailIdentifier = channelIdentifier(identity, 'EMAIL');
+    const smsIdentifier = channelIdentifier(identity, 'SMS');
     const [subscriptions, suppressions] = await Promise.all([
       db.channelSubscription.findMany({
         where: { workspaceId, memberId },
@@ -171,10 +180,18 @@ async function loadConsent(
         },
         orderBy: { channel: 'asc' },
       }),
-      db.suppressionEntry.findMany({
-        where: { workspaceId, memberId },
-        select: { channel: true, identifier: true, reason: true },
-      }),
+      emailIdentifier || smsIdentifier
+        ? db.suppressionEntry.findMany({
+            where: {
+              workspaceId,
+              OR: [
+                ...(emailIdentifier ? [{ channel: 'EMAIL' as const, identifier: emailIdentifier }] : []),
+                ...(smsIdentifier ? [{ channel: 'SMS' as const, identifier: smsIdentifier }] : []),
+              ],
+            },
+            select: { channel: true, identifier: true, reason: true },
+          })
+        : Promise.resolve([]),
     ]);
     return { subscriptions, suppressions };
   } catch (err) {

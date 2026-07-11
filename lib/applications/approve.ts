@@ -1,7 +1,10 @@
-/** Application approval — shared by the operator API route and the agent
- *  `applications.approve` tool, so both go through identical logic:
- *  flip status → APPROVED, upsert the Member, fire wallet pass + welcome
- *  email, emit audit events. */
+/** Application approval — THE one approve path. Shared by the operator API
+ *  route, the agent `applications.approve` tool, AND the MCP
+ *  `nobc_approve_application` tool (whose duplicated local implementation was
+ *  deleted 2026-07-11 — the earlier "identical logic" claim here was only true
+ *  for the first two): flip status → APPROVED, resolve + promote the Member in
+ *  place, sync channel consent, fire wallet pass + welcome email, emit audit
+ *  events. */
 import { MemberStatus, type Application, type AuditActorType, type Member } from '@prisma/client';
 import { db } from '@/lib/db';
 import { resolveMember } from '@/lib/member-identity';
