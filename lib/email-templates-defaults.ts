@@ -74,6 +74,36 @@ export const DEFAULT_EMAIL_TEMPLATES: DefaultTemplate[] = [
     enabled: true,
   },
   {
+    key: 'rsvp.confirmation_paid',
+    name: 'Ticket confirmation (with door QR)',
+    description:
+      'Sent after a paid or comp ticket purchase when the buyer has a member QR. Buyers without a QR get the standard RSVP confirmation.',
+    subject: "You're in: {{event.title}}",
+    bodyHtml:
+      `<p>{{member.firstName}},</p>` +
+      `<p>You're confirmed for <strong>{{event.title}}</strong>.</p>` +
+      `<p>{{event.dateFormatted}}<br/>{{event.timeFormatted}}<br/>{{event.location}}</p>` +
+      `<p>Show this QR code at the door and staff will scan you in:</p>` +
+      `<p><img src="{{qr.url}}" alt="Check-in QR code" width="200" height="200" style="border-radius:8px;" /></p>` +
+      `<p>Can't load the image? Use this link instead:<br/><a href="{{ticket.url}}">{{ticket.url}}</a></p>` +
+      SIG,
+    bodyText:
+      `{{member.firstName}},\n\nYou're confirmed for {{event.title}}.\n\n` +
+      `{{event.dateFormatted}}\n{{event.timeFormatted}}\n{{event.location}}\n\n` +
+      `Show your QR at the door: {{qr.url}}\n\n` +
+      `Or use your ticket link: {{ticket.url}}\n\nNo Bad Company`,
+    variables: [
+      'member.firstName',
+      'event.title',
+      'event.dateFormatted',
+      'event.timeFormatted',
+      'event.location',
+      'qr.url',
+      'ticket.url',
+    ],
+    enabled: true,
+  },
+  {
     key: 'event.reminder_upcoming',
     name: 'Upcoming-event reminder',
     description:
