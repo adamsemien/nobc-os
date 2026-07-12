@@ -1,15 +1,15 @@
-/** Consent unification (CRM substrate, Phase 1).
+/** Consent derivation + promotion-time merge (consent reconciliation, Phase 1).
  *
- *  Consent currently lives in two places that never sync — Application
- *  (`agreedToMembershipTerms` / `emailOptIn` / `smsOptInAt`) and Member marketing
- *  booleans (`marketingEmailOptIn` / `marketingSmsOptIn`). This writer makes both
- *  INPUTS that derive ChannelSubscription rows, so ChannelSubscription becomes the
- *  single read for "may we message this person on this channel" (via canSend).
+ *  Consent signals live in two legacy places — Application (`emailOptIn` /
+ *  `smsOptInAt`) and the Member marketing booleans. This module DERIVES a
+ *  signal from them and routes it through THE single consent writer
+ *  (lib/comms/consent-writer.ts), which reads the person-keyed canonical rows
+ *  first, merges under the locked conflict rule (most protective explicit
+ *  signal wins — the old "no-downgrade" special case is subsumed by it), and
+ *  converges every keying: person row, member mirror rows, Member booleans.
  *
- *  ADDITIVE LAW: the legacy columns are NOT dropped and NOT stopped-being-written;
- *  they simply stop being the read for send decisions. This writer only ever
- *  ELEVATES consent (creates a row, or upgrades toward SUBSCRIBED). It NEVER
- *  downgrades a SUBSCRIBED row — unsubscribe is a separate, explicit action.
+ *  ADDITIVE LAW: the legacy columns are NOT dropped; they are writer-maintained
+ *  mirrors, deprecated as a read path (locked decision 3).
  *
  *  Fire-and-forget safe: like logEngagementEvent, this never throws and never
  *  blocks the request path. Before the migration runs (ChannelSubscription table
@@ -17,10 +17,12 @@
  */
 import type { CommChannel, ConsentBasis, SubscriptionStatus } from '@prisma/client';
 import { db } from '@/lib/db';
-import { logEngagementEvent } from '@/lib/engagement';
+import { writeConsent } from '@/lib/comms/consent-writer';
 
 export type ConsentContext =
   | 'member_create'
+  | 'guest_create'
+  | 'import'
   | 'application_approval'
   | 'operator_manual'
   | 'backfill';
@@ -28,7 +30,7 @@ export type ConsentContext =
 const CHANNELS: CommChannel[] = ['EMAIL', 'SMS'];
 
 type DerivedSignal = {
-  status: SubscriptionStatus;
+  status: Extract<SubscriptionStatus, 'SUBSCRIBED' | 'PENDING'>;
   basis: ConsentBasis;
   source: string;
   at: Date | null;
@@ -88,16 +90,19 @@ function deriveSignal(
 }
 
 /**
- * Reconcile a member's ChannelSubscription rows from current consent signals.
- * Fires on member creation and application approval (and operator manual create).
- * Idempotent + no-downgrade, so it is safe to run repeatedly.
+ * Reconcile a member's consent state from current legacy signals — the
+ * promotion-time merge. Fires on member/guest creation, import, and
+ * application approval. Derives the incoming signal from the Member booleans +
+ * latest Application, then hands it to writeConsent in 'merge' mode: the
+ * writer reads the person-keyed rows first and the locked conflict rule
+ * decides (most protective explicit signal wins — replacing the old
+ * "no-downgrade" rule). Idempotent, safe to run repeatedly.
  */
 export async function syncMemberChannelConsent(args: {
   workspaceId: string;
   memberId: string;
-  /** Person spine (Phase 2A, scoped unfreeze): written ALONGSIDE memberId on
-   *  ChannelSubscription rows. Optional — callers without a resolved Person
-   *  omit it and the backfill/next sync fills it. */
+  /** Optional hint; the writer re-resolves the member's personId itself, so
+   *  callers without a resolved Person just omit it. */
   personId?: string | null;
   context: ConsentContext;
 }): Promise<void> {
@@ -107,6 +112,7 @@ export async function syncMemberChannelConsent(args: {
       select: {
         id: true,
         workspaceId: true,
+        personId: true,
         marketingEmailOptIn: true,
         marketingEmailOptInAt: true,
         marketingSmsOptIn: true,
@@ -124,68 +130,20 @@ export async function syncMemberChannelConsent(args: {
 
     for (const channel of CHANNELS) {
       const signal = deriveSignal(channel, member, latestApplication);
-
-      const existing = await db.channelSubscription.findUnique({
-        where: {
-          workspaceId_memberId_channel_stream: {
-            workspaceId: args.workspaceId,
-            memberId: args.memberId,
-            channel,
-            stream: '*',
-          },
-        },
-        select: { id: true, status: true, personId: true },
-      });
-
-      // No-downgrade: never touch an already-SUBSCRIBED row, and never overwrite an
-      // existing row with a weaker (PENDING) signal.
-      if (existing) {
-        if (existing.status === 'SUBSCRIBED') continue;
-        if (signal.status !== 'SUBSCRIBED') continue;
-        await db.channelSubscription.update({
-          where: { id: existing.id },
-          data: {
-            status: 'SUBSCRIBED',
-            consentBasis: signal.basis,
-            consentSource: `${signal.source}:${args.context}`,
-            consentAt: signal.at,
-            syncedAt: new Date(),
-            // Person spine (Phase 2A): fill when absent, never overwrite.
-            ...(args.personId && !existing.personId ? { personId: args.personId } : {}),
-          },
-        });
-        void logEngagementEvent({
-          workspaceId: args.workspaceId,
-          memberId: args.memberId,
-          eventType: 'channel_subscribed',
-          metadata: { channel, basis: signal.basis, source: signal.source, context: args.context },
-        });
-        continue;
-      }
-
-      await db.channelSubscription.create({
-        data: {
-          workspaceId: args.workspaceId,
-          memberId: args.memberId,
-          // Person spine (Phase 2A): parallel pointer alongside memberId.
-          personId: args.personId ?? null,
+      await writeConsent({
+        workspaceId: args.workspaceId,
+        memberId: args.memberId,
+        personId: args.personId ?? member.personId ?? null,
+        signal: {
           channel,
-          stream: '*',
           status: signal.status,
-          consentBasis: signal.basis,
-          consentSource: signal.source === 'none' ? null : `${signal.source}:${args.context}`,
-          consentAt: signal.at,
-          syncedAt: new Date(),
+          basis: signal.basis,
+          source: signal.source === 'none' ? null : `${signal.source}:${args.context}`,
+          at: signal.at,
         },
+        mode: 'merge',
+        context: args.context,
       });
-      if (signal.status === 'SUBSCRIBED') {
-        void logEngagementEvent({
-          workspaceId: args.workspaceId,
-          memberId: args.memberId,
-          eventType: 'channel_subscribed',
-          metadata: { channel, basis: signal.basis, source: signal.source, context: args.context },
-        });
-      }
     }
   } catch (err) {
     // Degrades to a logged no-op until the ChannelSubscription table is migrated.

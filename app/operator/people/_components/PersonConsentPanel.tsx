@@ -81,10 +81,13 @@ export function PersonConsentPanel({
   const router = useRouter();
   const [saving, setSaving] = useState<CommChannel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Block is a harder action than Unsubscribe (it stops receipts and
+  // reminders too), so it takes a two-step inline confirm per channel.
+  const [confirmingBlock, setConfirmingBlock] = useState<CommChannel | null>(null);
   const subByChannel = new Map(subscriptions.map((s) => [s.channel, s]));
   const suppByChannel = new Map(suppressions.map((s) => [s.channel, s]));
 
-  async function setStatus(channel: CommChannel, status: SubscriptionStatus) {
+  async function send(channel: CommChannel, body: Record<string, string>) {
     if (saving) return;
     setSaving(channel);
     setError(null);
@@ -92,13 +95,14 @@ export function PersonConsentPanel({
       const res = await fetch(`/api/operator/people/${personId}/consent`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel, status }),
+        body: JSON.stringify({ channel, ...body }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
         setError(data?.error ?? 'Could not save consent.');
         return;
       }
+      setConfirmingBlock(null);
       router.refresh();
     } catch {
       setError('Could not save consent.');
@@ -106,6 +110,10 @@ export function PersonConsentPanel({
       setSaving(null);
     }
   }
+
+  const setStatus = (channel: CommChannel, status: SubscriptionStatus) =>
+    send(channel, { status });
+  const block = (channel: CommChannel) => send(channel, { action: 'BLOCK' });
 
   return (
     <div>
@@ -137,7 +145,7 @@ export function PersonConsentPanel({
                 >
                   {supp ? 'Suppressed' : sub ? STATUS_LABEL[sub.status] : 'None'}
                 </span>
-                {canEdit ? (
+                {canEdit && confirmingBlock !== channel ? (
                   <button
                     type="button"
                     disabled={saving === channel}
@@ -147,11 +155,50 @@ export function PersonConsentPanel({
                     {saving === channel ? 'Saving…' : subscribed ? 'Unsubscribe' : 'Subscribe'}
                   </button>
                 ) : null}
+                {canEdit && !supp ? (
+                  confirmingBlock === channel ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={saving === channel}
+                        onClick={() => block(channel)}
+                        className="inline-flex h-7 items-center rounded-md border px-2.5 text-[12px] font-medium disabled:opacity-50"
+                        style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                      >
+                        {saving === channel ? 'Blocking…' : 'Confirm block'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={saving === channel}
+                        onClick={() => setConfirmingBlock(null)}
+                        className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-medium text-text-secondary hover:text-text-primary disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={saving === channel}
+                      onClick={() => setConfirmingBlock(channel)}
+                      className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-medium text-text-muted disabled:opacity-50"
+                      style={{ color: 'var(--danger)' }}
+                    >
+                      Block
+                    </button>
+                  )
+                ) : null}
               </div>
             </li>
           );
         })}
       </ul>
+      {confirmingBlock ? (
+        <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+          Block stops everything on {CHANNEL_LABEL[confirmingBlock]} - receipts and reminders
+          included. Unsubscribe only stops marketing.
+        </p>
+      ) : null}
       {error ? (
         <p className="mt-2 text-xs" style={{ color: 'var(--danger)' }}>
           {error}

@@ -21,6 +21,7 @@ import type { ContactRole, ContactSourceSystem, PrismaClient } from '@prisma/cli
 import type { NormalizedContact } from '../types';
 import type { ResolutionDecision } from './identity';
 import { generateMemberQrCode } from '@/lib/member-qr';
+import { syncMemberChannelConsent } from '@/lib/comms/consent-sync';
 // Dynamically imported inside linkPersonSpine (not statically here): resolve-person.ts
 // pulls in @/lib/db, which constructs a real Neon Prisma client at module load. A static
 // import here would drag that into planPersist's import graph too, breaking the "PURE,
@@ -296,6 +297,11 @@ export async function executePersist(
     const memberId = memberIdByContactIndex[item.contactIndex];
     if (!memberId) continue;
     await linkPersonSpine(db, workspaceId, memberId, item);
+    // Consent floor (reconciliation Phase 1): every imported contact gets
+    // visible, fail-closed PENDING ChannelSubscription rows through the single
+    // writer — never sendable until an explicit signal arrives. After the spine
+    // link so the person keying lands too. Fire-and-forget (self-catching).
+    void syncMemberChannelConsent({ workspaceId, memberId, context: 'import' });
   }
 
   return {

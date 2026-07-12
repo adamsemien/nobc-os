@@ -30,6 +30,7 @@ import { sendTicketConfirmation } from "@/lib/commerce/confirmation";
 import { bridgeGateAdmission } from "@/lib/commerce/gate-bridge";
 import { CapacityFullError, CompExhaustedError } from "@/lib/commerce/orders";
 import { checkCompCode, redeemCompCode } from "@/lib/commerce/promo-codes";
+import { writeConsent } from "@/lib/comms/consent-writer";
 import { db } from "@/lib/db";
 import { logEngagementEvent } from "@/lib/engagement";
 import { getDefaultRegistry, getGateEngine } from "@/lib/gate-engine";
@@ -291,6 +292,27 @@ async function recordCheckoutConsent(
           : {}),
       },
     });
+    // Consent reconciliation Phase 1 (scoped, additive): the same explicit
+    // opt-ins land in ChannelSubscription (person-keyed canonical + member
+    // mirrors) through THE single consent writer. Same fail-soft envelope -
+    // this try/catch already guarantees consent never blocks the ticket.
+    for (const channel of ["EMAIL", "SMS"] as const) {
+      const opted = channel === "EMAIL" ? input.emailOptIn : input.smsOptIn;
+      if (opted !== true) continue; // absence is not revocation
+      await writeConsent({
+        workspaceId: session.workspaceId,
+        memberId: session.memberId,
+        signal: {
+          channel,
+          status: "SUBSCRIBED",
+          basis: "EXPRESS_OPTIN",
+          source: "checkout",
+          at: now,
+        },
+        mode: "explicit",
+        context: "checkout",
+      });
+    }
   } catch (err) {
     console.error("[gate-guest-api] consent capture failed", {
       workspaceId: session.workspaceId,

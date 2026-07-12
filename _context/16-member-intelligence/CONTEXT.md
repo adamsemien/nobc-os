@@ -9,12 +9,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | 🟡 In progress — Phase 2A LIVE in prod; Phase 2B Campaign 1 (merge queue + spine hardening + People/Org CRUD) built on `feat/crm-merge-queue`, unmerged, ZERO DDL |
+| **State** | 🟡 In progress — Phase 2A LIVE in prod; Phase 2B Campaign 1 (merge queue + spine hardening + People/Org CRUD) built on `feat/crm-merge-queue`, unmerged, ZERO DDL. Consent reconciliation Phase 1+2 (single writer + suppression writers + emitted backfill) built on `consent-reconciliation`, unmerged, ZERO DDL, zero DB contact |
 | **V1 item** | — (post-V1, CRM substrate) |
-| **Last updated** | 2026-07-06 |
+| **Last updated** | 2026-07-11 |
 | **Owner** | Adam |
-| **Blocked on** | Adam: review + merge `feat/crm-merge-queue` (8 commits incl. the sponsor-narrative security fix). Also: `feat/apply-new-six` still carries the accidental People-CRUD commit `3fb2fdb` — restore its tip to `a2acfb3` once that stream pauses (content is cherry-picked onto this branch as `d034cbf`). |
-| **Next** | Adam merges Campaign 1, deploys, walks the verification checks (merge queue on the flagged pair, delete of the John Doe junk row, People search/filters, org edit/affiliations). Then Phase 2B Campaign 2 (Deal objects, Person-level consent — needs explicit unfreeze). |
+| **Blocked on** | Adam: (1) review + merge `consent-reconciliation` (Phase 1+2 build, this entry), then run `prisma/sql/consent-backfill-phase2.sql` in the Neon console and walk its verification SELECTs. (2) Review + merge `feat/crm-merge-queue` (8 commits incl. the sponsor-narrative security fix). Also: `feat/apply-new-six` still carries the accidental People-CRUD commit `3fb2fdb` — restore its tip to `a2acfb3` once that stream pauses (content is cherry-picked onto this branch as `d034cbf`). |
+| **Next** | 2026-07-11 — CONSENT RECONCILIATION PHASE 1+2 built on `consent-reconciliation` (committed local, NOT pushed; Adam's post-GO order, decisions locked): (1) `lib/comms/consent-writer.ts` — THE single consent writer; every consent mutation converges person-keyed canonical row + member-keyed mirror row(s) + Member marketing booleans in one transaction, under the locked conflict rule (Suppression > explicit UNSUBSCRIBED > explicit opt-in > no signal; recency ties within a tier only; missing timestamp never wins; 'explicit' mode for fresh first-party signals so re-subscribe after unsubscribe is lawful). (2) `syncMemberChannelConsent` rewired onto the writer — "no-downgrade" replaced by most-protective-wins. (3) Operator Person consent route + panel through the writer; NEW Block action (MANUAL_BLOCK SuppressionEntry, distinct copy from marketing-only Unsubscribe per decision 2). (4) Checkout consent (`recordCheckoutConsent`) additive writer call — opt-ins land in ChannelSubscription. (5) MCP `nobc_approve_application` deduped onto canonical `lib/applications/approve.ts` (MCP approves now also send wallet pass + welcome email — previously silently skipped). (6) Import + guest/operator member creation seed PENDING rows (visible, not sendable). (7) Suppression writers finally exist: Resend bounce→HARD_BOUNCE + complaint→SPAM_COMPLAINT, Twilio 21610→CARRIER_REJECT dual-write beside SuppressedContact, operator Block→MANUAL_BLOCK. (8) Member record panel suppression lookup switched to normalized identifier (recon finding 8 — now matches Person panel + canSend). (9) `prisma/sql/consent-backfill-phase2.sql` EMITTED, NOT run — SUBSCRIBED rows both keyings for the 4 blast-eligible member-channel pairs, EXPRESS_OPTIN where *OptInAt evidence exists else IMPORTED_LEGACY, with census-re-run verification SELECTs. Read paths UNCHANGED (blast consent/recipients byte-identical — Phase 3 cutover separately gated). Proof: tsc clean, build clean, suite 1246 pass / 4 fail (the known pre-existing apply-create failures), +39 new tests (writer decision table, webhook suppression, Block route). NEXT ACTION: Adam reviews + merges `consent-reconciliation`, runs the backfill SQL + verification, THEN decides Phase 3 (blast reads move to canSend). Prior: Adam merges Campaign 1, deploys, walks the verification checks (merge queue on the flagged pair, delete of the John Doe junk row, People search/filters, org edit/affiliations). Then Phase 2B Campaign 2 (Deal objects — needs explicit unfreeze). |
 
 ## Phase 2A — what shipped on `feat/crm-person-spine` (2026-07-06)
 
@@ -84,6 +84,14 @@
 - `lib/crm/resolve-person.ts`, `lib/crm/labels.ts`
 - `lib/member-identity.ts` (spine hook), `lib/auth.ts` (claim stamp), `lib/engagement.ts`
 - `lib/comms/consent-sync.ts`, `lib/comms/suppression.ts` (scoped unfreeze)
+- Consent reconciliation (branch `consent-reconciliation`): `lib/comms/consent-writer.ts`
+  (THE single writer), `app/api/operator/people/[id]/consent/route.ts` +
+  `PersonConsentPanel.tsx` (Block action), `app/api/gate/[token]/route.ts`
+  (recordCheckoutConsent, one additive call), `app/api/webhooks/resend/route.ts` +
+  `lib/blast/run.ts` (suppression writers), `lib/connectors/ingest/persist.ts` +
+  `lib/event-access-submit.ts` (PENDING seeds), `app/operator/members/[id]/page.tsx`
+  (identifier-keyed suppression read), `prisma/sql/consent-backfill-phase2.sql`
+  (EMITTED, not run), `tests/unit/comms/*`
 - `app/api/webhooks/clerk/route.ts`
 - `app/api/apply/membership/route.ts`, `app/api/apply/[slug]/route.ts`,
   `app/api/operator/members/create/route.ts`, `lib/mcp/tools/applications.ts`
