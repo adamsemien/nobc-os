@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveDefaultApplyWorkspace } from '@/lib/apply-workspace';
 import { isStorageConfigured, uploadObject } from '@/lib/dam/storage';
 import { applicationPhotoKey } from '@/lib/apply-photo';
-import { isAllowedImageBytes, type SniffedImageType } from '@/lib/image-magic-bytes';
+import { isAllowedImageBytes, sniffImageType, type SniffedImageType } from '@/lib/image-magic-bytes';
 import { isHeic, convertHeicToJpeg } from '@/lib/dam/heic';
 import sharp from 'sharp';
 import { publicRateLimit } from '@/lib/public-rate-limit';
@@ -16,13 +16,12 @@ import { publicRateLimit } from '@/lib/public-rate-limit';
 
 export const runtime = 'nodejs';
 
-const MAX_BYTES = 10 * 1024 * 1024;
-const ALLOWED = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+const MAX_BYTES = 20 * 1024 * 1024;
 const ALLOWED_BYTES = new Set<SniffedImageType>(['jpeg', 'png', 'webp']);
 
 export async function POST(req: NextRequest) {
   // This endpoint is intentionally unauthenticated (public /apply), and each call
-  // decodes up to 10MB through sharp — cap per-IP floods before that work. Bucket
+  // decodes up to 20MB through sharp — cap per-IP floods before that work. Bucket
   // is generous: a real applicant uploads a handful of photos, plus retries.
   const rateCheck = publicRateLimit(req, { bucket: 'apply-upload', max: 40 });
   if (!rateCheck.allowed) {
@@ -37,18 +36,24 @@ export async function POST(req: NextRequest) {
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: 'file field required' }, { status: 400 });
   }
-  // `kind=document` (the optional personality-test upload) additionally accepts PDF
-  // and HEIC/HEIF (iPhone screenshots). The default photo path is image-only and
-  // byte-for-byte unchanged. HEIC is detected by extension too — iPhone uploads
-  // often carry an empty file.type.
+  // `kind=document` (the optional personality-test upload) additionally accepts PDF.
+  // HEIC/HEIF is accepted on BOTH paths — iPhones shoot HEIC by default, so the
+  // /apply photo picker has to take them (it is transcoded to JPEG below). HEIC is
+  // detected by extension too, because mobile browsers routinely report an empty
+  // file.type for camera-roll images.
   const isDocument = form?.get('kind') === 'document';
   const isPdf = isDocument && file.type === 'application/pdf';
-  const isHeicDoc = isDocument && isHeic(file.type, file.name);
-  if (!ALLOWED.has(file.type) && !isPdf && !isHeicDoc) {
+  const isHeicImage = isHeic(file.type, file.name);
+  // Deliberately permissive: anything image-ish — including an empty file.type — is
+  // waved through to the magic-byte sniff below, which is the real gate. The strict
+  // MIME allowlist that used to sit here 400'd every HEIC and every empty-MIME photo,
+  // which is what broke uploads on mobile.
+  const looksLikeImage = !file.type || file.type.startsWith('image/');
+  if (!looksLikeImage && !isPdf && !isHeicImage) {
     return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 });
+    return NextResponse.json({ error: 'File too large (max 20MB)' }, { status: 400 });
   }
   if (!isStorageConfigured()) {
     return NextResponse.json({ error: 'Uploads unavailable' }, { status: 503 });
@@ -82,11 +87,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ key: pdfKey });
   }
 
-  // HEIC/HEIF documents (kind=document only): sharp can't decode HEIC on Vercel,
-  // so convert to JPEG first (reuses the DAM libheif path), then fall through to the
+  // HEIC/HEIF (photos and documents alike): sharp can't decode HEIC on Vercel, so
+  // convert to JPEG first (reuses the DAM libheif path), then fall through to the
   // shared image pipeline (magic-byte check on the decoded JPEG + EXIF strip).
   let imageBuf: Buffer = buf;
-  if (isHeicDoc) {
+  if (isHeicImage) {
     try {
       imageBuf = await convertHeicToJpeg(buf);
     } catch (e) {
@@ -124,14 +129,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not process image' }, { status: 400 });
   }
 
-  const ext = isHeicDoc
-    ? 'jpg'
-    : file.type === 'image/png'
-      ? 'png'
-      : file.type === 'image/webp'
-        ? 'webp'
-        : 'jpg';
-  const contentType = isHeicDoc ? 'image/jpeg' : file.type;
+  // Derive ext + Content-Type from the ACTUAL stored bytes, never from file.type.
+  // Mobile camera-roll uploads routinely declare an empty file.type, which used to
+  // be safe only because the strict MIME allowlist rejected them upstream; now that
+  // they're allowed through, trusting file.type here would store the object with an
+  // empty Content-Type. HEIC has already been transcoded to JPEG by this point.
+  const sniffed = sniffImageType(processed);
+  const ext = sniffed === 'png' ? 'png' : sniffed === 'webp' ? 'webp' : 'jpg';
+  const contentType =
+    sniffed === 'png' ? 'image/png' : sniffed === 'webp' ? 'image/webp' : 'image/jpeg';
   const key = applicationPhotoKey(workspace.id, ext);
   await uploadObject(key, processed, contentType);
 

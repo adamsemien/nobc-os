@@ -257,11 +257,23 @@ const LEGAL_STEP = QUESTION_STEPS;
 const REVEAL_STEP = QUESTION_STEPS + 1;
 
 // Photo picker limits - mirror the server caps in /api/apply/membership/upload
-// (10MB, image-only). The picked File objects live in component state and are
-// uploaded by the existing handleSubmit loop; nothing here touches that path.
+// (20MB; HEIC/HEIF transcoded server-side). The picked File objects live in
+// component state and are uploaded by the existing handleSubmit loop; nothing
+// here touches that path.
 const MAX_APPLY_PHOTOS = 5;
-const APPLY_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
-const APPLY_PHOTO_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+const APPLY_PHOTO_MAX_BYTES = 20 * 1024 * 1024;
+const APPLY_PHOTO_EXTENSIONS = /\.(jpe?g|png|webp|gif|heic|heif|avif)$/i;
+
+/** Deliberately permissive: iPhones hand us HEIC, and mobile browsers routinely
+ *  report an empty `file.type` for camera-roll images. A strict MIME allowlist
+ *  drops both on the floor, which is what broke mobile /apply. The server is the
+ *  real gate (magic-byte sniff + HEIC transcode), so the client only screens out
+ *  what is obviously not a photo. */
+function isLikelyPhotoFile(file: File): boolean {
+  if (!file.type) return true; // empty MIME - trust the server to sniff the bytes
+  if (file.type.startsWith('image/')) return true;
+  return APPLY_PHOTO_EXTENSIONS.test(file.name);
+}
 /** Page hosting the `photo` question - guardedSubmit's re-route target. */
 const PHOTO_PAGE_INDEX = PAGES.findIndex(page => page.some(q => q.type === 'photo'));
 const PHOTO_REQUIRED = PAGES.some(page => page.some(q => q.type === 'photo' && q.required));
@@ -891,12 +903,12 @@ export default function MembershipForm({
         problem = `You can share up to ${MAX_APPLY_PHOTOS} photos.`;
         break;
       }
-      if (!APPLY_PHOTO_TYPES.has(file.type)) {
-        problem = `"${file.name}" isn't a JPG, PNG, or WebP - please pick a different photo.`;
+      if (!isLikelyPhotoFile(file)) {
+        problem = `"${file.name}" doesn't look like a photo - please pick an image.`;
         continue;
       }
       if (file.size > APPLY_PHOTO_MAX_BYTES) {
-        problem = `"${file.name}" is over 10MB - please pick a smaller version.`;
+        problem = `"${file.name}" is over 20MB - please pick a smaller version.`;
         continue;
       }
       toUpload.push(file);
@@ -1698,9 +1710,15 @@ export default function MembershipForm({
           <input
             id={`${key}-input`}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            // image/* (not a MIME list) so iOS offers the whole camera roll, HEIC
+            // included. No `capture` - that would force camera-only and hide the library.
+            accept="image/*"
             multiple
-            style={{ display: 'none' }}
+            // Visually hidden rather than display:none - a display:none input is the
+            // one pattern iOS Safari has been known to refuse to open on tap.
+            style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+            tabIndex={-1}
+            aria-hidden="true"
             onChange={e => {
               const picked = e.target.files ? Array.from(e.target.files) : [];
               e.currentTarget.value = '';
