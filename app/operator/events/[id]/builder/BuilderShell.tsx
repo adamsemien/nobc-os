@@ -14,8 +14,9 @@
  */
 import { useCallback, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronDown, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ExternalLink, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { HeroImageUpload } from "../../_components/HeroImageUpload";
+import { ComposeEventFlow } from "../../../_components/ComposeEventFlow";
 import {
   CONDITION_OPEN,
   openGateSpec,
@@ -595,6 +596,7 @@ export function BuilderShell({
     until: "",
   };
   const [newDiscount, setNewDiscount] = useState(emptyDiscount);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const event = state.event;
   const published = event.status === "PUBLISHED";
@@ -714,8 +716,53 @@ export function BuilderShell({
                     ? `Live at /e/${event.slug}`
                     : "Draft - only you can see it"}
               </span>
+              <button
+                type="button"
+                onClick={() => setComposeOpen(true)}
+                className="mt-1 flex items-center gap-1 text-xs text-text-tertiary underline underline-offset-2"
+              >
+                <Sparkles size={11} /> Compose new event
+              </button>
             </div>
           </header>
+
+          {composeOpen ? (
+            <div
+              className="fixed inset-0 z-50 flex justify-end bg-black/30"
+              role="dialog"
+              aria-label="Compose an event"
+              onClick={() => setComposeOpen(false)}
+            >
+              <div
+                className="h-full w-full max-w-md overflow-y-auto border-l border-border bg-card p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={14} className="text-primary" />
+                    <h2 className="text-xs font-medium uppercase tracking-widest text-text-secondary">
+                      Compose a new event
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setComposeOpen(false)}
+                    aria-label="Close"
+                    className="text-text-tertiary transition-colors hover:text-text-primary"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  Describe it in a sentence - this starts a separate draft, and
+                  nothing is created until you confirm.
+                </p>
+                <div className="mt-4">
+                  <ComposeEventFlow autoFocus />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {showComposed && composedSummary ? (
             <div className="rounded-sm border border-primary bg-card p-4">

@@ -4,8 +4,8 @@ import { registerCommand } from '../registry';
 registerCommand({
   id: 'action.create-event',
   name: 'Create event',
-  description: 'Open the new-event form',
-  keywords: ['new', 'event', 'add'],
+  description: 'Describe it in plain English - or just name it',
+  keywords: ['new', 'event', 'add', 'compose'],
   group: 'action',
   icon: CalendarPlus,
   execute: (ctx) => {
