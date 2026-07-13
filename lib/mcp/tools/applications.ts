@@ -50,6 +50,13 @@ export async function approveApplication(ctx: McpContext, applicationId: string,
   });
   if (!outcome.ok) {
     if (outcome.error === 'already_approved') throw new Error('Already approved');
+    if (outcome.error === 'not_submitted') {
+      // Hard block, no override: approving a never-submitted draft requires a
+      // human clicking "Approve anyway" in the operator UI, not an agent call.
+      throw new Error(
+        'This application was never submitted (draft only) - approve it from the operator UI if intended',
+      );
+    }
     throw new Error('Application not found or not in this workspace');
   }
   return { application: outcome.application, member: outcome.member };

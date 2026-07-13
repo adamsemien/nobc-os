@@ -5,17 +5,20 @@ import { useRouter } from 'next/navigation';
 import { Check, Loader2 } from 'lucide-react';
 import { formatDateOnly } from '@/lib/operator-application-display';
 import { logQAAction } from '@/lib/dev/qa-action-log';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 type Props = {
   applicationId: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HOLD';
   reviewedAt: string | null;
+  submittedAt: string | null;
 };
 
 export function ApplicationDecisionBar({
   applicationId,
   status,
   reviewedAt,
+  submittedAt,
 }: Props) {
   const router = useRouter();
   const actionable = status === 'PENDING' || status === 'HOLD';
@@ -23,14 +26,21 @@ export function ApplicationDecisionBar({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmUnsubmitted, setConfirmUnsubmitted] = useState(false);
 
-  async function approve() {
+  async function approve(confirmed?: boolean) {
+    if (submittedAt === null && !confirmed) {
+      setConfirmUnsubmitted(true);
+      return;
+    }
     setError(null);
     setBusy('approve');
     try {
       const r = await fetch(`/api/operator/applications/${applicationId}/approve`, {
         method: 'POST',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmUnsubmitted: confirmed === true }),
       });
       if (!r.ok) throw new Error('request failed');
       logQAAction('approved application');
@@ -134,7 +144,7 @@ export function ApplicationDecisionBar({
           {!rejectOpen && (
             <button
               type="button"
-              onClick={approve}
+              onClick={() => approve()}
               disabled={busy !== null}
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 px-5 text-base font-medium text-white disabled:opacity-60 sm:min-w-[10rem] sm:w-auto"
               style={{ borderRadius: '4px', background: 'var(--primary)' }}
@@ -197,6 +207,20 @@ export function ApplicationDecisionBar({
           )}
         </div>
       </div>
+      {confirmUnsubmitted ? (
+        <ConfirmModal
+          title="Approve an application that was never submitted?"
+          subtitle="This application was never submitted - it has not been AI-scored and some fields may be incomplete. Approving now still creates a full member record."
+          confirmLabel="Approve anyway"
+          confirmTone="danger"
+          busy={busy === 'approve'}
+          onCancel={() => setConfirmUnsubmitted(false)}
+          onConfirm={() => {
+            setConfirmUnsubmitted(false);
+            void approve(true);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

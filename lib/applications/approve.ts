@@ -17,7 +17,7 @@ import { resend } from '@/lib/resend';
 
 export type ApproveOutcome =
   | { ok: true; application: Application; member: Member }
-  | { ok: false; error: 'not_found' | 'forbidden' | 'already_approved' };
+  | { ok: false; error: 'not_found' | 'forbidden' | 'already_approved' | 'not_submitted' };
 
 export async function approveApplication(params: {
   applicationId: string;
@@ -25,13 +25,21 @@ export async function approveApplication(params: {
   actorId: string;
   actorType?: AuditActorType;
   reviewNote?: string;
+  // Data Integrity Build A: an application with submittedAt === null was never
+  // submitted (draft-only). Approving one is blocked by default - an operator can
+  // still do it deliberately by passing this flag, which only the single-approve
+  // route exposes (behind its own explicit confirmation step). Bulk approve and the
+  // MCP/agent tool never pass this - a fat-fingered bulk select or an agent call
+  // must never silently override the guard.
+  allowUnsubmitted?: boolean;
 }): Promise<ApproveOutcome> {
-  const { applicationId, workspaceId, actorId, actorType, reviewNote } = params;
+  const { applicationId, workspaceId, actorId, actorType, reviewNote, allowUnsubmitted } = params;
 
   const app = await db.application.findUnique({ where: { id: applicationId } });
   if (!app) return { ok: false, error: 'not_found' };
   if (app.workspaceId !== workspaceId) return { ok: false, error: 'forbidden' };
   if (app.status === 'APPROVED') return { ok: false, error: 'already_approved' };
+  if (app.submittedAt === null && !allowUnsubmitted) return { ok: false, error: 'not_submitted' };
 
   const now = new Date();
 

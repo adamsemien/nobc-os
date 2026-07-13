@@ -19,7 +19,8 @@ type ApiApplication = {
   email: string;
   city: string | null;
   phone: string | null;
-  submittedAt: string;
+  createdAt: string;
+  submittedAt: string | null;
   status: string;
   consentEmail: boolean;
   consentSms: boolean;
@@ -56,6 +57,7 @@ function toQueueItem(row: ApiApplication): ApplicationsQueueItem {
     email: row.email,
     city: row.city,
     phone: row.phone,
+    createdAt: row.createdAt,
     submittedAt: row.submittedAt,
     consentEmail: row.consentEmail ?? false,
     consentSms: row.consentSms ?? false,

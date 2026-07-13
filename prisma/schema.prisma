@@ -636,6 +636,12 @@ model Application {
   revealHabitatThrive     String? // Q4 (perfectFriday) picked option label — "your best rooms"
   revealHabitatDim        String? // Q5 (skipFriday) picked option label — "rooms that don't deserve you"
   templateId              String?
+  // Completion signal (Data Integrity Build A, 2026-07-12): set ONLY inside the
+  // submit transaction (app/api/apply/membership/[id]/submit/route.ts). Null means
+  // never submitted - the applicant created a draft (account-gate or page-1) and
+  // never clicked Submit. Distinct from status, which stays PENDING either way, and
+  // from aiScore, which is also null on the BLOCKED-watchlist auto-reject path.
+  submittedAt             DateTime?
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt
 

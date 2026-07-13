@@ -23,7 +23,8 @@ export type ApplicationsQueueItem = {
   email: string;
   city: string | null;
   phone: string | null;
-  submittedAt: string;
+  createdAt: string;
+  submittedAt: string | null;
   aiTags: string[];
   aiScore: number | null;
   aiRecommendation:
@@ -41,6 +42,15 @@ export type ApplicationsQueueItem = {
   referredBy: string | null;
   consentEmail: boolean;
   consentSms: boolean;
+};
+
+// Human-readable copy for bulk-approve failure reasons — never render the raw
+// error code (e.g. 'not_submitted') the API returns.
+const BULK_FAILURE_LABELS: Record<string, string> = {
+  not_submitted: 'not submitted',
+  already_approved: 'already approved',
+  already_rejected: 'already rejected',
+  not_found: 'not found',
 };
 
 const ANSWER_ORDER = new Map(
@@ -220,7 +230,8 @@ function formatRecommendationLabel(value: string): string {
     .join(' ');
 }
 
-function formatSubmitted(iso: string): string {
+function formatSubmitted(iso: string | null): string {
+  if (!iso) return 'Not submitted';
   const d = new Date(iso);
   return new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
@@ -292,6 +303,8 @@ export function ApplicationsQueue({
   const [pendingBulkAction, setPendingBulkAction] = useState<string | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<'reject' | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [hideIncomplete, setHideIncomplete] = useState(false);
+  const [confirmUnsubmittedApprove, setConfirmUnsubmittedApprove] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const selectedIdRef = useRef(selectedId);
@@ -322,6 +335,9 @@ export function ApplicationsQueue({
 
   const visibleApps = useMemo(() => {
     let result = applications;
+    if (hideIncomplete) {
+      result = result.filter(app => app.submittedAt !== null);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(app =>
@@ -335,7 +351,7 @@ export function ApplicationsQueue({
     const sorted = [...result];
     switch (sortOrder) {
       case 'oldest':
-        sorted.sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+        sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         break;
       case 'score':
         sorted.sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1));
@@ -344,10 +360,10 @@ export function ApplicationsQueue({
         sorted.sort((a, b) => a.fullName.localeCompare(b.fullName));
         break;
       default:
-        sorted.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return sorted;
-  }, [applications, search, sortOrder]);
+  }, [applications, hideIncomplete, search, sortOrder]);
 
   useEffect(() => { visibleAppsRef.current = visibleApps; }, [visibleApps]);
 
@@ -373,7 +389,11 @@ export function ApplicationsQueue({
   }, []);
 
   const postAction = useCallback(
-    async (id: string, path: 'approve' | 'reject' | 'waitlist' | 'hold') => {
+    async (
+      id: string,
+      path: 'approve' | 'reject' | 'waitlist' | 'hold',
+      opts?: { confirmUnsubmitted?: boolean },
+    ) => {
       setFlash(null);
       setPendingAction(path);
       try {
@@ -381,7 +401,10 @@ export function ApplicationsQueue({
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ note: reviewNote }),
+          body: JSON.stringify({
+            note: reviewNote,
+            confirmUnsubmitted: opts?.confirmUnsubmitted === true,
+          }),
         });
         if (!res.ok) {
           const text = await res.text().catch(() => '');
@@ -413,6 +436,23 @@ export function ApplicationsQueue({
 
   useEffect(() => { postActionRef.current = postAction; }, [postAction]);
 
+  // A never-submitted draft (submittedAt === null) requires an explicit "approve
+  // anyway" confirmation before postAction fires — the server-side guard in
+  // approveApplication() is the real boundary, this just avoids a fat-finger.
+  const requestApprove = useCallback(
+    (id: string) => {
+      const app = applications.find(a => a.id === id);
+      if (app && app.submittedAt === null) {
+        setConfirmUnsubmittedApprove(id);
+        return;
+      }
+      postAction(id, 'approve');
+    },
+    [applications, postAction],
+  );
+  const requestApproveRef = useRef(requestApprove);
+  useEffect(() => { requestApproveRef.current = requestApprove; }, [requestApprove]);
+
   const bulkAction = useCallback(async (action: 'approve' | 'reject' | 'hold') => {
     setPendingBulkAction(action);
     const ids = Array.from(selectedIds);
@@ -427,7 +467,7 @@ export function ApplicationsQueue({
         ok?: boolean;
         succeeded?: number;
         failed?: number;
-        failures?: { id: string }[];
+        failures?: { id: string; error?: string }[];
       };
       const succeededIds = ids.filter(id => !(data.failures ?? []).some(f => f.id === id));
       const failCount = data.failed ?? Math.max(0, ids.length - (data.succeeded ?? 0));
@@ -435,9 +475,16 @@ export function ApplicationsQueue({
       setSelectedIds(new Set());
       logQAAction(`bulk ${action} ${succeededIds.length} application(s)`);
       const label = action === 'approve' ? 'approved' : action === 'hold' ? 'moved to hold' : 'rejected';
+      // Never surface a raw error code (e.g. 'not_submitted') — map to a short,
+      // human-readable reason when every failure shares one; mixed reasons keep
+      // the generic summary rather than building a multi-reason list.
+      const failReasons = new Set((data.failures ?? []).map(f => f.error));
+      const reasonLabel = failReasons.size === 1
+        ? (BULK_FAILURE_LABELS[[...failReasons][0] as string] ?? 'error')
+        : null;
       const msg = failCount === 0
         ? `${succeededIds.length} application${succeededIds.length !== 1 ? 's' : ''} ${label}.`
-        : `${succeededIds.length} ${label}; ${failCount} failed (already processed or error).`;
+        : `${succeededIds.length} ${label}; ${failCount} failed (${reasonLabel ?? 'already processed or error'}).`;
       setFlash({ type: failCount === 0 ? 'success' : 'error', message: msg });
       emitCountsRefresh();
     } catch {
@@ -462,7 +509,7 @@ export function ApplicationsQueue({
       const idx = apps.findIndex(a => a.id === cur);
       if (e.key === 'j') { const n = apps[Math.min(idx + 1, apps.length - 1)]; if (n) setSelectedId(n.id); }
       else if (e.key === 'k') { const p = apps[Math.max(idx - 1, 0)]; if (p) setSelectedId(p.id); }
-      else if (e.key === 'a' && cur) postActionRef.current(cur, 'approve');
+      else if (e.key === 'a' && cur) requestApproveRef.current(cur);
       else if (e.key === 'h' && cur) postActionRef.current(cur, 'hold');
       else if (e.key === 'r' && cur) postActionRef.current(cur, 'reject');
     }
@@ -575,6 +622,16 @@ export function ApplicationsQueue({
             </select>
           </div>
 
+          <label className="mb-3 flex items-center gap-2 text-xs text-text-secondary">
+            <input
+              type="checkbox"
+              checked={hideIncomplete}
+              onChange={e => setHideIncomplete(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border accent-primary"
+            />
+            Hide incomplete
+          </label>
+
           <ul className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pb-4 pr-0.5">
             {visibleApps.map(app => {
               const active = app.id === selectedId;
@@ -643,7 +700,7 @@ export function ApplicationsQueue({
                       {worth ? worth.total : ''}
                     </span>
                     <p className="obs-app-meta mt-0.5 text-xs text-text-muted">
-                      {[app.city, formatRelative(app.submittedAt)].filter(Boolean).join(' · ')}
+                      {[app.city, formatRelative(app.createdAt)].filter(Boolean).join(' · ')}
                     </p>
                     {app.archetype && (
                       <span
@@ -665,7 +722,11 @@ export function ApplicationsQueue({
                           <span className="truncate">{formatRecommendationLabel(app.aiRecommendation)}</span>
                         </span>
                       ) : null}
-                      {worth ? (
+                      {app.submittedAt === null ? (
+                        <span className="inline-flex rounded border border-dashed border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-text-secondary">
+                          Not submitted
+                        </span>
+                      ) : worth ? (
                         <span className="inline-flex items-center gap-1 text-[11px]">
                           <span className="font-semibold tabular-nums text-text-primary">{Math.round((worth.total / 30) * 100)}</span>
                           <span className={`font-medium ${tier!.className}`}>· {tier!.label}</span>
@@ -709,7 +770,7 @@ export function ApplicationsQueue({
               flash={flash}
               reviewNote={reviewNote}
               onNoteChange={setReviewNote}
-              onApprove={() => postAction(selected.id, 'approve')}
+              onApprove={() => requestApprove(selected.id)}
               onReject={() => postAction(selected.id, 'reject')}
               onWaitlist={() => postAction(selected.id, 'waitlist')}
               onHold={() => postAction(selected.id, 'hold')}
@@ -730,6 +791,22 @@ export function ApplicationsQueue({
           onConfirm={async () => {
             setConfirmBulk(null);
             await bulkAction('reject');
+          }}
+        />
+      ) : null}
+
+      {confirmUnsubmittedApprove ? (
+        <ConfirmModal
+          title="Approve an application that was never submitted?"
+          subtitle="This application was never submitted - it has not been AI-scored and some fields may be incomplete. Approving now still creates a full member record."
+          confirmLabel="Approve anyway"
+          confirmTone="danger"
+          busy={pendingAction === 'approve'}
+          onCancel={() => setConfirmUnsubmittedApprove(null)}
+          onConfirm={async () => {
+            const id = confirmUnsubmittedApprove;
+            setConfirmUnsubmittedApprove(null);
+            await postAction(id, 'approve', { confirmUnsubmitted: true });
           }}
         />
       ) : null}
@@ -768,7 +845,7 @@ export function ApplicationsQueue({
               flash={flash}
               reviewNote={reviewNote}
               onNoteChange={setReviewNote}
-              onApprove={() => postAction(selected.id, 'approve')}
+              onApprove={() => requestApprove(selected.id)}
               onReject={() => postAction(selected.id, 'reject')}
               onWaitlist={() => postAction(selected.id, 'waitlist')}
               onHold={() => postAction(selected.id, 'hold')}

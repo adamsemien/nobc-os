@@ -81,7 +81,8 @@ export async function GET(req: NextRequest) {
       email: app.email,
       city: app.city,
       phone: app.phone,
-      submittedAt: app.createdAt.toISOString(),
+      createdAt: app.createdAt.toISOString(),
+      submittedAt: app.submittedAt?.toISOString() ?? null,
       status: app.status,
       // Phase C: the email opt-in now lives on `emailOptIn` (the member apply flow
       // stopped writing legacy `consentEmail`); read it so the queue reflects the

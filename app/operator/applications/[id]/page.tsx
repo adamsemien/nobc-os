@@ -48,6 +48,7 @@ type DetailPayload = {
     city: string | null;
     status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HOLD';
     createdAt: string;
+    submittedAt: string | null;
     reviewedAt: string | null;
     rejectionReason: string | null;
     consentEmail: boolean;
@@ -166,7 +167,10 @@ export default async function OperatorApplicationDetailPage({
               {' · Applied '}{formatDateTime(app.createdAt)}
             </p>
           </div>
-          <div className="ml-auto shrink-0">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {app.submittedAt === null ? (
+              <StatusBadge tone="warning">Not submitted</StatusBadge>
+            ) : null}
             <StatusBadge tone={applicationTone(app.status)}>
               {app.status === 'HOLD' ? 'Hold' : app.status.toLowerCase()}
             </StatusBadge>
@@ -242,6 +246,14 @@ export default async function OperatorApplicationDetailPage({
 
           {/* RIGHT: AI intelligence + contact details + photos */}
           <section className="space-y-6">
+            {app.submittedAt === null && app.aiScore === null && !app.archetype ? (
+              <div
+                className="rounded-md p-4 text-sm"
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              >
+                This application was never submitted, so it has not been scored.
+              </div>
+            ) : null}
             {(app.aiScore !== null || app.archetype) && (
               <div
                 className="rounded-md p-4"
@@ -419,7 +431,12 @@ export default async function OperatorApplicationDetailPage({
         </div>
       </div>
 
-      <ApplicationDecisionBar applicationId={app.id} status={app.status} reviewedAt={app.reviewedAt} />
+      <ApplicationDecisionBar
+        applicationId={app.id}
+        status={app.status}
+        reviewedAt={app.reviewedAt}
+        submittedAt={app.submittedAt}
+      />
     </div>
   );
 }

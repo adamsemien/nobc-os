@@ -189,6 +189,10 @@ for (const app of APPS) {
       duplicateFlag: duplicateFlag ?? false,
       consentEmail: true,
       consentSms: false,
+      // Mirrors the prod backfill rule (Data Integrity Build A): scored or
+      // past-PENDING rows simulate a genuine submission; a PENDING+unscored row
+      // (e.g. Devon Washington above) intentionally stays unsubmitted.
+      submittedAt: fields.aiScore !== null || fields.status !== 'PENDING' ? new Date() : null,
       reviewedAt: ['APPROVED', 'REJECTED'].includes(fields.status) ? new Date() : null,
       reviewedBy: ['APPROVED', 'REJECTED'].includes(fields.status) ? 'seed' : null,
     },

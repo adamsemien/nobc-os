@@ -182,7 +182,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   );
 
   if (watchMatch?.type === 'BLOCKED') {
-    await db.application.update({ where: { id }, data: { status: 'REJECTED' } });
+    // The applicant DID click Submit — the block happens after the submit action.
+    // Stamp submittedAt so this row matches the backfill rule (status <> PENDING
+    // counts as submitted) instead of reading "Not submitted" forever.
+    await db.application.update({
+      where: { id },
+      data: { status: 'REJECTED', submittedAt: new Date() },
+    });
     await db.auditEvent.create({
       data: {
         workspaceId: application.workspaceId,
@@ -251,6 +257,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   await db.application.update({
     where: { id },
     data: {
+      submittedAt: new Date(),
       archetype: result.archetype,
       archetypeScores: result.archetypeScores,
       aiTags: result.tags,
