@@ -76,7 +76,8 @@ server actions in `lib/builder/compose-action.ts` (`proposeEventAction`,
 
 ```
 lib/builder/compose.ts                       ← extraction (planSchema), gap probe, description sidecar, titleEchoesLocation, core-gap detection, accessReadout, propose/execute split
-lib/ai/event-description.ts                  ← the ONE shared description generator (voiced prompt) - used by the compose sidecar AND the builder's Generate with AI button
+lib/ai/event-description.ts                  ← the ONE shared description generator (voiced prompt, spaced hyphens) + output-cleaning pipeline (unwrap preamble/quotes, strip metadata blocks, toBrandPunctuation) - used by the compose describer AND the builder's Generate with AI button
+lib/text/sanitize-copy.ts                    ← toBrandPunctuation(): deterministic em/en-dash → spaced-hyphen guarantee for AI-generated copy
 app/api/operator/events/generate-description/route.ts ← the button's route; generation logic now lives in lib/ai/event-description.ts
 lib/builder/compose-action.ts                ← the client seam: proposeEventAction + confirmComposeAction (STAFF-gated; no one-shot create)
 app/operator/_components/ComposeEventFlow.tsx ← the shared flow UI (prompt → questions → confirm → create)

@@ -123,31 +123,46 @@ describe("proposeComposition - the confirm-gate proof", () => {
     expect(result.proposal.gaps.map((g) => g.field)).toContain("startAt");
   });
 
-  it("fires the planner, the gap probe, and the describer concurrently", async () => {
-    // The planner resolves only once BOTH sidecars have been invoked - under
-    // any sequential flow (planner awaited to completion first) this
-    // deadlocks; under the three-way allSettled it completes.
-    let sidecarsSeen = 0;
+  it("fires the planner and the gap probe concurrently, not sequentially", async () => {
+    // The planner resolves only once the prober has been invoked - under a
+    // sequential flow this deadlocks; under allSettled it completes. (The
+    // describer is deliberately NOT in this race: its curated facts depend
+    // on the settled plan, so it runs after extraction.)
     let releasePlan!: (p: CompositionPlan) => void;
-    const sidecarRan = () => {
-      sidecarsSeen += 1;
-      if (sidecarsSeen === 2) releasePlan(basePlan);
-    };
     const result = await proposeComposition("party", {
       planner: () =>
         new Promise<CompositionPlan>((resolve) => {
           releasePlan = resolve;
         }),
       gapProber: async () => {
-        sidecarRan();
+        releasePlan(basePlan);
         return cleanProbe;
       },
-      describer: async () => {
-        sidecarRan();
+      describer: async () => "Drafted.",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("hands the describer curated human facts - never an ISO timestamp or a schema token", async () => {
+    let seen = "";
+    await proposeComposition("dinner sunday, $25 or members free", {
+      ...ports({
+        ...basePlan,
+        anyOneOf: [{ kind: "pay", priceCents: 2500 }, { kind: "member" }],
+      }),
+      describer: async (facts) => {
+        seen = facts;
         return "Drafted.";
       },
     });
-    expect(result.ok).toBe(true);
+    // basePlan's 2026-07-19T19:00:00.000Z is Sunday, July 19, 2pm in Chicago.
+    expect(seen).toContain("Event name: Pool Party");
+    expect(seen).toContain("Date: Sunday, July 19 at 2pm");
+    expect(seen).toContain("Location: Chateau Chloe");
+    expect(seen).toContain("pay $25");
+    expect(seen).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(seen).not.toContain("anyOneOf");
+    expect(seen).not.toContain("requiredAll");
   });
 
   it("a planner failure stays fatal even when the probe fulfills", async () => {

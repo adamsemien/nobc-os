@@ -21,9 +21,11 @@
  *  (planToGateSpec) are the shipped Phase E logic, reused as-is.
  *  Non-core fields (capacity, description, hero, service fee) never prompt -
  *  they default silently, flagged in assumptions, editable in the builder.
- *  The description defaults richly: a sidecar drafts it at compose time
- *  through the same shared generator as the builder's "Generate with AI"
- *  button, shown on the confirm screen, persisted only on operator confirm.
+ *  The description defaults richly: after extraction settles, a draft is
+ *  generated from the plan's curated facts (name, human date, location,
+ *  plain-language access) through the same shared generator as the builder's
+ *  "Generate with AI" button, shown on the confirm screen, persisted only on
+ *  operator confirm.
  *  Model: JUDGMENT_MODEL per the locked two-tier policy.
  */
 import { anthropic } from "@ai-sdk/anthropic";
@@ -93,7 +95,7 @@ Turn the operator's sentence into the plan schema. Rules:
 - "members free" means kind "member" as an alternative to paying.
 - Prices arrive in dollars; output cents.
 - Never invent requirements, codes, or capacities the operator did not imply. Leave nullable fields null when unsaid.
-- Every assumption you make (date, template, fee handling) goes in assumptions, one short line each, plain language.
+- Every assumption you make (date, template, fee handling) goes in assumptions, one short line each, plain language. Assumptions are shown to the operator verbatim: never mention schema field names (anyOneOf, requiredAll, serviceFeeMode, startAt) or enum values - write "either paying or holding a membership gets you in", never "pay or member treated as alternatives in anyOneOf".
 - Copy law: "Access" never "RSVP"; "No Bad Company" never "NBC"; spaced hyphens, never em dashes.`;
 
 async function defaultPlanner(prompt: string): Promise<CompositionPlan> {
@@ -257,9 +259,43 @@ async function defaultGapProber(prompt: string): Promise<GapProbe> {
 export type Describer = (prompt: string) => Promise<string>;
 
 async function defaultDescriber(prompt: string): Promise<string> {
-  return generateEventDescription(
-    `Write a description for this event. The operator's own note about it:\n\n${prompt}`,
-  );
+  return generateEventDescription(prompt);
+}
+
+/** "Sunday, July 19 at 7pm" in the club's home timezone - the ONLY form a
+ *  datetime may take on its way into the prose generator. */
+function humanWhen(iso: string): string {
+  const d = new Date(iso);
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(d);
+  const time = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+    .format(d)
+    .toLowerCase()
+    .replace(":00", "")
+    .replace(/\s/g, "");
+  return `${date} at ${time}`;
+}
+
+/** Curated, minimal, prose-safe facts for the description draft - the same
+ *  shape the Generate with AI button sends (name, human-readable date,
+ *  location) plus the plain-English access readout. NEVER the planner's raw
+ *  structured output, never an ISO timestamp, never a schema field name -
+ *  a prose model echoes whatever machine artifacts it is handed straight
+ *  into member-facing copy. */
+function describerFacts(plan: CompositionPlan): string {
+  const facts: string[] = [`Event name: ${plan.title}`];
+  if (plan.startAt) facts.push(`Date: ${humanWhen(plan.startAt)}`);
+  if (plan.location) facts.push(`Location: ${plan.location}`);
+  facts.push(`Access: ${accessReadout(plan).join(" ")}`);
+  return `Write a description for this event:\n\n${facts.join("\n")}\n\nIf you mention the date or time, write it in words a guest would read ("Sunday, July 19 at 7pm") - never a machine timestamp, never ISO 8601.`;
 }
 
 // ── Core gaps (locked decision 1) ───────────────────────────────────────────
@@ -412,15 +448,14 @@ export async function proposeComposition(
   }
   const full = buildPrompt(trimmed, opts?.now ?? new Date(), opts?.clarifications);
 
-  // Fire all three model calls together - one shared input, zero data
-  // dependency; propose latency is the slowest of the three, not the sum.
-  // allSettled (never Promise.all) so the failure modes stay independent: a
-  // planner failure is fatal, the probe and the description sidecar only
-  // degrade, and none can mask another.
-  const [planSettled, probeSettled, descSettled] = await Promise.allSettled([
+  // The extractor pair fires together - one shared input, zero data
+  // dependency; allSettled (never Promise.all) so the two failure modes stay
+  // independent: a planner failure is fatal, a probe failure only degrades,
+  // and neither can mask the other. The describer is deliberately NOT in
+  // this race - its curated facts depend on the settled plan (see below).
+  const [planSettled, probeSettled] = await Promise.allSettled([
     (opts?.planner ?? defaultPlanner)(full),
     (opts?.gapProber ?? defaultGapProber)(full),
-    (opts?.describer ?? defaultDescriber)(full),
   ]);
 
   let plan: CompositionPlan;
@@ -447,31 +482,34 @@ export async function proposeComposition(
     });
   }
 
-  // The description sidecar degrades the same way: a rejection or an empty
-  // draft is logged and the description simply stays null - the operator
-  // writes or generates one in the builder. Capped to planSchema's 2000 so
-  // the confirm round-trip re-parse never rejects a good plan over it.
-  let drafted: string | null = null;
-  try {
-    if (descSettled.status === "rejected") throw descSettled.reason;
-    const text = (typeof descSettled.value === "string" ? descSettled.value : "").trim();
-    if (!text) throw new Error("empty description");
-    drafted = text.slice(0, 2000);
-  } catch (err) {
-    console.error("[compose] description generation failed", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-
   // Normalize datetimes to the Z-form the action layer's zod accepts; an
   // unparseable start becomes a gap question instead of a post-confirm error.
-  // Description: words the operator dictated win; the sidecar fills the null.
-  plan = {
-    ...plan,
-    startAt: normalizeIso(plan.startAt),
-    description: plan.description ?? drafted,
-  };
+  plan = { ...plan, startAt: normalizeIso(plan.startAt) };
   const endAt = probe?.endImplied ? normalizeIso(probe.endAt) : null;
+
+  // The description drafts AFTER the plan settles, from curated facts only
+  // (name, human-readable date, location, plain-language access) - never the
+  // planner's raw output, never an ISO timestamp. That plan dependency is
+  // why it cannot ride the extractor pair's race. Skipped when the operator
+  // dictated their own words. Failure degrades the same way as the probe: a
+  // rejection or empty draft is logged and the description stays null - the
+  // operator writes or generates one in the builder. Capped to planSchema's
+  // 2000 so the confirm round-trip re-parse never rejects a good plan.
+  let drafted: string | null = null;
+  if (!plan.description) {
+    try {
+      const raw = await (opts?.describer ?? defaultDescriber)(describerFacts(plan));
+      const text = (typeof raw === "string" ? raw : "").trim();
+      if (!text) throw new Error("empty description");
+      drafted = text.slice(0, 2000);
+    } catch (err) {
+      console.error("[compose] description generation failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  // Words the operator dictated win; the draft only fills the null.
+  plan = { ...plan, description: plan.description ?? drafted };
 
   return {
     ok: true,
