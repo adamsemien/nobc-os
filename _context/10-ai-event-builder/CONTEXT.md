@@ -9,12 +9,12 @@
 
 | Field | Value |
 |---|---|
-| **State** | ✅ Shipped on `main` (compose, Phase E of the event-builder rebuild, `ecf1d07` 2026-07-03) + 🟡 confirm-before-create restructure built on `ai-event-creation`, unmerged |
+| **State** | ✅ Shipped on `main` (compose Phase E `ecf1d07` 2026-07-03; confirm-before-create + gap-fill + parallel propose merged, `main` @ `f0147fd`) + 🟡 richer-compose build (compose-time description via the shared generator + title-borrows-venue caution) on `richer-compose`, unmerged |
 | **V1 item** | #19 |
 | **Last updated** | 2026-07-12 |
 | **Owner** | Adam |
-| **Blocked on** | Adam: review + merge `ai-event-creation` (gap-fill + confirm gate + multi-entry-point build) |
-| **Next** | Adam reviews + merges `ai-event-creation`, then live-tests the four entry points (dashboard compose box, `/operator/events/new`, the builder's "Compose new event" slide-over, Cmd+K "Create event"). Next build after that (explicitly out of this one's scope): NL-EDIT an existing event, and URL/Luma-link import. |
+| **Blocked on** | Adam: review + merge `richer-compose` (compose-time description + proper-noun title caution) |
+| **Next** | Adam reviews + merges `richer-compose`, then live-checks the confirm screen from any entry point (dashboard compose box, `/operator/events/new`, the builder slide-over): a composed event should show a drafted description ("Drafted for you - editable in the builder") and, for a prompt like "party at Chateau Chloe", the venue-borrowed-title caution under the name. Next build after that (explicitly out of scope here): NL-EDIT an existing event, URL/Luma-link import, and the shared rich-text editor. |
 
 > **Doc history.** An earlier version of this file described a `feat/ai-event-builder`
 > branch (single `generateObject` at `app/api/agent/event-builder/route.ts`, hardcoded
@@ -75,7 +75,9 @@ server actions in `lib/builder/compose-action.ts` (`proposeEventAction`,
 ## Files in play
 
 ```
-lib/builder/compose.ts                       ← extraction (planSchema), gap probe, core-gap detection, accessReadout, propose/execute split
+lib/builder/compose.ts                       ← extraction (planSchema), gap probe, description sidecar, titleEchoesLocation, core-gap detection, accessReadout, propose/execute split
+lib/ai/event-description.ts                  ← the ONE shared description generator (voiced prompt) - used by the compose sidecar AND the builder's Generate with AI button
+app/api/operator/events/generate-description/route.ts ← the button's route; generation logic now lives in lib/ai/event-description.ts
 lib/builder/compose-action.ts                ← the client seam: proposeEventAction + confirmComposeAction (STAFF-gated; no one-shot create)
 app/operator/_components/ComposeEventFlow.tsx ← the shared flow UI (prompt → questions → confirm → create)
 app/operator/_components/ComposeEventBox.tsx  ← dashboard card wrapper

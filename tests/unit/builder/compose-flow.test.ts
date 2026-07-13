@@ -35,6 +35,7 @@ import {
   findCoreGaps,
   planToGateSpec,
   proposeComposition,
+  titleEchoesLocation,
   type CompositionPlan,
   type GapProbe,
 } from "@/lib/builder/compose";
@@ -59,9 +60,12 @@ const cleanProbe: GapProbe = {
   accessAmbiguous: false,
 };
 
+// Every propose test injects all three ports (planner, prober, describer) so
+// the suite never falls back to a default and touches the network.
 const ports = (plan: CompositionPlan, probe: GapProbe = cleanProbe) => ({
   planner: async () => plan,
   gapProber: async () => probe,
+  describer: async () => "Drafted.",
 });
 
 beforeEach(() => {
@@ -92,6 +96,7 @@ describe("proposeComposition - the confirm-gate proof", () => {
         return basePlan;
       },
       gapProber: async () => cleanProbe,
+      describer: async () => "Drafted.",
       clarifications: [{ question: "Where is it happening?", answer: "Chateau Chloe" }],
     });
     expect(seen).toContain("right now it is");
@@ -118,19 +123,28 @@ describe("proposeComposition - the confirm-gate proof", () => {
     expect(result.proposal.gaps.map((g) => g.field)).toContain("startAt");
   });
 
-  it("fires the planner and the gap probe concurrently, not sequentially", async () => {
-    // The planner resolves only once the prober has been invoked - under a
-    // sequential flow (planner awaited to completion first) this deadlocks;
-    // under the allSettled restructure it completes.
+  it("fires the planner, the gap probe, and the describer concurrently", async () => {
+    // The planner resolves only once BOTH sidecars have been invoked - under
+    // any sequential flow (planner awaited to completion first) this
+    // deadlocks; under the three-way allSettled it completes.
+    let sidecarsSeen = 0;
     let releasePlan!: (p: CompositionPlan) => void;
+    const sidecarRan = () => {
+      sidecarsSeen += 1;
+      if (sidecarsSeen === 2) releasePlan(basePlan);
+    };
     const result = await proposeComposition("party", {
       planner: () =>
         new Promise<CompositionPlan>((resolve) => {
           releasePlan = resolve;
         }),
       gapProber: async () => {
-        releasePlan(basePlan);
+        sidecarRan();
         return cleanProbe;
+      },
+      describer: async () => {
+        sidecarRan();
+        return "Drafted.";
       },
     });
     expect(result.ok).toBe(true);
@@ -142,6 +156,7 @@ describe("proposeComposition - the confirm-gate proof", () => {
         throw new Error("model down");
       },
       gapProber: async () => cleanProbe,
+      describer: async () => "Drafted.",
     });
     expect(result).toEqual({
       ok: false,
@@ -156,10 +171,66 @@ describe("proposeComposition - the confirm-gate proof", () => {
       gapProber: async () => {
         throw new Error("model down");
       },
+      describer: async () => "Drafted.",
     });
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("unreachable");
     expect(result.proposal.gaps.map((g) => g.field)).toEqual(["location"]);
+  });
+
+  it("the describer fills a null description; the operator's words win over it", async () => {
+    const filled = await proposeComposition("party", {
+      ...ports(basePlan),
+      describer: async () => "Low light, long tables, a night on its own clock.",
+    });
+    expect(filled.ok && filled.proposal.plan.description).toBe(
+      "Low light, long tables, a night on its own clock.",
+    );
+    const dictated = await proposeComposition("party", {
+      ...ports({ ...basePlan, description: "The operator wrote this." }),
+      describer: async () => "Generated prose that must not win.",
+    });
+    expect(dictated.ok && dictated.proposal.plan.description).toBe(
+      "The operator wrote this.",
+    );
+  });
+
+  it("a describer failure degrades - description stays null, zero writes", async () => {
+    const result = await proposeComposition("party", {
+      ...ports(basePlan),
+      describer: async () => {
+        throw new Error("model down");
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.proposal.plan.description).toBeNull();
+    expect(m.createEventDraft).not.toHaveBeenCalled();
+  });
+
+  it("flags titleFromLocation only when the derived title borrows the venue", async () => {
+    const flagged = await proposeComposition(
+      "party at chateau chloe",
+      ports({ ...basePlan, title: "Party at Chateau Chloe" }),
+    );
+    expect(flagged.ok && flagged.proposal.titleFromLocation).toBe(true);
+    // basePlan's "Pool Party" shares nothing with "Chateau Chloe".
+    const clean = await proposeComposition("pool party", ports(basePlan));
+    expect(clean.ok && clean.proposal.titleFromLocation).toBe(false);
+  });
+});
+
+describe("titleEchoesLocation - the proper-noun-in-title caution", () => {
+  it("flags a title that borrows the venue, whole or in part", () => {
+    expect(titleEchoesLocation("Party at Chateau Chloe", "Chateau Chloe")).toBe(true);
+    expect(titleEchoesLocation("Dinner at Sarah's", "Sarah's place")).toBe(true);
+  });
+
+  it("stays quiet when the title stands on its own", () => {
+    expect(titleEchoesLocation("Pool Party", "Chateau Chloe")).toBe(false);
+    expect(titleEchoesLocation("Late Night Dinner", null)).toBe(false);
+    // Stopwords alone never trigger it.
+    expect(titleEchoesLocation("Dinner at the Loft", "The Warehouse")).toBe(false);
   });
 });
 

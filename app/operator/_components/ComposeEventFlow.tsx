@@ -294,13 +294,33 @@ export function ComposeEventFlow({ autoFocus = false }: { autoFocus?: boolean })
 
   // ── Confirm (the safety gate - nothing exists until "Create draft") ────
   if (!proposal) return null;
-  const { plan, endAt, readout } = proposal;
+  const { plan, endAt, readout, titleFromLocation } = proposal;
   return (
     <div>
       <p className="text-xs uppercase tracking-widest text-text-tertiary">
         Review before anything is created
       </p>
       <h3 className="mt-2 text-lg text-text-primary">{plan.title}</h3>
+      {titleFromLocation ? (
+        <p className="mt-1 text-xs text-text-tertiary">
+          Heads up - the name borrows the venue. Fine to keep; rename it in
+          the builder if the event has its own name.
+        </p>
+      ) : null}
+      {plan.description ? (
+        <div className="mt-3">
+          <p className="text-sm leading-relaxed text-text-secondary">
+            {plan.description}
+          </p>
+          <p className="mt-1 text-xs text-text-tertiary">
+            Drafted for you - editable in the builder.
+          </p>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-text-tertiary">
+          No description yet - add one in the builder.
+        </p>
+      )}
       <dl className="mt-3 flex flex-col gap-1.5 text-sm">
         <div className="flex gap-2">
           <dt className="w-16 shrink-0 text-text-tertiary">When</dt>

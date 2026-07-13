@@ -21,11 +21,15 @@
  *  (planToGateSpec) are the shipped Phase E logic, reused as-is.
  *  Non-core fields (capacity, description, hero, service fee) never prompt -
  *  they default silently, flagged in assumptions, editable in the builder.
+ *  The description defaults richly: a sidecar drafts it at compose time
+ *  through the same shared generator as the builder's "Generate with AI"
+ *  button, shown on the confirm screen, persisted only on operator confirm.
  *  Model: JUDGMENT_MODEL per the locked two-tier policy.
  */
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
+import { generateEventDescription } from "@/lib/ai/event-description";
 import { JUDGMENT_MODEL } from "@/lib/ai/runtime-models";
 import {
   isOpenSpec,
@@ -244,6 +248,20 @@ async function defaultGapProber(prompt: string): Promise<GapProbe> {
   return result.object;
 }
 
+// ── Description sidecar (same pattern - planSchema stays frozen) ────────────
+// Drafts the event description at compose time through the SAME shared
+// generator the builder's "Generate with AI" button uses (one voiced prompt,
+// one model, zero drift). Fills plan.description only when the planner left
+// it null - words the operator dictated always win.
+
+export type Describer = (prompt: string) => Promise<string>;
+
+async function defaultDescriber(prompt: string): Promise<string> {
+  return generateEventDescription(
+    `Write a description for this event. The operator's own note about it:\n\n${prompt}`,
+  );
+}
+
 // ── Core gaps (locked decision 1) ───────────────────────────────────────────
 // Core = start, end (only when implied), location, access (only when
 // ambiguous). Capacity, description, hero, service fee NEVER prompt.
@@ -328,6 +346,35 @@ export function accessReadout(plan: CompositionPlan): string[] {
   return lines;
 }
 
+// ── Title-borrows-the-venue caution (pure string check, no model call) ──────
+
+const TITLE_STOPWORDS = new Set(["the", "a", "an", "at", "of", "and"]);
+
+function normalizeWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** True when the derived title borrows from the extracted location - e.g.
+ *  "Party at Chateau Chloe" from location "Chateau Chloe", or "Dinner at
+ *  Sarah's" from "Sarah's place". Surfaces as a review caution on the
+ *  confirm screen, never a block, so it deliberately biases toward
+ *  flagging - a false positive costs one harmless note. */
+export function titleEchoesLocation(title: string, location: string | null): boolean {
+  if (!location) return false;
+  const titleWords = normalizeWords(title);
+  const locationWords = normalizeWords(location);
+  if (locationWords.length === 0) return false;
+  if (` ${titleWords.join(" ")} `.includes(` ${locationWords.join(" ")} `)) return true;
+  const titleSet = new Set(titleWords);
+  return locationWords.some(
+    (w) => w.length >= 3 && !TITLE_STOPWORDS.has(w) && titleSet.has(w),
+  );
+}
+
 // ── Step 1: propose (extraction only - ZERO writes) ─────────────────────────
 
 export type CompositionProposal = {
@@ -336,6 +383,9 @@ export type CompositionProposal = {
   endAt: string | null;
   gaps: CoreGap[];
   readout: string[];
+  /** Display-only caution: the derived title borrows the venue/location
+   *  name, so the operator should eyeball it before confirming. */
+  titleFromLocation: boolean;
 };
 
 export type ProposeResult =
@@ -352,6 +402,7 @@ export async function proposeComposition(
     clarifications?: Clarification[];
     planner?: Planner;
     gapProber?: GapProber;
+    describer?: Describer;
     now?: Date;
   },
 ): Promise<ProposeResult> {
@@ -361,13 +412,15 @@ export async function proposeComposition(
   }
   const full = buildPrompt(trimmed, opts?.now ?? new Date(), opts?.clarifications);
 
-  // Fire both model calls together - one shared input, zero data dependency;
-  // propose latency is the slower of the two, not the sum. allSettled (never
-  // Promise.all) so the two failure modes stay independent: a planner failure
-  // is fatal, a probe failure only degrades, and neither can mask the other.
-  const [planSettled, probeSettled] = await Promise.allSettled([
+  // Fire all three model calls together - one shared input, zero data
+  // dependency; propose latency is the slowest of the three, not the sum.
+  // allSettled (never Promise.all) so the failure modes stay independent: a
+  // planner failure is fatal, the probe and the description sidecar only
+  // degrade, and none can mask another.
+  const [planSettled, probeSettled, descSettled] = await Promise.allSettled([
     (opts?.planner ?? defaultPlanner)(full),
     (opts?.gapProber ?? defaultGapProber)(full),
+    (opts?.describer ?? defaultDescriber)(full),
   ]);
 
   let plan: CompositionPlan;
@@ -394,9 +447,30 @@ export async function proposeComposition(
     });
   }
 
+  // The description sidecar degrades the same way: a rejection or an empty
+  // draft is logged and the description simply stays null - the operator
+  // writes or generates one in the builder. Capped to planSchema's 2000 so
+  // the confirm round-trip re-parse never rejects a good plan over it.
+  let drafted: string | null = null;
+  try {
+    if (descSettled.status === "rejected") throw descSettled.reason;
+    const text = (typeof descSettled.value === "string" ? descSettled.value : "").trim();
+    if (!text) throw new Error("empty description");
+    drafted = text.slice(0, 2000);
+  } catch (err) {
+    console.error("[compose] description generation failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   // Normalize datetimes to the Z-form the action layer's zod accepts; an
   // unparseable start becomes a gap question instead of a post-confirm error.
-  plan = { ...plan, startAt: normalizeIso(plan.startAt) };
+  // Description: words the operator dictated win; the sidecar fills the null.
+  plan = {
+    ...plan,
+    startAt: normalizeIso(plan.startAt),
+    description: plan.description ?? drafted,
+  };
   const endAt = probe?.endImplied ? normalizeIso(probe.endAt) : null;
 
   return {
@@ -406,6 +480,7 @@ export async function proposeComposition(
       endAt,
       gaps: findCoreGaps(plan, probe),
       readout: accessReadout(plan),
+      titleFromLocation: titleEchoesLocation(plan.title, plan.location),
     },
   };
 }
