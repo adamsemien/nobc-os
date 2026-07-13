@@ -91,7 +91,8 @@ type ApplicationRow = {
   email: string;
   city: string | null;
   phone: string | null;
-  submittedAt: string;
+  createdAt: string;
+  submittedAt: string | null;
   status: string;
   aiTags: string[];
   aiScore: number | null;

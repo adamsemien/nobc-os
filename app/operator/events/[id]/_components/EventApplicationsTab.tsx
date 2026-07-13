@@ -6,7 +6,8 @@ type ApplicationRow = {
   email: string;
   city: string | null;
   phone: string | null;
-  submittedAt: string;
+  createdAt: string;
+  submittedAt: string | null;
   status: string;
   aiTags: string[];
   aiScore: number | null;
@@ -35,6 +36,7 @@ export function EventApplicationsTab({ applications, eventId: _eventId }: Props)
     email: a.email,
     city: a.city,
     phone: a.phone,
+    createdAt: a.createdAt,
     submittedAt: a.submittedAt,
     aiTags: a.aiTags,
     aiScore: a.aiScore,

@@ -13,9 +13,11 @@ export async function POST(
   const { id } = await params;
 
   let reviewNote: string | undefined;
+  let confirmUnsubmitted = false;
   try {
-    const body = (await req.json()) as { note?: unknown };
+    const body = (await req.json()) as { note?: unknown; confirmUnsubmitted?: unknown };
     if (typeof body?.note === 'string') reviewNote = body.note.trim().slice(0, 4000) || undefined;
+    confirmUnsubmitted = body?.confirmUnsubmitted === true;
   } catch { /* optional */ }
 
   const outcome = await approveApplication({
@@ -23,6 +25,7 @@ export async function POST(
     workspaceId,
     actorId: userId,
     reviewNote,
+    allowUnsubmitted: confirmUnsubmitted,
   });
 
   if (!outcome.ok) {
@@ -30,6 +33,7 @@ export async function POST(
       not_found: { status: 404, error: 'Not found' },
       forbidden: { status: 403, error: 'Forbidden' },
       already_approved: { status: 409, error: 'Already approved' },
+      not_submitted: { status: 409, error: 'Not submitted' },
     } as const;
     const { status, error } = map[outcome.error];
     return Response.json({ error }, { status });

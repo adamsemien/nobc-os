@@ -106,6 +106,7 @@ export async function GET(
       city: app.city,
       status: app.status,
       createdAt: app.createdAt.toISOString(),
+      submittedAt: app.submittedAt?.toISOString() ?? null,
       reviewedAt: app.reviewedAt?.toISOString() ?? null,
       rejectionReason: app.rejectionReason ?? null,
       // Phase C: read the email opt-in from `emailOptIn` (the member apply flow

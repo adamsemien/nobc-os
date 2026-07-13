@@ -694,6 +694,10 @@ export async function seedPendingDemoApplications(
         archetype: p.archetype,
         archetypeScores: buildArchetypeScores(p.archetype, p.aiScore, idx),
         createdAt: new Date(Date.now() - ((idx % 7) + 1) * 86_400_000),
+        // Data Integrity Build A: this row simulates a fully-scored, genuine
+        // submission — stamp submittedAt so it doesn't trip the "not submitted"
+        // badge/guard for the wrong reason.
+        submittedAt: new Date(Date.now() - ((idx % 7) + 1) * 86_400_000),
       },
     });
     await db.applicationAnswer.createMany({

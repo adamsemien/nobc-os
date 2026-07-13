@@ -21,6 +21,7 @@ const m = vi.hoisted(() => ({
   verifyDraftToken: vi.fn(),
   appFindUnique: vi.fn(),
   appUpdate: vi.fn(),
+  txExecuteRaw: vi.fn(),
   auditCreate: vi.fn(),
   checkDuplicate: vi.fn(),
   checkWatchList: vi.fn(),
@@ -43,6 +44,14 @@ vi.mock('@/lib/db', () => ({
   db: {
     application: { findUnique: m.appFindUnique, update: m.appUpdate },
     auditEvent: { create: m.auditCreate },
+    // The route serializes the scoring critical section on a pg advisory lock
+    // inside db.$transaction (2026-07-02 refactor). The interactive-tx mock just
+    // runs the callback with a tx that can take the lock and re-read the row.
+    $transaction: async (fn: (tx: unknown) => unknown) =>
+      fn({
+        $executeRaw: m.txExecuteRaw,
+        application: { findUnique: m.appFindUnique },
+      }),
   },
 }));
 vi.mock('@/lib/resend', () => ({ resend: { emails: { send: m.emailSend } } }));
@@ -61,6 +70,11 @@ vi.mock('@/lib/comments-notify', () => ({ maybeFireSlack: m.maybeFireSlack }));
 vi.mock('@/lib/applications/backup', () => ({ backupApplication: m.backupApplication }));
 vi.mock('@react-email/render', () => ({ render: m.render }));
 vi.mock('@/emails/WelcomeEmail', () => ({ default: () => null }));
+// The account-ownership fallback (cookie miss → signed-in owner check) pulls in
+// Clerk's auth(), which throws its server-only guard under vitest. Mock both so
+// the 403 path asserts the route's own logic, not Clerk's environment check.
+vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ userId: null }) }));
+vi.mock('@/lib/apply-account-link', () => ({ isApplicationAccountOwner: async () => false }));
 
 // after() runs the callback synchronously enough for assertions; we don't assert on it here.
 vi.mock('next/server', async (orig) => {
@@ -92,6 +106,9 @@ const baseApp = {
   answers: [{ questionKey: 'q1', answer: 'hello' }],
 };
 
+// Matches the post-Reveal-B scoreApplication return shape: the reveal note and
+// the decisive tally output (secondary/blend/opener/habitat) ride along with the
+// score — the route persists them verbatim and reads result.personalNote.
 const scoreResult = {
   archetype: 'The Connector',
   archetypeScores: { 'The Connector': 0.8 },
@@ -100,6 +117,13 @@ const scoreResult = {
   tags: ['curious'],
   aiRecommendation: 'APPROVE',
   aiReasoning: 'good fit',
+  personalNote: 'You clearly care.',
+  secondary: 'Host',
+  blend: { primary: 55, secondary: 45 },
+  openerPhrase: 'the one who connects',
+  habitatThrive: 'dinner tables',
+  habitatDim: 'networking mixers',
+  subline: 'a subline',
 };
 
 beforeEach(() => {
@@ -203,8 +227,12 @@ describe('apply submit: BLOCKED auto-reject', () => {
     const res = await post();
     const body = await res.json();
     expect(body).toEqual({ blocked: true });
+    // The applicant DID click Submit — the BLOCKED branch stamps submittedAt so
+    // the row matches the backfill rule (status <> PENDING counts as submitted).
     expect(m.appUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'REJECTED' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'REJECTED', submittedAt: expect.any(Date) }),
+      }),
     );
     expect(m.scoreApplication).not.toHaveBeenCalled();
   });
@@ -236,7 +264,13 @@ describe('apply submit: happy path', () => {
     expect(m.scoreApplication).toHaveBeenCalledWith('app1');
     expect(m.appUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ archetype: 'The Connector', aiScore: 0.8 }),
+        data: expect.objectContaining({
+          archetype: 'The Connector',
+          aiScore: 0.8,
+          // Data Integrity Build A: the completion signal is stamped in the same
+          // scoring update — submittedAt=null must only ever mean "never submitted".
+          submittedAt: expect.any(Date),
+        }),
       }),
     );
     expect(body.archetype).toBe('The Connector');
