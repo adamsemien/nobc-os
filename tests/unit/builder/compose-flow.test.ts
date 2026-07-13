@@ -35,6 +35,7 @@ import {
   findCoreGaps,
   planToGateSpec,
   proposeComposition,
+  titleEchoesLocation,
   type CompositionPlan,
   type GapProbe,
 } from "@/lib/builder/compose";
@@ -59,9 +60,12 @@ const cleanProbe: GapProbe = {
   accessAmbiguous: false,
 };
 
+// Every propose test injects all three ports (planner, prober, describer) so
+// the suite never falls back to a default and touches the network.
 const ports = (plan: CompositionPlan, probe: GapProbe = cleanProbe) => ({
   planner: async () => plan,
   gapProber: async () => probe,
+  describer: async () => "Drafted.",
 });
 
 beforeEach(() => {
@@ -92,6 +96,7 @@ describe("proposeComposition - the confirm-gate proof", () => {
         return basePlan;
       },
       gapProber: async () => cleanProbe,
+      describer: async () => "Drafted.",
       clarifications: [{ question: "Where is it happening?", answer: "Chateau Chloe" }],
     });
     expect(seen).toContain("right now it is");
@@ -120,8 +125,9 @@ describe("proposeComposition - the confirm-gate proof", () => {
 
   it("fires the planner and the gap probe concurrently, not sequentially", async () => {
     // The planner resolves only once the prober has been invoked - under a
-    // sequential flow (planner awaited to completion first) this deadlocks;
-    // under the allSettled restructure it completes.
+    // sequential flow this deadlocks; under allSettled it completes. (The
+    // describer is deliberately NOT in this race: its curated facts depend
+    // on the settled plan, so it runs after extraction.)
     let releasePlan!: (p: CompositionPlan) => void;
     const result = await proposeComposition("party", {
       planner: () =>
@@ -132,8 +138,31 @@ describe("proposeComposition - the confirm-gate proof", () => {
         releasePlan(basePlan);
         return cleanProbe;
       },
+      describer: async () => "Drafted.",
     });
     expect(result.ok).toBe(true);
+  });
+
+  it("hands the describer curated human facts - never an ISO timestamp or a schema token", async () => {
+    let seen = "";
+    await proposeComposition("dinner sunday, $25 or members free", {
+      ...ports({
+        ...basePlan,
+        anyOneOf: [{ kind: "pay", priceCents: 2500 }, { kind: "member" }],
+      }),
+      describer: async (facts) => {
+        seen = facts;
+        return "Drafted.";
+      },
+    });
+    // basePlan's 2026-07-19T19:00:00.000Z is Sunday, July 19, 2pm in Chicago.
+    expect(seen).toContain("Event name: Pool Party");
+    expect(seen).toContain("Date: Sunday, July 19 at 2pm");
+    expect(seen).toContain("Location: Chateau Chloe");
+    expect(seen).toContain("pay $25");
+    expect(seen).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(seen).not.toContain("anyOneOf");
+    expect(seen).not.toContain("requiredAll");
   });
 
   it("a planner failure stays fatal even when the probe fulfills", async () => {
@@ -142,6 +171,7 @@ describe("proposeComposition - the confirm-gate proof", () => {
         throw new Error("model down");
       },
       gapProber: async () => cleanProbe,
+      describer: async () => "Drafted.",
     });
     expect(result).toEqual({
       ok: false,
@@ -156,10 +186,66 @@ describe("proposeComposition - the confirm-gate proof", () => {
       gapProber: async () => {
         throw new Error("model down");
       },
+      describer: async () => "Drafted.",
     });
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("unreachable");
     expect(result.proposal.gaps.map((g) => g.field)).toEqual(["location"]);
+  });
+
+  it("the describer fills a null description; the operator's words win over it", async () => {
+    const filled = await proposeComposition("party", {
+      ...ports(basePlan),
+      describer: async () => "Low light, long tables, a night on its own clock.",
+    });
+    expect(filled.ok && filled.proposal.plan.description).toBe(
+      "Low light, long tables, a night on its own clock.",
+    );
+    const dictated = await proposeComposition("party", {
+      ...ports({ ...basePlan, description: "The operator wrote this." }),
+      describer: async () => "Generated prose that must not win.",
+    });
+    expect(dictated.ok && dictated.proposal.plan.description).toBe(
+      "The operator wrote this.",
+    );
+  });
+
+  it("a describer failure degrades - description stays null, zero writes", async () => {
+    const result = await proposeComposition("party", {
+      ...ports(basePlan),
+      describer: async () => {
+        throw new Error("model down");
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.proposal.plan.description).toBeNull();
+    expect(m.createEventDraft).not.toHaveBeenCalled();
+  });
+
+  it("flags titleFromLocation only when the derived title borrows the venue", async () => {
+    const flagged = await proposeComposition(
+      "party at chateau chloe",
+      ports({ ...basePlan, title: "Party at Chateau Chloe" }),
+    );
+    expect(flagged.ok && flagged.proposal.titleFromLocation).toBe(true);
+    // basePlan's "Pool Party" shares nothing with "Chateau Chloe".
+    const clean = await proposeComposition("pool party", ports(basePlan));
+    expect(clean.ok && clean.proposal.titleFromLocation).toBe(false);
+  });
+});
+
+describe("titleEchoesLocation - the proper-noun-in-title caution", () => {
+  it("flags a title that borrows the venue, whole or in part", () => {
+    expect(titleEchoesLocation("Party at Chateau Chloe", "Chateau Chloe")).toBe(true);
+    expect(titleEchoesLocation("Dinner at Sarah's", "Sarah's place")).toBe(true);
+  });
+
+  it("stays quiet when the title stands on its own", () => {
+    expect(titleEchoesLocation("Pool Party", "Chateau Chloe")).toBe(false);
+    expect(titleEchoesLocation("Late Night Dinner", null)).toBe(false);
+    // Stopwords alone never trigger it.
+    expect(titleEchoesLocation("Dinner at the Loft", "The Warehouse")).toBe(false);
   });
 });
 

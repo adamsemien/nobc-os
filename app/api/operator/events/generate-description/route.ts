@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { generateText } from 'ai';
 import { OperatorRole } from '@prisma/client';
 import { requireRole } from '@/lib/operator-role';
-import { anthropic } from '@ai-sdk/anthropic';
-import { JUDGMENT_MODEL } from '@/lib/ai/runtime-models';
+import { generateEventDescription } from '@/lib/ai/event-description';
 
 /** POST /api/operator/events/generate-description — drafts a short event (or
- *  series) description in NoBC voice from the event facts. STAFF-gated; uses the
- *  workspace's resolved (locked Sonnet) model via the existing AI SDK pattern. */
+ *  series) description in NoBC voice from the event facts. STAFF-gated. The
+ *  generation itself lives in lib/ai/event-description.ts, shared with the
+ *  compose flow's description sidecar - one generator, two call sites. */
 const BodySchema = z.object({
   title: z.string().min(1).max(200),
   location: z.string().max(200).optional().nullable(),
@@ -16,16 +15,6 @@ const BodySchema = z.object({
   currentDescription: z.string().max(4000).optional().nullable(),
   kind: z.enum(['event', 'series']).default('event'),
 });
-
-const SYSTEM = `You write event descriptions for No Bad Company (NoBC), a premium curated members' club and event operator.
-
-Voice:
-- Atmospheric and specific — evoke the room, the night, and the people in it.
-- Confident and understated. Never hype, never corporate, never salesy.
-- No clichés ("join us", "don't miss out", "unforgettable", "curated experience"), no emoji, no exclamation marks.
-- Concrete over generic — anchor to the actual event, place, and moment.
-
-Output: 2-3 sentences. Plain prose only — no title, no markdown, no surrounding quotes, no preamble. Return only the description text.`;
 
 export async function POST(req: NextRequest) {
   const gate = await requireRole(OperatorRole.STAFF);
@@ -61,14 +50,7 @@ export async function POST(req: NextRequest) {
   }:\n\n${facts.join('\n')}`;
 
   try {
-    const { text } = await generateText({
-      model: anthropic(JUDGMENT_MODEL),
-      system: SYSTEM,
-      prompt,
-      maxOutputTokens: 300,
-      temperature: 0.8,
-    });
-    const description = text.trim();
+    const description = await generateEventDescription(prompt);
     if (!description) return NextResponse.json({ error: 'Empty response' }, { status: 502 });
     return NextResponse.json({ description });
   } catch (err) {
