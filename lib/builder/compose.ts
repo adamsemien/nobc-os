@@ -361,9 +361,19 @@ export async function proposeComposition(
   }
   const full = buildPrompt(trimmed, opts?.now ?? new Date(), opts?.clarifications);
 
+  // Fire both model calls together - one shared input, zero data dependency;
+  // propose latency is the slower of the two, not the sum. allSettled (never
+  // Promise.all) so the two failure modes stay independent: a planner failure
+  // is fatal, a probe failure only degrades, and neither can mask the other.
+  const [planSettled, probeSettled] = await Promise.allSettled([
+    (opts?.planner ?? defaultPlanner)(full),
+    (opts?.gapProber ?? defaultGapProber)(full),
+  ]);
+
   let plan: CompositionPlan;
   try {
-    plan = planSchema.parse(await (opts?.planner ?? defaultPlanner)(full));
+    if (planSettled.status === "rejected") throw planSettled.reason;
+    plan = planSchema.parse(planSettled.value);
   } catch (err) {
     console.error("[compose] planning failed", {
       error: err instanceof Error ? err.message : String(err),
@@ -376,7 +386,8 @@ export async function proposeComposition(
   // access model in plain English - remains the hard safety gate.
   let probe: GapProbe | null = null;
   try {
-    probe = gapProbeSchema.parse(await (opts?.gapProber ?? defaultGapProber)(full));
+    if (probeSettled.status === "rejected") throw probeSettled.reason;
+    probe = gapProbeSchema.parse(probeSettled.value);
   } catch (err) {
     console.error("[compose] gap probe failed", {
       error: err instanceof Error ? err.message : String(err),

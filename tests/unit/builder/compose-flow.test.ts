@@ -118,6 +118,38 @@ describe("proposeComposition - the confirm-gate proof", () => {
     expect(result.proposal.gaps.map((g) => g.field)).toContain("startAt");
   });
 
+  it("fires the planner and the gap probe concurrently, not sequentially", async () => {
+    // The planner resolves only once the prober has been invoked - under a
+    // sequential flow (planner awaited to completion first) this deadlocks;
+    // under the allSettled restructure it completes.
+    let releasePlan!: (p: CompositionPlan) => void;
+    const result = await proposeComposition("party", {
+      planner: () =>
+        new Promise<CompositionPlan>((resolve) => {
+          releasePlan = resolve;
+        }),
+      gapProber: async () => {
+        releasePlan(basePlan);
+        return cleanProbe;
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("a planner failure stays fatal even when the probe fulfills", async () => {
+    const result = await proposeComposition("party", {
+      planner: async () => {
+        throw new Error("model down");
+      },
+      gapProber: async () => cleanProbe,
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Could not compose that - try rephrasing.",
+    });
+    expect(m.createEventDraft).not.toHaveBeenCalled();
+  });
+
   it("a gap-probe failure degrades gracefully - plan gaps still computed", async () => {
     const result = await proposeComposition("party", {
       planner: async () => ({ ...basePlan, location: null }),

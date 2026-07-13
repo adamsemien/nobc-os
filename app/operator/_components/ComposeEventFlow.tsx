@@ -14,7 +14,7 @@
  *  Copy law: "Access" never "RSVP"; spaced hyphens, never em dashes; no raw
  *  enum values or spec JSON. Design tokens only.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import {
@@ -43,6 +43,52 @@ function fmtWhen(iso: string): string {
 
 type Stage = "input" | "asking" | "confirm";
 
+const WORKING_LINES = [
+  "Reading the room.",
+  "Setting the door.",
+  "Working out who gets in.",
+  "Pricing the night.",
+  "Putting it together.",
+];
+
+/** Shown while a propose is in flight. Mounted only while the propose
+ *  promise is pending (busy), so no timer can outlive the request - the
+ *  effect cleanup clears the cycle on unmount. Reduced motion holds the
+ *  first line: no cycling, no pulse. */
+function ComposeWorking() {
+  const [line, setLine] = useState(0);
+  const [faded, setFaded] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let swap: ReturnType<typeof setTimeout> | undefined;
+    const cycle = setInterval(() => {
+      setFaded(true);
+      swap = setTimeout(() => {
+        setLine((i) => (i + 1) % WORKING_LINES.length);
+        setFaded(false);
+      }, 300);
+    }, 1600);
+    return () => {
+      clearInterval(cycle);
+      if (swap) clearTimeout(swap);
+    };
+  }, []);
+
+  return (
+    <div role="status" className="flex items-center gap-2.5 py-3">
+      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
+      <p
+        className={`text-sm text-text-secondary transition-opacity duration-300 motion-reduce:transition-none ${
+          faded ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        {WORKING_LINES[line]}
+      </p>
+    </div>
+  );
+}
+
 export function ComposeEventFlow({ autoFocus = false }: { autoFocus?: boolean }) {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>("input");
@@ -67,7 +113,10 @@ export function ComposeEventFlow({ autoFocus = false }: { autoFocus?: boolean })
       const result = await proposeEventAction(prompt.trim(), clarifications);
       if (!result.ok) {
         fail(result.error);
-        if (!proposal) setStage("input");
+        // No prior proposal - back to input. With one (a round-two failure),
+        // fall back to the last good proposal so the error renders beneath
+        // it, never a blank screen (the asking stage has an empty queue).
+        setStage(proposal ? "confirm" : "input");
         return;
       }
       setProposal(result.proposal);
@@ -83,7 +132,7 @@ export function ComposeEventFlow({ autoFocus = false }: { autoFocus?: boolean })
       }
     } catch {
       fail("Could not compose that - try rephrasing.");
-      if (!proposal) setStage("input");
+      setStage(proposal ? "confirm" : "input");
     } finally {
       setBusy(false);
     }
@@ -149,6 +198,14 @@ export function ComposeEventFlow({ autoFocus = false }: { autoFocus?: boolean })
     setAsked([]);
     setError("");
   }
+
+  // ── Working (a propose is in flight) ───────────────────────────────────
+  // Covers BOTH propose await sites: the initial compose (stage "input") and
+  // the re-propose after gap answers (stage "asking" with an emptied queue,
+  // which would otherwise render blank). Appears when the propose promise
+  // starts, clears when it settles - busy is set around that await alone.
+  // The confirm screen's create path keeps its own button state.
+  if (busy && stage !== "confirm") return <ComposeWorking />;
 
   // ── Input ──────────────────────────────────────────────────────────────
   if (stage === "input") {
