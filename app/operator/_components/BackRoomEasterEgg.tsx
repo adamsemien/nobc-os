@@ -5,6 +5,7 @@ import { Volume2, VolumeX } from 'lucide-react';
 import type { ThemeId } from '@/lib/theme';
 import { useTheme } from './ThemeToggle';
 import { LastCallGame } from './LastCallGame';
+import { TheLineGame } from './TheLineGame';
 
 /**
  * THE BACK ROOM — type the secret knock ("knockknock", spaces allowed) anywhere
@@ -22,7 +23,7 @@ import { LastCallGame } from './LastCallGame';
 const KNOCK = 'knockknock';
 const DOOR_MS = 4300;
 
-type Phase = 'closed' | 'door' | 'room' | 'game' | 'lightsout';
+type Phase = 'closed' | 'door' | 'room' | 'game' | 'theline' | 'lightsout';
 
 type BackRoomAudio = {
   knock: () => void;
@@ -451,7 +452,7 @@ export function BackRoomEasterEgg() {
           </div>
         )}
 
-        {(phase === 'room' || phase === 'game') && (
+        {(phase === 'room' || phase === 'game' || phase === 'theline') && (
           <>
             <div className="br-smoke br-smoke-a" aria-hidden />
             <div className="br-smoke br-smoke-b" aria-hidden />
@@ -460,6 +461,17 @@ export function BackRoomEasterEgg() {
 
         {phase === 'game' && (
           <LastCallGame
+            sfx={
+              audioRef.current
+                ? { pluck: audioRef.current.pluck, buzz: audioRef.current.buzz }
+                : null
+            }
+            onExit={() => setPhase('room')}
+          />
+        )}
+
+        {phase === 'theline' && (
+          <TheLineGame
             sfx={
               audioRef.current
                 ? { pluck: audioRef.current.pluck, buzz: audioRef.current.buzz }
@@ -588,6 +600,10 @@ export function BackRoomEasterEgg() {
 
                   <button type="button" className="br-matchbook" onClick={() => setPhase('game')}>
                     Working the door tonight?
+                  </button>
+
+                  <button type="button" className="tl-neon" onClick={() => setPhase('theline')}>
+                    The line&rsquo;s around the block. Run it?
                   </button>
 
                   <p
