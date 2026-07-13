@@ -120,7 +120,7 @@ The way we think about it: Intelligence is not a vanity dashboard — it's how y
     body: `**Global**
 - Cmd+K — search & navigate (events, members, applications, settings)
 - Cmd+Shift+Option+A — open the AI agent panel
-- Cmd+Shift+Option+D — open the dev toolbar (DEV_USER_IDS only)
+- Cmd+Shift+Option+D — open the dev toolbar (dev-allowlisted users only)
 - ? — open this help panel
 - Esc — close any open panel
 

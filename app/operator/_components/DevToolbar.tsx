@@ -8,11 +8,7 @@ import type {
   MissionDifficulty,
 } from '@/lib/dev/qa-types';
 import { QAMissionPanel } from './QAMissionPanel';
-
-const ALLOWED_IDS = (process.env.NEXT_PUBLIC_DEV_USER_IDS ?? '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+import { isDevUser } from '@/lib/dev-users';
 
 // Exported so external openers (e.g. Settings → Developer) can persist the
 // open flag and dispatch the open event without duplicating the magic strings.
@@ -190,7 +186,7 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
     typeof process !== 'undefined' &&
     (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '').startsWith('pk_live_');
 
-  const isAllowed = isLoaded && !!user && ALLOWED_IDS.includes(user.id);
+  const isAllowed = isLoaded && !!user && isDevUser(user.id);
 
   useEffect(() => {
     if (!isAllowed) return;
@@ -444,10 +440,11 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
     } catch {}
   }
 
-  // Hard short-circuit: dev tooling must never render in production, even if a
-  // NEXT_PUBLIC_DEV_USER_IDS allowlist entry leaks into a prod env. NODE_ENV is
-  // inlined at build time, so this whole subtree is dead-stripped in a prod build.
-  if (process.env.NODE_ENV === 'production') return null;
+  // Posture change 2026-07-13 (Adam's explicit GO): the old NODE_ENV hard kill
+  // ("never render in production") is gone — isDevUser is the single boundary.
+  // In prod/preview it requires a NEXT_PUBLIC_DEV_USER_IDS entry; empty list =
+  // nobody. The /api/dev/* routes keep their own server-side DEV_USER_IDS gate,
+  // so UI visibility never grants API access by itself.
   if (!isLoaded || !isAllowed) return null;
 
   async function handleSeed() {

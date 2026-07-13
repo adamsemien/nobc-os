@@ -15,6 +15,7 @@ import { PageHeader } from '../_components/PageHeader';
 import { auth } from '@clerk/nextjs/server';
 import { getMemberWorkspaceId } from '@/lib/auth';
 import { isAdmin } from '@/lib/operator-role';
+import { isDevUser } from '@/lib/dev-users';
 import { OpenDevToolbarButton } from './OpenDevToolbarButton';
 import { SeedGravityLedgerButton } from './SeedGravityLedgerButton';
 
@@ -88,15 +89,11 @@ const CARDS: Card[] = [
   },
 ];
 
-const DEV_IDS = (process.env.DEV_USER_IDS ?? '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
-
 export default async function SettingsLandingPage() {
   const { userId } = await auth();
-  // Local dev always sees the Developer tools; production requires an explicit DEV_USER_IDS allowlist.
-  const isDev = process.env.NODE_ENV !== 'production' || (!!userId && DEV_IDS.includes(userId));
+  // Same predicate as the DevToolbar itself (lib/dev-users.ts): local dev always
+  // sees Developer tools; prod/preview require a NEXT_PUBLIC_DEV_USER_IDS entry.
+  const isDev = isDevUser(userId);
   // Developer section requires ADMIN role in addition to dev context — seed tool resets demo tenant.
   const workspaceId = await getMemberWorkspaceId(userId);
   const operatorIsAdmin = await isAdmin(userId, workspaceId);
