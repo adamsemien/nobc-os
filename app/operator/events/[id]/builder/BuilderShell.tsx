@@ -12,7 +12,7 @@
  *  Copy law: "Access" never "RSVP"; no raw enum values; spaced hyphens.
  *  Design tokens only.
  */
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, ExternalLink, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { HeroImageUpload } from "../../_components/HeroImageUpload";
@@ -36,6 +36,15 @@ import {
 } from "@/lib/builder/actions";
 
 const editorial = { fontFamily: "'PP Editorial New', Georgia, serif" };
+
+// The guest page's `lg` (1024px) breakpoint decides between its desktop
+// access card and its mobile sticky-CTA bar. Media queries inside an
+// <iframe> evaluate against the iframe's own rendered width, not the
+// operator's browser window - and this panel is only ~half the operator's
+// screen, so without forcing a wider render the guest page picks its mobile
+// layout here even on a desktop operator. Render at a fixed desktop width
+// and scale the frame down to fit the panel instead.
+const PREVIEW_VIEWPORT_WIDTH = 1280;
 
 // ── Access draft model (chips-as-a-sentence, depth 2) ───────────────────────
 
@@ -582,6 +591,19 @@ export function BuilderShell({
   );
   const [selectedChips, setSelectedChips] = useState<Set<string>>(new Set());
   const [previewVersion, setPreviewVersion] = useState(0);
+  const previewPanelRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
+
+  useEffect(() => {
+    const el = previewPanelRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setPreviewScale(entry.contentRect.width / PREVIEW_VIEWPORT_WIDTH);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const [saving, startSaving] = useTransition();
   const [notice, setNotice] = useState("");
   const [savedFlash, setSavedFlash] = useState(false);
@@ -670,12 +692,22 @@ export function BuilderShell({
             Open <ExternalLink size={12} />
           </a>
         </div>
-        <iframe
-          key={previewVersion}
-          src={previewUrl}
-          title="Guest page preview"
-          className="h-[52vh] w-full bg-bg lg:h-[calc(100dvh-37px)]"
-        />
+        <div
+          ref={previewPanelRef}
+          className="h-[52vh] w-full overflow-hidden bg-bg lg:h-[calc(100dvh-37px)]"
+        >
+          <iframe
+            key={previewVersion}
+            src={previewUrl}
+            title="Guest page preview"
+            className="origin-top-left bg-bg"
+            style={{
+              width: PREVIEW_VIEWPORT_WIDTH,
+              height: previewScale > 0 ? `${100 / previewScale}%` : "100%",
+              transform: `scale(${previewScale})`,
+            }}
+          />
+        </div>
       </div>
 
       {/* Right: the control rail. */}
