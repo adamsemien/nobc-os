@@ -3095,7 +3095,28 @@ button:not(:disabled):active,
 .br-stagger > *:nth-child(7) { animation-delay: 0.82s; }
 
 /* ---- Vinyl ---- */
-.br-vinyl-wrap { position: relative; width: 110px; height: 110px; }
+/* The wrap is a real <button> — flip the record to change the side. Strip the
+   native button chrome but keep its 110px layout box and the spinning child. */
+.br-vinyl-wrap {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease;
+}
+.br-vinyl-wrap:hover { transform: scale(1.03); }
+.br-vinyl-wrap:active { transform: scale(0.97); }
+.br-vinyl-wrap:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 6px;
+  border-radius: 50%;
+}
 .br-vinyl {
   width: 110px;
   height: 110px;
@@ -3122,6 +3143,11 @@ button:not(:disabled):active,
   letter-spacing: 0.14em;
   text-align: center;
   line-height: 1.25;
+  animation: br-label-flip 0.45s ease; /* re-keyed on each flip to replay */
+}
+@keyframes br-label-flip {
+  from { opacity: 0; transform: scale(0.55); }
+  to { opacity: 1; transform: scale(1); }
 }
 .br-tonearm {
   position: absolute;
@@ -3158,11 +3184,12 @@ button:not(:disabled):active,
 /* ---- Reduced motion: hold every scene still ---- */
 @media (prefers-reduced-motion: reduce) {
   .br-overlay, .br-knocking { animation: br-fade 0.01s both; }
-  .br-grain, .br-vinyl, .br-lamp, .br-smoke-a, .br-smoke-b, .br-dust,
+  .br-grain, .br-vinyl, .br-vinyl-label, .br-lamp, .br-smoke-a, .br-smoke-b, .br-dust,
   .br-eye::after, .br-slot-light, .br-caption-1, .br-caption-2,
   .br-flood, .br-door-open, .br-card, .br-stagger > * {
     animation: none;
   }
+  .br-vinyl-wrap:hover, .br-vinyl-wrap:active { transform: none; }
   .br-slot-light { transform: scaleY(1); }
   .br-card, .br-stagger > * { opacity: 1; }
   .br-card-tilt { transform: none; transition: none; }
