@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { requireWorkspaceId } from '@/lib/auth';
 import { requirePermission } from '@/lib/operator-role';
 import { ensureCommunicationsSeed } from '@/lib/ensure-communications';
+import { toBrandPunctuation } from '@/lib/text/sanitize-copy';
 
 export async function GET() {
   const { userId } = await auth();
@@ -75,9 +76,13 @@ export async function PATCH(req: NextRequest) {
   await db.emailTemplate.update({
     where: { id: existing.id },
     data: {
-      subject: parsed.data.subject,
-      bodyHtml: parsed.data.bodyHtml,
-      bodyText: parsed.data.bodyText,
+      // Brand punctuation law: no em/en dashes may persist in member-facing
+      // copy. Safe on bodyHtml: the regex only touches literal U+2013/U+2014,
+      // which never occur in tag/attribute markup. Subject re-trims because a
+      // leading/trailing dash would otherwise leave a stray " - ".
+      subject: toBrandPunctuation(parsed.data.subject).trim(),
+      bodyHtml: toBrandPunctuation(parsed.data.bodyHtml),
+      bodyText: toBrandPunctuation(parsed.data.bodyText),
       enabled: parsed.data.enabled,
       updatedBy: userId,
       // Only rich-editor saves carry editorConfig; string-editor saves omit it
