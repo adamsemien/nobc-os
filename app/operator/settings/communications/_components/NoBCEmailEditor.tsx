@@ -50,7 +50,11 @@ const NOBC_EDITOR_THEME: ThemeConfig = {
       color: EMAIL_THEME.text,
       fontFamily: EMAIL_THEME.fontBody,
       fontSize: 15,
-      lineHeight: 1.75,
+      // Must be a unit-carrying string: the theming pipeline appends the
+      // panel's % unit to bare numbers, so 1.75 becomes line-height:1.75%
+      // (~0.3px) and every line collapses onto the previous one — in the
+      // edit surface, the preview iframe, AND any bodyHtml saved from here.
+      lineHeight: '175%',
     },
     h1: { color: EMAIL_THEME.ink, fontFamily: EMAIL_THEME.fontDisplay },
     h2: { color: EMAIL_THEME.ink, fontFamily: EMAIL_THEME.fontDisplay },

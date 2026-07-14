@@ -11,6 +11,7 @@ import { db } from './db';
 import { resend } from './resend';
 import { DEFAULT_EMAIL_TEMPLATES } from './email-templates-defaults';
 import { flatten, interpolate } from './email-interpolate';
+import { toBrandPunctuation } from './text/sanitize-copy';
 
 export type { EmailVariables } from './email-interpolate';
 
@@ -95,9 +96,13 @@ export async function sendTemplatedEmail(
   if (!tpl.enabled) return { ok: false, reason: 'disabled' };
 
   const flat = flatten(variables);
-  const subject = interpolate(tpl.subject, flat);
-  const html = interpolate(tpl.bodyHtml, flat);
-  const text = interpolate(tpl.bodyText, flat);
+  // Brand punctuation law enforced at the send boundary: catches em/en dashes
+  // arriving via interpolated variables (e.g. an event title), which the save
+  // path can't see. Safe on html - the regex only touches literal dashes,
+  // never tag/attribute markup.
+  const subject = toBrandPunctuation(interpolate(tpl.subject, flat));
+  const html = toBrandPunctuation(interpolate(tpl.bodyHtml, flat));
+  const text = toBrandPunctuation(interpolate(tpl.bodyText, flat));
 
   const recipients = Array.isArray(to) ? to : [to];
 
