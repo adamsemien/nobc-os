@@ -10,6 +10,7 @@ import type {
 import { QAMissionPanel } from './QAMissionPanel';
 import { isDevUser } from '@/lib/dev-users';
 import { WHISPER_PLAY_EVENT } from './ObsidianIdleEgg';
+import { THELINE_PLAY_EVENT } from './BackRoomEasterEgg';
 
 // Exported so external openers (e.g. Settings → Developer) can persist the
 // open flag and dispatch the open event without duplicating the magic strings.
@@ -125,6 +126,8 @@ const EASTER_EGGS: string[] = [
   'Switch to AIM theme — away message banner (Settings → Theme)',
   'Switch to MySpace theme — now playing banner (Settings → Theme)',
   'Type "frogger" on /apply — playable game',
+  'Type "theline" anywhere - The Line, the door-line runner (straight into the game)',
+  'Type "knockknock" anywhere - The Back Room (the record, Last Call, The Line, kill the lights)',
 ];
 
 const ROOM_FLOURISHES = 'Arrival chime · sellout confetti · ✦ Purple-List VIP markers';
@@ -1210,6 +1213,24 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
                     {egg}
                   </div>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event(THELINE_PLAY_EVENT))}
+                  style={{
+                    alignSelf: 'flex-start',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: '#b9a7e8',
+                    fontSize: 10,
+                    lineHeight: '1.6',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: 2,
+                  }}
+                >
+                  ▶ play The Line now
+                </button>
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new Event(WHISPER_PLAY_EVENT))}

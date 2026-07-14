@@ -23,6 +23,12 @@ import { TheLineGame } from './TheLineGame';
 const KNOCK = 'knockknock';
 const DOOR_MS = 4300;
 
+/** Typed word that jumps STRAIGHT into The Line (the door-line runner) -
+ *  no knock, no door cinematic - plus the DevToolbar's click-to-play event
+ *  for the same. Exiting the game lands you in the room. */
+const LINE_WORD = 'theline';
+export const THELINE_PLAY_EVENT = 'nobc:play-theline';
+
 type Phase = 'closed' | 'door' | 'room' | 'game' | 'theline' | 'lightsout';
 
 type BackRoomAudio = {
@@ -262,6 +268,27 @@ export function BackRoomEasterEgg() {
     setPhase('door');
   }, []);
 
+  /** Straight to The Line - skips the knock and the door cinematic. Used by
+   *  the typed word and the DevToolbar play button; audio still initializes
+   *  so the game keeps its sfx and the room its record on exit. */
+  const openTheLine = useCallback(() => {
+    if (phaseRef.current !== 'closed') {
+      setPhase('theline');
+      return;
+    }
+    restoreFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    audioRef.current = createBackRoomAudio();
+    setPhase('theline');
+  }, []);
+
+  // The DevToolbar's click-to-play for The Line.
+  useEffect(() => {
+    const onPlay = () => openTheLine();
+    window.addEventListener(THELINE_PLAY_EVENT, onPlay);
+    return () => window.removeEventListener(THELINE_PLAY_EVENT, onPlay);
+  }, [openTheLine]);
+
   // The secret knock — letters typed anywhere outside an editable field.
   useEffect(() => {
     let buffer = '';
@@ -288,11 +315,14 @@ export function BackRoomEasterEgg() {
       if (buffer === KNOCK) {
         buffer = '';
         open();
+      } else if (buffer.endsWith(LINE_WORD)) {
+        buffer = '';
+        openTheLine();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, openTheLine]);
 
   // The touch knock — knock on the glass: tap-tap, pause, tap-tap on any
   // non-interactive surface. Phones have no keyboard to type the knock with.
