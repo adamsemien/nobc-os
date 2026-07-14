@@ -17,7 +17,9 @@
 import { useEffect, useRef } from 'react';
 import { EmailEditor, type EmailEditorRef } from '@react-email/editor';
 import { composeReactEmail } from '@react-email/editor/core';
-import type { ThemeConfig } from '@react-email/editor/plugins';
+import { StarterKit } from '@react-email/editor/extensions';
+import { EmailTheming, type ThemeConfig } from '@react-email/editor/plugins';
+import { Placeholder } from '@tiptap/extension-placeholder';
 import type { Content, JSONContent } from '@tiptap/core';
 
 import '@react-email/editor/themes/default.css';
@@ -57,6 +59,20 @@ const NOBC_EDITOR_THEME: ThemeConfig = {
     button: { backgroundColor: EMAIL_THEME.red, color: '#FFFFFF' },
   },
 };
+
+// The `extensions` prop on EmailEditor REPLACES the package's defaults
+// (extensionsProp ?? [StarterKit, Placeholder, EmailTheming]) — it does not
+// extend them. Passing [MergeVariable] alone drops StarterKit's Document node
+// and crashes ProseMirror at construction ("Schema is missing its top node
+// type ('doc')"), and silently kills the theme/placeholder props, which are
+// only consumed inside the default branch. So the full default set is rebuilt
+// here explicitly, with MergeVariable appended.
+export const EDITOR_EXTENSIONS = [
+  StarterKit.configure(),
+  Placeholder.configure({ placeholder: 'Write the reminder…', includeChildren: true }),
+  EmailTheming.configure({ theme: NOBC_EDITOR_THEME }),
+  MergeVariable,
+];
 
 export default function NoBCEmailEditor({
   initialContent,
@@ -133,9 +149,7 @@ export default function NoBCEmailEditor({
         <EmailEditor
           ref={editorRef}
           content={initialContent as Content}
-          theme={NOBC_EDITOR_THEME}
-          extensions={[MergeVariable]}
-          placeholder="Write the reminder…"
+          extensions={EDITOR_EXTENSIONS}
           onReady={(ref) => {
             editorRef.current = ref;
             scheduleCompose(ref);
