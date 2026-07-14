@@ -120,7 +120,7 @@ const EASTER_EGGS: string[] = [
   '↑↑↓↓←→←→BA on any page (Void theme) — 3-second white-out flash',
   'Click applicant name 3× fast in review panel — full-screen founder message',
   'Approve an application (Rosé theme) — confetti on approval',
-  'Idle 60s (Obsidian theme) — ambient whisper',
+  'Type "curated" anywhere (any theme), or idle 60s on Obsidian - ambient whisper',
   'Switch to AIM theme — away message banner (Settings → Theme)',
   'Switch to MySpace theme — now playing banner (Settings → Theme)',
   'Type "frogger" on /apply — playable game',
