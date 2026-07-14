@@ -9,6 +9,7 @@ import type {
 } from '@/lib/dev/qa-types';
 import { QAMissionPanel } from './QAMissionPanel';
 import { isDevUser } from '@/lib/dev-users';
+import { WHISPER_PLAY_EVENT } from './ObsidianIdleEgg';
 
 // Exported so external openers (e.g. Settings → Developer) can persist the
 // open flag and dispatch the open event without duplicating the magic strings.
@@ -1209,6 +1210,24 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
                     {egg}
                   </div>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event(WHISPER_PLAY_EVENT))}
+                  style={{
+                    alignSelf: 'flex-start',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: '#b9a7e8',
+                    fontSize: 10,
+                    lineHeight: '1.6',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: 2,
+                  }}
+                >
+                  ▶ play the whisper line now
+                </button>
               </div>
             </div>
 

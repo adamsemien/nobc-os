@@ -377,9 +377,11 @@
   font-family: var(--font-cormorant), Georgia, serif;
   font-weight: 300;
   font-style: italic;
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 0.04em;
-  color: rgba(201, 168, 76, 0.55);
+  /* Gold pulled toward each theme's text color so the line reads on cream
+     and dark alike - the old flat 55% gold vanished on light themes. */
+  color: color-mix(in oklab, rgb(201 168 76) 55%, var(--text-primary));
   pointer-events: none;
   z-index: 9999;
   animation: obs-whisper 4s ease-in-out forwards;

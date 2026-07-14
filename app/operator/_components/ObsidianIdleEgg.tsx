@@ -1,25 +1,41 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from './ThemeToggle';
 
-/** The whisper line, two ways in:
- *  - Idle: Obsidian theme + 60s of stillness, once per page load (original).
+/** The whisper line, three ways in:
  *  - Typed: spell "curated" anywhere in the operator tool, outside a text
- *    field, on any theme, repeatable - the Back Room's knock pattern, so the
- *    line is actually reachable on demand. */
+ *    field, on any theme, repeatable. The listener rides the CAPTURE phase
+ *    so no other handler can swallow the keys first, and non-letter keys
+ *    (Shift, arrows, pauses) are ignored rather than resetting the word -
+ *    only focusing a text field clears it.
+ *  - Clicked: the DevToolbar's egg list dispatches WHISPER_PLAY_EVENT.
+ *  - Idle: Obsidian theme + 60s of stillness, once per page load (original).
+ *  Re-triggers restart the fade (keyed remount), never stack timers. */
+export const WHISPER_PLAY_EVENT = 'nobc:play-whisper';
 const WORD = 'curated';
 
 export function ObsidianIdleEgg() {
   const { theme } = useTheme();
-  const [visible, setVisible] = useState(false);
-  const visibleRef = useRef(false);
-  visibleRef.current = visible;
+  const [showCount, setShowCount] = useState(0);
   const shownRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // The typed way in. Same field/modifier guards as the Back Room knock so
-  // normal typing in inputs never triggers it; letters only, rolling buffer.
+  const show = useCallback(() => {
+    setShowCount((n) => n + 1);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setShowCount(0), 4000);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    },
+    [],
+  );
+
+  // The typed way in.
   useEffect(() => {
     let buffer = '';
     const onKey = (e: KeyboardEvent) => {
@@ -35,32 +51,35 @@ export function ObsidianIdleEgg() {
         buffer = '';
         return;
       }
-      if (!/^[a-z]$/i.test(e.key)) {
-        buffer = '';
-        return;
-      }
+      if (!/^[a-z]$/i.test(e.key)) return;
       buffer = (buffer + e.key.toLowerCase()).slice(-WORD.length);
-      if (buffer === WORD && !visibleRef.current) {
+      if (buffer === WORD) {
         buffer = '';
-        setVisible(true);
-        setTimeout(() => setVisible(false), 4000);
+        show();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [show]);
 
+  // The clicked way in (DevToolbar egg list).
+  useEffect(() => {
+    const onPlay = () => show();
+    window.addEventListener(WHISPER_PLAY_EVENT, onPlay);
+    return () => window.removeEventListener(WHISPER_PLAY_EVENT, onPlay);
+  }, [show]);
+
+  // The idle way in (original).
   useEffect(() => {
     if (theme !== 'obsidian') return;
     if (shownRef.current) return;
 
     const reset = () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       if (shownRef.current) return;
-      timerRef.current = setTimeout(() => {
+      idleTimerRef.current = setTimeout(() => {
         shownRef.current = true;
-        setVisible(true);
-        setTimeout(() => setVisible(false), 4000);
+        show();
       }, 60_000);
     };
 
@@ -69,15 +88,15 @@ export function ObsidianIdleEgg() {
     reset();
 
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       events.forEach((e) => window.removeEventListener(e, reset));
     };
-  }, [theme]);
+  }, [theme, show]);
 
-  if (!visible) return null;
+  if (showCount === 0) return null;
 
   return (
-    <p className="obs-idle-whisper" aria-hidden="true">
+    <p key={showCount} className="obs-idle-whisper" aria-hidden="true">
       the room is always being curated.
     </p>
   );
