@@ -11,6 +11,11 @@ export default defineConfig({
   // emails/GuestAccessConfirmation.tsx via the apply submit route) fails at
   // collection. Match Next's automatic JSX runtime.
   oxc: { jsx: { runtime: 'automatic' } },
+  // Inline empty PostCSS config: stops Vite from loading postcss.config.mjs
+  // (Tailwind 4's plugin shape breaks in the vitest context) when a test
+  // imports a module that side-imports CSS, e.g. NoBCEmailEditor's editor
+  // stylesheets. Tests never need real CSS output.
+  css: { postcss: { plugins: [] } },
   test: {
     include: ['tests/unit/**/*.test.ts'],
     environment: 'node',

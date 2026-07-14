@@ -1,7 +1,21 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, Eye, HelpCircle } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { ChevronDown, Eye, HelpCircle, Send } from 'lucide-react';
+
+import { flatten, interpolate } from '@/lib/email-interpolate';
+import { SAMPLE_EMAIL_DATA } from '@/lib/email-sample-data';
+import type { ComposedEmail } from './NoBCEmailEditor';
+
+// Rich editor slice: event.reminder only until proven. The other templates
+// stay on the plain string editor below.
+const RICH_EDITOR_TEMPLATE_KEYS = new Set(['event.reminder']);
+
+// TipTap is browser-only.
+const NoBCEmailEditor = dynamic(() => import('./NoBCEmailEditor'), { ssr: false });
+
+const SAMPLE_FLAT = flatten(SAMPLE_EMAIL_DATA);
 
 function HelpTipInline({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -39,6 +53,7 @@ export type TemplateRow = {
   bodyHtml: string;
   bodyText: string;
   variables: unknown;
+  editorConfig: unknown;
   enabled: boolean;
   updatedAt: string;
 };
@@ -93,15 +108,19 @@ export function CommunicationsEditor({
 }
 
 function TemplateCard({ initial }: { initial: TemplateRow }) {
+  const isRich = RICH_EDITOR_TEMPLATE_KEYS.has(initial.key);
   const [open, setOpen] = useState(false);
   const [enabled, setEnabled] = useState(initial.enabled);
   const [subject, setSubject] = useState(initial.subject);
   const [bodyHtml, setBodyHtml] = useState(initial.bodyHtml);
   const [bodyText, setBodyText] = useState(initial.bodyText);
+  const [editorConfig, setEditorConfig] = useState<unknown>(initial.editorConfig);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testStatus, setTestStatus] = useState<string | null>(null);
 
   const vars = useMemo(() => variableList(initial.variables), [initial.variables]);
 
@@ -118,6 +137,9 @@ function TemplateCard({ initial }: { initial: TemplateRow }) {
           bodyHtml: next.bodyHtml ?? bodyHtml,
           bodyText: next.bodyText ?? bodyText,
           enabled: next.enabled ?? enabled,
+          // Rich-editor saves persist the TipTap doc alongside the rendered
+          // bodies; string-editor saves omit it entirely.
+          ...(isRich && editorConfig != null ? { editorConfig } : {}),
         }),
       });
       if (!res.ok) {
@@ -129,6 +151,33 @@ function TemplateCard({ initial }: { initial: TemplateRow }) {
       setError(e instanceof Error ? e.message : 'Could not save');
     } finally {
       setSaving(false);
+    }
+  }
+
+  function onDocumentChange(composed: ComposedEmail) {
+    setBodyHtml(composed.html);
+    setBodyText(composed.text);
+    setEditorConfig(composed.editorConfig);
+  }
+
+  // Renders with sample data to the signed-in operator's own email - the
+  // server resolves the recipient from the session, never from this call.
+  async function sendTest() {
+    setSendingTest(true);
+    setTestStatus(null);
+    try {
+      const res = await fetch('/api/operator/settings/communications/send-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateKey: initial.key }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { to?: string; error?: string };
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Could not send test');
+      setTestStatus(`Test sent to ${data.to ?? 'your email'}`);
+    } catch (e) {
+      setTestStatus(e instanceof Error ? e.message : 'Could not send test');
+    } finally {
+      setSendingTest(false);
     }
   }
 
@@ -198,25 +247,41 @@ function TemplateCard({ initial }: { initial: TemplateRow }) {
             />
           </Field>
 
-          <Field label="HTML body">
-            <textarea
-              value={bodyHtml}
-              onChange={(e) => setBodyHtml(e.target.value)}
-              rows={6}
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-            />
-          </Field>
+          {isRich ? (
+            <Field label="Body">
+              <NoBCEmailEditor
+                initialContent={
+                  initial.editorConfig != null
+                    ? (initial.editorConfig as Record<string, unknown>)
+                    : initial.bodyHtml
+                }
+                variables={vars}
+                onDocumentChange={onDocumentChange}
+              />
+            </Field>
+          ) : (
+            <>
+              <Field label="HTML body">
+                <textarea
+                  value={bodyHtml}
+                  onChange={(e) => setBodyHtml(e.target.value)}
+                  rows={6}
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                />
+              </Field>
 
-          <Field label="Plain text body">
-            <textarea
-              value={bodyText}
-              onChange={(e) => setBodyText(e.target.value)}
-              rows={5}
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-            />
-          </Field>
+              <Field label="Plain text body">
+                <textarea
+                  value={bodyText}
+                  onChange={(e) => setBodyText(e.target.value)}
+                  rows={5}
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                />
+              </Field>
+            </>
+          )}
 
-          {vars.length > 0 ? (
+          {!isRich && vars.length > 0 ? (
             <div>
               <div className="mb-1.5 text-[11px] uppercase tracking-[0.08em] font-medium text-text-secondary">
                 Variables — click to insert
@@ -263,6 +328,18 @@ function TemplateCard({ initial }: { initial: TemplateRow }) {
                 <Eye className="h-3.5 w-3.5" aria-hidden />
                 {previewOpen ? 'Hide preview' : 'Preview'}
               </button>
+              {isRich ? (
+                <button
+                  type="button"
+                  onClick={() => void sendTest()}
+                  disabled={sendingTest}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-primary hover:border-primary hover:text-primary disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" aria-hidden />
+                  {sendingTest ? 'Sending…' : 'Send test to my email'}
+                </button>
+              ) : null}
+              {testStatus ? <span className="text-xs text-text-muted">{testStatus}</span> : null}
               <div className="text-xs text-text-muted">
                 {error ? (
                   <span className="text-danger">{error}</span>
@@ -284,12 +361,31 @@ function TemplateCard({ initial }: { initial: TemplateRow }) {
           </div>
 
           {previewOpen ? (
-            <div className="rounded-md border border-border bg-page p-4">
-              <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-text-muted">Subject</div>
-              <p className="mb-4 text-sm font-medium text-text-primary">{subject}</p>
-              <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-text-muted">Preview</div>
-              <div className="prose prose-sm max-w-none text-sm text-text-primary" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
-            </div>
+            isRich ? (
+              // Preview = send: the same html the send path would dispatch, run
+              // through the SAME interpolator with the shared sample data, in a
+              // fully sandboxed iframe (no scripts). Live-updates as she types.
+              <div className="rounded-md border border-border bg-page p-4">
+                <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-text-muted">Subject</div>
+                <p className="mb-4 text-sm font-medium text-text-primary">{interpolate(subject, SAMPLE_FLAT)}</p>
+                <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-text-muted">
+                  Preview — sample data
+                </div>
+                <iframe
+                  sandbox=""
+                  title="Email preview"
+                  className="h-[480px] w-full rounded-md border border-border bg-white"
+                  srcDoc={interpolate(bodyHtml, SAMPLE_FLAT)}
+                />
+              </div>
+            ) : (
+              <div className="rounded-md border border-border bg-page p-4">
+                <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-text-muted">Subject</div>
+                <p className="mb-4 text-sm font-medium text-text-primary">{subject}</p>
+                <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-text-muted">Preview</div>
+                <div className="prose prose-sm max-w-none text-sm text-text-primary" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+              </div>
+            )
           ) : null}
         </div>
       ) : null}
