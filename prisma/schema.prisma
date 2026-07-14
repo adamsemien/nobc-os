@@ -162,6 +162,11 @@ model EmailTemplate {
   bodyHtml    String    @db.Text
   bodyText    String    @db.Text
   variables   Json
+  /// TipTap editor document for templates authored in the rich email editor
+  /// (event.reminder slice). Source of truth for re-editing; bodyHtml/bodyText
+  /// stay the rendered targets the send path reads. Null = template still on
+  /// the plain string editor. Column applied out-of-band by Adam (additive SQL).
+  editorConfig Json?
   enabled     Boolean   @default(true)
   updatedAt   DateTime  @updatedAt
   updatedBy   String?
