@@ -6,7 +6,7 @@ import {
   Html,
   Preview,
   Text,
-} from '@react-email/components';
+} from 'react-email';
 import * as React from 'react';
 
 export default function WaitlistEmail({ name }: { name: string }) {
@@ -64,7 +64,7 @@ const paragraph: React.CSSProperties = {
 };
 
 const divider: React.CSSProperties = {
-  borderColor: '#e8e4dc',
+  borderTop: '1px solid #e8e4dc',
   margin: '40px 0 32px',
 };
 
