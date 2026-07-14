@@ -7,7 +7,7 @@ import {
   Html,
   Preview,
   Text,
-} from 'react-email';
+} from '@react-email/components';
 import * as React from 'react';
 import { archetypeDisplayName } from '@/config/archetypes';
 
@@ -117,7 +117,7 @@ const cta: React.CSSProperties = {
 };
 
 const divider: React.CSSProperties = {
-  borderTop: '1px solid #e8e4dc',
+  borderColor: '#e8e4dc',
   margin: '40px 0 32px',
 };
 

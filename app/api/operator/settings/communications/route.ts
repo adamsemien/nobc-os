@@ -1,5 +1,4 @@
 import { auth } from '@clerk/nextjs/server';
-import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -28,7 +27,6 @@ export async function GET() {
         bodyHtml: true,
         bodyText: true,
         variables: true,
-        editorConfig: true,
         enabled: true,
         updatedAt: true,
       },
@@ -46,14 +44,9 @@ export async function GET() {
 const TemplatePatchSchema = z.object({
   id: z.string(),
   subject: z.string().trim().min(1).max(200),
-  // 200k: rich-editor output is table-layout HTML, far more verbose than the
-  // hand-written string templates the old 60k cap was sized for.
-  bodyHtml: z.string().min(1).max(200_000),
+  bodyHtml: z.string().min(1).max(60_000),
   bodyText: z.string().min(1).max(60_000),
   enabled: z.boolean(),
-  // TipTap document from the rich editor (event.reminder slice). Optional and
-  // additive: the plain string editor never sends it.
-  editorConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -80,11 +73,6 @@ export async function PATCH(req: NextRequest) {
       bodyText: parsed.data.bodyText,
       enabled: parsed.data.enabled,
       updatedBy: userId,
-      // Only rich-editor saves carry editorConfig; string-editor saves omit it
-      // and must not clobber a previously saved document.
-      ...(parsed.data.editorConfig !== undefined
-        ? { editorConfig: parsed.data.editorConfig as Prisma.InputJsonValue }
-        : {}),
     },
   });
 

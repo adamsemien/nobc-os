@@ -10,9 +10,8 @@
 import { db } from './db';
 import { resend } from './resend';
 import { DEFAULT_EMAIL_TEMPLATES } from './email-templates-defaults';
-import { flatten, interpolate } from './email-interpolate';
 
-export type { EmailVariables } from './email-interpolate';
+export type EmailVariables = Record<string, string | number | null | undefined>;
 
 export type SendResult =
   | { ok: true; messageId?: string }
@@ -47,8 +46,31 @@ export async function sendBlastEmail(args: {
   return { id: send.data?.id ?? null };
 }
 
-// flatten() + interpolate() moved verbatim to lib/email-interpolate.ts so the
-// communications preview and this send path share ONE interpolator.
+/** Flatten {member: {firstName: 'X'}} → {'member.firstName': 'X'} so callers can
+ *  pass nested objects too. */
+function flatten(obj: Record<string, unknown>, prefix = ''): EmailVariables {
+  const out: EmailVariables = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date)) {
+      Object.assign(out, flatten(v as Record<string, unknown>, key));
+    } else if (v instanceof Date) {
+      out[key] = v.toISOString();
+    } else if (v == null) {
+      out[key] = '';
+    } else {
+      out[key] = v as string | number;
+    }
+  }
+  return out;
+}
+
+function interpolate(input: string, vars: EmailVariables): string {
+  return input.replace(/\{\{\s*([a-zA-Z0-9._]+)\s*\}\}/g, (_, key: string) => {
+    const v = vars[key];
+    return v == null ? '' : String(v);
+  });
+}
 
 async function loadTemplate(workspaceId: string, key: string) {
   const row = await db.emailTemplate.findUnique({

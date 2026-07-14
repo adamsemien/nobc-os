@@ -6,7 +6,7 @@ import {
   Html,
   Preview,
   Text,
-} from 'react-email';
+} from '@react-email/components';
 import * as React from 'react';
 
 export default function EventCancelledEmail({
@@ -89,7 +89,7 @@ const paragraph: React.CSSProperties = {
 };
 
 const divider: React.CSSProperties = {
-  borderTop: '1px solid #e8e4dc',
+  borderColor: '#e8e4dc',
   margin: '40px 0 32px',
 };
 

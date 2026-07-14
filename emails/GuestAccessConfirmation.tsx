@@ -18,7 +18,7 @@ import {
   Img,
   Preview,
   Text,
-} from 'react-email';
+} from '@react-email/components';
 import * as React from 'react';
 import { render } from '@react-email/render';
 import { resend } from '@/lib/resend';
@@ -218,7 +218,7 @@ const qrImage: React.CSSProperties = {
 };
 
 const divider: React.CSSProperties = {
-  borderTop: '1px solid #D4C4B4',
+  borderColor: '#D4C4B4',
   margin: '32px 0',
 };
 
