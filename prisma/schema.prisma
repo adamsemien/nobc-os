@@ -2767,3 +2767,12 @@ model SuppressionEntry {
   @@index([memberId])
   @@index([personId])
 }
+
+// Chloe's application-quiz review tool (/review/application). One JSON document
+// keyed "main" — the Questions tab autosaves the whole review state here.
+model ApplicationReviewState {
+  id        String   @id @default(cuid())
+  key       String   @unique @default("main")
+  data      Json
+  updatedAt DateTime @updatedAt
+}

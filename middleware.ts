@@ -6,6 +6,7 @@ const isProtectedRoute = createRouteMatcher([
   '/onboarding(.*)',
   '/check-in(.*)',
   '/qa-panel(.*)',
+  '/review(.*)',
 ]);
 
 // Clerk validates the session token's `azp` (authorized party) claim against this
