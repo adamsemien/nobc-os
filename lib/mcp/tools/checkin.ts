@@ -63,7 +63,7 @@ export const checkinTools: McpTool[] = [
       const rsvp = args.rsvpId
         ? await db.rSVP.findFirst({
             where: { id: args.rsvpId, workspaceId: ctx.workspaceId },
-            select: { id: true, checkedIn: true, checkedInAt: true, eventId: true },
+            select: { id: true, checkedIn: true, checkedInAt: true, eventId: true, ticketStatus: true },
           })
         : await db.rSVP.findFirst({
             where: {
@@ -71,10 +71,17 @@ export const checkinTools: McpTool[] = [
               eventId: args.eventId,
               member: { memberQrCode: args.memberQrCode },
             },
-            select: { id: true, checkedIn: true, checkedInAt: true, eventId: true },
+            select: { id: true, checkedIn: true, checkedInAt: true, eventId: true, ticketStatus: true },
           });
 
       if (!rsvp) throw new Error('RSVP not found or not in this workspace');
+      // Same gate the door PWA enforces (/api/check-in/[rsvpId]): only confirmed
+      // or held tickets may check in, regardless of how the RSVP was resolved.
+      if (!['confirmed', 'held'].includes(rsvp.ticketStatus)) {
+        throw new Error(
+          `RSVP is not eligible for check-in (ticket status: ${rsvp.ticketStatus}) - only confirmed or held tickets can be checked in`,
+        );
+      }
       if (rsvp.checkedIn) {
         return { rsvpId: rsvp.id, checkedIn: true, checkedInAt: rsvp.checkedInAt, alreadyCheckedIn: true };
       }
