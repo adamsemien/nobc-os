@@ -72,7 +72,9 @@ export async function resolveBlastRecipients(
           lastName: true,
           phone: true,
           marketingEmailOptIn: true,
+          marketingEmailOptInAt: true,
           marketingSmsOptIn: true,
+          marketingSmsOptInAt: true,
           // Deliberately NOT selected: redListed. ACCESS never touches CHANNEL.
         },
       },

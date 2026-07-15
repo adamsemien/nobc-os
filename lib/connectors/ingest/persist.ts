@@ -293,14 +293,18 @@ export async function executePersist(
   // Person-spine-visible before the import route responds. Non-fatal per item: the
   // CRM spine must never turn an otherwise-successful import into a failed one.
   for (const item of plan.items) {
-    if (item.action !== 'create') continue;
     const memberId = memberIdByContactIndex[item.contactIndex];
     if (!memberId) continue;
-    await linkPersonSpine(db, workspaceId, memberId, item);
-    // Consent floor (reconciliation Phase 1): every imported contact gets
-    // visible, fail-closed PENDING ChannelSubscription rows through the single
-    // writer — never sendable until an explicit signal arrives. After the spine
-    // link so the person keying lands too. Fire-and-forget (self-catching).
+    if (item.action === 'create') {
+      await linkPersonSpine(db, workspaceId, memberId, item);
+    }
+    // Consent floor (reconciliation Phase 1): every imported contact — created
+    // OR attached — re-converges through the single writer. Creates get
+    // visible, fail-closed PENDING ChannelSubscription rows (never sendable
+    // until an explicit signal arrives); attaches re-converge the existing
+    // member's cluster so an attach never leaves consent keyings divergent.
+    // After the spine link so the person keying lands too. Fire-and-forget
+    // (self-catching).
     void syncMemberChannelConsent({ workspaceId, memberId, context: 'import' });
   }
 
