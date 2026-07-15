@@ -24,10 +24,12 @@ const KNOCK = 'knockknock';
 const DOOR_MS = 4300;
 
 /** Typed word that jumps STRAIGHT into The Line (the door-line runner) -
- *  no knock, no door cinematic - plus the DevToolbar's click-to-play event
- *  for the same. Exiting the game lands you in the room. */
+ *  no knock, no door cinematic - plus the DevToolbar's click-to-play events
+ *  for the room and both games. Exiting a game lands you in the room. */
 const LINE_WORD = 'theline';
 export const THELINE_PLAY_EVENT = 'nobc:play-theline';
+export const LASTCALL_PLAY_EVENT = 'nobc:play-lastcall';
+export const BACKROOM_OPEN_EVENT = 'nobc:open-backroom';
 
 type Phase = 'closed' | 'door' | 'room' | 'game' | 'theline' | 'lightsout';
 
@@ -268,26 +270,36 @@ export function BackRoomEasterEgg() {
     setPhase('door');
   }, []);
 
-  /** Straight to The Line - skips the knock and the door cinematic. Used by
-   *  the typed word and the DevToolbar play button; audio still initializes
-   *  so the game keeps its sfx and the room its record on exit. */
-  const openTheLine = useCallback(() => {
+  /** Straight to a phase - skips the knock and the door cinematic. Used by
+   *  the typed word and the DevToolbar play buttons; audio still initializes
+   *  so the games keep their sfx and the room its record on exit. */
+  const openInto = useCallback((target: 'room' | 'game' | 'theline') => {
     if (phaseRef.current !== 'closed') {
-      setPhase('theline');
+      setPhase(target);
       return;
     }
     restoreFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     audioRef.current = createBackRoomAudio();
-    setPhase('theline');
+    setPhase(target);
   }, []);
 
-  // The DevToolbar's click-to-play for The Line.
+  const openTheLine = useCallback(() => openInto('theline'), [openInto]);
+
+  // The DevToolbar's click-to-play events: The Line, Last Call, the room.
   useEffect(() => {
-    const onPlay = () => openTheLine();
-    window.addEventListener(THELINE_PLAY_EVENT, onPlay);
-    return () => window.removeEventListener(THELINE_PLAY_EVENT, onPlay);
-  }, [openTheLine]);
+    const onLine = () => openInto('theline');
+    const onLastCall = () => openInto('game');
+    const onRoom = () => open();
+    window.addEventListener(THELINE_PLAY_EVENT, onLine);
+    window.addEventListener(LASTCALL_PLAY_EVENT, onLastCall);
+    window.addEventListener(BACKROOM_OPEN_EVENT, onRoom);
+    return () => {
+      window.removeEventListener(THELINE_PLAY_EVENT, onLine);
+      window.removeEventListener(LASTCALL_PLAY_EVENT, onLastCall);
+      window.removeEventListener(BACKROOM_OPEN_EVENT, onRoom);
+    };
+  }, [openInto, open]);
 
   // The secret knock — letters typed anywhere outside an editable field.
   useEffect(() => {

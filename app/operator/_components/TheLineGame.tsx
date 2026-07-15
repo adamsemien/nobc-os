@@ -92,7 +92,7 @@ interface RunState {
   entities: Entity[];
   nextSpawnZ: number;
   shake: number;
-  flashes: { x: number; y: number; t: number; good: boolean }[];
+  flashes: { x: number; y: number; t: number; good: boolean; streak?: boolean }[];
   playerX: number; // rendered x, eased toward lane center
 }
 
@@ -169,6 +169,30 @@ function resolveTokens(el: HTMLElement) {
   };
 }
 
+type Rgb = [number, number, number];
+
+/** Resolve any CSS color string to numeric RGB so the scene can mix its own
+ *  shades (shadows, glows, glass, brass) from the theme tokens - still zero
+ *  raw hex in this file. */
+function toRgb(el: HTMLElement, color: string): Rgb {
+  const prev = el.style.color;
+  el.style.color = color;
+  const m = getComputedStyle(el).color.match(/\d+(\.\d+)?/g);
+  el.style.color = prev;
+  const [r = 0, g = 0, b = 0] = (m ?? []).map(Number);
+  return [r, g, b];
+}
+
+const mixRgb = (a: Rgb, b: Rgb, t: number): Rgb => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
+const cssRgb = (c: Rgb, alpha = 1) =>
+  `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${alpha})`;
+const BLACK: Rgb = [0, 0, 0];
+const WHITE: Rgb = [255, 255, 255];
+
 export function TheLineGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
   const [mode, setMode] = useState<'briefing' | 'run' | 'between' | 'report'>('briefing');
   const [best, setBest] = useState<number | null>(null);
@@ -241,7 +265,10 @@ export function TheLineGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
     if (target) {
       target.cleared = true;
       s.score += 40;
-      if (!reducedRef.current) s.flashes.push({ x: target.lane, y: target.z, t: 0.3, good: true });
+      if (!reducedRef.current) {
+        s.flashes.push({ x: target.lane, y: target.z, t: 0.3, good: true });
+        s.flashes.push({ x: target.lane, y: target.z, t: 0.22, good: true, streak: true });
+      }
       sfx?.pluck();
     }
   }, [sfx]);
@@ -281,9 +308,84 @@ export function TheLineGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
     canvas.height = cssH * dpr;
     ctx.scale(dpr, dpr);
 
-    const laneX = (lane: number) => cssW * (0.2 + lane * 0.3);
+    // Numeric RGB for every token so the scene can mix its own shades.
+    const RGB = {
+      bg: toRgb(canvas, tokens.bg),
+      surface: toRgb(canvas, tokens.surface),
+      text: toRgb(canvas, tokens.text),
+      muted: toRgb(canvas, tokens.muted),
+      accent: toRgb(canvas, tokens.accent),
+      good: toRgb(canvas, tokens.good),
+      border: toRgb(canvas, tokens.border),
+    };
+    const brass = mixRgb(RGB.accent, WHITE, 0.45);
+    const warm = mixRgb(RGB.accent, WHITE, 0.6);
+
+    const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
+    /** Perspective: everything converges toward the door as z grows. */
+    const PINCH = 0.7;
+    const depthAt = (z: number) => 1 - PINCH * clamp01(z / 34);
+    const laneXAt = (lane: number, z: number) => {
+      const bottom = cssW * (0.2 + lane * 0.3);
+      return cssW / 2 + (bottom - cssW / 2) * depthAt(z);
+    };
+    const ropeXAt = (i: number, z: number) => {
+      const bottom = cssW * (0.05 + i * 0.3);
+      return cssW / 2 + (bottom - cssW / 2) * depthAt(z);
+    };
     /** World z → screen y with a mild pseudo-depth squeeze. */
     const zToY = (z: number) => cssH * 0.82 - (z / 34) * cssH * 0.78;
+
+    const roundRectPath = (x: number, y: number, w: number, h: number, r: number) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    };
+    const groundShadow = (x: number, y: number, rx: number, ry: number, a: number) => {
+      ctx.fillStyle = cssRgb(BLACK, a);
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    /** Readable label chip - dark pill, bright text, never below 10px. */
+    const pill = (x: number, y: number, label: string, edge: Rgb, depth: number) => {
+      const size = Math.max(10, Math.round(12 * Math.max(depth, 0.72)));
+      ctx.font = `700 ${size}px ui-sans-serif, system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const w = ctx.measureText(label).width + 16;
+      const h = size + 10;
+      ctx.fillStyle = cssRgb(mixRgb(RGB.bg, BLACK, 0.45), 0.88);
+      roundRectPath(x - w / 2, y - h / 2, w, h, h / 2);
+      ctx.fill();
+      ctx.strokeStyle = cssRgb(edge, 0.9);
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.fillStyle = cssRgb(mixRgb(RGB.text, WHITE, 0.2));
+      ctx.fillText(label, x, y + 0.5);
+    };
+    /** A little silhouette person: head + shoulders, rimmed in light. */
+    const figure = (x: number, feetY: number, h: number, fill: Rgb, rim: Rgb | null) => {
+      const headR = h * 0.16;
+      const shoulder = h * 0.34;
+      ctx.fillStyle = cssRgb(fill);
+      ctx.beginPath();
+      ctx.moveTo(x - shoulder, feetY);
+      ctx.quadraticCurveTo(x - shoulder, feetY - h * 0.62, x - headR * 1.1, feetY - h * 0.68);
+      ctx.arc(x, feetY - h * 0.78, headR, Math.PI, 0);
+      ctx.quadraticCurveTo(x + shoulder, feetY - h * 0.62, x + shoulder, feetY);
+      ctx.closePath();
+      ctx.fill();
+      if (rim) {
+        ctx.strokeStyle = cssRgb(rim, 0.7);
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+    };
 
     let last = performance.now();
     let hudAcc = 0;
@@ -360,87 +462,259 @@ export function TheLineGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
       // --- draw ---
       ctx.save();
       if (s.shake > 0) ctx.translate((rand() - 0.5) * s.shake * 14, (rand() - 0.5) * s.shake * 14);
-      ctx.fillStyle = tokens.bg;
+
+      // Night street: dark at the feet, a breath of warmth toward the door.
+      const sky = ctx.createLinearGradient(0, 0, 0, cssH);
+      sky.addColorStop(0, cssRgb(mixRgb(RGB.bg, RGB.accent, 0.12)));
+      sky.addColorStop(0.35, cssRgb(RGB.bg));
+      sky.addColorStop(1, cssRgb(mixRgb(RGB.bg, BLACK, 0.5)));
+      ctx.fillStyle = sky;
       ctx.fillRect(-8, -8, cssW + 16, cssH + 16);
 
-      // Lane ropes
-      ctx.strokeStyle = tokens.border;
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 4; i++) {
-        const x = cssW * (0.05 + i * 0.3);
+      const doorScale = Math.min(1, s.dist / len + 0.15);
+      const doorX = cssW / 2;
+      const doorTop = cssH * 0.025;
+      const dw = 46 + 78 * doorScale;
+      const dh = 30 + 44 * doorScale;
+
+      // Light pooling out of the club and down the street.
+      const pool = ctx.createRadialGradient(doorX, doorTop + dh, 6, doorX, doorTop + dh, cssH * 0.6);
+      pool.addColorStop(0, cssRgb(warm, 0.1 + 0.16 * doorScale));
+      pool.addColorStop(1, cssRgb(warm, 0));
+      ctx.fillStyle = pool;
+      ctx.fillRect(0, 0, cssW, cssH);
+
+      // Dark building masses outside the ropes.
+      for (const side of [0, 3] as const) {
+        ctx.fillStyle = cssRgb(mixRgb(RGB.bg, BLACK, 0.4), 0.9);
         ctx.beginPath();
-        ctx.moveTo(x, cssH * 0.04);
-        ctx.lineTo(x, cssH * 0.9);
-        ctx.stroke();
+        const edgeX = side === 0 ? -8 : cssW + 8;
+        ctx.moveTo(edgeX, zToY(-2));
+        ctx.lineTo(ropeXAt(side, 0), zToY(0));
+        ctx.lineTo(ropeXAt(side, 34), zToY(34));
+        ctx.lineTo(edgeX, zToY(34));
+        ctx.closePath();
+        ctx.fill();
       }
 
-      // The door, growing as you approach
-      const doorScale = Math.min(1, s.dist / len + 0.15);
-      ctx.fillStyle = tokens.surface;
-      const dw = 60 * doorScale + 20;
-      ctx.fillRect(cssW / 2 - dw / 2, cssH * 0.02, dw, 26 * doorScale + 8);
-      ctx.fillStyle = tokens.accent;
-      ctx.font = `${9 + 4 * doorScale}px ui-sans-serif, system-ui`;
-      ctx.textAlign = 'center';
-      ctx.fillText('THE DOOR', cssW / 2, cssH * 0.02 + 17 * doorScale + 6);
+      // The red carpet running the center lane to the door.
+      ctx.fillStyle = cssRgb(RGB.accent, 0.09);
+      ctx.beginPath();
+      ctx.moveTo(doorX - dw * 0.3, doorTop + dh);
+      ctx.lineTo(doorX + dw * 0.3, doorTop + dh);
+      ctx.lineTo(laneXAt(1, 0) + cssW * 0.1, zToY(0) + 24);
+      ctx.lineTo(laneXAt(1, 0) - cssW * 0.1, zToY(0) + 24);
+      ctx.closePath();
+      ctx.fill();
 
-      // Entities
-      for (const e of s.entities) {
-        const y = zToY(Math.max(e.z, -2));
-        const x = laneX(e.lane);
+      // The door itself: warm doorway, awning, bouncer.
+      ctx.fillStyle = cssRgb(mixRgb(RGB.bg, BLACK, 0.55));
+      ctx.fillRect(doorX - dw / 2 - 5, doorTop - 3, dw + 10, dh + 6);
+      const doorway = ctx.createLinearGradient(0, doorTop, 0, doorTop + dh);
+      doorway.addColorStop(0, cssRgb(warm, 0.95));
+      doorway.addColorStop(1, cssRgb(warm, 0.35));
+      ctx.fillStyle = doorway;
+      ctx.fillRect(doorX - dw / 2, doorTop, dw, dh);
+      ctx.fillStyle = cssRgb(mixRgb(RGB.bg, BLACK, 0.5), 0.85);
+      ctx.fillRect(doorX + dw * 0.08, doorTop, dw * 0.42, dh); // door panel, ajar
+      ctx.fillStyle = cssRgb(brass);
+      ctx.beginPath();
+      ctx.arc(doorX + dw * 0.13, doorTop + dh * 0.55, Math.max(1.5, 2.4 * doorScale), 0, Math.PI * 2);
+      ctx.fill();
+      // Awning with scalloped edge.
+      const awnH = 10 + 12 * doorScale;
+      ctx.fillStyle = cssRgb(RGB.accent);
+      ctx.beginPath();
+      ctx.moveTo(doorX - dw * 0.8, doorTop - 2);
+      ctx.lineTo(doorX - dw * 0.55, doorTop - awnH);
+      ctx.lineTo(doorX + dw * 0.55, doorTop - awnH);
+      ctx.lineTo(doorX + dw * 0.8, doorTop - 2);
+      ctx.closePath();
+      ctx.fill();
+      const scallops = 5;
+      for (let i = 0; i < scallops; i++) {
+        const sx = doorX - dw * 0.8 + ((i + 0.5) * dw * 1.6) / scallops;
+        ctx.beginPath();
+        ctx.arc(sx, doorTop - 2, (dw * 1.6) / scallops / 2, 0, Math.PI);
+        ctx.fill();
+      }
+      if (doorScale > 0.35) {
+        ctx.fillStyle = cssRgb(WHITE, 0.92);
+        ctx.font = `700 ${Math.max(8, Math.round(11 * doorScale))}px ui-sans-serif, system-ui`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('THE BACK ROOM', doorX, doorTop - awnH / 2 - 1);
+      }
+      // The bouncer, unimpressed, beside the door.
+      figure(doorX + dw * 0.82, doorTop + dh + 2, dh * 0.68, mixRgb(RGB.bg, BLACK, 0.42), mixRgb(RGB.text, RGB.bg, 0.5));
+
+      // Velvet ropes on brass stanchions, scrolling with the world.
+      const postSpacing = 8;
+      const phase = s.dist % postSpacing;
+      for (let i = 0; i < 4; i++) {
+        let prev: { x: number; y: number } | null = null;
+        for (let pz = postSpacing - phase; pz <= 34; pz += postSpacing) {
+          const d = depthAt(pz);
+          const bx = ropeXAt(i, pz);
+          const by = zToY(pz);
+          const h = 17 * d;
+          // post
+          ctx.strokeStyle = cssRgb(mixRgb(RGB.text, RGB.bg, 0.55));
+          ctx.lineWidth = Math.max(1, 2 * d);
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(bx, by - h);
+          ctx.stroke();
+          ctx.fillStyle = cssRgb(brass);
+          ctx.beginPath();
+          ctx.arc(bx, by - h, Math.max(1.4, 2.6 * d), 0, Math.PI * 2);
+          ctx.fill();
+          // rope back to the previous post, sagging
+          if (prev) {
+            const midD = depthAt(pz - postSpacing / 2);
+            ctx.strokeStyle = cssRgb(RGB.accent, 0.16);
+            ctx.lineWidth = Math.max(3, 7 * midD);
+            ctx.beginPath();
+            ctx.moveTo(prev.x, prev.y);
+            ctx.quadraticCurveTo((prev.x + bx) / 2, (prev.y + by - h) / 2 + 9 * midD, bx, by - h);
+            ctx.stroke();
+            ctx.strokeStyle = cssRgb(mixRgb(RGB.accent, BLACK, 0.15), 0.9);
+            ctx.lineWidth = Math.max(1.2, 2.6 * midD);
+            ctx.stroke();
+          }
+          prev = { x: bx, y: by - h };
+        }
+      }
+
+      // Entities, far to near so nearer things overdraw.
+      for (const e of [...s.entities].sort((a, b) => b.z - a.z)) {
+        const z = Math.max(e.z, -2);
+        const y = zToY(z);
+        const x = laneXAt(e.lane, z);
         const depth = Math.max(0.35, 1 - e.z / 40);
         if (e.kind === 'gate') {
-          ctx.globalAlpha = e.used ? 0.25 : depth;
-          ctx.strokeStyle = e.good ? tokens.good : tokens.accent;
-          ctx.lineWidth = 2;
-          const w = cssW * 0.24 * depth;
+          ctx.globalAlpha = e.used ? 0.22 : 1;
+          const w = cssW * 0.26 * depth;
+          const edge = e.good ? RGB.good : RGB.accent;
+          const postH = 15 * depth;
+          for (const gx of [x - w / 2, x + w / 2]) {
+            ctx.strokeStyle = cssRgb(mixRgb(RGB.text, RGB.bg, 0.55));
+            ctx.lineWidth = Math.max(1, 2 * depth);
+            ctx.beginPath();
+            ctx.moveTo(gx, y);
+            ctx.lineTo(gx, y - postH);
+            ctx.stroke();
+            ctx.fillStyle = cssRgb(brass);
+            ctx.beginPath();
+            ctx.arc(gx, y - postH, Math.max(1.4, 2.4 * depth), 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.strokeStyle = cssRgb(mixRgb(RGB.accent, BLACK, 0.1), 0.9);
+          ctx.lineWidth = Math.max(1.2, 2.4 * depth);
           ctx.beginPath();
-          ctx.moveTo(x - w / 2, y);
-          ctx.quadraticCurveTo(x, y + 10 * depth, x + w / 2, y);
+          ctx.moveTo(x - w / 2, y - postH);
+          ctx.quadraticCurveTo(x, y - postH + 8 * depth, x + w / 2, y - postH);
           ctx.stroke();
-          ctx.fillStyle = e.good ? tokens.good : tokens.accent;
-          ctx.font = `${Math.max(7, 10 * depth)}px ui-sans-serif, system-ui`;
-          ctx.fillText(e.label, x, y - 6 * depth);
+          ctx.save();
+          ctx.shadowColor = cssRgb(edge, 0.8);
+          ctx.shadowBlur = 12 * depth;
+          pill(x, y - postH + 8 * depth + (Math.max(10, 12 * Math.max(depth, 0.72)) + 10) / 2 + 3, e.label, edge, depth);
+          ctx.restore();
+          ctx.globalAlpha = 1;
         } else if (!e.cleared) {
-          ctx.globalAlpha = depth;
-          ctx.fillStyle = tokens.muted;
-          const r = 9 * depth;
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = tokens.text;
-          ctx.font = `${Math.max(6, 8 * depth)}px ui-sans-serif, system-ui`;
-          ctx.fillText(e.label, x, y - r - 4);
+          groundShadow(x, y + 3 * depth, 14 * depth, 3.6 * depth, 0.35);
+          figure(x, y + 2 * depth, 30 * depth, mixRgb(RGB.bg, BLACK, 0.32), RGB.accent);
+          pill(x, y - 36 * depth, e.label, mixRgb(RGB.accent, WHITE, 0.2), depth);
         }
-        ctx.globalAlpha = 1;
       }
 
-      // Impact / gate flashes (token-colored, suppressed under reduced motion)
-      for (const f of s.flashes) {
-        ctx.globalAlpha = Math.max(0, f.t / 0.35) * 0.5;
-        ctx.fillStyle = f.good ? tokens.good : tokens.accent;
-        ctx.beginPath();
-        ctx.arc(laneX(f.x), zToY(f.y), 26 * (1 - f.t / 0.35) + 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-
-      // Player + crew dots trailing
+      // Player position (needed by streaks before the player draws).
       const px = cssW * (0.2 + s.playerX * 0.6);
       const py = cssH * 0.84;
+
+      // Flashes: vibe streaks, then bursts with particles.
+      for (const f of s.flashes) {
+        const c = f.good ? RGB.good : RGB.accent;
+        if (f.streak) {
+          const pT = Math.max(0, f.t / 0.22);
+          const tx = laneXAt(f.x, f.y);
+          const ty = zToY(f.y);
+          ctx.strokeStyle = cssRgb(mixRgb(c, WHITE, 0.4), pT * 0.9);
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(px, py - 14);
+          ctx.lineTo(tx, ty);
+          ctx.stroke();
+          ctx.fillStyle = cssRgb(WHITE, pT);
+          ctx.beginPath();
+          ctx.arc(tx, ty, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          continue;
+        }
+        const life = Math.max(0, f.t / 0.35);
+        const pT = 1 - life;
+        const fx = laneXAt(f.x, f.y);
+        const fy = zToY(f.y);
+        const burst = ctx.createRadialGradient(fx, fy, 1, fx, fy, 10 + 34 * pT);
+        burst.addColorStop(0, cssRgb(mixRgb(c, WHITE, 0.5), life * 0.8));
+        burst.addColorStop(1, cssRgb(c, 0));
+        ctx.fillStyle = burst;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 10 + 34 * pT, 0, Math.PI * 2);
+        ctx.fill();
+        for (let j = 0; j < 7; j++) {
+          const ang = (j / 7) * Math.PI * 2 + f.x * 1.3;
+          const dist = 6 + 40 * pT;
+          ctx.fillStyle = cssRgb(mixRgb(c, WHITE, 0.35), life);
+          ctx.beginPath();
+          ctx.arc(fx + Math.cos(ang) * dist, fy + Math.sin(ang) * dist * 0.6, 3 * life + 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // The doorman (you) and the crew trailing behind.
+      const glow = ctx.createRadialGradient(px, py + 8, 2, px, py + 8, 30);
+      glow.addColorStop(0, cssRgb(RGB.accent, 0.28));
+      glow.addColorStop(1, cssRgb(RGB.accent, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(px, py + 8, 30, 0, Math.PI * 2);
+      ctx.fill();
+      groundShadow(px, py + 15, 18, 4.5, 0.4);
       const blink = s.iframes > 0 && Math.floor(now / 90) % 2 === 0;
       if (!blink) {
-        ctx.fillStyle = tokens.text;
+        figure(px, py + 14, 34, mixRgb(RGB.bg, WHITE, 0.3), mixRgb(RGB.text, WHITE, 0.1));
+        // shirt + clipboard: the uniform of the door.
+        ctx.fillStyle = cssRgb(WHITE, 0.85);
         ctx.beginPath();
-        ctx.arc(px, py, 10, 0, Math.PI * 2);
+        ctx.moveTo(px - 3.5, py - 9);
+        ctx.lineTo(px + 3.5, py - 9);
+        ctx.lineTo(px, py - 2);
+        ctx.closePath();
         ctx.fill();
+        ctx.save();
+        ctx.translate(px + 11, py + 2);
+        ctx.rotate(0.16);
+        ctx.fillStyle = cssRgb(WHITE, 0.8);
+        ctx.fillRect(-3.5, -5, 7, 10);
+        ctx.strokeStyle = cssRgb(RGB.accent, 0.9);
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-3.5, -5, 7, 10);
+        ctx.restore();
       }
-      ctx.fillStyle = tokens.muted;
       for (let i = 0; i < Math.min(s.crew, 12); i++) {
-        ctx.beginPath();
-        ctx.arc(px + Math.sin(i * 2.1) * 16, py + 16 + i * 7, 4, 0, Math.PI * 2);
-        ctx.fill();
+        const bx = px + Math.sin(i * 2.4) * 20;
+        const by = py + 18 + i * 7 + Math.sin(now / 280 + i * 1.7) * 1.6;
+        figure(bx, by + 8, 16, mixRgb(RGB.text, RGB.bg, 0.45), null);
       }
+      if (s.crew > 12) pill(px, py + 18 + 12 * 7 + 16, `+${s.crew - 12} MORE`, RGB.muted, 1);
+
+      // Bottom vignette so the street sinks into the dark.
+      const vig = ctx.createLinearGradient(0, cssH * 0.86, 0, cssH);
+      vig.addColorStop(0, cssRgb(BLACK, 0));
+      vig.addColorStop(1, cssRgb(BLACK, 0.42));
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, cssH * 0.86, cssW, cssH * 0.14);
       ctx.restore();
 
       // HUD sync (cheap state write ~4x/sec)

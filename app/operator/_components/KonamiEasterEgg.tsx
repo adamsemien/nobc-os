@@ -6,10 +6,22 @@ import { useEffect, useState } from 'react';
  * Konami code (↑↑↓↓←→←→BA) → a 3-second white-out flash, but only while the
  * Void theme is active. Mounted globally in the operator layout so the sequence
  * is listenable on any operator page (it previously lived inside ApplicationsQueue
- * and only fired on /operator/applications).
+ * and only fired on /operator/applications). The DevToolbar egg menu can fire
+ * the flash directly, on any theme, via KONAMI_PLAY_EVENT.
  */
+export const KONAMI_PLAY_EVENT = 'nobc:play-konami';
+
 export function KonamiEasterEgg() {
   const [voidInverted, setVoidInverted] = useState(false);
+
+  useEffect(() => {
+    const onPlay = () => {
+      setVoidInverted(true);
+      setTimeout(() => setVoidInverted(false), 3000);
+    };
+    window.addEventListener(KONAMI_PLAY_EVENT, onPlay);
+    return () => window.removeEventListener(KONAMI_PLAY_EVENT, onPlay);
+  }, []);
 
   useEffect(() => {
     const sequence = [
