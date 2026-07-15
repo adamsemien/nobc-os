@@ -189,7 +189,7 @@ export async function POST(
       eventDate: event.startAt,
       eventLocation: event.location,
       rsvpId,
-      qrAvailable: Boolean(rsvpMember.memberQrCode),
+      qrAvailable: emailVariant === 'confirmed' ? Boolean(rsvpMember.memberQrCode) : false,
       workspaceId,
     }).catch((err) => {
       console.error('[public-submit] sendGuestAccessConfirmation failed', { rsvpId, err });

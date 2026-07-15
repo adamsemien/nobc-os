@@ -384,7 +384,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           eventDate: activeEvent.startAt,
           eventLocation: activeEvent.location,
           rsvpId: door1RsvpId,
-          qrAvailable: Boolean(door1MemberQrCode),
+          qrAvailable: member.status === MemberStatus.APPROVED ? Boolean(door1MemberQrCode) : false,
           workspaceId: application.workspaceId,
         };
       }
