@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useUser } from '@clerk/nextjs';
 import type { Persona, PersonaStep } from '@/lib/dev/persona-types';
 import type {
@@ -10,7 +10,10 @@ import type {
 import { QAMissionPanel } from './QAMissionPanel';
 import { isDevUser } from '@/lib/dev-users';
 import { WHISPER_PLAY_EVENT } from './ObsidianIdleEgg';
-import { THELINE_PLAY_EVENT } from './BackRoomEasterEgg';
+import { BACKROOM_OPEN_EVENT, LASTCALL_PLAY_EVENT, THELINE_PLAY_EVENT } from './BackRoomEasterEgg';
+import { KONAMI_PLAY_EVENT } from './KonamiEasterEgg';
+import { useTheme } from './ThemeToggle';
+import type { ThemeId } from '@/lib/theme';
 
 // Exported so external openers (e.g. Settings → Developer) can persist the
 // open flag and dispatch the open event without duplicating the magic strings.
@@ -118,22 +121,86 @@ const SHORTCUT_GROUPS: { label: string; rows: { keys: string[]; desc: string }[]
   },
 ];
 
-const EASTER_EGGS: string[] = [
-  '↑↑↓↓←→←→BA on any page (Void theme) — 3-second white-out flash',
-  'Click applicant name 3× fast in review panel — full-screen founder message',
-  'Approve an application (Rosé theme) — confetti on approval',
-  'Type "curated" anywhere (any theme), or idle 60s on Obsidian - ambient whisper',
-  'Switch to AIM theme — away message banner (Settings → Theme)',
-  'Switch to MySpace theme — now playing banner (Settings → Theme)',
-  'Type "frogger" on /apply — playable game',
-  'Type "theline" anywhere - The Line, the door-line runner (straight into the game)',
-  'Type "knockknock" anywhere - The Back Room (the record, Last Call, The Line, kill the lights)',
+/** The egg menu: every easter egg with its real trigger AND a one-click way
+ *  in. Directions audited 2026-07-14 against the actual implementations. */
+type EggAction =
+  | { kind: 'event'; event: string; label: string }
+  | { kind: 'theme'; theme: ThemeId; label: string }
+  | { kind: 'link'; href: string; label: string };
+
+const EGG_MENU: { desc: string; action?: EggAction }[] = [
+  {
+    desc: 'The Line - type "theline" anywhere (focus outside a text field); straight into the door-line runner',
+    action: { kind: 'event', event: THELINE_PLAY_EVENT, label: 'play' },
+  },
+  {
+    desc: 'Last Call - inside the Back Room, the "Working the door tonight?" matchbook',
+    action: { kind: 'event', event: LASTCALL_PLAY_EVENT, label: 'play' },
+  },
+  {
+    desc: 'The Back Room - type "knockknock" (spaces fine) anywhere; on a phone: tap-tap, pause, tap-tap',
+    action: { kind: 'event', event: BACKROOM_OPEN_EVENT, label: 'knock' },
+  },
+  {
+    desc: 'Kill the lights - the switch inside the Back Room; drops the whole dashboard into Darkroom',
+    action: { kind: 'theme', theme: 'darkroom', label: 'toggle Darkroom' },
+  },
+  {
+    desc: 'The whisper - type "curated" anywhere, any theme; or hold still 60s on Obsidian',
+    action: { kind: 'event', event: WHISPER_PLAY_EVENT, label: 'play' },
+  },
+  {
+    desc: 'White-out - ↑↑↓↓←→←→BA on any operator page while the Void theme is active',
+    action: { kind: 'event', event: KONAMI_PLAY_EVENT, label: 'flash' },
+  },
+  {
+    desc: 'Founder message - triple-click the applicant name in the Applications review panel',
+  },
+  {
+    desc: 'Rosé confetti - approve an application on the Rosé theme (the Approve button itself bursts)',
+    action: { kind: 'theme', theme: 'rose', label: 'toggle Rosé' },
+  },
+  {
+    desc: 'Wax seal - open a top-tier scored application in the review panel on the Parchment theme',
+    action: { kind: 'theme', theme: 'parchment', label: 'toggle Parchment' },
+  },
+  {
+    desc: 'AIM away message - switch to the AIM theme',
+    action: { kind: 'theme', theme: 'aim', label: 'toggle AIM' },
+  },
+  {
+    desc: 'MySpace mode - switch to the MySpace theme',
+    action: { kind: 'theme', theme: 'myspace', label: 'toggle MySpace' },
+  },
+  {
+    desc: 'South Congress Frogger - on /apply, type "frogger" with focus outside a text field',
+    action: { kind: 'link', href: '/apply', label: 'open /apply' },
+  },
 ];
+
+const EGG_BTN_STYLE: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  color: '#b9a7e8',
+  fontSize: 10,
+  lineHeight: '1.6',
+  cursor: 'pointer',
+  textDecoration: 'underline',
+  textUnderlineOffset: 2,
+  whiteSpace: 'nowrap',
+};
 
 const ROOM_FLOURISHES = 'Arrival chime · sellout confetti · ✦ Purple-List VIP markers';
 
 export function DevToolbar({ workspaceId }: DevToolbarProps) {
   const { user, isLoaded } = useUser();
+  const { theme, setTheme } = useTheme();
+
+  const runEgg = (action: EggAction) => {
+    if (action.kind === 'event') window.dispatchEvent(new Event(action.event));
+    else if (action.kind === 'theme') setTheme(theme === action.theme ? 'nobc' : action.theme);
+  };
   const [open, setOpen] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -1207,48 +1274,33 @@ export function DevToolbar({ workspaceId }: DevToolbarProps) {
               <div style={{ color: '#7a6a8a', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>
                 Easter eggs
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {EASTER_EGGS.map((egg) => (
-                  <div key={egg} style={{ color: '#c4b8d4', fontSize: 10, lineHeight: '1.6' }}>
-                    {egg}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {EGG_MENU.map((egg) => (
+                  <div key={egg.desc} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                    <span style={{ flex: 1, color: '#c4b8d4', fontSize: 10, lineHeight: '1.6' }}>
+                      {egg.desc}
+                    </span>
+                    {egg.action &&
+                      (egg.action.kind === 'link' ? (
+                        <a
+                          href={egg.action.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={EGG_BTN_STYLE}
+                        >
+                          ▶ {egg.action.label}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => runEgg(egg.action!)}
+                          style={EGG_BTN_STYLE}
+                        >
+                          ▶ {egg.action.label}
+                        </button>
+                      ))}
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new Event(THELINE_PLAY_EVENT))}
-                  style={{
-                    alignSelf: 'flex-start',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    color: '#b9a7e8',
-                    fontSize: 10,
-                    lineHeight: '1.6',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    textUnderlineOffset: 2,
-                  }}
-                >
-                  ▶ play The Line now
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new Event(WHISPER_PLAY_EVENT))}
-                  style={{
-                    alignSelf: 'flex-start',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    color: '#b9a7e8',
-                    fontSize: 10,
-                    lineHeight: '1.6',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    textUnderlineOffset: 2,
-                  }}
-                >
-                  ▶ play the whisper line now
-                </button>
               </div>
             </div>
 
