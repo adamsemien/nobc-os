@@ -218,7 +218,7 @@ export function TheLineGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(BEST_KEY);
-      if (stored !== null) setBest(Number(stored) || 0);
+      if (stored !== null) setBest(Math.round(Number(stored) || 0));
     } catch {
       // localStorage unavailable — best score simply hidden
     }
@@ -226,7 +226,7 @@ export function TheLineGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
   }, []);
 
   const endGame = useCallback((s: RunState, reachedDoor: boolean) => {
-    const score = s.score;
+    const score = Math.round(s.score);
     setFinalScore(score);
     setMadeIt(reachedDoor);
     setMode('report');
@@ -618,13 +618,15 @@ export function TheLineGame({ sfx, onExit }: { sfx: Sfx; onExit: () => void }) {
           ctx.save();
           ctx.shadowColor = cssRgb(edge, 0.8);
           ctx.shadowBlur = 12 * depth;
-          pill(x, y - postH + 8 * depth + (Math.max(10, 12 * Math.max(depth, 0.72)) + 10) / 2 + 3, e.label, edge, depth);
+          // Plaques staggered per lane so paired gates never collide.
+          pill(x, y - postH + 8 * depth + (Math.max(10, 12 * Math.max(depth, 0.72)) + 10) / 2 + 3 + e.lane * 13 * depth, e.label, edge, depth);
           ctx.restore();
           ctx.globalAlpha = 1;
         } else if (!e.cleared) {
           groundShadow(x, y + 3 * depth, 14 * depth, 3.6 * depth, 0.35);
           figure(x, y + 2 * depth, 30 * depth, mixRgb(RGB.bg, BLACK, 0.32), RGB.accent);
-          pill(x, y - 36 * depth, e.label, mixRgb(RGB.accent, WHITE, 0.2), depth);
+          // Chips staggered per lane so same-row neighbors never overlap.
+          pill(x, y - (36 + e.lane * 15) * depth, e.label, mixRgb(RGB.accent, WHITE, 0.2), depth);
         }
       }
 
