@@ -93,6 +93,16 @@ export async function resolveMember(input: ResolveMemberInput): Promise<Resolved
     const canonical = await followMergedInto(existing);
     const withQr = await ensureQrCode(canonical);
     const personId = await attachPersonSpine(withQr, input);
+    // Consent floor: re-converge through the single writer on EVERY resolve of
+    // an existing member — an attachPersonSpine here may have just linked a
+    // Person, and consent keyed to it must converge (same unconditional
+    // pattern as lib/applications/approve.ts). Fire-and-forget + idempotent.
+    void syncMemberChannelConsent({
+      workspaceId,
+      memberId: withQr.id,
+      personId,
+      context: 'member_create',
+    });
     return personId && !withQr.personId ? { ...withQr, personId } : withQr;
   }
 
