@@ -14,6 +14,7 @@ import { AimEasterEgg } from './_components/AimEasterEgg';
 import { MyspaceEasterEgg } from './_components/MyspaceEasterEgg';
 import { KonamiEasterEgg } from './_components/KonamiEasterEgg';
 import { BackRoomEasterEgg } from './_components/BackRoomEasterEgg';
+import { FroggerEasterEgg } from './_components/FroggerEasterEgg';
 import { CommandPaletteProvider } from '@/components/command-palette/CommandPaletteProvider';
 import { CommandKPill } from '@/components/command-palette/CommandKPill';
 import { CountsProvider } from '@/components/counts/CountsProvider';
@@ -102,6 +103,7 @@ export default async function OperatorLayout({
         <MyspaceEasterEgg />
         <KonamiEasterEgg />
         <BackRoomEasterEgg />
+        <FroggerEasterEgg />
         <CommandKPill />
         <OperatorTopBar />
         <HelpPanel />
