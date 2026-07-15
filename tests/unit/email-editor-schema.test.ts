@@ -31,6 +31,24 @@ describe('event.reminder editor schema', () => {
     expect(schema.nodes.mergeVariable).toBeDefined();
   });
 
+  // Pins the Phase 1 recon finding: formatting marks were ALREADY registered
+  // by the package StarterKit (Cmd+B bolded before any toolbar existed). If a
+  // future extensions change drops one, the bubble menu goes dead silently.
+  it('EDITOR_EXTENSIONS registers the formatting marks the bubble menu drives', () => {
+    const schema = getSchema(EDITOR_EXTENSIONS);
+    for (const mark of ['bold', 'italic', 'underline', 'strike', 'link']) {
+      expect(schema.marks[mark], `mark "${mark}"`).toBeDefined();
+    }
+  });
+
+  // The image node arrives via EmailEditor's onUploadImage prop (the package
+  // appends it to the extension list at runtime), NOT via EDITOR_EXTENSIONS -
+  // its absence here is expected and correct.
+  it('EDITOR_EXTENSIONS itself carries no image node (onUploadImage adds it)', () => {
+    const schema = getSchema(EDITOR_EXTENSIONS);
+    expect(schema.nodes.image).toBeUndefined();
+  });
+
   it('EmailTheming is configured with the real NoBC theme, not left unthemed', () => {
     const theming = EDITOR_EXTENSIONS.find((ext) => ext.name === 'theming');
     expect(theming).toBeDefined();
