@@ -12,6 +12,7 @@ import { isDevUser } from '@/lib/dev-users';
 import { WHISPER_PLAY_EVENT } from './ObsidianIdleEgg';
 import { BACKROOM_OPEN_EVENT, LASTCALL_PLAY_EVENT, THELINE_PLAY_EVENT } from './BackRoomEasterEgg';
 import { KONAMI_PLAY_EVENT } from './KonamiEasterEgg';
+import { FROGGER_PLAY_EVENT } from './FroggerEasterEgg';
 import { useTheme } from './ThemeToggle';
 import type { ThemeId } from '@/lib/theme';
 
@@ -174,7 +175,7 @@ const EGG_MENU: { desc: string; action?: EggAction }[] = [
   },
   {
     desc: 'South Congress Frogger - on /apply, type "frogger" with focus outside a text field',
-    action: { kind: 'link', href: '/apply', label: 'open /apply' },
+    action: { kind: 'event', event: FROGGER_PLAY_EVENT, label: 'play' },
   },
 ];
 
