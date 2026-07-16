@@ -74,8 +74,6 @@ test('operator completes paid event via comp bypass — "You\'re on the list"', 
     }
   });
 
-  await page.context().tracing.start({ screenshots: true, snapshots: true });
-
   try {
     // ── Step 1: Navigate to the ticketed event ───────────────────────────────
     await page.goto(`/m/events/${TICKETED_EVENT_SLUG}`);
@@ -138,12 +136,6 @@ test('operator completes paid event via comp bypass — "You\'re on the list"', 
     console.error('[comp-ticket] Console errors:', consoleErrors);
     console.error('[comp-ticket] Failed API requests:', failedApis);
     throw err;
-  } finally {
-    const traceDir = path.join(process.cwd(), 'test-results');
-    mkdirSync(traceDir, { recursive: true });
-    await page.context().tracing.stop({
-      path: path.join(traceDir, `comp-ticket-trace_${Date.now()}.zip`),
-    });
   }
 });
 

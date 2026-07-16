@@ -65,8 +65,6 @@ test('member registers for open event — "Reserve My Spot" → "You\'re on the 
     }
   });
 
-  await page.context().tracing.start({ screenshots: true, snapshots: true });
-
   try {
     // ── Step 1: Navigate to the event page ──────────────────────────────────
     await page.goto(`/m/events/${EVENT_SLUG}`);
@@ -122,12 +120,6 @@ test('member registers for open event — "Reserve My Spot" → "You\'re on the 
     console.error('[open-event] Console errors:', consoleErrors);
     console.error('[open-event] Failed API requests:', failedApis);
     throw err;
-  } finally {
-    const traceDir = path.join(process.cwd(), 'test-results');
-    mkdirSync(traceDir, { recursive: true });
-    await page.context().tracing.stop({
-      path: path.join(traceDir, `open-event-trace_${Date.now()}.zip`),
-    });
   }
 });
 

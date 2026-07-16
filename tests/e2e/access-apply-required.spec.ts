@@ -67,8 +67,6 @@ test('member applies to approval-required event — "Apply to Attend" → pendin
     }
   });
 
-  await page.context().tracing.start({ screenshots: true, snapshots: true });
-
   try {
     // ── Step 1: Navigate to the event page ──────────────────────────────────
     await page.goto(`/m/events/${EVENT_SLUG}`);
@@ -127,12 +125,6 @@ test('member applies to approval-required event — "Apply to Attend" → pendin
     console.error('[apply-event] Console errors:', consoleErrors);
     console.error('[apply-event] Failed API requests:', failedApis);
     throw err;
-  } finally {
-    const traceDir = path.join(process.cwd(), 'test-results');
-    mkdirSync(traceDir, { recursive: true });
-    await page.context().tracing.stop({
-      path: path.join(traceDir, `apply-event-trace_${Date.now()}.zip`),
-    });
   }
 });
 
