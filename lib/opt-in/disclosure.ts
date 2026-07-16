@@ -22,14 +22,34 @@
  * marketing traffic. Terms are legal copy; escalated, not touched.
  */
 
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
+
 export const DISCLOSURE_VERSION = 'v1';
 
 /** Build the exact disclosure text for this version. Deterministic within a
- *  deploy: same env, same string — render and submit see identical text. */
+ *  deploy: same env, same string — render and submit see identical text.
+ *
+ *  The env var stays E.164 (the Twilio send path depends on it); only the
+ *  RENDER is display-formatted here — a valid NANPA (+1) number becomes
+ *  "(844) 393-0889"; non-US or unparseable input passes through verbatim.
+ *
+ *  THROWS when the number is null/empty: a disclosure that cannot identify
+ *  the sender must not render at all. Both call sites are server-side, so
+ *  this surfaces as a 500 — never a silently broken legal artifact. */
 export function buildDisclosureText(marketingNumber: string | null): string {
-  const fromNumber = marketingNumber?.trim()
-    ? marketingNumber.trim()
-    : 'the number these messages come from';
+  const trimmed = marketingNumber?.trim();
+  if (!trimmed) {
+    throw new Error(
+      'buildDisclosureText: MARKETING_TWILIO_PHONE_NUMBER is unset — the SMS disclosure cannot identify its sender and must not render.',
+    );
+  }
+  // countryCallingCode, not country: toll-free +1 numbers are NANPA-shared and
+  // libphonenumber often cannot pin them to 'US' specifically.
+  const parsed = parsePhoneNumberFromString(trimmed);
+  const fromNumber =
+    parsed && parsed.countryCallingCode === '1' && parsed.isValid()
+      ? parsed.formatNational()
+      : trimmed;
   return (
     'By checking this box, I agree to receive recurring marketing and event text messages ' +
     '(e.g. event invitations, announcements, and reminders) from No Bad Company at the phone ' +
