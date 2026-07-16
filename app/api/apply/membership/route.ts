@@ -14,6 +14,7 @@ import {
   signApplyDraftToken,
 } from '@/lib/apply-draft-token';
 import { emailSchema, phoneSchema, shortText, answersMap, normalizePhone } from '@/lib/validation';
+import { scalarsFromAnswers } from '@/lib/apply/promote-answers';
 
 /** JSON `{ id }` response that also sets the httpOnly draft-access cookie, so
  *  only the creating browser can later GET/PATCH/submit this draft. */
@@ -123,6 +124,13 @@ export async function POST(req: NextRequest) {
             upsertAnswer(existingPending.id, questionKey, String(answer ?? '')),
           ),
         );
+        // Scalar promotion (write path): the reuse branch previously never
+        // touched the typed columns — promote parseable contact scalars from
+        // the carried answers so the reused draft converges too.
+        const scalars = scalarsFromAnswers(answers);
+        if (Object.keys(scalars).length > 0) {
+          await db.application.update({ where: { id: existingPending.id }, data: scalars });
+        }
       }
       await stampApplicationOwner(existingPending.id, userId);
       return draftCreated(existingPending.id);
@@ -176,6 +184,9 @@ export async function POST(req: NextRequest) {
         referredBy: referredBy ?? null,
         consentEmail: false,
         consentSms: false,
+        // Scalar promotion (write path): answers carried on create win over the
+        // body fields when parseable — one normalizer (toE164) on the answers path.
+        ...scalarsFromAnswers(answers),
       },
       select: { id: true },
     });
@@ -208,6 +219,12 @@ export async function POST(req: NextRequest) {
               upsertAnswer(raced.id, questionKey, String(answer ?? '')),
             ),
           );
+          // Scalar promotion (write path): mirror the reuse branch — the raced
+          // row must converge from carried answers too.
+          const scalars = scalarsFromAnswers(answers);
+          if (Object.keys(scalars).length > 0) {
+            await db.application.update({ where: { id: raced.id }, data: scalars });
+          }
         }
         await stampApplicationOwner(raced.id, userId);
         return draftCreated(raced.id);

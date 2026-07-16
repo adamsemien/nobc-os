@@ -8,6 +8,7 @@ import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-tok
 import { isApplicationAccountOwner } from '@/lib/apply-account-link';
 import { emailSchema, phoneSchema, shortText, answersMap, normalizePhone } from '@/lib/validation';
 import { structuredConsentWrites, getConsentIp } from '@/lib/apply-consent';
+import { scalarsFromAnswers } from '@/lib/apply/promote-answers';
 
 const ID_RE = /^[a-z0-9_-]{8,40}$/i;
 
@@ -152,6 +153,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (fields.referredBy !== undefined) updateData.referredBy = fields.referredBy;
   if (fields.consentEmail !== undefined) updateData.consentEmail = fields.consentEmail;
   if (fields.consentSms !== undefined) updateData.consentSms = fields.consentSms;
+
+  // Scalar promotion (write path): typed columns converge from the raw answers
+  // on every save — cell → phone (E.164, promote-on-parse-only, so a partial
+  // autosaved number never clobbers a good one), homeAddress.city → city. The
+  // answers themselves are stored raw below, unchanged.
+  Object.assign(updateData, scalarsFromAnswers(answers));
 
   // PHASE B dual-write: derive the structured consent columns from the same
   // booleans written above. Legacy consentEmail/consentSms writes are unchanged.

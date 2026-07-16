@@ -7,6 +7,7 @@
  *  events. */
 import { MemberStatus, type Application, type AuditActorType, type Member } from '@prisma/client';
 import { db } from '@/lib/db';
+import { promoteApplicationScalars, type PromotedScalars } from '@/lib/apply/promote-answers';
 import { resolveMember } from '@/lib/member-identity';
 import { ACTIVE_EVENT_ID } from '@/lib/active-event';
 import { emitEvent } from '@/lib/emit-event';
@@ -43,6 +44,18 @@ export async function approveApplication(params: {
 
   const now = new Date();
 
+  // Scalar promotion (read path): approval must not depend on the typed
+  // columns being fresh — promote from ApplicationAnswer at decision time
+  // (heals the row) and use the promoted contact values below. Fail-soft:
+  // enrichment must never fail the approval.
+  let promoted: PromotedScalars = { phone: null, city: null, zip: null };
+  try {
+    promoted = await promoteApplicationScalars(app.id);
+  } catch (err) {
+    console.error(`[approve] scalar promotion failed for application ${app.id}:`, err);
+  }
+  const applicantPhone = promoted.phone ?? app.phone ?? undefined;
+
   // Check before resolve so we can emit member.created vs nothing.
   const existingMember = await db.member.findUnique({
     where: { workspaceId_email: { workspaceId, email: app.email } },
@@ -57,7 +70,7 @@ export async function approveApplication(params: {
     email: app.email,
     name: app.fullName,
     clerkUserId: `applicant:${app.id}`,
-    phone: app.phone ?? undefined,
+    phone: applicantPhone,
     source: 'approval',
   });
 
@@ -77,6 +90,38 @@ export async function approveApplication(params: {
       data: { status: MemberStatus.APPROVED, approved: true, approvedAt: now },
     }),
   ]);
+
+  // Contact enrichment (read path, fill-if-empty only): resolveMember writes
+  // phone ONLY when it mints a new Member — the existing-member path (the
+  // normal case, since Door 1 mints the GUEST at submit) drops it. Fill the
+  // Member row here, and carry phone + home ZIP onto the Person spine
+  // (Person.postalCode is otherwise written only by the SMS opt-in page —
+  // fill-if-empty never fights it). Never fails the approval.
+  try {
+    if (applicantPhone) {
+      await db.member.updateMany({
+        where: { id: member.id, OR: [{ phone: null }, { phone: '' }] },
+        data: { phone: applicantPhone },
+      });
+    }
+    const personId = app.personId ?? member.personId;
+    if (personId && (applicantPhone || promoted.zip)) {
+      const person = await db.person.findUnique({
+        where: { id: personId },
+        select: { phone: true, postalCode: true },
+      });
+      if (person) {
+        const personFill: { phone?: string; postalCode?: string } = {};
+        if (applicantPhone && !person.phone) personFill.phone = applicantPhone;
+        if (promoted.zip && !person.postalCode) personFill.postalCode = promoted.zip;
+        if (Object.keys(personFill).length > 0) {
+          await db.person.update({ where: { id: personId }, data: personFill });
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[approve] contact enrichment failed for application ${app.id}:`, err);
+  }
 
   await emitEvent({
     workspaceId,
