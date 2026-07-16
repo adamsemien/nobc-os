@@ -10,6 +10,7 @@ import { MemberStatus } from '@prisma/client';
 import { maybeFireSlack } from '@/lib/comments-notify';
 import { backupApplication } from '@/lib/applications/backup';
 import { auth } from '@clerk/nextjs/server';
+import { promoteApplicationScalars } from '@/lib/apply/promote-answers';
 import { publicRateLimit } from '@/lib/public-rate-limit';
 import { APPLY_DRAFT_COOKIE, verifyApplyDraftToken } from '@/lib/apply-draft-token';
 import { isApplicationAccountOwner } from '@/lib/apply-account-link';
@@ -96,6 +97,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ blocked: true, cached: true });
   }
 
+  // ── Scalar promotion (read path) ──────────────────────────────────────
+  // Promote answers → typed columns BEFORE the phone consumers below
+  // (checkDuplicate, checkWatchList, Door 1 resolveMember): a draft saved
+  // before the write-path promotion deployed must not submit with a stale
+  // null phone. Fail-soft — promotion must never block a submission.
+  let applicantPhone: string | null = application.phone;
+  try {
+    const promoted = await promoteApplicationScalars(application.id, application.answers);
+    // The promotion derives from the LATEST answers and was just persisted —
+    // it wins over the stale scalar loaded above; fall back to the scalar
+    // only when no answer parsed.
+    applicantPhone = promoted.phone ?? application.phone;
+  } catch (e) {
+    console.error('[promote-answers] submit-time promotion failed', {
+      applicationId: id,
+      err: e instanceof Error ? e.message : String(e),
+    });
+  }
+
   // ── Atomic once-only guard ────────────────────────────────────────────
   // Concurrent submits for the same draft (two tabs, a network retry, a replayed or
   // account-relinked cookie) would each pass the idempotency guard above while aiScore
@@ -157,7 +177,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const isDuplicate = await checkDuplicate(
     application.workspaceId,
     application.email,
-    application.phone,
+    applicantPhone,
     application.id,
   );
   if (isDuplicate) {
@@ -177,7 +197,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const watchMatch = await checkWatchList(
     application.workspaceId,
     application.email,
-    application.phone,
+    applicantPhone,
     null, // Instagram not yet captured as an explicit form field
   );
 
@@ -212,7 +232,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       email: application.email,
       name: application.fullName,
       clerkUserId: `app_${application.id}`,
-      phone: application.phone ?? undefined,
+      phone: applicantPhone ?? undefined,
       source: 'apply_purple',
     });
     const member = await promoteMemberToApproved(resolved.id, { approvedAt: now });
@@ -335,7 +355,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         email: application.email,
         name: application.fullName,
         clerkUserId: `app_${application.id}`,
-        phone: application.phone ?? undefined,
+        phone: applicantPhone ?? undefined,
         source: 'apply',
       });
       door1MemberQrCode = member.memberQrCode;
