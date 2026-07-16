@@ -100,7 +100,7 @@ describe('classifyBinding', () => {
 
 describe('disclosure block', () => {
   it('carries every mandated element', () => {
-    const text = buildDisclosureText('(844) 555-0100');
+    const text = buildDisclosureText('+18443930889');
     expect(text).toContain('No Bad Company');
     expect(text).toContain('recurring marketing and event text messages');
     expect(text).toContain('Message frequency varies');
@@ -108,12 +108,27 @@ describe('disclosure block', () => {
     expect(text).toContain('Reply STOP to cancel, HELP for help');
     expect(text).toContain('/terms');
     expect(text).toContain('/privacy');
-    expect(text).toContain('(844) 555-0100');
     expect(text).toContain('not a condition of any purchase or membership');
   });
 
+  it('renders a US E.164 number in display format', () => {
+    expect(buildDisclosureText('+18443930889')).toContain('sent from (844) 393-0889.');
+    expect(buildDisclosureText('+18443930889')).not.toContain('+18443930889');
+  });
+
+  it('throws when the number is unset — a disclosure without a sender must not render', () => {
+    expect(() => buildDisclosureText(null)).toThrow(/MARKETING_TWILIO_PHONE_NUMBER/);
+    expect(() => buildDisclosureText('')).toThrow(/MARKETING_TWILIO_PHONE_NUMBER/);
+    expect(() => buildDisclosureText('   ')).toThrow(/MARKETING_TWILIO_PHONE_NUMBER/);
+  });
+
+  it('passes non-US or unparseable input through verbatim, never throwing', () => {
+    expect(buildDisclosureText('+442071838750')).toContain('sent from +442071838750.');
+    expect(buildDisclosureText('not-a-number')).toContain('sent from not-a-number.');
+  });
+
   it('is deterministic and versioned', () => {
-    expect(buildDisclosureText('x')).toBe(buildDisclosureText('x'));
+    expect(buildDisclosureText('+18443930889')).toBe(buildDisclosureText('+18443930889'));
     expect(DISCLOSURE_VERSION).toBe('v1');
   });
 });
