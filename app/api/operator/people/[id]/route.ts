@@ -72,7 +72,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
  *    MemberEngagementEvent → personId SET NULL; person-only events (no
  *      memberId) are deleted in the same transaction so no double-null
  *      orphans remain
- *    other Persons' potentialDuplicateOfId → SET NULL (their flag clears) */
+ *    other Persons' potentialDuplicateOfId → SET NULL (their flag clears)
+ *    ConsentArtifact → RESTRICT (guarded above with a 409 — TCPA consent
+ *      evidence is never deletable) */
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const gate = await requireRole(OperatorRole.ADMIN);
   if (!gate.ok) return gate.response;
@@ -81,7 +83,9 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
 
   const person = await db.person.findFirst({
     where: { id, workspaceId },
-    include: { _count: { select: { members: true, applications: true, mergedFrom: true } } },
+    include: {
+      _count: { select: { members: true, applications: true, mergedFrom: true, consentArtifacts: true } },
+    },
   });
   if (!person) return NextResponse.json({ error: 'Person not found.' }, { status: 404 });
 
@@ -109,6 +113,15 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   if (person._count.applications > 0) {
     return NextResponse.json(
       { error: 'This person has an application on file — deletion is blocked.' },
+      { status: 409 },
+    );
+  }
+  // ConsentArtifact carries onDelete: Restrict — without this guard the delete
+  // below would surface a raw Prisma P2003 (500) instead of this clean refusal.
+  // Consent evidence outlives tidiness (TCPA retention).
+  if (person._count.consentArtifacts > 0) {
+    return NextResponse.json(
+      { error: 'This person has SMS consent records on file — consent evidence cannot be deleted.' },
       { status: 409 },
     );
   }

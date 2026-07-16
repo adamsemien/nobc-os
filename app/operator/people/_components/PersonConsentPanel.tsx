@@ -17,6 +17,7 @@ const STATUS_LABEL: Record<SubscriptionStatus, string> = {
 
 const BASIS_LABEL: Record<ConsentBasis, string> = {
   EXPRESS_OPTIN: 'Express opt-in',
+  EXPRESS_WRITTEN: 'Express written (opt-in page)',
   IMPLIED_RELATIONSHIP: 'Implied (relationship)',
   IMPORTED_LEGACY: 'Imported (legacy)',
   OPERATOR_ADDED: 'Operator added',

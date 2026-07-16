@@ -97,6 +97,7 @@ model Workspace {
   // fields only; no columns on Workspace.
   channelSubscriptions ChannelSubscription[]
   suppressionEntries   SuppressionEntry[]
+  consentArtifacts     ConsentArtifact[]
 
   // Person-centric CRM spine (Phase 2A)
   persons             Person[]
@@ -281,6 +282,10 @@ model Person {
   phone         String?
   firstName     String?
   lastName      String?
+  /// Live postal code for quiet-hours timezone derivation (SMS opt-in page,
+  /// first-party). Nullable — legacy rows have none; the frozen, required copy
+  /// lives on ConsentArtifact.postalCode.
+  postalCode    String?
 
   /// Multi-valued CRM roles - same vocabulary as Member.roles.
   roles ContactRole[] @default([])
@@ -315,6 +320,7 @@ model Person {
   organizations        PersonOrganization[]
   channelSubscriptions ChannelSubscription[]
   suppressionEntries   SuppressionEntry[]
+  consentArtifacts     ConsentArtifact[]
   smsConversations     SmsConversation[]
   transactionalEmailLogs TransactionalEmailLog[]
 
@@ -2700,6 +2706,12 @@ enum SubscriptionStatus {
 
 enum ConsentBasis {
   EXPRESS_OPTIN
+  /// TCPA-grade prior express WRITTEN consent captured on our own web form with
+  /// the full disclosure block (SMS opt-in page). Distinct from EXPRESS_OPTIN,
+  /// which covers legacy checkbox/profile signals that carried no disclosure.
+  /// MIGRATION NOTE: ALTER TYPE ADD VALUE must ship as its OWN statement,
+  /// committed before anything references it — see prisma/sql/sms-optin-01-enum.sql.
+  EXPRESS_WRITTEN
   IMPLIED_RELATIONSHIP
   IMPORTED_LEGACY
   OPERATOR_ADDED
@@ -2771,6 +2783,68 @@ model SuppressionEntry {
   @@index([workspaceId, channel])
   @@index([memberId])
   @@index([personId])
+}
+
+/// How an SMS opt-in was bound to its Person — recorded evidence, never inference.
+enum ConsentBindingMethod {
+  /// Signed-token arrival; submitted E.164 matches the token Person's stored phone.
+  TOKEN_PHONE_MATCH
+  /// Signed-token arrival; the token Person had no phone on file (or a different
+  /// one) — the submitted number is new to them.
+  TOKEN_PHONE_NEW
+  /// Organic arrival, no token; Person resolved or minted via resolvePerson.
+  COLD
+}
+
+/// TCPA consent artifact (SMS opt-in page) — the IMMUTABLE, append-only evidence
+/// record of one express-written-consent act. ChannelSubscription is the live,
+/// mutable state; this row is what gets produced in a dispute. No update or
+/// delete path exists by design — the ONE permitted mutation is confirmedAt
+/// (null -> timestamp, once).
+///
+/// confirmedAt is a POSSESSION signal (an inbound reply proved a human holds
+/// the handset), NEVER a legal gate — status is SUBSCRIBED from the affirmative
+/// act; single opt-in is the legal basis. It flips ONLY on an inbound reply to
+/// the stage-2 confirmation SMS (deferred, blocked on toll-free verification) —
+/// never on a delivery callback: a DLR proves carrier acceptance, not a human.
+/// Deliverability state belongs on the message record, not here.
+///
+/// onDelete: Restrict on person is deliberate — consent evidence outlives
+/// tidiness, and the Person hard-delete route carries a matching 409 guard
+/// (app/api/operator/people/[id]/route.ts) so this never surfaces as a raw P2003.
+model ConsentArtifact {
+  id                String               @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace            @relation(fields: [workspaceId], references: [id])
+  personId          String
+  person            Person               @relation(fields: [personId], references: [id], onDelete: Restrict)
+  channel           CommChannel
+  /// E.164 via libphonenumber-js — the single normalizer for this page.
+  phone             String
+  /// Required at capture (quiet-hours timezone, zip-level). The live, updatable
+  /// copy is Person.postalCode.
+  postalCode        String
+  /// UTC moment of the affirmative act (the checkbox submit).
+  consentAt         DateTime
+  /// See model doc: possession signal, inbound-reply only, never a legal gate.
+  confirmedAt       DateTime?
+  ip                String
+  userAgent         String
+  /// VERBATIM disclosure text shown at the moment of consent — snapshotted,
+  /// never a pointer to live copy that can drift.
+  disclosureText    String
+  disclosureVersion String
+  formUrl           String
+  bindingMethod     ConsentBindingMethod
+  /// Set when the submitted E.164 already belonged to a DIFFERENT existing
+  /// Person — recorded for the merge queue, never silently resolved. Plain
+  /// column, no FK: the referenced Person may later merge or be deleted and
+  /// the evidence must not block that.
+  phoneMatchedPersonId String?
+  createdAt         DateTime             @default(now())
+
+  @@index([workspaceId, personId])
+  @@index([workspaceId, phone])
 }
 
 // Chloe's application-quiz review tool (/review/application). One JSON document
