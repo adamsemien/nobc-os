@@ -152,9 +152,6 @@ test('guest completes Stripe ticketed checkout and lands on "You\'re on the list
   const guestEmail = `e2e-stripe+${Date.now()}@example.test`;
   const guestName = 'E2E Test Guest';
 
-  // ── Start Playwright trace ──────────────────────────────────────────────────
-  await page.context().tracing.start({ screenshots: true, snapshots: true });
-
   try {
     // ── Step 1: Sign in as guest user ─────────────────────────────────────────
     await setupClerkTestingToken({ page });
@@ -306,12 +303,5 @@ test('guest completes Stripe ticketed checkout and lands on "You\'re on the list
     console.error('[guest-checkout] Failed network requests:');
     failedRequests.forEach((r) => console.error(r));
     throw err;
-  } finally {
-    // Always save trace so failures are inspectable with `playwright show-trace`.
-    const traceDir = path.join(process.cwd(), 'test-results');
-    mkdirSync(traceDir, { recursive: true });
-    await page.context().tracing.stop({
-      path: path.join(traceDir, `guest-checkout-trace_${Date.now()}.zip`),
-    });
   }
 });

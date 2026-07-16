@@ -71,8 +71,6 @@ test('at-capacity event — registers on waitlist and shows display string (not 
     }
   });
 
-  await page.context().tracing.start({ screenshots: true, snapshots: true });
-
   try {
     // ── Step 1: Navigate to the full event ──────────────────────────────────
     await page.goto(`/m/events/${FULL_EVENT_SLUG}`);
@@ -122,12 +120,6 @@ test('at-capacity event — registers on waitlist and shows display string (not 
     console.error('[capacity-waitlist] Console errors:', consoleErrors);
     console.error('[capacity-waitlist] Failed API requests:', failedApis);
     throw err;
-  } finally {
-    const traceDir = path.join(process.cwd(), 'test-results');
-    mkdirSync(traceDir, { recursive: true });
-    await page.context().tracing.stop({
-      path: path.join(traceDir, `capacity-waitlist-trace_${Date.now()}.zip`),
-    });
   }
 });
 
