@@ -45,15 +45,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Public links not configured (DAM_PUBLIC_LINK_SECRET unset).' }, { status: 501 });
   }
 
-  // Workspace: explicit env pin, else the sole workspace (this is a
-  // single-workspace install; fail loudly if that ever changes).
+  // Workspace: explicit env pin (NBN_DAM_WORKSPACE_ID) wins; otherwise the
+  // OLDEST workspace, which is NoBC / tenant zero — the same convention the
+  // apply form uses (lib/apply-workspace.ts). Deterministic and
+  // single-tenant-safe; the read-only, photos-only surface makes a wrong guess
+  // low-blast-radius (and Adam would spot it instantly).
   let workspaceId = process.env.NBN_DAM_WORKSPACE_ID || '';
   if (!workspaceId) {
-    const workspaces = await db.workspace.findMany({ select: { id: true }, take: 2 });
-    if (workspaces.length !== 1) {
-      return NextResponse.json({ error: 'Multiple workspaces — set NBN_DAM_WORKSPACE_ID.' }, { status: 501 });
+    const oldest = await db.workspace.findMany({ orderBy: { createdAt: 'asc' }, take: 1, select: { id: true } });
+    if (!oldest.length) {
+      return NextResponse.json({ error: 'No workspace found.' }, { status: 501 });
     }
-    workspaceId = workspaces[0].id;
+    workspaceId = oldest[0].id;
   }
 
   const p = parseAssetQuery(req.nextUrl.searchParams);
