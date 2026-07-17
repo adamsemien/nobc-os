@@ -70,6 +70,7 @@ export async function approveApplication(params: {
     email: app.email,
     name: app.fullName,
     clerkUserId: `applicant:${app.id}`,
+    personId: app.personId ?? undefined,
     phone: applicantPhone,
     source: 'approval',
   });

@@ -2,13 +2,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the Prisma singleton and the QR mint so resolveMember can be exercised
 // without a database. We assert on the exact `data` passed to member.create.
-const { findFirst, findUnique, create, update } = vi.hoisted(() => ({
+// The person/contactSource models back the person-spine paths (attachPersonSpine
+// + resolvePerson fallback) — unset mocks return undefined, which the spine's
+// non-fatal catch turns into "no personId", preserving the pre-spine assertions.
+const {
+  findFirst, findUnique, create, update,
+  personFindFirst, personFindUnique, personCreate, contactSourceUpsert,
+} = vi.hoisted(() => ({
   findFirst: vi.fn(),
   findUnique: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
+  personFindFirst: vi.fn(),
+  personFindUnique: vi.fn(),
+  personCreate: vi.fn(),
+  contactSourceUpsert: vi.fn(),
 }));
-vi.mock('@/lib/db', () => ({ db: { member: { findFirst, findUnique, create, update } } }));
+vi.mock('@/lib/db', () => ({
+  db: {
+    member: { findFirst, findUnique, create, update },
+    person: { findFirst: personFindFirst, findUnique: personFindUnique, create: personCreate },
+    contactSource: { upsert: contactSourceUpsert },
+  },
+}));
 vi.mock('@/lib/member-qr', () => ({ generateMemberQrCode: () => 'qr_fixed_token' }));
 vi.mock('@/lib/engagement', () => ({ logEngagementEvent: vi.fn() }));
 
@@ -19,6 +35,10 @@ beforeEach(() => {
   findUnique.mockReset();
   create.mockReset();
   update.mockReset();
+  personFindFirst.mockReset();
+  personFindUnique.mockReset();
+  personCreate.mockReset();
+  contactSourceUpsert.mockReset();
 });
 
 describe('resolveMember — invariants', () => {
@@ -106,5 +126,98 @@ describe('resolveMember — invariants', () => {
 
     expect(update).toHaveBeenCalledOnce();
     expect(m.memberQrCode).toBe('qr_fixed_token');
+  });
+});
+
+describe('resolveMember — caller-known personId (person spine)', () => {
+  it('links the new member directly to input.personId, skipping resolvePerson', async () => {
+    findFirst.mockResolvedValue(null);
+    create.mockImplementation(({ data }) => Promise.resolve({ id: 'm1', ...data }));
+    personFindUnique.mockResolvedValue({ id: 'p1', workspaceId: 'w1', mergedIntoId: null });
+    update.mockResolvedValue({});
+
+    const m = await resolveMember({
+      workspaceId: 'w1', email: 'x@example.com', name: 'X', clerkUserId: 'app_123',
+      personId: 'p1', source: 'apply',
+    });
+
+    expect(update).toHaveBeenCalledWith({ where: { id: 'm1' }, data: { personId: 'p1' } });
+    expect(m.personId).toBe('p1');
+    // Direct link — resolvePerson (email match / mint) never runs.
+    expect(personFindFirst).not.toHaveBeenCalled();
+    expect(personCreate).not.toHaveBeenCalled();
+  });
+
+  it('follows Person.mergedIntoId to the canonical person before linking', async () => {
+    findFirst.mockResolvedValue(null);
+    create.mockImplementation(({ data }) => Promise.resolve({ id: 'm1', ...data }));
+    personFindUnique.mockImplementation(({ where }) =>
+      Promise.resolve(
+        where.id === 'p1'
+          ? { id: 'p1', workspaceId: 'w1', mergedIntoId: 'p2' }
+          : { id: 'p2', workspaceId: 'w1', mergedIntoId: null },
+      ),
+    );
+    update.mockResolvedValue({});
+
+    const m = await resolveMember({
+      workspaceId: 'w1', email: 'x@example.com', personId: 'p1', source: 'approval',
+    });
+
+    expect(update).toHaveBeenCalledWith({ where: { id: 'm1' }, data: { personId: 'p2' } });
+    expect(m.personId).toBe('p2');
+  });
+
+  it('keeps an existing Member.personId when input.personId disagrees (never overwrites)', async () => {
+    findFirst.mockResolvedValue({
+      id: 'existing', workspaceId: 'w1', email: 'x@example.com', firstName: 'X', lastName: '',
+      status: 'GUEST', approved: false, memberQrCode: 'q', phone: null,
+      mergedIntoId: null, personId: 'pA',
+    });
+
+    const m = await resolveMember({
+      workspaceId: 'w1', email: 'x@example.com', personId: 'pB', source: 'apply',
+    });
+
+    expect(m.personId).toBe('pA');
+    expect(update).not.toHaveBeenCalled();
+    expect(personFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('falls back to resolvePerson when input.personId is dangling', async () => {
+    findFirst.mockResolvedValue(null);
+    create.mockImplementation(({ data }) => Promise.resolve({ id: 'm1', ...data }));
+    personFindUnique.mockResolvedValue(null); // caller personId points at nothing
+    personFindFirst.mockResolvedValue(null); // no email collision either
+    personCreate.mockResolvedValue({ id: 'pNew', workspaceId: 'w1', email: 'x@example.com', roles: [] });
+    contactSourceUpsert.mockResolvedValue({});
+    update.mockResolvedValue({});
+
+    const m = await resolveMember({
+      workspaceId: 'w1', email: 'x@example.com', personId: 'p_gone', source: 'apply',
+    });
+
+    expect(personCreate).toHaveBeenCalledOnce(); // resolvePerson fallback minted
+    expect(update).toHaveBeenCalledWith({ where: { id: 'm1' }, data: { personId: 'pNew' } });
+    expect(m.personId).toBe('pNew');
+  });
+
+  it('never links a personId from another workspace — falls back to resolvePerson', async () => {
+    findFirst.mockResolvedValue(null);
+    create.mockImplementation(({ data }) => Promise.resolve({ id: 'm1', ...data }));
+    personFindUnique.mockResolvedValue({ id: 'pX', workspaceId: 'OTHER_WS', mergedIntoId: null });
+    personFindFirst.mockResolvedValue(null);
+    personCreate.mockResolvedValue({ id: 'pNew', workspaceId: 'w1', email: 'x@example.com', roles: [] });
+    contactSourceUpsert.mockResolvedValue({});
+    update.mockResolvedValue({});
+
+    const m = await resolveMember({
+      workspaceId: 'w1', email: 'x@example.com', personId: 'pX', source: 'apply',
+    });
+
+    // The cross-tenant Person is never linked; the fallback mints in-workspace.
+    expect(update).not.toHaveBeenCalledWith({ where: { id: 'm1' }, data: { personId: 'pX' } });
+    expect(update).toHaveBeenCalledWith({ where: { id: 'm1' }, data: { personId: 'pNew' } });
+    expect(m.personId).toBe('pNew');
   });
 });
