@@ -60,6 +60,14 @@ export async function POST(req: NextRequest) {
           failed.push({ id, error: 'already_rejected' });
           continue;
         }
+        // Data Integrity: never bulk-reject a draft (submittedAt === null) - that
+        // emails a rejection to someone who never applied. Fail-closed with no
+        // escape hatch, exactly as bulk approve fails-closed on unsubmitted drafts
+        // (approveApplication is called without allowUnsubmitted here).
+        if (app.submittedAt === null) {
+          failed.push({ id, error: 'not_submitted' });
+          continue;
+        }
         await db.application.update({
           where: { id },
           data: {

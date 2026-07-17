@@ -27,6 +27,7 @@ export function ApplicationDecisionBar({
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmUnsubmitted, setConfirmUnsubmitted] = useState(false);
+  const [confirmUnsubmittedReject, setConfirmUnsubmittedReject] = useState(false);
 
   async function approve(confirmed?: boolean) {
     if (submittedAt === null && !confirmed) {
@@ -53,7 +54,11 @@ export function ApplicationDecisionBar({
     }
   }
 
-  async function reject() {
+  async function reject(confirmed?: boolean) {
+    if (submittedAt === null && !confirmed) {
+      setConfirmUnsubmittedReject(true);
+      return;
+    }
     setError(null);
     setBusy('reject');
     try {
@@ -61,7 +66,10 @@ export function ApplicationDecisionBar({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ reason: reason.trim() || undefined }),
+        body: JSON.stringify({
+          reason: reason.trim() || undefined,
+          confirmUnsubmitted: confirmed === true,
+        }),
       });
       if (!r.ok) throw new Error('request failed');
       logQAAction('rejected application');
@@ -195,7 +203,7 @@ export function ApplicationDecisionBar({
               </button>
               <button
                 type="button"
-                onClick={reject}
+                onClick={() => reject()}
                 disabled={busy !== null}
                 className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 px-5 text-base font-medium text-white disabled:opacity-60"
                 style={{ borderRadius: '4px', background: 'var(--primary)' }}
@@ -218,6 +226,20 @@ export function ApplicationDecisionBar({
           onConfirm={() => {
             setConfirmUnsubmitted(false);
             void approve(true);
+          }}
+        />
+      ) : null}
+      {confirmUnsubmittedReject ? (
+        <ConfirmModal
+          title="Reject an application that was never submitted?"
+          subtitle="This application was never submitted - it has not been AI-scored. Rejecting now sends a rejection email to someone who never applied."
+          confirmLabel="Reject anyway"
+          confirmTone="danger"
+          busy={busy === 'reject'}
+          onCancel={() => setConfirmUnsubmittedReject(false)}
+          onConfirm={() => {
+            setConfirmUnsubmittedReject(false);
+            void reject(true);
           }}
         />
       ) : null}

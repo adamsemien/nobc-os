@@ -303,8 +303,9 @@ export function ApplicationsQueue({
   const [pendingBulkAction, setPendingBulkAction] = useState<string | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<'reject' | null>(null);
   const [reviewNote, setReviewNote] = useState('');
-  const [hideIncomplete, setHideIncomplete] = useState(false);
+  const [hideIncomplete, setHideIncomplete] = useState(true);
   const [confirmUnsubmittedApprove, setConfirmUnsubmittedApprove] = useState<string | null>(null);
+  const [confirmUnsubmittedReject, setConfirmUnsubmittedReject] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const selectedIdRef = useRef(selectedId);
@@ -453,6 +454,25 @@ export function ApplicationsQueue({
   const requestApproveRef = useRef(requestApprove);
   useEffect(() => { requestApproveRef.current = requestApprove; }, [requestApprove]);
 
+  // Symmetric to requestApprove: a never-submitted draft (submittedAt === null)
+  // requires an explicit "reject anyway" confirmation before postAction fires.
+  // The 'r' shortcut, the desktop button, and the mobile button all route
+  // through THIS one function - the shortcut cannot bypass the guard, and the
+  // server reject route re-checks with its own submittedAt guard.
+  const requestReject = useCallback(
+    (id: string) => {
+      const app = applications.find(a => a.id === id);
+      if (app && app.submittedAt === null) {
+        setConfirmUnsubmittedReject(id);
+        return;
+      }
+      postAction(id, 'reject');
+    },
+    [applications, postAction],
+  );
+  const requestRejectRef = useRef(requestReject);
+  useEffect(() => { requestRejectRef.current = requestReject; }, [requestReject]);
+
   const bulkAction = useCallback(async (action: 'approve' | 'reject' | 'hold') => {
     setPendingBulkAction(action);
     const ids = Array.from(selectedIds);
@@ -511,7 +531,7 @@ export function ApplicationsQueue({
       else if (e.key === 'k') { const p = apps[Math.max(idx - 1, 0)]; if (p) setSelectedId(p.id); }
       else if (e.key === 'a' && cur) requestApproveRef.current(cur);
       else if (e.key === 'h' && cur) postActionRef.current(cur, 'hold');
-      else if (e.key === 'r' && cur) postActionRef.current(cur, 'reject');
+      else if (e.key === 'r' && cur) requestRejectRef.current(cur);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -771,7 +791,7 @@ export function ApplicationsQueue({
               reviewNote={reviewNote}
               onNoteChange={setReviewNote}
               onApprove={() => requestApprove(selected.id)}
-              onReject={() => postAction(selected.id, 'reject')}
+              onReject={() => requestReject(selected.id)}
               onWaitlist={() => postAction(selected.id, 'waitlist')}
               onHold={() => postAction(selected.id, 'hold')}
               tierNames={tierNames}
@@ -811,6 +831,22 @@ export function ApplicationsQueue({
         />
       ) : null}
 
+      {confirmUnsubmittedReject ? (
+        <ConfirmModal
+          title="Reject an application that was never submitted?"
+          subtitle="This application was never submitted - it has not been AI-scored. Rejecting now sends a rejection email to someone who never applied."
+          confirmLabel="Reject anyway"
+          confirmTone="danger"
+          busy={pendingAction === 'reject'}
+          onCancel={() => setConfirmUnsubmittedReject(null)}
+          onConfirm={async () => {
+            const id = confirmUnsubmittedReject;
+            setConfirmUnsubmittedReject(null);
+            await postAction(id, 'reject', { confirmUnsubmitted: true });
+          }}
+        />
+      ) : null}
+
       {sheetOpen && selected ? (
         <div
           className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] flex-col lg:hidden"
@@ -846,7 +882,7 @@ export function ApplicationsQueue({
               reviewNote={reviewNote}
               onNoteChange={setReviewNote}
               onApprove={() => requestApprove(selected.id)}
-              onReject={() => postAction(selected.id, 'reject')}
+              onReject={() => requestReject(selected.id)}
               onWaitlist={() => postAction(selected.id, 'waitlist')}
               onHold={() => postAction(selected.id, 'hold')}
               tierNames={tierNames}

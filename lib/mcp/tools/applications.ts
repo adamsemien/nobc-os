@@ -187,6 +187,19 @@ export const applicationTools: McpTool[] = [
     destructive: true,
     handler: async (ctx, rawArgs) => {
       const args = rejectSchema.parse(rawArgs);
+      // Data Integrity: hard-block rejecting a never-submitted draft. Rejecting one
+      // emails a decline to someone who never applied; no agent override, mirrors
+      // the nobc_approve_application never-submitted block above.
+      const draft = await db.application.findFirst({
+        where: { id: args.applicationId, workspaceId: ctx.workspaceId },
+        select: { submittedAt: true },
+      });
+      if (!draft) throw new Error('Application not found or not in this workspace');
+      if (draft.submittedAt === null) {
+        throw new Error(
+          'This application was never submitted (draft only) - reject it from the operator UI if intended',
+        );
+      }
       return setApplicationStatus(ctx, args.applicationId, 'REJECTED', 'application.rejected', {
         reason: args.reason,
         note: args.note,
