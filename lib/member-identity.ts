@@ -35,6 +35,12 @@ export type ResolveMemberInput = {
    *  synthetic, email-keyed id so the `@@unique([workspaceId, clerkUserId])`
    *  constraint is satisfied without a real Clerk account. */
   clerkUserId?: string;
+  /** Known Person id for this human (e.g. Application.personId, minted at draft
+   *  create with the real Clerk identity). When set, attachPersonSpine links the
+   *  Member to it directly and skips resolvePerson — the caller already holds
+   *  the canonical identity, so re-deriving it from an unverified typed email
+   *  would mint a duplicate Person. */
+  personId?: string;
   phone?: string;
   /** Provenance label for the call site (e.g. 'plus_one', 'walkin', 'apply'). */
   source: string;
@@ -181,18 +187,50 @@ export async function promoteMemberToApproved(
 
 /**
  * Person spine (Phase 2A): make sure the resolved Member hangs off a Person.
- * Short-circuits when already linked. The email reaching this path was typed,
- * not identity-provider-proven, so it goes in UNVERIFIED — resolvePerson will
- * never use it to link to an existing Person (strict policy); a real Clerk id
- * on the input still links authoritatively. Non-fatal by design: the CRM spine
- * must never break member resolution.
+ * Short-circuits when already linked. A caller-known `input.personId` links
+ * directly (merge-followed + workspace-checked); otherwise the email reaching
+ * this path was typed, not identity-provider-proven, so it goes in UNVERIFIED —
+ * resolvePerson will never use it to link to an existing Person (strict
+ * policy); a real Clerk id on the input still links authoritatively. Non-fatal
+ * by design: the CRM spine must never break member resolution.
  */
 async function attachPersonSpine(
   member: ResolvedMember,
   input: ResolveMemberInput,
 ): Promise<string | null> {
-  if (member.personId) return member.personId;
+  if (member.personId) {
+    if (input.personId && input.personId !== member.personId) {
+      console.warn(
+        `[resolveMember] personId disagreement (member=${member.id} linked=${member.personId} caller=${input.personId} source=${input.source}) — keeping the existing link`,
+      );
+    }
+    return member.personId;
+  }
   try {
+    // Caller-known Person (e.g. the Application's Person, minted at draft create
+    // with the real Clerk identity): link directly. Running it through
+    // resolvePerson instead would re-derive identity from an UNVERIFIED typed
+    // email, which policy-correctly refuses to link and mints a duplicate —
+    // the exact split this path exists to prevent. Follow soft-merge to the
+    // canonical row; a dangling id or a cross-workspace id falls through to
+    // resolvePerson (workspace scoping is the security boundary — never link a
+    // Member to another tenant's Person).
+    if (input.personId) {
+      const person = await followPersonMergedInto(input.personId);
+      if (person && person.workspaceId === member.workspaceId) {
+        await db.member.update({ where: { id: member.id }, data: { personId: person.id } });
+        return person.id;
+      }
+      if (person) {
+        console.warn(
+          `[resolveMember] caller personId belongs to another workspace (member=${member.id} memberWorkspace=${member.workspaceId} personId=${input.personId} personWorkspace=${person.workspaceId} source=${input.source}) — falling back to resolvePerson`,
+        );
+      } else {
+        console.warn(
+          `[resolveMember] caller personId not found (member=${member.id} personId=${input.personId} source=${input.source}) — falling back to resolvePerson`,
+        );
+      }
+    }
     // Person names must be REAL data. Member rows default a missing name to
     // firstName='Guest' (splitName above + lib/clerk-member.ts) — that
     // placeholder must never be written to the Person record; pass null and
@@ -232,6 +270,27 @@ async function followMergedInto(member: ResolvedMember): Promise<ResolvedMember>
       select: SELECT,
     });
     if (!next) break; // dangling pointer — fall back to the last good row
+    current = next;
+  }
+  return current;
+}
+
+/** Person-side twin of followMergedInto above: walk Person.mergedIntoId to the
+ *  canonical row (capped against cycles). Null when the id is dangling. Carries
+ *  workspaceId so attachPersonSpine can refuse a cross-tenant link. */
+async function followPersonMergedInto(
+  personId: string,
+): Promise<{ id: string; workspaceId: string } | null> {
+  let current = await db.person.findUnique({
+    where: { id: personId },
+    select: { id: true, workspaceId: true, mergedIntoId: true },
+  });
+  for (let hops = 0; current?.mergedIntoId && hops < 10; hops++) {
+    const next = await db.person.findUnique({
+      where: { id: current.mergedIntoId },
+      select: { id: true, workspaceId: true, mergedIntoId: true },
+    });
+    if (!next) break;
     current = next;
   }
   return current;

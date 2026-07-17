@@ -232,6 +232,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       email: application.email,
       name: application.fullName,
       clerkUserId: `app_${application.id}`,
+      personId: application.personId ?? undefined,
       phone: applicantPhone ?? undefined,
       source: 'apply_purple',
     });
@@ -355,6 +356,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         email: application.email,
         name: application.fullName,
         clerkUserId: `app_${application.id}`,
+        personId: application.personId ?? undefined,
         phone: applicantPhone ?? undefined,
         source: 'apply',
       });
