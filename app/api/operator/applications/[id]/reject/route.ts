@@ -30,14 +30,25 @@ export async function POST(
 
   let reason: string | undefined;
   let reviewNote: string | null = null;
+  let confirmUnsubmitted = false;
   try {
-    const body = (await req.json()) as { reason?: unknown; note?: unknown };
+    const body = (await req.json()) as { reason?: unknown; note?: unknown; confirmUnsubmitted?: unknown };
     if (typeof body?.reason === 'string') {
       reason = body.reason.trim().slice(0, 4000) || undefined;
     }
     reviewNote = typeof body?.note === 'string' ? body.note.trim().slice(0, 4000) || null : null;
+    confirmUnsubmitted = body?.confirmUnsubmitted === true;
   } catch {
     /* optional body */
+  }
+
+  // Data Integrity: an application with submittedAt === null was never submitted
+  // (draft-only). Rejecting one fires a rejection email to someone who never
+  // applied. Blocked by default; the single-reject confirm modal passes
+  // confirmUnsubmitted to override deliberately - mirrors the approve route's
+  // allowUnsubmitted escape hatch.
+  if (app.submittedAt === null && !confirmUnsubmitted) {
+    return Response.json({ error: 'Not submitted' }, { status: 409 });
   }
 
   const updatedApp = await db.application.update({

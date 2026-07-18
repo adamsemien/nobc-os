@@ -26,10 +26,26 @@ const m = vi.hoisted(() => ({
   answerCreate: vi.fn(),
   answerUpdate: vi.fn(),
   resolvePerson: vi.fn(),
+  auth: vi.fn(),
+  getVerifiedEmail: vi.fn(),
 }));
 
 vi.mock('@/lib/public-rate-limit', () => ({ publicRateLimit: m.rateLimit }));
 vi.mock('@/lib/crm/resolve-person', () => ({ resolvePerson: m.resolvePerson }));
+// The route calls Clerk's auth() (added by D4). Without this, @clerk/nextjs/server
+// pulls in `server-only`, which throws under vitest. Backed by a per-test fn so a
+// case can run anonymous (userId=null) or signed-in.
+vi.mock('@clerk/nextjs/server', () => ({ auth: m.auth }));
+// Reuse + P2002-recovery are ownership-gated on the caller's VERIFIED Clerk email
+// (IDOR fix, D4c). Mock the account-link helpers so a signed-in verified caller
+// can exercise those branches; stampApplicationOwner is a no-op here.
+vi.mock('@/lib/apply-account-link', () => ({
+  getVerifiedClerkEmail: m.getVerifiedEmail,
+  stampApplicationOwner: vi.fn(),
+}));
+// Fire-and-forget funnel signal on the create path — stub it so it never reaches
+// the (unmocked) db.engagementEvent table.
+vi.mock('@/lib/engagement', () => ({ logEngagementEvent: vi.fn() }));
 vi.mock('@/lib/db', () => ({
   db: {
     workspace: { findUnique: m.wsFindUnique, findMany: m.wsFindMany },
@@ -56,6 +72,9 @@ beforeEach(() => {
   m.appCreate.mockResolvedValue({ id: 'app_new' });
   m.answerFindFirst.mockResolvedValue(null);
   m.answerCreate.mockResolvedValue({});
+  // Default: anonymous public apply (no signed-in Clerk user, no verified email).
+  m.auth.mockResolvedValue({ userId: null });
+  m.getVerifiedEmail.mockResolvedValue(null);
 });
 
 describe('apply create: rate limit', () => {
@@ -70,6 +89,10 @@ describe('apply create: rate limit', () => {
 
 describe('apply create: idempotency (BLOCKER 5)', () => {
   it('reuses an existing PENDING application instead of creating a new one', async () => {
+    // Reuse is ownership-gated (D4c): only a signed-in caller whose VERIFIED Clerk
+    // email matches the PENDING row reuses it — anonymous body-email never does.
+    m.auth.mockResolvedValue({ userId: 'u1' });
+    m.getVerifiedEmail.mockResolvedValue('a@b.com');
     m.appFindFirst.mockResolvedValue({ id: 'app_existing' });
     const res = await post({ email: 'a@b.com' });
     const body = await res.json();
@@ -89,6 +112,9 @@ describe('apply create: idempotency (BLOCKER 5)', () => {
 
 describe('apply create: P2002 recovery', () => {
   it('returns the raced row instead of 500 when create hits a unique violation', async () => {
+    // P2002 recovery is ownership-gated (D4c) on the same verified email as reuse.
+    m.auth.mockResolvedValue({ userId: 'u1' });
+    m.getVerifiedEmail.mockResolvedValue('race@b.com');
     // findFirst on the PENDING guard misses (no row yet), create races and loses.
     m.appFindFirst
       .mockResolvedValueOnce(null) // PENDING guard

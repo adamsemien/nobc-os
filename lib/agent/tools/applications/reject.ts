@@ -32,6 +32,10 @@ const rejectApplication: AgentTool<Input, unknown> = {
       where: { id: input.applicationId, workspaceId: ctx.workspaceId },
     });
     if (!app) return { ok: false, error: 'not_found' };
+    // Data Integrity: a never-submitted draft (submittedAt === null) must never be
+    // rejected by an agent - that emails a decline to someone who never applied.
+    // Fail-closed with no override, exactly as the approve path hard-blocks agents.
+    if (app.submittedAt === null) return { ok: false, error: 'not_submitted' };
 
     await db.application.update({
       where: { id: app.id },
