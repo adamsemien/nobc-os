@@ -337,13 +337,20 @@ export const SEED: ReviewSection[] = [
   {id:"R5", status:"green", field:"Most / least · +2 most, −1 least",
    q:"In a room, your gift is making…",
    struck:"",
-   opts:["People feel seen","Ideas collide","Things happen","Everyone feels welcome","The vibe lifts","Decisions get made"],
+   opts:[
+    ["Spark","…the night fun"],
+    ["Caregiver","…the space feel like home"],
+    ["Sage","…the conversation deeper"],
+    ["Connector","…the right people meet"],
+    ["Champion","…one person feel like the only person in the room"],
+    ["Builder","…ambitious things feel possible"]
+   ],
    rows:[
-    ["live","These are the real options from the live app - the wording is set. What still gets a final check against the live app is only which nature each option points to and the exact points. Nothing here for you to rewrite."],
+    ["live","These are the real options from the live app - the wording and the nature map now match it. Nothing here for you to rewrite."],
     ["data","Your signature effect on a room - so we can build a table where every seat brings a different gift."]
    ],
    scored:"Counts · +2 most / −1 least",
-   cmt:"Wording is set. We're confirming the behind-the-scenes nature map and points against the live app - that's our task, not yours."},
+   cmt:"Wording is set. The options and their nature map now match the live app."},
 
   {id:"R6", status:"green", field:"Most / least · +2 most, −1 least",
    q:"What's most likely to actually ruin a party for you, and what would you let slide?",
@@ -363,28 +370,61 @@ export const SEED: ReviewSection[] = [
    scored:"Counts · +2 most / −1 least",
    cmt:"You rewrote the stem and all six options and gave the order and scoring. Your wording is what we're using."},
 
-  {id:"R7", status:"green", field:"Pick one + skip one (both required) · +2 pick, −1 skip",
-   q:"Pick your perfect Friday night - and, from the same list, the one you'd politely skip.",
+  {id:"R7", status:"green", field:"Tap · pick one · +2 to one nature",
+   q:"Pick your perfect Friday night.",
    struck:"",
-   opts:["A long dinner that becomes the only conversation","A live set, small and loud","A house party that goes too late","Drinks with two who should know each other","Something outside that turns into an adventure","A quiet night that stays that way"],
-   rows:[
-    ["live","These are the real options from the live app - the wording is set. Only the nature map and the exact points get a final check against the live app."],
-    ["hab","A pure room question - your pick and your skip both name the room that fits you. Nothing here is optional; the skip is a required second choice, because what you'd pass on says as much as what you'd pick."],
-    ["data","Event targeting - which of our events to invite you to, which to spare you."]
+   opts:[
+    ["Spark","A house party with great music that goes late"],
+    ["Caregiver","Hosting a table of six, menu planned days ago"],
+    ["Sage","A three-hour dinner with one or two brilliant people"],
+    ["Connector","A room full of people who've never met, and should"],
+    ["Champion","The standing dinner where everyone already knows everyone"],
+    ["Builder","A salon, a tasting, a dinner with a theme"]
    ],
-   scored:"Counts · +2 pick / −1 skip",
-   cmt:"Wording is set. We're confirming the nature map and points against the live app. (Renamed the second half from \"skip\" so it never reads as optional.)"},
+   rows:[
+    ["live","These are the real options from the live app - the wording is set."],
+    ["map","Each option points to the nature beside it: +2. Signal order: Spark · Caregiver · Sage · Connector · Champion · Builder."],
+    ["data","Event targeting - which of our events to invite you to."]
+   ],
+   scored:"Counts · +2 tap",
+   cmt:"Wording is set. Split from the old combined pick-and-skip card; the skip is its own card below."},
+
+  {id:"R7b", status:"green", field:"Tap · pick one · −2 to one nature",
+   q:"Now the one you'd politely skip. Same list. What you'd pass on says as much as what you'd pick.",
+   struck:"",
+   opts:[
+    ["Spark","A house party with great music that goes late"],
+    ["Caregiver","Hosting a table of six, menu planned days ago"],
+    ["Sage","A three-hour dinner with one or two brilliant people"],
+    ["Connector","A room full of people who've never met, and should"],
+    ["Champion","The standing dinner where everyone already knows everyone"],
+    ["Builder","A salon, a tasting, a dinner with a theme"]
+   ],
+   rows:[
+    ["live","Same six options as the pick card - the wording is set."],
+    ["map","Each option points to the nature beside it: −2. Signal order: Spark · Caregiver · Sage · Connector · Champion · Builder."],
+    ["data","Event targeting - which events to spare you."]
+   ],
+   scored:"Counts · −2 tap",
+   cmt:"Split out from the old combined pick-and-skip card so the skip never reads as optional."},
 
   {id:"R8", status:"green", field:"Tap · pick one · +2 to one nature",
    q:"At your absolute best in a room, people would say you were…",
    struck:"",
-   opts:["Magnetic","The reason it felt like home","The best conversation there","The night's best introduction","Someone's whole cheering section","The reason they finally started something"],
+   opts:[
+    ["Spark","Magnetic"],
+    ["Caregiver","The reason it felt like home"],
+    ["Sage","The best conversation there"],
+    ["Connector","The night's best introduction"],
+    ["Champion","Someone's whole cheering section"],
+    ["Builder","The reason they finally started something"]
+   ],
    rows:[
-    ["live","These are the real options from the live app - the wording is set. Only the nature map and the exact points get a final check against the live app."],
+    ["live","These are the real options from the live app - the wording and the nature map now match it."],
     ["data","Your peak role in a room - and this is the line your reveal opens with, in your own words. Load-bearing for the reveal."]
    ],
    scored:"Counts · +2 tap",
-   cmt:"Wording is set. We're confirming the nature map and points against the live app."},
+   cmt:"Wording is set. The options and their nature map now match the live app."},
  ]},
 
  /* ============ SECTION 03 ============ */
