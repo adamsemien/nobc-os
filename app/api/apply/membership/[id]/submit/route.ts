@@ -116,64 +116,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
   }
 
-  // ── Atomic once-only guard ────────────────────────────────────────────
+  // ── Atomic once-only guard (Option B: score-first, one write transaction) ──
   // Concurrent submits for the same draft (two tabs, a network retry, a replayed or
   // account-relinked cookie) would each pass the idempotency guard above while aiScore
-  // is still null and then score INDEPENDENTLY - two billed Sonnet calls each, a
-  // duplicated Door 1 (and PURPLE) email, duplicate audit rows. Serialize per-draft on
-  // a Postgres transaction-scoped advisory lock: a second submit blocks until the
-  // first COMMITS (durably writing aiScore below), then re-reads it non-null and
-  // returns the cached reveal - never billing or emailing twice. The xact lock
-  // releases automatically when the transaction ends INCLUDING on error, so a scoring
-  // failure never locks a draft out (a retry re-enters with aiScore still null). No
-  // schema change: the existing aiScore column is the durable "already scored" signal.
-  // scoreApplication / lib/scoring.ts are unchanged - the lock is taken AROUND the
-  // call, here in the route. The whole scoring + email critical section runs inside;
-  // Door 1 + confirmation email (after the lock) is winner-only because a loser
-  // returns cached from within the lock and never reaches it.
-  const outcome = await db.$transaction(async (tx) => {
-  // $executeRaw, NOT $queryRaw: pg_advisory_xact_lock() returns Postgres `void`,
-  // which Prisma 7's $queryRaw cannot deserialize (P2010 "Failed to deserialize
-  // column of type 'void'" - this 500'd every prod submission, 2026-07-02).
-  // $executeRaw runs the statement and discards the result; the lock semantics
-  // are identical (verified: lock held inside the tx, released at COMMIT/ROLLBACK).
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+  // is still null and then score INDEPENDENTLY - two billed Sonnet calls. That wasted
+  // double-score is ACCEPTED (money, not corruption). What must be single-winner is
+  // the WRITE path: every route-level write that must be consistent (the duplicate /
+  // blocked audits, the BLOCKED status update, the PURPLE approval + audit, and the
+  // aiScore/submittedAt stamp) runs on the tx client inside ONE $transaction, entered
+  // under a per-draft pg advisory xact lock - all commit or none. A losing concurrent
+  // submit blocks on the lock until the winner COMMITS (durably writing aiScore),
+  // then re-reads it non-null inside the tx and returns the cached reveal - never
+  // re-writing or re-emailing. The xact lock releases automatically when the
+  // transaction ends INCLUDING on error, so a failure never locks a draft out (a
+  // retry re-enters with aiScore still null). The Anthropic call runs BEFORE the
+  // write transaction - never while a write tx, its DB connection, or the advisory
+  // lock is held. No schema change: the existing aiScore column is the durable
+  // "already scored" signal. scoreApplication / lib/scoring.ts are unchanged.
+  //
+  // (On every lock below: $executeRaw, NOT $queryRaw - pg_advisory_xact_lock()
+  // returns Postgres `void`, which Prisma 7's $queryRaw cannot deserialize (P2010
+  // "Failed to deserialize column of type 'void'" - this 500'd every prod
+  // submission, 2026-07-02). $executeRaw runs the statement and discards the
+  // result; the lock semantics are identical.)
 
-  // Re-read under the lock. If a concurrent submit already scored (or was decided),
-  // return its persisted reveal and do NO scoring / billing / email on this request.
-  const locked = await tx.application.findUnique({
-    where: { id },
-    select: {
-      aiScore: true,
-      status: true,
-      archetype: true,
-      archetypeScores: true,
-      aiTags: true,
-      personalNote: true,
-      personalizedCopy: true,
-      revealSecondary: true,
-      revealBlendPrimary: true,
-      revealBlendSecondary: true,
-      revealOpenerPhrase: true,
-      revealHabitatThrive: true,
-      revealHabitatDim: true,
-    },
-  });
-  if (locked && locked.aiScore !== null) {
-    return NextResponse.json({
-      cached: true,
-      archetype: locked.archetype ?? '',
-      archetypeScores: (locked.archetypeScores ?? {}) as Record<string, number>,
-      tags: locked.aiTags,
-      personalNote: locked.personalNote ?? locked.personalizedCopy ?? '',
-      ...revealFieldsFromRow(locked),
-    });
-  }
-  if (locked && locked.status === 'REJECTED') {
-    return NextResponse.json({ blocked: true, cached: true });
-  }
-
-  // ── 1. Duplicate check ────────────────────────────────────────────────
+  // ── 1. Duplicate check (pre-scoring READ) ─────────────────────────────
+  // Determined via reads BEFORE scoring so a duplicate applicant never triggers a
+  // billed scoring call. The audit write commits under the same per-draft advisory
+  // lock as every other write on this route.
   const isDuplicate = await checkDuplicate(
     application.workspaceId,
     application.email,
@@ -181,19 +151,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     application.id,
   );
   if (isDuplicate) {
-    await db.auditEvent.create({
-      data: {
-        workspaceId: application.workspaceId,
-        actorType: 'SYSTEM',
-        action: 'application.duplicate_blocked',
-        entityType: 'Application',
-        entityId: application.id,
-      },
-    });
+    await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+      await tx.auditEvent.create({
+        data: {
+          workspaceId: application.workspaceId,
+          actorType: 'SYSTEM',
+          action: 'application.duplicate_blocked',
+          entityType: 'Application',
+          entityId: application.id,
+        },
+      });
+    }, { timeout: 60_000, maxWait: 20_000 });
     return NextResponse.json({ error: 'duplicate_application' }, { status: 409 });
   }
 
-  // ── 2 + 3. WatchList check ────────────────────────────────────────────
+  // ── 2 + 3. WatchList check (pre-scoring READ) ─────────────────────────
   const watchMatch = await checkWatchList(
     application.workspaceId,
     application.email,
@@ -202,31 +175,61 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   );
 
   if (watchMatch?.type === 'BLOCKED') {
-    // The applicant DID click Submit — the block happens after the submit action.
-    // Stamp submittedAt so this row matches the backfill rule (status <> PENDING
-    // counts as submitted) instead of reading "Not submitted" forever.
-    await db.application.update({
-      where: { id },
-      data: { status: 'REJECTED', submittedAt: new Date() },
-    });
-    await db.auditEvent.create({
-      data: {
-        workspaceId: application.workspaceId,
-        actorType: 'SYSTEM',
-        action: 'application.blocked',
-        entityType: 'Application',
-        entityId: application.id,
-        metadata: { watchListEntryId: watchMatch.entryId },
-      },
-    });
+    // A watchlisted-BLOCKED applicant never reaches scoring (billing short-circuit).
+    // Status update + audit commit atomically; the in-tx re-read makes a concurrent
+    // double-submit single-winner (the loser sees REJECTED and returns the cached
+    // blocked shape without a second write).
+    const blockedOutcome = await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+      const locked = await tx.application.findUnique({
+        where: { id },
+        select: { status: true },
+      });
+      if (locked && locked.status === 'REJECTED') {
+        return NextResponse.json({ blocked: true, cached: true });
+      }
+      // The applicant DID click Submit — the block happens after the submit action.
+      // Stamp submittedAt so this row matches the backfill rule (status <> PENDING
+      // counts as submitted) instead of reading "Not submitted" forever.
+      await tx.application.update({
+        where: { id },
+        data: { status: 'REJECTED', submittedAt: new Date() },
+      });
+      await tx.auditEvent.create({
+        data: {
+          workspaceId: application.workspaceId,
+          actorType: 'SYSTEM',
+          action: 'application.blocked',
+          entityType: 'Application',
+          entityId: application.id,
+          metadata: { watchListEntryId: watchMatch.entryId },
+        },
+      });
+      return null;
+    }, { timeout: 60_000, maxWait: 20_000 });
+    if (blockedOutcome) return blockedOutcome;
     return NextResponse.json({ blocked: true });
   }
 
+  // Question-agnostic AI scoring — driven by the template's QuestionDefinitions.
+  // Phase 5: scoreApplication now ALSO returns the reveal-note (folded into the
+  // grader, no second AI call) and the decisive tally output (secondary, blend,
+  // Q6 openerPhrase, templated Q4/Q5 habitat labels) that the reveal reads verbatim.
+  // Runs BEFORE any route-level write, outside any transaction - the Anthropic call
+  // holds no write tx, no write-path DB connection, and no advisory lock.
+  const result = await scoreApplication(id);
+  const personalNote = result.personalNote;
+
+  // ── PURPLE member resolution (outside the write tx, idempotent) ───────
+  // Resolve through the canonical path (mints a QR, GUEST), then promote — the
+  // PURPLE allowlist is a legitimate, operator-curated approval gate. Both calls
+  // are replay-safe (find-or-create with P2002 recovery / in-place update), so
+  // they deliberately stay OUTSIDE the write tx; a resubmit never reaches them
+  // because the already-scored guard short-circuits first. The Application-side
+  // approval writes happen inside the tx below.
+  let purple: { now: Date; memberId: string; watchListEntryId: string } | null = null;
   if (watchMatch?.type === 'PURPLE') {
     const now = new Date();
-
-    // Resolve through the canonical path (mints a QR, GUEST), then promote — the
-    // PURPLE allowlist is a legitimate, operator-curated approval gate.
     const resolved = await resolveMember({
       workspaceId: application.workspaceId,
       email: application.email,
@@ -237,77 +240,124 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       source: 'apply_purple',
     });
     const member = await promoteMemberToApproved(resolved.id, { approvedAt: now });
+    purple = { now, memberId: member.id, watchListEntryId: watchMatch.entryId };
+    // Fall through to the write tx: the archetype is persisted even for auto-approvals.
+  }
 
-    await db.application.update({
+  // ── THE write transaction — every consistent write commits or none ────
+  const outcome = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+
+    // Re-read under the lock. If a concurrent submit already scored (or was decided),
+    // return its persisted reveal and do NO write / email on this request.
+    const locked = await tx.application.findUnique({
       where: { id },
-      data: { status: 'APPROVED', reviewedAt: now, reviewedBy: 'system', memberId: member.id },
+      select: {
+        aiScore: true,
+        status: true,
+        archetype: true,
+        archetypeScores: true,
+        aiTags: true,
+        personalNote: true,
+        personalizedCopy: true,
+        revealSecondary: true,
+        revealBlendPrimary: true,
+        revealBlendSecondary: true,
+        revealOpenerPhrase: true,
+        revealHabitatThrive: true,
+        revealHabitatDim: true,
+      },
+    });
+    if (locked && locked.aiScore !== null) {
+      return NextResponse.json({
+        cached: true,
+        archetype: locked.archetype ?? '',
+        archetypeScores: (locked.archetypeScores ?? {}) as Record<string, number>,
+        tags: locked.aiTags,
+        personalNote: locked.personalNote ?? locked.personalizedCopy ?? '',
+        ...revealFieldsFromRow(locked),
+      });
+    }
+    if (locked && locked.status === 'REJECTED') {
+      return NextResponse.json({ blocked: true, cached: true });
+    }
+
+    if (purple) {
+      await tx.application.update({
+        where: { id },
+        data: {
+          status: 'APPROVED',
+          reviewedAt: purple.now,
+          reviewedBy: 'system',
+          memberId: purple.memberId,
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          workspaceId: application.workspaceId,
+          actorType: 'SYSTEM',
+          action: 'application.purple_list_approved',
+          entityType: 'Application',
+          entityId: application.id,
+          metadata: { watchListEntryId: purple.watchListEntryId },
+        },
+      });
+    }
+
+    await tx.application.update({
+      where: { id },
+      data: {
+        submittedAt: new Date(),
+        archetype: result.archetype,
+        archetypeScores: result.archetypeScores,
+        aiTags: result.tags,
+        // scoreApplication returns memberWorthTotal on a 0–100 scale; canonical
+        // aiScore is 0–1. Scale at the persistence boundary only.
+        aiScore: result.memberWorthTotal / 100,
+        aiRecommendation: result.aiRecommendation,
+        aiReasoning: result.aiReasoning,
+        // The six-archetype reveal writes personalNote; personalizedCopy is no
+        // longer written for new applications (legacy rows keep theirs).
+        personalNote,
+        // Reveal B (Phase 5): persist the decisive tally output the reveal reads.
+        // (primary nature = archetype above.)
+        revealSecondary: result.secondary,
+        revealBlendPrimary: result.blend.primary,
+        revealBlendSecondary: result.blend.secondary,
+        revealOpenerPhrase: result.openerPhrase,
+        revealHabitatThrive: result.habitatThrive,
+        revealHabitatDim: result.habitatDim,
+      },
     });
 
+    return null;
+  }, { timeout: 60_000, maxWait: 20_000 });
+
+  // A loser (or a concurrently-decided terminal path) already returned its NextResponse
+  // from inside the lock; re-emit it and skip the winner-only side effects below.
+  if (outcome instanceof NextResponse) return outcome;
+
+  // ── PURPLE welcome email — AFTER the write tx commits ─────────────────
+  // An aborted tx can therefore never have emailed, and the send carries a Resend
+  // Idempotency-Key scoped to this application so a transport retry physically
+  // cannot double-send. A resubmit never reaches here (already-scored guard); a
+  // concurrent loser returned from inside the lock above. Failure stays non-fatal.
+  if (purple) {
     try {
       const html = await render(WelcomeEmail({ name: application.fullName, archetype: undefined }));
-      await resend.emails.send({
-        from: 'The No Bad Company <team@thenobadcompany.com>',
-        to: application.email,
-        subject: "you're in. welcome to no bad company.",
-        html,
-      });
+      await resend.emails.send(
+        {
+          from: 'The No Bad Company <team@thenobadcompany.com>',
+          to: application.email,
+          subject: "you're in. welcome to no bad company.",
+          html,
+        },
+        { idempotencyKey: `purple-welcome/${application.id}` },
+      );
     } catch (e) {
       console.error('Purple list welcome email failed', e);
     }
-
-    await db.auditEvent.create({
-      data: {
-        workspaceId: application.workspaceId,
-        actorType: 'SYSTEM',
-        action: 'application.purple_list_approved',
-        entityType: 'Application',
-        entityId: application.id,
-        metadata: { watchListEntryId: watchMatch.entryId },
-      },
-    });
-    // Fall through to AI scoring so the archetype is computed even for auto-approvals.
   }
-
-  // Question-agnostic AI scoring — driven by the template's QuestionDefinitions.
-  // Phase 5: scoreApplication now ALSO returns the reveal-note (folded into the
-  // grader, no second AI call) and the decisive tally output (secondary, blend,
-  // Q6 openerPhrase, templated Q4/Q5 habitat labels) that the reveal reads verbatim.
-  const result = await scoreApplication(id);
-  const personalNote = result.personalNote;
-
-  await db.application.update({
-    where: { id },
-    data: {
-      submittedAt: new Date(),
-      archetype: result.archetype,
-      archetypeScores: result.archetypeScores,
-      aiTags: result.tags,
-      // scoreApplication returns memberWorthTotal on a 0–100 scale; canonical
-      // aiScore is 0–1. Scale at the persistence boundary only.
-      aiScore: result.memberWorthTotal / 100,
-      aiRecommendation: result.aiRecommendation,
-      aiReasoning: result.aiReasoning,
-      // The six-archetype reveal writes personalNote; personalizedCopy is no
-      // longer written for new applications (legacy rows keep theirs).
-      personalNote,
-      // Reveal B (Phase 5): persist the decisive tally output the reveal reads.
-      // (primary nature = archetype above.)
-      revealSecondary: result.secondary,
-      revealBlendPrimary: result.blend.primary,
-      revealBlendSecondary: result.blend.secondary,
-      revealOpenerPhrase: result.openerPhrase,
-      revealHabitatThrive: result.habitatThrive,
-      revealHabitatDim: result.habitatDim,
-    },
-  });
-
-  return { result, personalNote };
-  }, { timeout: 60_000, maxWait: 20_000 });
-
-  // A loser (or a duplicate / blocked terminal path) already returned its NextResponse
-  // from inside the lock; re-emit it and skip the winner-only Door 1 + email below.
-  if (outcome instanceof NextResponse) return outcome;
-  const { result, personalNote } = outcome;
 
   // TODO(ways-in-phase-a, ON HOLD): emit the application-submitted engagement
   // fact here - the submit has definitively succeeded at this point. Emission
