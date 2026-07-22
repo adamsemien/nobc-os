@@ -63,3 +63,7 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# sentry — .env.sentry-build-plugin is already covered by the .env* rule above;
+# .sentryclirc can hold an auth token and must never be committed.
+.sentryclirc

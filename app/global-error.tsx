@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 // Root error boundary. Catches errors thrown in the ROOT layout/template itself
 // (which app/error.tsx cannot — that only covers errors below the root layout).
@@ -15,6 +16,9 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // Report to Sentry first (no-op locally — init is gated to Vercel
+    // production/preview). The console + alerting relay below stay as-is.
+    Sentry.captureException(error);
     console.error('[app/global-error] root-level error caught by boundary', {
       message: error.message,
       digest: error.digest,

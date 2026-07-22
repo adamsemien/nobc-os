@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Content-Security-Policy — shipped REPORT-ONLY on purpose.
 //
@@ -19,7 +20,7 @@ const CSP_REPORT_ONLY = [
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.thenobadcompany.com https://js.stripe.com https://challenges.cloudflare.com",
-  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.thenobadcompany.com https://api.stripe.com https://*.r2.cloudflarestorage.com wss:",
+  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.thenobadcompany.com https://api.stripe.com https://*.r2.cloudflarestorage.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io wss:",
   "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
   "worker-src 'self' blob:",
 ].join('; ');
@@ -44,4 +45,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry build-time plugin: uploads source maps on Vercel builds (needs
+// SENTRY_AUTH_TOKEN/SENTRY_ORG/SENTRY_PROJECT in env; no-ops locally where
+// they're unset), then deletes them from the client bundle so maps are never
+// publicly served. All values come from env — never hardcode.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+  telemetry: false,
+});
