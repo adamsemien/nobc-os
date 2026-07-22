@@ -73,13 +73,20 @@ function scrubEvent(event: ErrorEvent): ErrorEvent {
   }
 }
 
+// NOTE: this file is compiled into the BROWSER bundle — only NEXT_PUBLIC_*
+// env vars are inlined by Next.js; plain VERCEL_ENV would be undefined at
+// runtime and permanently disable the client SDK. NEXT_PUBLIC_VERCEL_ENV and
+// NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA are Vercel-documented framework system
+// vars (auto-exposed for Next.js projects). Server/edge configs correctly
+// keep the non-public VERCEL_* names.
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled:
-    process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview',
-  environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
-  ...(process.env.VERCEL_GIT_COMMIT_SHA
-    ? { release: process.env.VERCEL_GIT_COMMIT_SHA }
+    process.env.NEXT_PUBLIC_VERCEL_ENV === 'production' ||
+    process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview',
+  environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.NODE_ENV,
+  ...(process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA
+    ? { release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA }
     : {}),
   tracesSampleRate: 0,
   // Session Replay stays fully off — do not raise without explicit sign-off.

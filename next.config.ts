@@ -58,5 +58,12 @@ export default withSentryConfig(nextConfig, {
   sourcemaps: {
     deleteSourcemapsAfterUpload: true,
   },
+  // Fail the build if release creation or source map upload errors — a green
+  // deploy with broken/missing source maps is worse than a red build. When no
+  // SENTRY_AUTH_TOKEN is present (local dev) the plugin skips upload with a
+  // warning and never calls this handler, so local builds stay green.
+  errorHandler: (err) => {
+    throw err;
+  },
   telemetry: false,
 });
